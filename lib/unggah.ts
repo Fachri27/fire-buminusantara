@@ -120,8 +120,8 @@ export async function simpanBerkas(
     console.log("[Upload OK]", { url, type: mime });
 
     return { path: AWALAN_LOKAL + relatif, url };
-  } catch (error) {
-    const err = error as { message?: string; name?: string };
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : { message: String(error), name: "Unknown" };
     console.error("[Upload ERROR]", { message: err.message, code: err.name });
 
     // Fallback ke local storage
@@ -131,7 +131,7 @@ export async function simpanBerkas(
       await writeFile(penuh, isi);
       return { path: AWALAN_LOKAL + relatif, url: `/media/${relatif}` };
     } catch {
-      return { galat: err.message ?? "Gagal menyimpan berkas." };
+      return { galat: err.message || "Gagal menyimpan berkas." };
     }
   }
 }
