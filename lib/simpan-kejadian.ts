@@ -44,8 +44,14 @@ async function susunGaleri(
 
   const media: BerkasMedia[] = [];
   for (const [i, berkas] of lama.entries()) {
-    if (simpan.has(i)) media.push(berkas);
-    else await hapusBerkas(berkas.path);
+    if (simpan.has(i)) {
+      media.push(berkas);
+    } else {
+      // Posternya ikut: berkas yatim di bucket tidak merusak apa pun, tapi
+      // tidak ada alasan membiarkannya menumpuk.
+      await hapusBerkas(berkas.path);
+      await hapusBerkas(berkas.poster);
+    }
   }
 
   const kiriman = data.getAll("media_files");

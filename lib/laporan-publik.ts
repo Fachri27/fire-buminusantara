@@ -154,7 +154,10 @@ export async function simpanLaporanPublik(
     if ("galat" in hasil) {
       // Berkas yang sudah terlanjur naik dibuang lagi: laporan ini tidak jadi
       // tersimpan, jadi tidak ada yang menunjuk ke sana selamanya.
-      for (const sudah of media) await hapusBerkas(sudah.path);
+      for (const sudah of media) {
+        await hapusBerkas(sudah.path);
+        await hapusBerkas(sudah.poster);
+      }
       return { ok: false, galat: `${b.name}: ${hasil.galat}`, bidang: "berkas" };
     }
     media.push(hasil);
@@ -178,7 +181,10 @@ export async function simpanLaporanPublik(
       },
     });
   } catch (e) {
-    for (const sudah of media) await hapusBerkas(sudah.path);
+    for (const sudah of media) {
+      await hapusBerkas(sudah.path);
+      await hapusBerkas(sudah.poster);
+    }
     return {
       ok: false,
       galat: e instanceof Error ? e.message : "Laporan gagal disimpan. Coba lagi.",

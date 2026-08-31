@@ -25,10 +25,10 @@ export function urlMedia(path: string | null): string | null {
 }
 
 /** Satu berkas dalam galeri kejadian, sebagaimana tersimpan di kolom `media`. */
-export type BerkasMedia = { path: string; type: "image" | "video" };
+export type BerkasMedia = { path: string; type: "image" | "video"; poster?: string };
 
 /** Satu item galeri yang siap dirender. */
-export type ItemMedia = { jenis: "gambar" | "video"; url: string };
+export type ItemMedia = { jenis: "gambar" | "video"; url: string; poster?: string };
 
 /**
  * Baca kolom `media` — JSON bebas bentuk dari basis data, jadi tiap entri
@@ -42,10 +42,12 @@ export function bacaBerkasMedia(nilai: unknown): BerkasMedia[] {
   const hasil: BerkasMedia[] = [];
   for (const item of nilai) {
     if (!item || typeof item !== "object") continue;
-    const { path, type } = item as Record<string, unknown>;
+    const { path, type, poster } = item as Record<string, unknown>;
     if (typeof path !== "string" || !path) continue;
     if (type !== "image" && type !== "video") continue;
-    hasil.push({ path, type });
+    hasil.push(
+      typeof poster === "string" && poster ? { path, type, poster } : { path, type },
+    );
   }
   return hasil;
 }
@@ -65,7 +67,12 @@ export function itemMedia(
   for (const berkas of bacaBerkasMedia(media)) {
     const url = urlMedia(berkas.path);
     if (!url) continue;
-    galeri.push({ jenis: berkas.type === "video" ? "video" : "gambar", url });
+    if (berkas.type === "video") {
+      const poster = berkas.poster ? urlMedia(berkas.poster) : null;
+      galeri.push(poster ? { jenis: "video", url, poster } : { jenis: "video", url });
+    } else {
+      galeri.push({ jenis: "gambar", url });
+    }
     terpakai.push(berkas.path);
   }
 
@@ -98,8 +105,10 @@ export function itemMedia(
  * disertakan sebagai url kosong supaya indeksnya tidak bergeser.
  */
 export function galeriTersimpan(media: unknown): ItemMedia[] {
-  return bacaBerkasMedia(media).map((b) => ({
-    jenis: b.type === "video" ? "video" : "gambar",
-    url: urlMedia(b.path) ?? "",
-  }));
+  return bacaBerkasMedia(media).map((b) => {
+    const url = urlMedia(b.path) ?? "";
+    if (b.type !== "video") return { jenis: "gambar" as const, url };
+    const poster = b.poster ? urlMedia(b.poster) : null;
+    return poster ? { jenis: "video" as const, url, poster } : { jenis: "video" as const, url };
+  });
 }

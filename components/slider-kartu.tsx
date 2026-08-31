@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { VideoKartu } from "./video-kartu";
 import type { ItemMedia } from "@/lib/media";
 
@@ -39,6 +39,17 @@ export function SliderKartu({
   // Galeri bisa menyusut saat data dimuat ulang; indeks yang tertinggal di luar
   // batas akan merender undefined.
   const kini = indeks < media.length ? indeks : 0;
+
+  // Kerangka pemuatan untuk foto: tampil sampai berkasnya termuat. Keadaan dari
+  // foto sebelumnya tidak berlaku saat media berganti, jadi tiap perpindahan
+  // indeks menyuruhnya tampil lagi — foto yang sudah tersangkut di tembolok
+  // diloloskan lewat `complete`.
+  const [fotoSiap, setFotoSiap] = useState(false);
+  const refFoto = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    setFotoSiap(refFoto.current?.complete ?? true);
+  }, [kini]);
+
   const m = media[kini];
   if (!m) return null;
 
@@ -48,12 +59,24 @@ export function SliderKartu({
         // key: media berganti berarti elemen video berganti, bukan sekadar
         // src-nya. Tanpa itu React memakai ulang elemen yang sama dan lencana
         // durasi milik media sebelumnya sempat terbawa.
-        <VideoKartu key={`v${kini}`} src={m.url} poster={poster} label={label} aktif={aktif}
+        // Poster per-media (bingkai videonya sendiri) menang atas thumbnail
+        // kejadian — kartu multi-video tidak berbagi satu gambar yang salah.
+        <VideoKartu key={`v${kini}`} src={m.url} poster={m.poster ?? poster} label={label} aktif={aktif}
                     kurangiGerak={kurangiGerak} className={kelasMedia} onBuka={onBuka} />
       ) : (
-        <img key={`g${kini}`} src={m.url} alt={label} loading="eager" decoding="async"
-             onClick={(e) => { if (aktif) { e.stopPropagation(); onBuka(); } }}
-             className={`${kelasMedia} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`} />
+        <>
+          <img key={`g${kini}`} ref={refFoto} src={m.url} alt={label} loading="eager"
+               decoding="async"
+               onLoad={() => setFotoSiap(true)}
+               onError={() => setFotoSiap(true)}
+               onClick={(e) => { if (aktif) { e.stopPropagation(); onBuka(); } }}
+               className={`${kelasMedia} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`} />
+
+          {/* Kerangka yang sama dengan milik video: menutup kotak sampai
+              fotonya benar-benar termuat (atau gagal — menunggu lebih lama
+              tidak akan mengubah apa pun). */}
+          <div aria-hidden="true" className={`kartu-kerangka ${fotoSiap ? "tutup" : ""}`} />
+        </>
       )}
 
       {media.length > 1 && (

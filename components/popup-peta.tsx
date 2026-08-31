@@ -204,9 +204,10 @@ export function PopupPeta({
                     <div className="relative shrink-0 overflow-hidden rounded-[10px] bg-black/5 ring-1 ring-black/10">
                       {awal?.jenis === "video" ? (
                         /* #t=0.5 meminta peramban melompat ke detik itu; tanpa itu
-                           <video> tanpa poster berhenti di bingkai kosong. */
-                        <video src={`${awal.url}#t=0.5`} preload="metadata" muted playsInline
-                               aria-hidden="true"
+                           <video> tanpa poster berhenti di bingkai kosong. Poster
+                           bingkai otomatis (bila ada) tampil lebih instan. */
+                        <video src={`${awal.url}#t=0.5`} poster={awal.poster} preload="metadata" muted
+                               playsInline aria-hidden="true"
                                className="h-[clamp(80px,18vw,120px)] w-[clamp(120px,27vw,190px)] object-cover
                                           transition-transform duration-300 group-hover:scale-105
                                           panggung:h-[130px] panggung:w-[210px]" />

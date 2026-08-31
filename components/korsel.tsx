@@ -88,7 +88,14 @@ export function Korsel({ berita, onBuka }: { berita: Berita[]; onBuka: (i: numbe
             <div
               ref={jalurRef}
               onTransitionEnd={(e) => { if (e.propertyName === "transform" && e.target === e.currentTarget) normalkan(); }}
-              style={{ transform: `translateX(${geser}px)` }}
+              // Sebelum terapkan() memasang angka piksel, geser masih null —
+              // pusatkan lewat calc() CSS: hasilnya nilai yang SAMA dengan
+              // -(aktif*langkah + lebarKartu/2), tapi dihitung peramban pada
+              // bingkai pertama, bukan menunggu efek pasang. Token menangani
+              // kedua mode sekaligus (aliran maupun panggung).
+              style={{ transform: geser === null
+                ? `translateX(calc(${-(aktif)} * (var(--kartu-lebar) + var(--kartu-sela)) - var(--kartu-lebar) / 2))`
+                : `translateX(${geser}px)` }}
               className={`relative left-1/2 flex items-stretch gap-[var(--kartu-sela)]
                           transition-transform duration-[550ms] ease-[cubic-bezier(0.4,0,0.2,1)]
                           panggung:absolute panggung:top-[40px] ${diam ? "transition-none" : ""}`}

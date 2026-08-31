@@ -32,6 +32,24 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
   const ref = useRef<HTMLVideoElement | null>(null);
   const [durasi, setDurasi] = useState("");
   const [usai, setUsai] = useState(false);
+  const [siap, setSiap] = useState(false);
+
+  // Poster tunggal ditunggu juga: sekalipun preload-nya "none", peramban
+  // menampilkan berkas poster jauh sebelum data video siap, jadi kerangkanya
+  // boleh pudar begitu poster selesai diunduh — bukan menunggu video.
+  useEffect(() => {
+    if (!poster) return;
+    const img = new Image();
+    img.onload = () => setSiap(true);
+    img.src = poster;
+    return () => { img.onload = null; };
+  }, [poster]);
+
+  // Peristiwa bisa saja terlewat sebelum React memasang pendengarnya; kalau
+  // bingkainya sudah terkandung, kerangka langsung ditutup.
+  useEffect(() => {
+    if (ref.current && ref.current.readyState >= 2) setSiap(true);
+  }, []);
 
   /** Selama berjalan yang ditampilkan SISA waktunya; sebelum diputar dan
    *  sesudah habis, durasi penuhnya. */
@@ -80,12 +98,23 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
         muted
         playsInline
         preload={poster ? "none" : "metadata"}
-        onLoadedMetadata={catat}
+        onLoadedMetadata={() => {
+          catat();
+          // Mode kurangi gerak tidak memutar otomatis — menunggu canplay
+          // berarti kerangka berdenyut di bawah tombol putar bawaan sampai
+          // pengguna menekannya sendiri. Metadata cukup di sini.
+          if (kurangiGerak) setSiap(true);
+        }}
+        onCanPlay={() => setSiap(true)}
         onTimeUpdate={catat}
         onEnded={() => { setUsai(true); catat(); }}
         onClick={(e) => { if (aktif) { e.stopPropagation(); onBuka(); } }}
         className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`}
       />
+
+      {/* Kerangka pemuatan: menutupi kotak selama video/poster belum siap.
+          Di bawah lencana & tombol putar ulang (z-index 2 di CSS-nya). */}
+      <div aria-hidden="true" className={`kartu-kerangka ${siap ? "tutup" : ""}`} />
 
       {durasi && (
         <p className="kartu-durasi" aria-hidden="true">{durasi}</p>

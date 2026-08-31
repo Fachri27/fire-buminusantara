@@ -26,7 +26,12 @@ export function gunakanKorsel(berita: Berita[]) {
   const salinan = gulung ? 3 : 1;
 
   const [aktif, setAktif] = useState(gulung ? berita.length + 1 : 0);
-  const [geser, setGeser] = useState(0);
+  // null = belum diukur: jalur menempatkan dirinya lewat calc() CSS (lihat
+  // korsel.tsx) supaya bingkai PERTAMA hasil SSR sudah di tengah. Tanpa itu
+  // isi yang di-stream masuk sempat tergambar dengan geser=0 — seluruh rak
+  // terdorong ke kanan separuh lebarnya — lalu melompat ke tengah begitu
+  // efek pasang berjalan: kedipan setelah kerangka diganti.
+  const [geser, setGeser] = useState<number | null>(null);
   const [diam, setDiam] = useState(true); // true = transisi dimatikan
   const [terlihat, setTerlihat] = useState(true);
 

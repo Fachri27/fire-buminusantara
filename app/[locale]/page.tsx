@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ambilBerita, hitungLaporanProvinsi } from "@/lib/events";
 import { ambilTigaTeratas } from "@/lib/wms";
 import { HalamanFire } from "@/components/halaman-fire";
+import { KerangkaBeranda } from "@/components/kerangka-beranda";
 import { Nav } from "@/components/nav";
 import { adaBahasa, type Bahasa } from "@/lib/bahasa";
 
@@ -49,7 +50,9 @@ export default async function Halaman({ params }: PageProps<'/[locale]'>) {
           perlu benar sejak byte pertama (SEO). */}
       <Nav bahasa={locale as Bahasa} />
       <h1 className="sr-only">Pantauan kebakaran hutan dan lahan Indonesia</h1>
-      <Suspense fallback={null}>
+      {/* Kerangka pemuatan menahan geometri dua layar supaya isi yang
+          menggantikannya tidak menggeser tata letak saat data tiba. */}
+      <Suspense fallback={<KerangkaBeranda bahasa={locale as Bahasa} />}>
         <IsiHalaman bahasa={locale as Bahasa} />
       </Suspense>
     </>

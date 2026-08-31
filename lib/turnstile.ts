@@ -19,13 +19,18 @@ export async function turnstileSah(token: string | null, ip: string | null): Pro
     // Fail-open HANYA di pengembangan; di produksi tidak ada secret = tidak lolos.
     return process.env.NODE_ENV !== "production";
   }
-  if (!token) return false;
+  // Token Turnstile paling panjang 2048 karakter — yang lebih panjang dari itu
+  // pasti bukan token sah, tidak ada gunanya mengirimkannya ke Cloudflare.
+  if (!token || token.length > 2048) return false;
 
   try {
     const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ secret, response: token, ...(ip ? { remoteip: ip } : {}) }),
+      // Kiriman warga tidak boleh menggantung selamanya hanya karena siteverify
+      // lambat; batas 10 detik, dan lewatnya batas itu jatuh ke fail-closed di bawah.
+      signal: AbortSignal.timeout(10_000),
     });
     const data = await r.json();
     return Boolean(data?.success);

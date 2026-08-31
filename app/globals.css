@@ -204,6 +204,132 @@ html {
   display: none;
 }
 
+/* Kerangka beranda (components/kerangka-beranda.tsx) memakai denyut bawaan
+   Tailwind; matikan bagi yang meminta gerak dikurangi — perlakuan yang sama
+   dengan .kartu-kerangka di kartu-video.css. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+/* ── Kerangka beranda, mode panggung ──────────────────────────────────────
+   Isi asli menempatakan koordinat desain 1920×1080 lalu memperkecilnya
+   lewat transform scale yang dipasang gunakanPanggung() — JS yang baru
+   menyala SETELAH kerangka diganti, jadi kerangka tidak boleh mengandalkan
+   --skala. Ukuran kanvas yang sama diperoleh murni lewat CSS: kanvas 16:9
+   yang pas di viewport (min(100vw, 100vh·16/9)). Seluruh koordinat desain
+   korsel (jendela 70/140/1780×680, kartu 526×594 sela 76, statistik
+   836/95 kartu 307×208, peta 193.1/280.4/1533.8×575.8) ditulis sebagai
+   pecahan kanvas itu — hasilnya proporsi dan letak yang identik dengan
+   isi asli, tanpa penskalaan transform. Di luar media query ini kerangka
+   memakai tata letak aliran yang utilitasnya sudah benar. */
+@media (min-width: 1100px) and (min-height: 640px) {
+  .kerangka-beranda__kanvas {
+    --kb-lebar: min(100vw, calc(100vh * 16 / 9));
+    --kb-tinggi: min(100vh, calc(100vw * 9 / 16));
+
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--kb-lebar);
+    height: var(--kb-tinggi);
+    max-width: none;
+    margin: 0;
+    transform: translate(-50%, -50%);
+
+    /* Token kartu/statistik dinyatakan sebagai pecahan kanvas — persis
+       nilai piksel desain yang dipakai isi asli sebelum diskalakan. */
+    --kartu-lebar: calc(var(--kb-lebar) * 526 / 1920);
+    --kartu-tinggi: calc(var(--kb-tinggi) * 594 / 1080);
+    --kartu-sela: calc(var(--kb-lebar) * 76 / 1920);
+    --kartu-pias: calc(var(--kb-tinggi) * 36 / 1080) calc(var(--kb-lebar) * 28 / 1920);
+    --gambar-lebar: calc(var(--kb-lebar) * 462 / 1920);
+    --gambar-jarak: auto;
+    --gambar-tinggi-maks: none;
+    --ukuran-label: calc(var(--kb-tinggi) * 26 / 1080);
+    --ukuran-tanggal: calc(var(--kb-tinggi) * 16 / 1080);
+    --ukuran-nilai: calc(var(--kb-tinggi) * 34 / 1080);
+    --statistik-pias: calc(var(--kb-tinggi) * 19 / 1080) calc(var(--kb-lebar) * 14 / 1920);
+    --statistik-jarak-label: calc(var(--kb-tinggi) * 41 / 1080);
+  }
+
+  /* Dua layar: persis h-screen tanpa bantalan — sama seperti variannya
+     pada section asli. */
+  .kerangka-beranda__hero,
+  .kerangka-beranda__layar-peta {
+    display: block;
+    height: 100vh;
+    min-height: 0;
+    padding: 0;
+  }
+  .kerangka-beranda__layar-peta {
+    position: relative;
+  }
+
+  .kerangka-beranda__jendela {
+    position: absolute;
+    top: calc(var(--kb-tinggi) * 140 / 1080);
+    left: calc(var(--kb-lebar) * 70 / 1920);
+    width: calc(var(--kb-lebar) * 1780 / 1920);
+    height: calc(var(--kb-tinggi) * 680 / 1080);
+    padding: 0;
+  }
+
+  .kerangka-beranda__rak {
+    position: absolute;
+    top: calc(var(--kb-tinggi) * 40 / 1080);
+    right: 0;
+    left: 0;
+  }
+
+  .kerangka-beranda__kartu,
+  .kerangka-beranda__slot {
+    border-radius: calc(var(--kb-lebar) * 12 / 1920);
+  }
+
+  .kerangka-beranda__media {
+    border-radius: calc(var(--kb-lebar) * 10 / 1920);
+  }
+
+  .kerangka-beranda__statistik {
+    position: absolute;
+    top: calc(var(--kb-tinggi) * 836 / 1080);
+    right: calc(var(--kb-lebar) * 95 / 1920);
+    left: calc(var(--kb-lebar) * 95 / 1920);
+    margin-top: 0;
+  }
+
+  .kerangka-beranda__statistik-label {
+    display: none;
+  }
+
+  .kerangka-beranda__jalur-statistik {
+    justify-content: space-between;
+    gap: 0;
+    overflow: visible;
+  }
+
+  .kerangka-beranda__kartu-statistik {
+    width: calc(var(--kb-lebar) * 307 / 1920);
+    height: calc(var(--kb-tinggi) * 208 / 1080);
+  }
+
+  /* Peta pada mode panggung: kolom pencarian memang tidak ada (hanya aliran). */
+  .kerangka-beranda__peta {
+    position: absolute;
+    top: calc(var(--kb-tinggi) * 280.4 / 1080);
+    left: calc(var(--kb-lebar) * 193.1 / 1920);
+    width: calc(var(--kb-lebar) * 1533.8 / 1920);
+    height: calc(var(--kb-tinggi) * 575.8 / 1080);
+    border-radius: calc(var(--kb-lebar) * 10 / 1920);
+  }
+
+  .kerangka-beranda__panel {
+    display: none;
+  }
+}
+
 /* ── Wadah Leaflet ────────────────────────────────────────────────────────
    Bawaan leaflet.css memberi .leaflet-container `background: #ddd` — bidang
    abu solid. Peta ini sengaja tidak memakai citra dasar apa pun: yang harus
@@ -218,4 +344,12 @@ html {
   font-size: var(--ukuran-catatan);
   color: var(--color-tinta);
   touch-action: manipulation;
+}
+
+/* ── Bilah unggah ─────────────────────────────────────────────────────────
+   Segmen yang bergeser untuk form yang sedang mengirim berkas
+   (components/bilah-unggah.tsx). */
+@keyframes bilah-unggah {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
 }

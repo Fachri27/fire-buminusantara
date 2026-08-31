@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { PetaLokasi } from "../peta-lokasi";
+import { BilahUnggah } from "@/components/bilah-unggah";
 import { DatePicker } from "@/components/ui/date-picker";
 import type { ItemMedia } from "@/lib/media";
 
@@ -66,7 +68,7 @@ export function FormKejadian({
 
   async function ambil(kata: string, geser: number) {
     const id = ++permintaan.current;
-    geser === 0 ? setMencari(true) : setMemuatLagi(true);
+    if (geser === 0) setMencari(true); else setMemuatLagi(true);
     try {
       const r = await fetch(`/api/lokasi?q=${encodeURIComponent(kata)}&offset=${geser}`);
       const baru: Lokasi[] = r.ok ? (await r.json()).hasil ?? [] : [];
@@ -231,16 +233,28 @@ export function FormKejadian({
 
       {/* Bilah aksi menempel di dasar layar: form ini panjang, dan tombol simpan
           tidak boleh ikut hilang ke bawah saat editor sedang di bagian media. */}
-      <div className="sticky bottom-0 -mx-5 mt-8 flex flex-wrap items-center gap-3 border-t
-                      border-[var(--garis-tegas)] bg-[var(--kertas)] px-5 py-3 lg:-mx-10 lg:px-10">
-        <button type="submit" className="cms-tombol cms-tombol--utama">
-          {sedangUbah ? "Simpan perubahan" : "Tambah kejadian"}
-        </button>
-        <Link href="/admin/kejadian" className="cms-mata px-1 underline-offset-4 hover:underline">
-          Batal
-        </Link>
-      </div>
+      <AksiSimpan sedangUbah={sedangUbah} />
     </form>
+  );
+}
+
+/** Bilah aksi menempel di dasar layar: form ini panjang, dan tombol simpan
+ *  tidak boleh ikut hilang ke bawah saat editor sedang di bagian media.
+ *  `useFormStatus` harus di komponen anak — ia hanya tahu status <form> di
+ *  atasnya di pohon, dan di komponen ini belum ada <form> yang melingkupinya. */
+function AksiSimpan({ sedangUbah }: { sedangUbah: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <div className="sticky bottom-0 -mx-5 mt-8 flex flex-wrap items-center gap-3 border-t
+                    border-[var(--garis-tegas)] bg-[var(--kertas)] px-5 py-3 lg:-mx-10 lg:px-10">
+      {pending && <BilahUnggah />}
+      <button type="submit" disabled={pending} className="cms-tombol cms-tombol--utama">
+        {sedangUbah ? "Simpan perubahan" : "Tambah kejadian"}
+      </button>
+      <Link href="/admin/kejadian" className="cms-mata px-1 underline-offset-4 hover:underline">
+        Batal
+      </Link>
+    </div>
   );
 }
 

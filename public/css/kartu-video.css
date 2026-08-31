@@ -102,6 +102,52 @@
   }
 }
 
+/* --- kerangka pemuatan media --- */
+
+/* Video kartu tidak mengunduh apa pun sampai gilirannya di tengah (preload
+   "none"/"metadata"), jadi kotaknya sempat kosong — sekalipun berkasnya normal.
+   Kerangka ini menutupi kotak itu sampai bingkai pertama benar-benar siap
+   (atau poster tunggalnya termuat), lalu memudar. Ditulis tangan dengan alasan
+   yang sama seperti lencana di atas: menang atas kedua build Tailwind, berapa
+   pun urutan pemuatannya.
+
+   z-index 1: di atas <video> yang tak ber-lapis, di bawah lencana & tombol
+   putar ulang (z-index 2) supaya keduanya tetap terbaca selagi memuat.
+   pointer-events: none — klik selagi memuat tetap membuka pop-up rincian.
+   Radius 10px mengikuti kotak media varian lanskap; varian vertikal terpotong
+   wrapper-nya yang overflow-hidden, jadi nilainya tak berpengaruh di sana. */
+.kartu-kerangka {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 10px;
+  /* Palet yang sama dengan placeholder "Belum ada foto" di kartu-berita —
+     kerangka yang pudar menyambung mulus ke kotak kosong apa adanya. */
+  background: linear-gradient(150deg, #eef1f4, #d7dee4);
+  animation: denyut-kerangka 1.5s ease-in-out infinite;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+
+/* Siap: berhenti berdenyut dulu, baru memudar — bukan lenyap seketika di
+   tengah denyutan. */
+.kartu-kerangka.tutup {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes denyut-kerangka {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kartu-kerangka {
+    transition: none;
+    animation: none;
+  }
+}
+
 /* --- pop-up rincian ---
    Di pop-up, lencana menempel pada .rincian__media yang position: relative,
    jadi ia duduk di sudut kanan atas KOTAK MEDIA — bukan panelnya. Di layar

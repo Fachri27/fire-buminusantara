@@ -50,7 +50,8 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
   return (
     <>
       {m.jenis === "video" ? (
-        <video key={`v${kini}`} ref={videoRef} src={m.url} poster={poster ?? undefined}
+        <video key={`v${kini}`} ref={videoRef} src={m.url}
+               poster={(m.poster ?? poster) ?? undefined}
                aria-label={label} controls playsInline preload="metadata" />
       ) : (
         <img key={`g${kini}`} src={m.url} alt={label} />

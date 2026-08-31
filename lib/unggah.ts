@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { writeFile, mkdir, unlink } from "node:fs/promises";
+import { writeFile, mkdir, unlink, stat, copyFile, readFile, mkdtemp, rm } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import os from "node:os";
 import path from "node:path";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
 export const AWALAN_LOKAL = "fire/";
 
@@ -58,6 +61,8 @@ export const getConfig = () => ({
 });
 
 const AKAR_MEDIA = path.join(process.cwd(), "media");
+
+const jalankanFfmpeg = promisify(execFile);
 
 let s3Client: S3Client | null = null;
 
@@ -151,14 +156,24 @@ export async function simpanBerkas(
  * jadi jenisnya TIDAK diberitahukan di muka — simpanBerkas() menentukannya dari
  * isi berkas. Kategori dibaca kembali dari path hasil (`gambar/…` atau
  * `video/…`), bukan dari MIME klien.
+ *
+ * Setiap video langsung dibekali posternya (`poster`): bingkai di detik
+ * pertamanya, diunggah sebagai gambar tersendiri. Tanpa itu kartu korsel yang
+ * belum giliran diputar menampilkan kotak kosong — video memang tidak
+ * diunduh sampai kartunya di tengah.
  */
 export async function simpanBerkasGaleri(
   berkas: File,
-): Promise<{ path: string; type: "image" | "video" } | { galat: string }> {
+): Promise<{ path: string; type: "image" | "video"; poster?: string } | { galat: string }> {
   const hasil = await simpanBerkas(berkas);
   if ("galat" in hasil) return hasil;
   const video = hasil.path.startsWith(`${AWALAN_LOKAL}video/`);
-  return { path: hasil.path, type: video ? "video" : "image" };
+  if (!video) return { path: hasil.path, type: "image" };
+
+  const poster = await bingkaiVideo(hasil.path);
+  return poster
+    ? { path: hasil.path, type: "video", poster }
+    : { path: hasil.path, type: "video" };
 }
 
 /**
@@ -187,6 +202,51 @@ export async function hapusBerkas(jalur: string | null | undefined): Promise<voi
   }
 }
 
-export async function bingkaiVideo(_pathVideo: string): Promise<string | null> {
-  return null;
+export async function bingkaiVideo(pathVideo: string): Promise<string | null> {
+  if (!pathVideo.startsWith(AWALAN_LOKAL)) return null;
+  const relatif = pathVideo.slice(AWALAN_LOKAL.length);
+
+  const kerja = await mkdtemp(path.join(os.tmpdir(), "bingkai-"));
+  const masukan = path.join(kerja, "masukan");
+  const keluaran = path.join(kerja, "bingkai.jpg");
+
+  try {
+    // Sumber byte video: salinan cadangan lokal bila ada (jalur saat MinIO
+    // mati), kalau tidak diambil dari bucket.
+    try {
+      await stat(path.join(AKAR_MEDIA, relatif));
+      await copyFile(path.join(AKAR_MEDIA, relatif), masukan);
+    } catch {
+      const objek = await getMinioClient().send(
+        new GetObjectCommand({ Bucket: getConfig().bucket, Key: relatif }),
+      );
+      if (!objek.Body) return null;
+      await writeFile(masukan, await objek.Body.transformToByteArray());
+    }
+
+    // Bingkai di detik pertama; video yang lebih pendek dari lompatannya
+    // diulang tanpa lompatan — bingkai pertama tetap lebih baik daripada nihil.
+    // Skala memakai min(720,iw): kecil tidak diubar, besar diringankan.
+    for (const lompat of ["1", "0"]) {
+      await jalankanFfmpeg(
+        "ffmpeg",
+        ["-nostdin", "-y", "-ss", lompat, "-i", masukan, "-frames:v", "1",
+         "-vf", "scale=min(720\\,iw):-2", "-q:v", "4", keluaran],
+        { timeout: 20_000 },
+      );
+      if (await stat(keluaran).then(() => true).catch(() => false)) {
+        const hasil = await simpanBerkas(
+          new File([await readFile(keluaran)], "bingkai.jpg", { type: "image/jpeg" }),
+        );
+        return "galat" in hasil ? null : hasil.path;
+      }
+    }
+    return null;
+  } catch {
+    // Poster adalah pelengkap: ffmpeg yang tidak terpasang atau video yang
+    // rusak tidak boleh menggagalkan simpanan berkasnya.
+    return null;
+  } finally {
+    await rm(kerja, { recursive: true, force: true });
+  }
 }

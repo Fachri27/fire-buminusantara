@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ambilBerita, ambilBeritaSlug, hitungLaporanProvinsi } from "@/lib/events";
 import { ambilTigaTeratas } from "@/lib/wms";
 import { HalamanFire } from "@/components/halaman-fire";
+import { KerangkaBeranda } from "@/components/kerangka-beranda";
 import { Nav } from "@/components/nav";
 import { adaBahasa, type Bahasa } from "@/lib/bahasa";
 
@@ -82,7 +83,7 @@ export default async function HalamanKejadian({ params }: Props) {
     <>
       <Nav bahasa={locale as Bahasa} />
       <h1 className="sr-only">Pantauan kebakaran hutan dan lahan Indonesia</h1>
-      <Suspense fallback={null}>
+      <Suspense fallback={<KerangkaBeranda bahasa={locale as Bahasa} />}>
         <IsiHalaman bahasa={locale as Bahasa} slug={slug} />
       </Suspense>
     </>

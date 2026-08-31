@@ -4,6 +4,7 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "@/lib/batas-laporan";
 import { TEKS_LAPOR, type Bahasa } from "@/lib/bahasa";
+import { BilahUnggah } from "@/components/bilah-unggah";
 import { kirimLaporan, type KeadaanLapor } from "./aksi";
 
 /** Site key Turnstile. Tanpa ini (pengembangan) widget tidak dirender dan
@@ -386,6 +387,8 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
       {/* Wadah widget Turnstile — sekaligus tempat kolom `captcha`-nya. Harus
           tetap di DALAM form supaya tokennya ikut terkirim. */}
       <div ref={captchaRef} />
+
+      {mengirim && <BilahUnggah />}
 
       <div className="flex items-center gap-4 border-t border-black/[0.08] pt-6">
         <button type="submit" disabled={mengirim} className={`${TOMBOL_UTAMA} disabled:opacity-60`}>
