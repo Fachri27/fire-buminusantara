@@ -8,9 +8,14 @@ services:
     env_file: .env
     ports:
       - "127.0.0.1:3000:3000"
-    extra_hosts:
-      # Supaya container bisa menjangkau MariaDB/MinIO yang berjalan di host.
-      - "host.docker.internal:host-gateway"
+    networks:
+      # Jaringan bersama dengan MinIO/MariaDB (dibuat manual:
+      # docker network create shared) — container saling memanggil dengan nama
+      # layanan (http://minio:9000), tanpa lewat port host. Port 127.0.0.1
+      # MinIO tidak bisa dijangkau dari container (host.docker.internal datang
+      # lewat alamat bridge, bukan loopback).
+      - shared
+      - default
     healthcheck:
       # /id dipaksa dynamic → lolos hanya jika app hidup DAN database terjangkau.
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/id').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
@@ -18,3 +23,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+networks:
+  shared:
+    external: true

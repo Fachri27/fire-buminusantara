@@ -113,6 +113,8 @@ fi
 
 # ── 4. Deploy ────────────────────────────────────────────────────────────────
 log "pull + up (role=$ROLE)"
+# Jaringan bersama dengan MinIO/MariaDB — dibuat bila belum ada.
+docker network create shared 2>/dev/null || true
 compose pull
 compose up -d --remove-orphans
 
