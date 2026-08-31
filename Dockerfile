@@ -23,6 +23,14 @@ ENV NEXT_PUBLIC_MEDIA_URL=$NEXT_PUBLIC_MEDIA_URL \
 # Bisa dilepas bila Turbopack build terbukti stabil di CI.
 RUN npx prisma generate && npx next build --webpack
 
+# CLI prisma lengkap (dengan dependensinya) untuk tahap runtime. Versi
+# disamakan dengan devDependency supaya migrasi dijalankan CLI yang sama
+# dengan yang membuatnya.
+RUN mkdir -p /opt/prisma && cd /opt/prisma \
+    && npm init -y >/dev/null \
+    && npm install --no-audit --no-fund --omit=dev \
+       "prisma@$(node -p "require('/app/package.json').devDependencies.prisma")" >/dev/null
+
 # ── Tahap 2: runtime ─────────────────────────────────────────────────────────
 FROM node:22-alpine
 WORKDIR /app
@@ -34,6 +42,19 @@ COPY --from=builder /app/public ./public
 # Asuransi kalau pelacakan berkas Next tidak menyalin klien Prisma hasil generate.
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
+# Migrasi dijalankan saat container start (lihat CMD), jadi berkas migrasi dan
+# CLI prisma harus ikut. CLI dipasang utuh di /opt/prisma — menyalin paketnya
+# saja tidak cukup: CLI v7 butuh dependensinya sendiri (effect dll.).
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /opt/prisma /opt/prisma
+
+# Prisma 7 mewajibkan datasource.url dari berkas config, bukan schema.prisma.
+# prisma.config.ts repo tidak dipakai di sini karena butuh runtime TypeScript;
+# versi .mjs ini setara dan dibaca langsung oleh Node.
+RUN printf '%s\n' \
+    "export default { schema: 'prisma/schema.prisma', migrations: { path: 'prisma/migrations' }, datasource: { url: process.env.DATABASE_URL } };" \
+    > /app/prisma.config.mjs
+
 # server.js standalone mendengarkan di $HOSTNAME, dan Docker mengisi HOSTNAME
 # dengan ID container (mis. 08aafe8f2476 → 172.21.0.4) — akibatnya port 3000
 # hanya hidup di satu antarmuka: 127.0.0.1 di dalam container mati dan
@@ -41,4 +62,10 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 ENV HOSTNAME=0.0.0.0 PORT=3000
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+# migrate deploy sebelum server hidup: hanya menerapkan migrasi yang tertunda,
+# tidak pernah membuat berkas migrasi baru dan tidak menjalankan seed. Kalau
+# migrasi gagal, container mati → healthcheck merah → remote-deploy.sh rollback,
+# jadi versi rusak tidak pernah melayani trafik.
+# Dipanggil ke build/index.js langsung, bukan lewat node_modules/.bin/prisma:
+# symlink itu putus saat disalin antar tahap build.
+CMD ["sh", "-c", "/opt/prisma/node_modules/.bin/prisma migrate deploy --config=/app/prisma.config.mjs && exec node server.js"]
