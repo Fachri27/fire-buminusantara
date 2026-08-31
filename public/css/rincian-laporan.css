@@ -1,0 +1,647 @@
+/**
+ * Pop-up rincian laporan — terbuka saat judul/gambar kartu korsel atau kartu
+ * berita di dialog peta diklik.
+ *
+ * Tampilannya mengikuti rujukan yang diminta: dua panel, media besar beralas
+ * hitam di kiri, rel gelap selebar ±360px di kanan, dan kolom "tambahkan
+ * komentar" dipatok di dasar rel. Urutan rel dari atas ke bawah sama dengan
+ * rujukan — kepala, kapsi, daftar komentar, lalu kolom kirim. Baris ikon dan
+ * baris jumlah suka pada rujukan tidak dipakai: tidak ada padanannya di sini.
+ * Pindah laporan tetap bisa lewat tombol panah papan ketik.
+ *
+ * Ditulis sebagai CSS komponen, sama alasannya dengan pantauan-kosong.css:
+ * public/dist/style.css adalah hasil build tanpa sumber di repo, jadi kelas
+ * utility baru tidak akan ter-generate.
+ */
+
+.rincian {
+  /* Alas media tetap hitam — foto dan rekaman butuh alas gelap. Rel-nya
+     putih, memakai tinta dan garis rambut yang sama dengan dialog peta di
+     halaman ini. */
+  --r-hitam: #000;
+  --r-rel: #fff;
+  --r-garis: rgb(26 25 25 / 0.1);
+  --r-teks: var(--color-tinta, #1a1919);
+  --r-redup: rgb(26 25 25 / 0.55);
+  --r-sorot: rgb(26 25 25 / 0.06);
+  --r-tautan: #0095f6;
+
+  /* Satu tingkat di atas dialog peta (z-45) karena bisa terbuka
+     menumpanginya, tetap di bawah kop navigasi (z-50). */
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(4rem + clamp(8px, 2vw, 20px)) clamp(8px, 3vw, 36px) clamp(8px, 2vw, 20px);
+  background: rgb(0 0 0 / 0.82);
+}
+
+.rincian__panel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  width: min(1400px, 100%);
+  height: min(100%, 900px);
+  min-height: min(460px, 72svh);
+  overflow: hidden;
+  border: 1px solid var(--r-garis);
+  border-radius: 6px;
+  background: var(--r-hitam);
+  outline: none;
+}
+
+/* --- Panel media ---------------------------------------------------------
+   object-fit: contain di atas alas hitam — seperti rujukan, dan justru inilah
+   gunanya pop-up: melihat seluruh bingkai, tidak terpotong seperti di kartu. */
+.rincian__media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--r-hitam);
+}
+
+.rincian__media img,
+.rincian__media video {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* --- Slider media --------------------------------------------------------
+   Panah dan titik untuk kejadian dengan beberapa foto/video. Ditulis di sini,
+   bukan sebagai utility Tailwind, karena keduanya menumpang di atas
+   .rincian__media yang seluruh gayanya juga berada di berkas ini. */
+
+.rincian__slider-tombol {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  transform: translateY(-50%);
+  cursor: pointer;
+  place-items: center;
+  border-radius: 999px;
+  border: 0;
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  backdrop-filter: blur(4px);
+  transition: background-color 0.2s ease;
+}
+
+.rincian__slider-tombol:hover {
+  background: rgb(0 0 0 / 0.65);
+}
+
+.rincian__slider-tombol svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rincian__slider-tombol--kiri {
+  left: 12px;
+}
+
+.rincian__slider-tombol--kanan {
+  right: 12px;
+}
+
+.rincian__dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rincian__slider-tombol {
+    transition: none;
+  }
+}
+
+/* --- Rel kanan ----------------------------------------------------------- */
+.rincian__rel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-left: 1px solid var(--r-garis);
+  background: var(--r-rel);
+  color: var(--r-teks);
+}
+
+/* Kepala: keping bundar + nama pulau + tanggal, tombol tutup di kanan —
+   posisi yang sama dengan baris profil pada rujukan. */
+.rincian__kepala {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--r-garis);
+  padding: 14px 52px 14px 16px;
+}
+
+.rincian__keping {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  object-fit: cover;
+  background: var(--r-sorot);
+}
+
+.rincian__pulau {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.rincian__tanggal {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--r-redup);
+}
+
+/* Badan bergulir: kapsi + daftar komentar, persis seperti rujukan yang
+   menggulirkan keduanya bersama.
+
+   `flex: 1` di sini yang memaku kolom kirim di dasar rel. Dulu ada varian
+   --ringkas yang mematikannya selama pengunjung belum masuk, karena sisa
+   ruangnya dipakai ajakan masuk lewat Google yang dipusatkan di tengah. Ajakan
+   itu sudah tidak ada (kolom nama + email kembali dipakai), jadi variannya ikut
+   dilepas: yang tersisa hanya badan yang tidak meregang dan tidak ada apa pun
+   yang mengambil sisa ruangnya — kolom kirim berhenti di tengah rel dengan
+   ruang putih menganga di bawahnya. */
+.rincian__badan {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.rincian__kapsi {
+  display: flex;
+  gap: 12px;
+}
+
+.rincian__kapsi-isi {
+  min-width: 0;
+  flex: 1;
+}
+
+.rincian__judul {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--r-teks);
+}
+
+.rincian__desc {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--r-redup);
+  white-space: pre-line;
+}
+
+.rincian__data {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.rincian__label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--r-redup);
+}
+
+.rincian__nilai {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--r-teks);
+}
+
+/* --- Daftar komentar ----------------------------------------------------- */
+.rincian__utas {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.rincian__komen {
+  display: flex;
+  gap: 10px;
+}
+
+/* Keping di baris komentar lebih kecil daripada keping laporan di kepala rel.
+   Sebagian besar bobot baris ini datang dari lingkarannya, bukan hurufnya —
+   mengecilkan teks saja tidak membuat barisnya terasa lebih ringkas. Dibatasi
+   ke dalam .rincian__komen supaya keping laporan di kepala & kapsi tidak ikut
+   mengecil. */
+.rincian__komen .rincian__keping,
+.rincian__komen .rincian__inisial {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+
+/* Tidak ada foto profil di sini, jadi kepingnya berisi huruf pertama nama —
+   menjaga irama baris rujukan tanpa mengarang identitas. */
+.rincian__inisial {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--r-sorot);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--r-teks);
+  text-transform: uppercase;
+}
+
+.rincian__komen-isi {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Sengaja lebih kecil dari .rincian__judul (14px). Judul laporan dan isi
+   komentar adalah dua lapis isi yang berbeda; disamakan ukurannya, keduanya
+   berebut perhatian dan rel ini terbaca seperti satu blok datar. */
+.rincian__komen-teks {
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Tanpa margin: spasi antar bagian datang dari spasi eksplisit di markup
+   ({" "} di kolom-komentar.tsx). Di template Blade Pasopati, jeda baris di
+   antara elemen sudah menghasilkan spasi; JSX menghilangkannya, jadi
+   mengandalkan jeda baris membuat nama dan kalimatnya menempel. */
+.rincian__komen-nama {
+  font-weight: 600;
+}
+
+/* Baris kaki: waktu + tombol Balas, sebaris seperti rujukan. */
+.rincian__komen-kaki {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--r-redup);
+}
+
+.rincian__balas {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--r-redup);
+  transition: color 0.2s ease;
+}
+
+.rincian__balas:hover {
+  color: var(--r-teks);
+}
+
+.rincian__balas:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* @sebutan: siapa yang sedang dibalas. Diberi warna tautan seperti rujukan,
+   tapi bukan tautan — belum ada halaman profil untuk dituju. */
+.rincian__sebutan {
+  font-weight: 600;
+  color: var(--r-tautan);
+}
+
+/* --- Balasan ------------------------------------------------------------- */
+.rincian__lihat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--r-redup);
+  transition: color 0.2s ease;
+}
+
+.rincian__lihat:hover {
+  color: var(--r-teks);
+}
+
+.rincian__lihat:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Garis pendek penanda cabang yang dilipat — bukan hiasan: ia menyatakan
+   bahwa ada isi yang tersembunyi di bawah komentar ini. */
+.rincian__lihat-garis {
+  width: 22px;
+  height: 1px;
+  flex-shrink: 0;
+  background: rgb(26 25 25 / 0.28);
+}
+
+.rincian__balasan {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+/* Kelas, bukan x-show: pada versi Alpine yang dipakai di sini x-show tidak
+   selalu menerapkan kembali display:none pada elemen yang subtree-nya ikut
+   berubah (lihat catatan di peta.blade.php). */
+.rincian__balasan--tutup {
+  display: none;
+}
+
+/* --- Menandai sedang membalas -------------------------------------------- */
+.rincian__membalas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--r-redup);
+}
+
+.rincian__batal {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--r-tautan);
+}
+
+.rincian__batal:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.rincian__kosong {
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--r-redup);
+}
+
+.rincian__galat {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--color-api, #e60012);
+}
+
+/* --- Kolom kirim: dipatok di dasar rel, seperti rujukan ------------------ */
+.rincian__kirim {
+  display: grid;
+  flex-shrink: 0;
+  gap: 8px;
+  border-top: 1px solid var(--r-garis);
+  padding: 10px 16px;
+}
+
+/* Widget Turnstile: dibatasi lebar rel supaya tidak mendorong kolom ketik. */
+.rincian__captcha {
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* Isian nama + email di atas kolom komentar. */
+.rincian__identitas {
+  display: flex;
+  gap: 8px;
+}
+
+.rincian__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--r-garis);
+  padding: 6px 0;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--r-teks);
+}
+
+.rincian__input::placeholder {
+  color: var(--r-redup);
+}
+
+.rincian__input:focus {
+  outline: none;
+  border-bottom-color: var(--r-tautan);
+}
+
+.rincian__baris {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rincian__jebakan {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.rincian__ketik-bungkus {
+  flex: 1;
+  min-width: 0;
+}
+
+.rincian__ketik {
+  /* Bukan flex: elemen ini anak <label>, bukan anak .rincian__baris. */
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 6px 0;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--r-teks);
+  resize: none;
+}
+
+.rincian__ketik::placeholder {
+  color: var(--r-redup);
+}
+
+.rincian__ketik:focus-visible {
+  outline: none;
+}
+
+.rincian__ketik:focus-visible {
+  border-bottom: 0;
+}
+
+.rincian__tombol-kirim {
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--r-tautan);
+  transition: opacity 0.2s ease;
+}
+
+.rincian__tombol-kirim:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.rincian__tombol-kirim:focus-visible,
+.rincian__tutup:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
+}
+
+/* Keping kecil di baris ketik — sejajar dengan tombol emoji pada rujukan,
+   tapi diisi foto akun yang sedang menulis. */
+.rincian__keping--kecil,
+.rincian__inisial--kecil {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+
+/* --- Tombol tutup -------------------------------------------------------- */
+.rincian__tutup {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  place-items: center;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--r-teks);
+  transition: background-color 0.2s ease;
+}
+
+.rincian__tutup:hover {
+  background: var(--r-sorot);
+}
+
+.rincian__tutup svg {
+  width: 15px;
+  height: auto;
+}
+
+/* --- Tombol bagikan -------------------------------------------------------
+   Sejajar dengan tombol tutup, diletakkan tepat di kirinya. */
+.rincian__bagikan {
+  position: absolute;
+  top: 12px;
+  right: 50px;
+  z-index: 2;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  place-items: center;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--r-teks);
+  transition: background-color 0.2s ease;
+}
+
+.rincian__bagikan:hover {
+  background: var(--r-sorot);
+}
+
+.rincian__bagikan svg {
+  width: 15px;
+  height: auto;
+}
+
+.rincian__bagikan:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
+}
+
+/* --- Toast "Link tersalin" ------------------------------------------------
+   Muncul sebentar di puncak panel setelah link disalin ke clipboard. */
+.rincian__toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--r-teks);
+  color: #fff;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+  pointer-events: none;
+}
+
+/* --- Layar sempit: panel ditumpuk ---------------------------------------- */
+@media (max-width: 860px) {
+  .rincian {
+    padding: calc(4rem + 6px) 6px 6px;
+  }
+
+  .rincian__panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100%;
+  }
+
+  .rincian__media {
+    max-height: 40svh;
+  }
+
+  /* Elemennya ikut dibatasi, bukan hanya panelnya: tanpa ini video yang lebih
+     tinggi dari panel terpotong overflow:hidden, dan bilah kendali bawaannya
+     ikut terpangkas. */
+  .rincian__media img,
+  .rincian__media video {
+    max-height: 40svh;
+  }
+
+  .rincian__rel {
+    border-top: 1px solid var(--r-garis);
+    border-left: 0;
+  }
+}

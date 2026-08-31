@@ -1,0 +1,101 @@
+import { prisma } from "./prisma";
+
+/** Jenis konten yang dikomentari di /fire. */
+export const TIPE = "App\\Models\\Event";
+
+export type ReaksiKomentar = {
+  id: number;
+  jenis: string;
+  ip_address: string | null;
+  created_at: Date | null;
+  user: { id: number; name: string } | null;
+  komentar: { id: number; body: string } | null;
+  event: { id: number; title_id: string } | null;
+};
+
+export type HasilDaftarReaksi = {
+  daftar: ReaksiKomentar[];
+  total: number;
+};
+
+/** Reaksi terbaru, disertai komentar dan kejadian yang menampungnya. */
+export async function daftarReaksi(halaman = 1, batas = 15): Promise<HasilDaftarReaksi> {
+  const [total, baris] = await Promise.all([
+    prisma.comment_reactions.count(),
+    prisma.comment_reactions.findMany({
+      orderBy: { created_at: "desc" },
+      skip: (halaman - 1) * batas,
+      take: batas,
+      select: {
+        id: true,
+        type: true,
+        ip_address: true,
+        created_at: true,
+        users: { select: { id: true, name: true } },
+        comments: {
+          select: { id: true, body: true, commentable_id: true },
+        },
+      },
+    }),
+  ]);
+
+  const idKejadian = [...new Set(
+    baris.map((r) => Number(r.comments?.commentable_id)).filter((id) => id > 0),
+  )];
+
+  const kejadian = idKejadian.length
+    ? await prisma.events.findMany({
+        where: { id: { in: idKejadian } },
+        select: { id: true, title_id: true },
+      })
+    : [];
+
+  const petaE = new Map(kejadian.map((e) => [Number(e.id), e]));
+
+  const daftar = baris.map((r) => {
+    const k = r.comments;
+    const e = k ? petaE.get(Number(k.commentable_id)) : undefined;
+    return {
+      id: Number(r.id),
+      jenis: r.type,
+      ip_address: r.ip_address,
+      created_at: r.created_at,
+      user: r.users ? { id: Number(r.users.id), name: r.users.name } : null,
+      komentar: k ? { id: Number(k.id), body: k.body } : null,
+      event: e ? { id: Number(e.id), title_id: e.title_id } : null,
+    };
+  });
+
+  return { daftar, total };
+}
+
+/** Hitung reaksi per kejadian: berapa like & dislike pada semua komentarnya. */
+export async function reaksiPerKejadian() {
+  const hasil = await prisma.comments.groupBy({
+    by: ["commentable_id"],
+    where: { commentable_type: TIPE },
+    _count: { _all: true },
+  });
+
+  const idKejadian = hasil
+    .map((h) => Number(h.commentable_id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+
+  const kejadian = idKejadian.length
+    ? await prisma.events.findMany({
+        where: { id: { in: idKejadian } },
+        select: { id: true, title_id: true },
+      })
+    : [];
+
+  const petaE = new Map(kejadian.map((e) => [Number(e.id), e]));
+
+  return hasil
+    .map((h) => ({
+      kejadianId: Number(h.commentable_id),
+      jumlahReaksi: h._count._all,
+      judul: petaE.get(Number(h.commentable_id))?.title_id ?? "Kejadian terhapus",
+    }))
+    .filter((x) => x.kejadianId > 0)
+    .sort((a, b) => b.jumlahReaksi - a.jumlahReaksi);
+}

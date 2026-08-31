@@ -1,0 +1,353 @@
+/**
+ * Ragam rupa CMS — "papan jaga".
+ *
+ * Bukan dasbor kartu-di-atas-abu. Rujukannya papan jaga pos pemantau: tulang
+ * punggung gelap di kiri, catatan berbaris di atas kertas, dipisah garis rambut,
+ * angka disetel monospace supaya kolom-kolomnya sejajar dan mudah dibaca sekilas.
+ *
+ * Situs publiknya terbitan — merah penuh, Poppins, sudut membulat 10-14px.
+ * CMS-nya alat: radius 3px, tanpa bayangan melayang, warna dipakai hanya ketika
+ * ia BERARTI (belum ditinjau, hapus, aktif). Perbedaan itu disengaja supaya
+ * seorang editor tahu ia sedang di balik panggung, bukan di halaman depan.
+ *
+ * Semua di-scope ke .cms: berkas ini diimpor layout admin, jadi tidak boleh
+ * bocor ke halaman /fire yang berbagi berkas Tailwind yang sama.
+ */
+
+.cms {
+  /* Dasar */
+  --jelaga: #16150f;   /* tinta & tulang punggung; hitam bersemu zaitun */
+  --arang: #24231b;    /* bidang naik di dalam tulang punggung */
+  --kertas: #efeee7;   /* dasar halaman */
+  --papan: #faf9f5;    /* baris & bidang isian */
+
+  /* Garis dan teks turunan tinta — ditulis sebagai warna jadi, bukan opacity,
+     supaya tetap sama di atas kertas maupun di atas papan. */
+  --garis: #d8d7cd;
+  --garis-tegas: #bcbbb0;
+  --redup: #6e6d63;
+  --lirih: #8d8c82;
+
+  /* Warna yang berarti */
+  --api: #e60012;
+  --bara: #8f1116;
+  --hijau: #2b5343;
+  --hijau-naik: #386a56;
+  --limau: #bdd142;
+
+  --jari: 3px;
+
+  background: var(--kertas);
+  color: var(--jelaga);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Tipografi ──────────────────────────────────────────────────────────── */
+
+/* Label kecil berspasi. Satu-satunya hiasan tipografi yang dipakai berulang:
+   ia menandai JENIS data, jadi mata bisa melompat antar blok tanpa membaca. */
+.cms-mata {
+  font-family: var(--huruf-padat), sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--redup);
+}
+
+.cms-judul {
+  font-family: var(--huruf-padat), sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.05;
+}
+
+/* Judul yang isinya tulisan orang — judul kejadian, nama provinsi — memakai
+   huruf yang sama tetapi TANPA dipaksa kapital: itu teks yang diketik editor,
+   dan mengubah bentuknya berarti menampilkan sesuatu yang bukan miliknya. */
+.cms-judul--asli {
+  text-transform: none;
+  letter-spacing: -0.005em;
+}
+
+/* Angka pasti: id, koordinat, hektare, jam. Monospace bertabular supaya
+   digitnya tidak bergoyang saat nilainya berubah. */
+.cms-angka {
+  font-family: var(--huruf-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ── Tulang punggung ────────────────────────────────────────────────────── */
+
+.cms-punggung {
+  background: var(--jelaga);
+  color: #e8e7de;
+}
+
+.cms-tautan {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px 9px 12px;
+  border-left: 3px solid transparent;
+  color: #a8a79c;
+  font-family: var(--huruf-padat), sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.cms-tautan:hover {
+  background: var(--arang);
+  color: #f2f1e8;
+}
+
+/* Halaman yang sedang dibuka ditandai batang limau — warna paling terang di
+   tangga peta, dan satu-satunya tempat ia muncul di tulang punggung. */
+.cms-tautan[aria-current="page"] {
+  background: var(--arang);
+  border-left-color: var(--limau);
+  color: #fff;
+}
+
+/* ── Baris catatan ──────────────────────────────────────────────────────── */
+
+/* Satu catatan = satu baris beralas papan dengan tepi kiri berwarna keadaan.
+   Tepinya melebar saat disentuh penunjuk: umpan balik tanpa memindahkan apa
+   pun, jadi daftar sepanjang apa pun tetap tenang. */
+.cms-baris {
+  position: relative;
+  background: var(--papan);
+  border: 1px solid var(--garis);
+  border-radius: var(--jari);
+  transition: border-color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+
+.cms-baris:hover {
+  background: #fff;
+  border-color: var(--garis-tegas);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* ── Cap keadaan ────────────────────────────────────────────────────────── */
+
+/* Bukan pil berwarna lembut: keadaan moderasi itu keputusan, jadi ditandai
+   seperti cap pada formulir — huruf kecil berspasi di dalam garis tegas. */
+.cms-cap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  border-radius: var(--jari);
+  font-family: var(--huruf-padat), sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+
+.cms-cap--perhatian { color: var(--bara); background: #e6001208; }
+.cms-cap--aman { color: var(--hijau); background: #2b534308; }
+.cms-cap--diam { color: var(--redup); background: #16150f06; }
+
+/* ── Isian ──────────────────────────────────────────────────────────────── */
+
+/* Kotak isian tanpa bayangan, garisnya menebal saat difokus. Cincin fokus
+   limau dipakai SELURUH CMS — satu warna fokus, jadi posisi papan tik selalu
+   ketemu di mana pun.
+
+   Lebarnya sengaja TIDAK disetel di sini. Berkas ini tidak berada di dalam
+   @layer, jadi apa pun yang disetelnya mengalahkan utility Tailwind di markup —
+   `w-56` pada satu kolom saringan tidak akan pernah menang atas `width: 100%`.
+   Yang menyangkut tata letak ditinggalkan untuk markup; berkas ini memegang
+   rupa. */
+.cms-isian {
+  background: var(--papan);
+  border: 1px solid var(--garis-tegas);
+  border-radius: var(--jari);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--jelaga);
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.cms-isian::placeholder { color: var(--lirih); }
+
+.cms-isian:hover { background: #fff; }
+
+.cms-isian:focus-visible,
+.cms-isian:focus {
+  outline: 2px solid var(--limau);
+  outline-offset: 1px;
+  border-color: var(--jelaga);
+  background: #fff;
+}
+
+.cms-isian[type="file"] { padding: 6px 10px; }
+
+.cms-isian[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--garis-tegas);
+  border-radius: var(--jari);
+  background: var(--kertas);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--jelaga);
+  cursor: pointer;
+}
+
+textarea.cms-isian { line-height: 1.55; resize: vertical; }
+
+/* ── Tombol ─────────────────────────────────────────────────────────────── */
+
+.cms-tombol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--jari);
+  font-family: var(--huruf-padat), sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.cms-tombol:focus-visible {
+  outline: 2px solid var(--limau);
+  outline-offset: 2px;
+}
+
+.cms-tombol:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.cms-tombol--utama { background: var(--hijau); color: #fff; }
+.cms-tombol--utama:hover:not(:disabled) { background: var(--hijau-naik); }
+
+.cms-tombol--garis {
+  background: var(--papan);
+  border-color: var(--garis-tegas);
+  color: var(--jelaga);
+}
+.cms-tombol--garis:hover:not(:disabled) { background: #fff; border-color: var(--jelaga); }
+
+/* Merusak data: garis merah, isi baru muncul saat disentuh — cukup terlihat
+   untuk sengaja dicari, cukup sepi untuk tidak tertekan tanpa niat. */
+.cms-tombol--bahaya {
+  background: transparent;
+  border-color: var(--api);
+  color: var(--bara);
+}
+.cms-tombol--bahaya:hover:not(:disabled) { background: #e6001210; }
+
+/* Tekan kedua pada hapus: bentuk yang sama, kini terisi penuh. Perubahan
+   isinya yang menandai bahwa tombol ini sekarang benar-benar akan menghapus. */
+.cms-tombol--bahaya-isi {
+  background: var(--api);
+  border-color: var(--api);
+  color: #fff;
+}
+.cms-tombol--bahaya-isi:hover:not(:disabled) { background: var(--bara); border-color: var(--bara); }
+
+/* Tombol di dalam tulang punggung gelap. */
+.cms-tombol--sunyi {
+  background: transparent;
+  border-color: #ffffff40;
+  color: #e8e7de;
+}
+.cms-tombol--sunyi:hover:not(:disabled) { background: #ffffff1a; border-color: #ffffff99; color: #fff; }
+
+.cms-tombol--kecil { padding: 5px 11px; font-size: 12.5px; }
+
+/* ── Bidang kosong & galat ──────────────────────────────────────────────── */
+
+.cms-kosong {
+  border: 1px dashed var(--garis-tegas);
+  border-radius: var(--jari);
+  background: #faf9f580;
+  padding: 44px 24px;
+  text-align: center;
+}
+
+.cms-galat {
+  display: flex;
+  gap: 10px;
+  border: 1px solid var(--api);
+  border-left-width: 3px;
+  border-radius: var(--jari);
+  background: #e6001208;
+  padding: 10px 12px;
+  color: var(--bara);
+  font-size: 13.5px;
+}
+
+/* ── Peta pintu masuk ───────────────────────────────────────────────────── */
+
+/* Nusantara digambar sekali saat halaman masuk terbuka: garisnya ditarik dari
+   barat ke timur. pathLength="1" pada tiap provinsi membuat panjang semua
+   lintasan dianggap satu, jadi provinsi sebesar Papua dan sekecil Bali selesai
+   digambar bersamaan — tanpa itu yang kecil sudah usai sebelum yang besar
+   mulai terlihat. */
+@keyframes cms-tarik {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes cms-nyala {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cms-peta path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: cms-tarik 1100ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.cms-peta .cms-peta__sorot {
+  animation: cms-tarik 1100ms cubic-bezier(0.4, 0, 0.2, 1) forwards,
+             cms-nyala 700ms ease 900ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cms-peta path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .cms-peta .cms-peta__sorot { opacity: 1; }
+  .cms-baris, .cms-isian, .cms-tombol, .cms-tautan { transition: none; }
+}
+
+/* ── Penanda pemilih lokasi di peta ───────────────────────────────────────
+   DivIcon: wadahnya diberi Leaflet (class peta-lokasi-penanda), isinya satu
+   titik yang digambar CSS. Titiknya pas di ujung yang ditunjuk — iconAnchor
+   di peta-lokasi.tsx mengunci tepat ke tengahnya. */
+.peta-lokasi-penanda {
+  background: none;
+  border: 0;
+}
+
+.peta-lokasi-penanda span {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 2px;
+  border-radius: 999px;
+  background: var(--api);
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.45);
+}

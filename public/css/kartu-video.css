@@ -1,0 +1,120 @@
+/**
+ * Lencana durasi + tombol putar ulang pada video kartu korsel (section 1).
+ *
+ * Ditulis tangan, bukan sebagai utility Tailwind: public/dist/style.css adalah
+ * hasil build tanpa sumber di repo, jadi kelas utility baru tidak akan pernah
+ * ter-generate. Tanpa @layer supaya menang atas kedua build Tailwind, berapa pun
+ * urutan pemuatannya.
+ *
+ * Ukurannya diturunkan dari --ukuran-tanggal, token kartu yang sudah punya nilai
+ * berbeda untuk mode aliran (clamp 12-14px) dan mode panggung (16px). Dengan
+ * begitu lencana ikut mengecil di ponsel dan ikut membesar di kanvas 1920x1080
+ * tanpa aturan media sendiri. Jarak dan bantalan memakai em supaya seluruh
+ * bentuknya berskala bersama tulisannya.
+ *
+ * Tidak memakai backdrop-filter. Kartu-kartu ini berada di atas foto latar
+ * seukuran layar yang digeser parallax saat halaman digulir, dan sebuah
+ * backdrop-filter di sana memaksa peramban mengambil ulang latarnya tiap frame —
+ * persis penyebab guliran berat yang sudah pernah dibereskan di tepi-lunak.css.
+ */
+
+/* .kartu-bingkai sengaja TIDAK diberi gaya apa pun. Ia cuma kaitan: penanda
+   kotak media supaya tombol putar ulang menemukan elemen <video>-nya lewat
+   closest(). Menyetel position di sini justru merusak — pada varian vertikal
+   penandanya menempel di elemen yang sudah `absolute`, dan berkas ini tanpa
+   @layer, jadi `position: relative` akan menang atas kelas Tailwind-nya.
+   Yang menjadi induk penempatan adalah posisi milik masing-masing kotak:
+   `absolute` pada varian vertikal, `relative` pada varian lanskap. */
+
+/* --- lencana durasi --- */
+
+.kartu-durasi {
+  position: absolute;
+  top: 0.7em;
+  right: 0.7em;
+  z-index: 2;
+  padding: 0.24em 0.62em;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  color: #fff;
+  font-size: calc(var(--ukuran-tanggal) * 0.85);
+  font-weight: 600;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums; /* angka tidak bergoyang saat menghitung mundur */
+  letter-spacing: 0.01em;
+  /* Lencana hanya penanda; klik di atasnya tetap milik medianya. */
+  pointer-events: none;
+}
+
+/* --- tombol putar ulang --- */
+
+/* Wadah menutupi media supaya tombolnya benar-benar di tengah, tetapi tembus
+   klik: klik di luar tombol tetap membuka pop-up rincian seperti biasa. */
+.kartu-ulang-wadah {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.kartu-ulang {
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  width: 2.9em;
+  height: 2.9em;
+  border: 0;
+  border-radius: 999px;
+  /* Cukup pekat untuk terbaca di atas bingkai terakhir video apa pun —
+     tanpa scrim yang akan ikut meredupkan judul kartu varian vertikal. */
+  background: rgb(0 0 0 / 0.62);
+  box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.75);
+  color: #fff;
+  font-size: calc(var(--ukuran-tanggal) * 0.85);
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.kartu-ulang:hover {
+  background: rgb(0 0 0 / 0.8);
+  transform: scale(1.06);
+}
+
+.kartu-ulang:focus-visible {
+  outline: 2px solid var(--color-api, #e8590c);
+  outline-offset: 3px;
+}
+
+.kartu-ulang svg {
+  width: 1.5em;
+  height: 1.5em;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kartu-ulang {
+    transition: none;
+  }
+  .kartu-ulang:hover {
+    transform: none;
+  }
+}
+
+/* --- pop-up rincian ---
+   Di pop-up, lencana menempel pada .rincian__media yang position: relative,
+   jadi ia duduk di sudut kanan atas KOTAK MEDIA — bukan panelnya. Di layar
+   lebar itu kolom kiri, sementara tombol tutup & bagikan menempel di panel
+   dan jatuh di atas rel kanan, jadi keduanya tidak pernah bertemu.
+
+   Di bawah 860px panelnya menumpuk: media naik ke atas, dan sudut kanan atas
+   panel menjadi sudut kanan atas media juga — persis tempat tombol tutup
+   (right: 12px) dan bagikan (right: 50px) berada. Lencananya diturunkan ke
+   bawah kedua tombol itu. Ambangnya sengaja sama dengan yang dipakai
+   rincian-laporan.css untuk menumpuk panelnya. */
+@media (max-width: 860px) {
+  .rincian__media .kartu-durasi {
+    top: 52px;
+  }
+}

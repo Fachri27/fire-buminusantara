@@ -1,0 +1,221 @@
+@import "tailwindcss";
+/* Leaflet diimpor DI SINI, bukan di dalam komponen peta.
+
+   Dulu dimuat lewat `await import("leaflet/dist/leaflet.css")` bersama
+   pustakanya, jadi selalu masuk SETELAH berkas ini — dan `background: #ddd`
+   bawaannya mengalahkan override .leaflet-container di bawah, sehingga peta
+   tetap beralas abu. Ditarik ke sini supaya urutannya pasti. */
+@import "leaflet/dist/leaflet.css";
+
+/* ── Mode tampilan ────────────────────────────────────────────────────────
+   Dua tata letak, bukan sekadar breakpoint responsif biasa:
+
+   panggung — kanvas 1920x1080 presisi desain, diperkecil proporsional agar
+              pas di layar. Aktif hanya kalau layarnya cukup lebar DAN cukup
+              tinggi; kanvas selebar itu di layar pendek akan mengecil sampai
+              teksnya tak terbaca.
+   aliran   — tata letak mengalir untuk layar sempit atau pendek. Kebalikan
+              persis dari panggung.
+   pendek   — layar yang tingginya mepet; dipakai melepas hero dari sticky.
+
+   Nilainya disalin dari build lama (public/dist/style.css di Pasopati) yang
+   sumber konfigurasinya tidak pernah ikut ke repo. Sekarang sumbernya di sini. */
+@custom-variant panggung (@media (min-width: 1100px) and (min-height: 640px));
+/* Ditulis sebagai negasi, BUKAN "(max-width: …), (max-height: …)". Tailwind v4
+   tidak memecah media query list ber-koma di @custom-variant: separuh keduanya
+   bocor keluar jadi bagian selector — `.aliran\:hidden (max-height: 639.98px) {`
+   — dan seluruh berkas gagal diparse. `not all and (…)` menyatakan hal yang
+   sama persis tanpa koma. */
+@custom-variant aliran (@media not all and (min-width: 1100px) and (min-height: 640px));
+@custom-variant pendek (@media (max-height: 620px));
+
+@theme {
+  /* Palet Pasopati. */
+  --color-tinta: #1a1919;
+  --color-panggung: #14100f;
+  --color-api: #e60012;
+  --color-api-peta: #be302b;
+  --color-bara: #8f1116;
+  --color-garis: #bdd142;
+  --color-hijau: #2b5343;
+  --color-hijau-dalam: #1f3d31;
+  --color-laut: #e6e3de;
+  --color-merah-psp: #e3061d;
+  --color-merah-psp-dalam: #c10518;
+
+  /* Tangga warna choropleth peta, dari paling sepi ke paling padat. */
+  --color-peta-0: #e8f0b5;
+  --color-peta-1: #d78e88;
+  --color-peta-2: #d16b65;
+  --color-peta-3: #c84241;
+  --color-peta-4: #b51523;
+  --color-peta-5: #90101a;
+  --color-peta-tanpa-data: #d5d2cb;
+}
+
+/* ── Token tata letak ─────────────────────────────────────────────────────
+   Nilai bawaan = mode aliran; mode panggung menimpanya di bawah. Ditulis
+   sebagai custom property, bukan kelas, karena dipakai bergantian oleh markup
+   dan oleh CSS komponen (kartu, peta, pop-up). */
+:root {
+  --pias: clamp(16px, 5vw, 40px);
+  --sela: clamp(12px, 3.2vw, 20px);
+
+  --kartu-lebar: min(78vw, 340px);
+  --kartu-tinggi: clamp(230px, 46svh, 440px);
+  --kartu-sela: clamp(14px, 4vw, 28px);
+  --kartu-pias: clamp(14px, 4vw, 22px);
+  --kartu-judul-jarak: clamp(10px, 3vw, 18px);
+  --kartu-judul-lebar: none;
+
+  --gambar-lebar: 100%;
+  --gambar-jarak: clamp(10px, 2.8vw, 18px);
+  --gambar-tinggi-maks: none;
+
+  --panah-ukuran: 44px;
+  --panah-ikon: 22px;
+
+  --statistik-lebar: min(52vw, 210px);
+  --statistik-pias: clamp(12px, 3.2vw, 16px);
+  --statistik-jarak-label: clamp(6px, 1.8vw, 10px);
+
+  --ukuran-eyebrow: clamp(11px, 2.9vw, 13px);
+  --ukuran-bagian: clamp(20px, 5.4vw, 26px);
+  --ukuran-label: clamp(17px, 4.6vw, 22px);
+  --ukuran-nama: clamp(17px, 4.4vw, 20px);
+  --ukuran-nilai: clamp(24px, 7vw, 34px);
+  --ukuran-pulau: clamp(13px, 3.3vw, 17px);
+  --ukuran-judul: clamp(13px, 3.3vw, 18px);
+  /* Judul kartu lanskap satu anak tangga di bawah label pulau, supaya hierarki
+     jelas dan teks tidak berebut dengan media di bawahnya. */
+  --ukuran-judul-lanskap: clamp(13px, 3.3vw, 18px);
+  --ukuran-tanggal: clamp(12px, 3.1vw, 14px);
+  --ukuran-catatan: clamp(12px, 3vw, 14px);
+  --ukuran-rincian-nama: clamp(19px, 5.2vw, 24px);
+}
+
+@media (min-width: 1100px) and (min-height: 640px) {
+  :root {
+    --kartu-lebar: 526px;
+    --kartu-tinggi: 594px;
+    --kartu-sela: 76px;
+    --kartu-pias: 36px 28px;
+    --kartu-judul-jarak: 41px;
+    --kartu-judul-lebar: 450px;
+
+    --gambar-lebar: 462px;
+    --gambar-jarak: auto;
+    --gambar-tinggi-maks: 34svh;
+
+    --panah-ukuran: 80px;
+    --panah-ikon: 45px;
+
+    --statistik-pias: 19px 14px;
+    --statistik-jarak-label: 41px;
+
+    --ukuran-eyebrow: 16px;
+    --ukuran-label: 26px;
+    --ukuran-nilai: 34px;
+    --ukuran-pulau: 26px;
+    --ukuran-judul: 26px;
+    --ukuran-judul-lanskap: 22px;
+    --ukuran-tanggal: 16px;
+    --ukuran-catatan: 15px;
+    --ukuran-rincian-nama: 28px;
+  }
+}
+
+/* Mode aktif, dibaca JS lewat getComputedStyle.
+   CSS yang memegang ambangnya, bukan JS: kalau JS punya angka sendiri, suatu
+   saat keduanya berselisih dan kanvas diskalakan padahal tata letaknya sudah
+   mengalir. */
+:root { --mode: "aliran"; }
+
+@media (min-width: 1100px) and (min-height: 640px) {
+  :root { --mode: "panggung"; }
+}
+
+html {
+  background: var(--color-panggung);
+  color: var(--color-tinta);
+}
+
+/* ── Lapisan latar section 2 ──────────────────────────────────────────────
+   Peta tidak memakai citra dasar sendiri: wadah Leaflet dibiarkan tembus
+   pandang (lihat .leaflet-container di bawah), lalu foto latar layar plus
+   gradasi merah inilah yang menjadi dasarnya.
+
+   Gradiennya transparan di puncak, jadi tepi atas section masih menampilkan
+   foto di belakangnya sebelum melebur ke merah — itu yang membuat peralihan
+   dari hero ke peta terasa menyatu, bukan berganti mendadak. */
+.kabut-api {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #be302b 35%,
+    var(--color-api-peta) 70%
+  );
+}
+
+/* Tepi atas section 2 dilembutkan selama ia menggulir menutupi hero.
+   --kabur-tepi digerakkan ScrollTrigger: 1 saat tepi atas section menyentuh
+   tepi bawah viewport, 0 saat tiba di atas. Bentuk sisa*(1-sisa) membuat
+   masker melebar di tengah perjalanan lalu menutup lagi di ujung. */
+.tepi-lunak {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    black calc(var(--kabur-tepi, 0) * (1 - var(--kabur-tepi, 0)) * 200svh)
+  );
+}
+
+.kabur-tepi {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--kabur-tepi, 0) * (1 - var(--kabur-tepi, 0)) * 200svh);
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / calc(var(--kabur-tepi, 0) * 0.35)) 0%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(#000 0%, #0000 100%);
+  /* backdrop-filter SENGAJA tidak dipakai di sini.
+
+     Di Pasopati properti ini pernah ada (blur mengikuti --kabur-tepi) dan
+     ternyata jadi penyebab guliran terasa berat: adanya backdrop-filter
+     membuat elemen ini "backdrop root", sehingga peramban mengambil ulang
+     seluruh isi di belakangnya tiap kali isi itu bergeser — bahkan ketika
+     radiusnya kebetulan 0. Di belakangnya ada peta Leaflet dan foto latar
+     seukuran layar. Yang hilang hanya kaburan tipis; gradien putih dan
+     maskernya tetap melembutkan peralihannya. */
+}
+
+/* Strip statistik digulir dengan snap; bilah gulirnya disembunyikan supaya
+   tidak memotong kartu terakhir. */
+.tanpa-bilah-gulir {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.tanpa-bilah-gulir::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Wadah Leaflet ────────────────────────────────────────────────────────
+   Bawaan leaflet.css memberi .leaflet-container `background: #ddd` — bidang
+   abu solid. Peta ini sengaja tidak memakai citra dasar apa pun: yang harus
+   terlihat di sela pulau dan di sekeliling Indonesia adalah section di
+   belakangnya, bukan alas abu.
+
+   Font dan warnanya ikut disetel di sini supaya tooltip serta kontrol bawaan
+   Leaflet memakai tipografi halaman, bukan bawaan pustakanya. */
+.leaflet-container {
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--ukuran-catatan);
+  color: var(--color-tinta);
+  touch-action: manipulation;
+}

@@ -1,0 +1,61 @@
+/**
+ * Angka jumlah kebakaran di tengah tiap provinsi (section 2 — peta sebaran).
+ *
+ * Ditulis tangan, bukan sebagai utility Tailwind: markup-nya dibuat Leaflet
+ * (L.divIcon), bukan Blade, dan public/dist/style.css adalah hasil build tanpa
+ * sumber di repo — kelas utility baru tidak akan ter-generate. Tanpa @layer
+ * supaya menang atas kedua build Tailwind, berapa pun urutan pemuatannya.
+ */
+
+/* Ikon Leaflet berukuran nol: Leaflet menulis transform pada elemen INI untuk
+   menempatkannya di koordinatnya, jadi elemen ini tidak bisa dipusatkan dengan
+   transform lagi. Yang dipusatkan adalah <span> di dalamnya, yang bebas
+   transform. */
+.peta-angka {
+  width: 0;
+  height: 0;
+  overflow: visible;
+}
+
+.peta-angka__nilai {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  /* Diturunkan dari --ukuran-tanggal, token yang sudah punya dua nilai: clamp
+     untuk mode aliran dan 16px tetap untuk mode panggung. Itu penting di sini —
+     di mode panggung peta duduk di dalam kanvas 1920x1080 yang diperkecil
+     --skala, jadi ukuran yang dinyatakan dalam vw akan dikecilkan DUA KALI
+     (sekali oleh viewport, sekali oleh kanvas) dan angkanya jadi terlalu kecil
+     di jendela yang tidak selebar 1920. Dengan token ini, tulisan dan petanya
+     mengecil dengan faktor yang sama, persis seperti kartu di section 1. */
+  font-size: calc(var(--ukuran-tanggal) * 0.8);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  /* Choropleth di bawahnya berkisar dari kuning muda sampai merah tua, jadi
+     satu warna teks saja tidak pernah cukup kontras di seluruh peta. Garis
+     luar gelap membuat angka putih terbaca di atas keduanya. Text-shadow empat
+     arah, bukan -webkit-text-stroke: yang terakhir memakan bagian dalam huruf
+     dan pada ukuran sekecil ini angkanya jadi kurus tak terbaca. */
+  text-shadow:
+    0 0 3px rgb(26 25 25 / 0.85),
+    1px 1px 0 rgb(26 25 25 / 0.7),
+    -1px 1px 0 rgb(26 25 25 / 0.7),
+    1px -1px 0 rgb(26 25 25 / 0.7),
+    -1px -1px 0 rgb(26 25 25 / 0.7);
+  /* Penanda, bukan sasaran: klik harus tembus ke poligon provinsi di bawahnya.
+     Pane-nya sudah pointer-events: none, ini penjaga kedua kalau penanda ini
+     suatu saat dipindah ke pane lain. */
+  pointer-events: none;
+}
+
+/* Angka ini bertumpuk dengan angka provinsi lain yang lebih luas (lihat
+   perbaruiAngka di js/peta.js). Disembunyikan, bukan dikecilkan: dua angka yang
+   saling menutupi membuat KEDUANYA tak terbaca, sedangkan satu yang hilang
+   masih bisa dibaca lewat panel provinsinya. */
+.peta-angka--bertumpuk {
+  display: none;
+}

@@ -1,0 +1,29 @@
+/**
+ * Kursor "bisa diklik" pada media kartu korsel (section 1).
+ *
+ * Hanya foto/video di kartu TENGAH yang bisa diklik untuk membuka rincian.
+ * Sebelumnya penandanya kelas `cursor-pointer` yang ikut `i === aktif` saja,
+ * dan itu salah pada satu kejadian yang sering: pengguna mengklik kartu samping
+ * (mati) untuk menghidupkannya. Begitu diklik, kartu itu langsung menjadi aktif
+ * — jadi gaya kursornya berubah menjadi pointer saat itu juga — lalu kartunya
+ * meluncur ke tengah selama 550 ms. Setelah luncurannya selesai, penunjuk tikus
+ * tidak lagi berada di atas kartu tengah, tetapi kursornya tetap berbentuk
+ * pointer: pointer diberikan oleh KEADAAN, bukan oleh apa yang benar-benar ada
+ * di bawah penunjuk.
+ *
+ * Di sini pointer diikat pada :hover, jadi ia mengikuti penunjuk tikus, bukan
+ * keadaan korsel. Penanda .kartu-hidup dilepas selama luncuran (lihat `kunci`
+ * di beranda.js) karena selama transform berjalan di compositor peramban tidak
+ * menguji ulang apa yang ada di bawah penunjuk; pemasangan kembali penanda itu
+ * di akhir luncuran adalah perubahan gaya yang memaksa pengujian ulang, dan di
+ * situlah kursor kembali ke bentuk yang benar.
+ *
+ * Judul kartu sengaja tidak ikut aturan ini: judul tetap bisa diklik di kartu
+ * mana pun, jadi cursor-pointer statisnya memang selalu benar.
+ *
+ * Tanpa @layer supaya menang atas kedua build Tailwind, berapa pun urutannya.
+ */
+
+.kartu-hidup .kartu-media:hover {
+  cursor: pointer;
+}

@@ -1,0 +1,75 @@
+/**
+ * Pop-up wilayah pada peta sebaran: tumbuh dari titik yang ditekan.
+ *
+ * Rujukannya efek "genie" macOS, tetapi lengkungannya sengaja tidak ditiru:
+ * genie MEMBENGKOKKAN jendelanya — tiap irisan tegaknya digeser berbeda
+ * mengikuti kurva. Transform CSS selalu memetakan garis lurus menjadi garis
+ * lurus (2D affine; 3D menambah perspektif, tetap proyektif), jadi persegi tidak
+ * bisa dilengkungkan seperti itu. Menirunya berarti memotret panel jadi tekstur
+ * lalu melengkungkannya di WebGL — dan selama animasi panelnya berhenti jadi
+ * gambar diam, padahal isinya siluet, pemilih tanggal, dan daftar berita yang
+ * hidup.
+ *
+ * Yang ditiru bagian yang membawa maknanya: panel datang DARI tempat yang
+ * ditekan. Titik jangkarnya disetel js/peta.js (pasangAsal) sebagai
+ * transform-origin.
+ */
+
+.peta-popup {
+  /* Ditahan sampai js/peta.js melepasnya. Panel ini lahir berbarengan dengan
+     daftar beritanya, flatpickr, dan penguncian gulir halaman (body overflow,
+     yang menata ulang SELURUH halaman dan menghilangkan bilah gulir). Kalau
+     animasinya mulai di frame yang sama, frame-frame pertamanya termakan
+     pekerjaan itu — dan justru awal animasi yang paling terlihat. */
+  animation: peta-popup-tumbuh 420ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation-play-state: paused;
+
+  /* `both` menahan bingkai awal sejak elemen muncul, jadi tidak ada kedipan
+     panel ukuran penuh sebelum animasinya jalan. */
+}
+
+.peta-popup--jalan {
+  animation-play-state: running;
+  /* Dipasang satu frame SEBELUM animasi mulai, bukan bersamaan: petunjuk ini
+     hanya berguna kalau compositor sempat menyiapkan lapisannya lebih dulu.
+     Tanpa lapisan sendiri, tiap frame mengecat ulang panel selebar layar di
+     atas peta Leaflet yang penuh poligon. */
+  will-change: transform, opacity;
+}
+
+/* Selesai: animasinya dilepas sama sekali, dan bersamanya lapisan compositor
+   yang tidak lagi ada gunanya ditahan di memori. `animation: none` memulangkan
+   elemen ke keadaan wajarnya — scale 1, opacity 1 — sama dengan bingkai
+   terakhir, jadi tidak ada lompatan. */
+.peta-popup--diam {
+  animation: none;
+  will-change: auto;
+}
+
+@keyframes peta-popup-tumbuh {
+  from {
+    /* 0,14 dan bukan sepersekian kecil: di bawah itu isi panel jadi coreng tak
+       terbaca selama separuh animasi, dan yang terbaca bukan "cepat" melainkan
+       "berantakan". Segini masih jelas berangkat dari satu titik. */
+    transform: scale(0.14);
+    opacity: 0;
+  }
+
+  /* Buram selesai lebih dulu daripada ukurannya: kalau opacity ikut sampai
+     akhir, panel terlihat menempel setengah tembus di atas peta selama separuh
+     animasi. */
+  40% {
+    opacity: 1;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .peta-popup {
+    animation: none;
+  }
+}
