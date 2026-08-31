@@ -8,6 +8,7 @@ const TAUTAN: { href: string; label: string; tepat?: boolean; admin?: boolean }[
   { href: "/admin/kejadian", label: "Kejadian" },
   { href: "/admin/komentar", label: "Komentar", tepat: true },
   { href: "/admin/komentar/reaksi", label: "Reaksi" },
+  { href: "/admin/laporan", label: "Laporan warga" },
   { href: "/admin/pengguna", label: "Pengguna", admin: true },
 ];
 
@@ -36,7 +37,18 @@ function Tunggak({ jumlah, terang }: { jumlah: number; terang: boolean }) {
   );
 }
 
-export function MenuAdmin({ belumDitinjau, peran }: { belumDitinjau: number; peran: string }) {
+/** Angka tunggakan per halaman. Dulu hanya komentar yang punya, jadi lencananya
+ *  ditulis langsung di satu cabang if; sekarang ada dua antrean, dan
+ *  menambahkan cabang kedua akan mengundang cabang ketiga. */
+export type Tunggakan = { belumDitinjau: number; laporanMenunggu: number };
+
+function tunggakanUntuk(href: string, t: Tunggakan): number {
+  if (href === "/admin/komentar") return t.belumDitinjau;
+  if (href === "/admin/laporan") return t.laporanMenunggu;
+  return 0;
+}
+
+export function MenuAdmin({ tunggakan, peran }: { tunggakan: Tunggakan; peran: string }) {
   const jalur = usePathname();
 
   return (
@@ -47,7 +59,7 @@ export function MenuAdmin({ belumDitinjau, peran }: { belumDitinjau: number; per
           <Link key={t.href} href={t.href} aria-current={aktif ? "page" : undefined}
                 className="cms-tautan">
             {t.label}
-            {t.href === "/admin/komentar" && <Tunggak jumlah={belumDitinjau} terang />}
+            <Tunggak jumlah={tunggakanUntuk(t.href, tunggakan)} terang />
           </Link>
         );
       })}
@@ -55,7 +67,7 @@ export function MenuAdmin({ belumDitinjau, peran }: { belumDitinjau: number; per
   );
 }
 
-export function MenuAdminAtas({ belumDitinjau, peran }: { belumDitinjau: number; peran: string }) {
+export function MenuAdminAtas({ tunggakan, peran }: { tunggakan: Tunggakan; peran: string }) {
   const jalur = usePathname();
 
   return (
@@ -63,14 +75,15 @@ export function MenuAdminAtas({ belumDitinjau, peran }: { belumDitinjau: number;
          className="tanpa-bilah-gulir flex gap-1 overflow-x-auto border-t border-white/10 px-2 py-1.5">
       {tautannya(peran).map((t) => {
         const aktif = sedangDibuka(jalur, t);
+        const menunggu = tunggakanUntuk(t.href, tunggakan);
         return (
           <Link key={t.href} href={t.href} aria-current={aktif ? "page" : undefined}
                 className={`cms-mata shrink-0 rounded-[3px] px-2.5 py-1.5 whitespace-nowrap transition-colors ${
                   aktif ? "bg-[var(--limau)] text-[var(--jelaga)]" : "text-[#a8a79c] hover:text-white"
                 }`}>
             {t.label}
-            {t.href === "/admin/komentar" && belumDitinjau > 0 && (
-              <span className="cms-angka ml-1.5 text-[11px]">({belumDitinjau})</span>
+            {menunggu > 0 && (
+              <span className="cms-angka ml-1.5 text-[11px]">({menunggu})</span>
             )}
           </Link>
         );

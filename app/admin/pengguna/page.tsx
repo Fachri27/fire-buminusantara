@@ -26,7 +26,7 @@ export default async function DaftarPengguna({
   searchParams: Promise<{ halaman?: string; page?: string }>;
 }) {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
   // Mengelola akun adalah urusan admin; editor cukup mengerjakan kejadiannya.
   if (sesi.peran !== "admin") redirect("/admin");
 

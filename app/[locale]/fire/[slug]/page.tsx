@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const deskripsi =
     kejadian.deskripsi ||
     `Pantauan karhutla di ${kejadian.lokasi ?? "Indonesia"} (${kejadian.tanggal}).`;
-  const gambar = kejadian.poster || kejadian.gambar;
+  const gambar = kejadian.poster;
 
   return {
     title: judul,

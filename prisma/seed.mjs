@@ -85,7 +85,84 @@ async function main() {
     });
   }
 
-  console.log("Benih selesai: 1 admin (admin@pasopati.test / admin123), 2 kejadian, 1 komentar.");
+  // ── Laporan warga ─────────────────────────────────────────────────────────
+  // `public_reports` tidak punya kolom unik untuk di-upsert, jadi keidempotenan
+  // dijaga lewat penanda umum (sebagian laporan diberi koordinat) dan hitungan:
+  // hanya dibuat ketika tabel masih kosong, supaya menjalankan `npm run seed`
+  // berulang tidak menumpuk data pengembangan.
+  const laporanWarga = [
+    {
+      title: "Asap tebal dari lahan kosong di Cisarua",
+      description:
+        "Terlihat asap tebal membumbung dari lahan kosong dekat pemukiman sejak pagi. Belum ada petugas, mohon dicek.",
+      media: [],
+      reporter_name: "Budi Santoso",
+      location_lat: -6.836029,
+      location_lng: 107.494909,
+      status: "pending",
+    },
+    {
+      title: "Api kecil di tepi sawah, Cicalengka",
+      description: "Ada bara kecil di tepi sawah, sudah saya padamkan pakai air selokan. Koordinat titik semula.",
+      media: [],
+      reporter_name: null,
+      location_lat: -6.986987,
+      location_lng: 107.839817,
+      status: "pending",
+    },
+    {
+      title: "Kebakaran lahan gambut di Rokan Hilir",
+      description: "Kebakaran lahan gambut meluas sejak kemarin, asap sampai ke jalan raya. Warga mulai sesak napas.",
+      media: [],
+      reporter_name: "Siti Aminah",
+      location_lat: 1.369771,
+      location_lng: 100.63189,
+      status: "approved",
+    },
+    {
+      title: "Laporan duplikat kebakaran di Cisarua",
+      description: "Ternyata laporan saya telat, kejadian sudah ditangani oleh tim pemadam setempat.",
+      media: [],
+      reporter_name: "Budi Santoso",
+      location_lat: -6.836029,
+      location_lng: 107.494909,
+      status: "rejected",
+    },
+    {
+      title: "Pembakaran sampah di halaman sekolah",
+      description: "Pembakaran sampah besar-besaran, asapnya mengganggu kelas sebelah. Bukan kebakaran liar.",
+      media: [],
+      reporter_name: null,
+      location_lat: null,
+      location_lng: null,
+      status: "pending",
+    },
+  ];
+
+  const sudahAdaLaporan = await prisma.public_reports.count();
+  if (sudahAdaLaporan === 0) {
+    for (const l of laporanWarga) {
+      await prisma.public_reports.create({
+        data: {
+          title: l.title,
+          description: l.description,
+          media: l.media,
+          reporter_name: l.reporter_name,
+          location_lat: l.location_lat,
+          location_lng: l.location_lng,
+          status: l.status,
+          ip_address: "127.0.0.1",
+          created_at: sekarang,
+          updated_at: sekarang,
+        },
+      });
+    }
+  }
+
+  console.log(
+    "Benih selesai: 1 admin (admin@pasopati.test / admin123), 2 kejadian, 1 komentar, " +
+    `${sudahAdaLaporan === 0 ? laporanWarga.length : 0} laporan warga.`,
+  );
 }
 
 main()

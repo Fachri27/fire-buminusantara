@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { daftarKomentar, simpanKomentar, turnstileSah } from "@/lib/komentar";
+import { daftarKomentar, simpanKomentar } from "@/lib/komentar";
+import { ipDari, turnstileSah } from "@/lib/turnstile";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -14,12 +15,6 @@ import { prisma } from "@/lib/prisma";
 
 const BATAS_ISI = 2000;
 const BATAS_NAMA = 100;
-
-function ipDari(req: Request): string | null {
-  // Di belakang proxy, alamat aslinya ada di header ini.
-  const maju = req.headers.get("x-forwarded-for");
-  return maju ? maju.split(",")[0].trim() : req.headers.get("x-real-ip");
-}
 
 async function eventAda(id: number) {
   return Boolean(await prisma.events.findUnique({ where: { id }, select: { id: true } }));

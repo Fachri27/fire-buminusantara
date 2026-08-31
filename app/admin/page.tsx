@@ -15,7 +15,7 @@ const waktu = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short",
 
 export default async function Ringkasan() {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
 
   const [jumlahKejadian, jumlahKomentar, belumDisetujui, kejadianTerbaru, komentarTerbaru] =
     await Promise.all([

@@ -31,7 +31,7 @@ export default async function Masuk({
     );
     // Pesan yang sama untuk email tak dikenal, sandi salah, maupun peran yang
     // tidak berhak — supaya tidak bisa dipakai menebak akun mana yang ada.
-    if (!sesi) redirect("/admin/masuk?galat=1");
+    if (!sesi) redirect("/admin/login?galat=1");
     await buatSesi(sesi);
     redirect("/admin/kejadian");
   }

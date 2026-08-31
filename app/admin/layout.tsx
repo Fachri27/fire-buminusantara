@@ -3,6 +3,7 @@ import Link from "next/link";
 import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed } from "next/font/google";
 import { prisma } from "@/lib/prisma";
 import { bacaSesi } from "@/lib/sesi";
+import { hitungMenunggu } from "@/lib/laporan-publik";
 import { MenuAdmin, MenuAdminAtas } from "./menu-admin";
 import { keluar } from "./aksi-sesi";
 import "./cms.css";
@@ -36,11 +37,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     return <div className={`cms ${badan.className} ${padat.variable} ${mono.variable}`}>{children}</div>;
   }
 
-  // Angka yang menunggu dikerjakan ditulis di menunya sendiri; itu satu-satunya
-  // hitungan yang perlu dilihat editor sebelum memilih halaman.
-  const belumDitinjau = await prisma.comments.count({
-    where: { commentable_type: "App\\Models\\Event", is_approved: false },
-  });
+  // Angka yang menunggu dikerjakan ditulis di menunya sendiri; itulah hitungan
+  // yang perlu dilihat editor sebelum memilih halaman. Dua kueri kecil, jalan
+  // berbarengan — keduanya ikut setiap render halaman CMS mana pun.
+  const [belumDitinjau, laporanMenunggu] = await Promise.all([
+    prisma.comments.count({
+      where: { commentable_type: "App\\Models\\Event", is_approved: false },
+    }),
+    hitungMenunggu(),
+  ]);
+
+  const tunggakan = { belumDitinjau, laporanMenunggu };
 
   return (
     <div className={`cms ${badan.className} ${padat.variable} ${mono.variable} min-h-screen`}>
@@ -50,7 +57,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                           self-start lg:flex lg:h-screen">
           <Kop />
           <div className="mt-6 flex-1">
-            <MenuAdmin belumDitinjau={belumDitinjau} peran={sesi.peran} />
+            <MenuAdmin tunggakan={tunggakan} peran={sesi.peran} />
           </div>
           <Kaki nama={sesi.nama} peran={sesi.peran} />
         </aside>
@@ -64,7 +71,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <TombolKeluar />
             </div>
           </div>
-          <MenuAdminAtas belumDitinjau={belumDitinjau} peran={sesi.peran} />
+          <MenuAdminAtas tunggakan={tunggakan} peran={sesi.peran} />
         </div>
 
         <main className="min-w-0 flex-1">{children}</main>

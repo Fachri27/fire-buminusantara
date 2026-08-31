@@ -21,6 +21,7 @@ export const TEKS_NAV = {
       peta: "Peta Sebaran",
     } as Record<string, string>,
     ganti: "Ganti bahasa",
+    lapor: "Lapor",
   },
   en: {
     navigasi: "Main navigation",
@@ -30,5 +31,79 @@ export const TEKS_NAV = {
       peta: "Spread Map",
     } as Record<string, string>,
     ganti: "Switch language",
+    lapor: "Report",
+  },
+} as const satisfies Record<Bahasa, unknown>;
+
+/** Teks halaman lapor. Halaman ini berada di bawah [locale] seperti yang lain,
+ *  jadi seluruh tulisannya — termasuk pesan galat dari peramban — ikut bahasa
+ *  yang sedang dibuka. Pesan galat dari SERVER tetap berbahasa Indonesia:
+ *  ia datang dari validasi yang sama yang dibaca petugas CMS. */
+export const TEKS_LAPOR = {
+  id: {
+    judulHalaman: "Lapor Kejadian Karhutla",
+    catatan:
+      "Melihat kebakaran hutan atau lahan? Ceritakan di sini. Laporan diperiksa petugas sebelum ditampilkan.",
+    kembali: "Kembali ke beranda",
+    labelJudul: "Judul laporan",
+    petunjukJudul: "Ringkas saja, mis. “Asap tebal di tepi jalan Trans-Kalimantan”",
+    labelDeskripsi: "Apa yang terjadi",
+    petunjukDeskripsi: "Kapan Anda melihatnya, seberapa luas, apa yang terbakar.",
+    labelBerkas: "Foto atau video",
+    petunjukBerkas: "Boleh lebih dari satu. JPG, PNG, WebP, MP4, MOV, atau WebM.",
+    catatanMetadata:
+      "Berkas dikirim apa adanya — data kamera dan lokasi di dalam foto tidak dihapus.",
+    pilihBerkas: "Pilih berkas",
+    hapusBerkas: "Hapus",
+    labelLokasi: "Titik lokasi (opsional)",
+    petunjukLokasi: "Kosongkan kalau tidak yakin. Petugas bisa melengkapinya nanti.",
+    lat: "Latitude",
+    lng: "Longitude",
+    pakaiLokasi: "Pakai lokasi saya",
+    mencariLokasi: "Mencari lokasi…",
+    lokasiGagal: "Lokasi tidak bisa diambil. Isi manual atau kosongkan saja.",
+    labelNama: "Nama Anda (opsional)",
+    anonim: "Kirim sebagai anonim",
+    kirim: "Kirim laporan",
+    mengirim: "Mengirim…",
+    berhasilJudul: "Laporan terkirim",
+    berhasilIsi:
+      "Terima kasih. Laporan Anda masuk antrean pemeriksaan petugas dan belum tampil di situs.",
+    lagi: "Kirim laporan lain",
+    terlaluBesar: "Total berkas melebihi 100 MB. Kurangi atau perkecil dulu.",
+    terlaluBanyak: "Maksimal {n} berkas per laporan.",
+  },
+  en: {
+    judulHalaman: "Report a Wildfire",
+    catatan:
+      "Seeing a forest or land fire? Tell us here. Reports are checked by staff before they appear.",
+    kembali: "Back to home",
+    labelJudul: "Report title",
+    petunjukJudul: "Keep it short, e.g. “Heavy smoke along the Trans-Kalimantan road”",
+    labelDeskripsi: "What happened",
+    petunjukDeskripsi: "When you saw it, how large it was, what is burning.",
+    labelBerkas: "Photos or video",
+    petunjukBerkas: "More than one is fine. JPG, PNG, WebP, MP4, MOV, or WebM.",
+    catatanMetadata:
+      "Files are sent as-is — the camera and location data inside your photos is not stripped.",
+    pilihBerkas: "Choose files",
+    hapusBerkas: "Remove",
+    labelLokasi: "Coordinates (optional)",
+    petunjukLokasi: "Leave empty if unsure. Staff can fill it in later.",
+    lat: "Latitude",
+    lng: "Longitude",
+    pakaiLokasi: "Use my location",
+    mencariLokasi: "Locating…",
+    lokasiGagal: "Could not read your location. Enter it manually or leave it empty.",
+    labelNama: "Your name (optional)",
+    anonim: "Submit anonymously",
+    kirim: "Send report",
+    mengirim: "Sending…",
+    berhasilJudul: "Report sent",
+    berhasilIsi:
+      "Thank you. Your report is queued for review and is not shown on the site yet.",
+    lagi: "Send another report",
+    terlaluBesar: "Total file size exceeds 100 MB. Remove or shrink some files first.",
+    terlaluBanyak: "At most {n} files per report.",
   },
 } as const satisfies Record<Bahasa, unknown>;

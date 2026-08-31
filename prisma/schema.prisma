@@ -26,6 +26,7 @@ model users {
   updated_at        DateTime?           @db.Timestamp(0)
   comment_reactions comment_reactions[]
   comments          comments[]
+  public_reports    public_reports[]
 }
 
 model events {
@@ -109,4 +110,45 @@ enum comment_reactions_type {
 enum events_orientation {
   landscape
   horizontal
+}
+
+// ── Laporan warga ────────────────────────────────────────────────────────────
+// Tabel MILIK CMS ini, bukan warisan Laravel — tapi namanya tetap Inggris dan
+// snake_case seperti tetangganya, karena ia duduk di basis data yang sama dan
+// dibaca orang yang sama.
+//
+// Terpisah dari `events` dengan sengaja: kiriman orang luar belum tentu benar,
+// sedangkan apa pun yang masuk `events` langsung tampil di korsel dan ikut
+// terhitung di peta. Yang lolos verifikasi disalin ke sana oleh editor, bukan
+// mengalir sendiri.
+
+model public_reports {
+  id            BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
+  title         String                @db.VarChar(255)
+  description   String                @db.Text
+  /// Lampiran: [{ path, type: "image" | "video" }] — bentuknya sama persis
+  /// dengan events.media, jadi bacaBerkasMedia() dipakai bersama.
+  media         Json?
+  /// null = pelapor memilih anonim. Kolomnya kosong, bukan diisi "Anonim":
+  /// nama "Anonim" tidak bisa dibedakan dari orang yang memang mengetik itu.
+  reporter_name String?               @db.VarChar(255)
+  /// Keduanya opsional dan selalu berpasangan — lihat simpanLaporanPublik().
+  location_lat  Decimal?              @db.Decimal(10, 7)
+  location_lng  Decimal?              @db.Decimal(10, 7)
+  status        public_reports_status @default(pending)
+  ip_address    String?               @db.VarChar(45)
+  reviewed_by   BigInt?               @db.UnsignedBigInt
+  reviewed_at   DateTime?             @db.Timestamp(0)
+  created_at    DateTime?             @db.Timestamp(0)
+  updated_at    DateTime?             @db.Timestamp(0)
+  peninjau      users?                @relation(fields: [reviewed_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "public_reports_reviewed_by_foreign")
+
+  @@index([status, created_at], map: "public_reports_status_created_at_index")
+  @@index([reviewed_by], map: "public_reports_reviewed_by_foreign")
+}
+
+enum public_reports_status {
+  pending
+  approved
+  rejected
 }

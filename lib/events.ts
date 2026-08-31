@@ -9,7 +9,9 @@ export type Berita = {
   pulau: string | null;
   tanggal: string;
   judul: string;
-  gambar: string;
+  /** Thumbnail asli kejadian (sama dengan `poster`), null kalau tidak ada —
+   *  tidak memakai foto dummy. Komponen menampilkan placeholder sendiri. */
+  gambar: string | null;
   alt: string;
   video: string | null;
   /** Poster video: HANYA thumbnail asli kejadian ini, tanpa cadangan. Kalau
@@ -27,8 +29,6 @@ export type Berita = {
   /** true = foto memenuhi bingkai kartu, judul menumpang putih di atasnya. */
   vertikal: boolean;
 };
-
-const GAMBAR_BAWAAN = "/assets/img/berita-jawa.jpg";
 
 const tanggalId = new Intl.DateTimeFormat("id-ID", {
   day: "numeric",
@@ -60,7 +60,10 @@ function keBerita(e: Baris): Berita {
     pulau: inferPulau(e.location),
     tanggal: tanggalId.format(e.event_date),
     judul: e.title_id,
-    gambar: poster ?? GAMBAR_BAWAAN,
+    // Payload ini menyeberang ke komponen klien; tanpa foto asli, `gambar`
+    // dibiarkan null — tidak ada foto dummy lagi. Yang memakainya (mis. kartu
+    // dan pop-up) menampilkan placeholder sendiri.
+    gambar: poster,
     alt: e.title_id,
     video: urlMedia(e.video),
     poster,

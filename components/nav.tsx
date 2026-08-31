@@ -125,6 +125,15 @@ export function Nav({ bahasa }: Props) {
             })}
           </nav>
 
+          {/* Jalan masuk ke form laporan warga. Tautan sungguhan, bukan jangkar
+              gulir seperti dua tombol di sebelahnya — halamannya lain. */}
+          <a
+            href={`/${bahasa}/lapor`}
+            className="rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+          >
+            {teks.lapor}
+          </a>
+
           {/* Garis Pemisah Tipis */}
           <div className="h-4 w-[1px] bg-black/10" aria-hidden="true" />
 

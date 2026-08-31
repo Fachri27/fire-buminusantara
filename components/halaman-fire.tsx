@@ -239,10 +239,20 @@ function Rincian({
         )}
 
         <div className="rincian__media kartu-bingkai">
-          <SliderRincian
-            key={berita.id}
-            media={berita.media.length > 0 ? berita.media : [{ jenis: "gambar", url: berita.gambar }]}
-            poster={berita.poster} label={berita.alt} kurangiGerak={kurangiGerak} />
+          {berita.media.length > 0 ? (
+            <SliderRincian
+              key={berita.id}
+              media={berita.media}
+              poster={berita.poster} label={berita.alt} kurangiGerak={kurangiGerak} />
+          ) : (
+            // Tanpa media apa pun: tidak menampilkan foto dummy — kotak
+            // medianya memuat petunjuk lokasi saja.
+            <div className="flex h-full min-h-[140px] items-center justify-center bg-[linear-gradient(150deg,#eef1f4,#d7dee4)]">
+              <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-black/45">
+                {berita.lokasi || "Belum ada foto"}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="rincian__rel">
