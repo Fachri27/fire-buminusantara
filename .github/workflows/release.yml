@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# Antrikan, jangan dibatalkan — dua build/deploy boleh berurutan, tidak tumpang tindih.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      prod_deploy: ${{ steps.filter.outputs.prod_deploy }}
+      # Tag string yang dikirim ke deploy.yml, dibangun dari layanan role prod.
+      prod_tags: ${{ steps.filter.outputs.prod_tags }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ambil tag deployed/* (basis diff yang menyembuhkan diri)
+        run: git fetch --quiet --tags --force origin
+
+      - name: Deteksi perubahan per layanan dan per role
+        id: filter
+        env:
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          # Basis diff role = tag deployed/prod (commit terakhir yang role itu
+          # kirim), jatuh ke event.before hanya bila tag belum ada. Inilah yang
+          # membuat run berikutnya mengambil apa yang dilewati run merah —
+          # tag hanya bergerak saat deploy sukses.
+          if git cat-file -e refs/tags/deployed/prod^{commit} 2>/dev/null; then
+            BASE="refs/tags/deployed/prod"
+          else
+            BASE="$BEFORE"
+          fi
+
+          # Fail open: basis tak teratasi → deploy semua.
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            echo "prod_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "prod_tags=WEB_TAG=sha-$SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          MERGE="$(git merge-base HEAD "$BASE" 2>/dev/null || true)"
+          if [ -z "$MERGE" ]; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            echo "prod_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "prod_tags=WEB_TAG=sha-$SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          DIFF="$(git diff --name-only "$MERGE" HEAD)"
+          WEB_CHANGED=false; INFRA_PROD=false
+
+          if echo "$DIFF" | grep -qE '^(app|components|hooks|lib|public)/|^(proxy\.ts|package(-lock)?\.json|tsconfig|eslint\.config\.mjs|next\.config\.ts|prisma/|Dockerfile)'; then
+            WEB_CHANGED=true
+          fi
+          # Infra role prod: berkas yang dipakai skrip deploy di box — memaksa
+          # SEMUA layanan role itu nyala walau kode tak berubah.
+          if echo "$DIFF" | grep -qE '^(\.github/|docker-compose\.prod\.yml|deploy/)'; then
+            WEB_CHANGED=true
+            INFRA_PROD=true
+          fi
+
+          echo "web=$WEB_CHANGED" >> "$GITHUB_OUTPUT"
+          if [ "$WEB_CHANGED" = "true" ] || [ "$INFRA_PROD" = "true" ]; then
+            echo "prod_deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prod_deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "prod_tags=WEB_TAG=sha-$SHA" >> "$GITHUB_OUTPUT"
+
+  # Ulangi CI untuk push langsung ke main — commit yang menyingkir alur PR
+  # tetap harus lolos uji sebelum membangun.
+  ci:
+    needs: changes
+    uses: ./.github/workflows/ci.yml
+
+  build-web:
+    needs: [ci, changes]
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tag image (latest + sha panjang + sha pendek)
+        uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/ultramenid/fire-buminusantara
+          tags: |
+            type=raw,value=latest
+            type=sha,format=long
+            type=sha
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # NEXT_PUBLIC_* dipanggang saat build → datang dari repository variables.
+          build-args: |
+            NEXT_PUBLIC_MEDIA_URL=${{ vars.NEXT_PUBLIC_MEDIA_URL }}
+            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+
+  deploy-prod:
+    needs: [ci, changes, build-web]
+    # always() + cek hasil eksplisit: build yang SKIPPED (layanan tak berubah)
+    # tidak memblokir deploy, tetapi yang gagal/dibatalkan memblokir. Tanpa
+    # always(), hasil 'skipped' pada needs membuat kondisi ini tak pernah
+    # dievaluasi dan deploy tidak pernah jalan.
+    if: always() && needs.changes.outputs.prod_deploy == 'true' && needs.changes.result == 'success' && needs.ci.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit
+    with:
+      role: prod
+      tags: ${{ needs.changes.outputs.prod_tags }}
+
+  # Geser basis diff role — hanya setelah deploy suksesnya. Ini yang membuat
+  # run hijau berikutnya mengambil apa yang dilewati run merah.
+  tag-deployed-prod:
+    needs: [deploy-prod]
+    if: needs.deploy-prod.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gerakkan tag deployed/prod
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          git tag -f deployed/prod "$SHA"
+          git push --force origin refs/tags/deployed/prod

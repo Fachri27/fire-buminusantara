@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  # Dipanggil release.yml untuk push langsung ke main — tanpa ini commit yang
+  # menyingkir alur PR sampai produksi tanpa diuji.
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Hitung basis diff
+        id: base
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            BASE="origin/$BASE_REF"
+          else
+            BASE="$BEFORE"
+          fi
+          # Fail open: basis hilang (cabang baru, force-push, all-zeroes) → uji semua.
+          if git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=FORCE_ALL" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deteksi layanan yang berubah
+        id: filter
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+        run: |
+          web() { echo "web=$1" >> "$GITHUB_OUTPUT"; }
+
+          if [ "$BASE" = "FORCE_ALL" ]; then web true; exit 0; fi
+          MERGE="$(git merge-base HEAD "$BASE" 2>/dev/null || true)"
+          [ -n "$MERGE" ] || { web true; exit 0; }
+
+          DIFF="$(git diff --name-only "$MERGE" HEAD)"
+
+          # Berkas global memaksa SEMUA layanan nyala — perubahan root/lockfile
+          # bisa merusak apa saja; lebih terlalu banyak diuji daripada terlewat.
+          if echo "$DIFF" | grep -qE '^(\.github/|package(-lock)?\.json|tsconfig|eslint\.config\.mjs|next\.config\.ts|prisma/|Dockerfile|docker-compose\.|deploy/|proxy\.ts)'; then
+            web true; exit 0
+          fi
+
+          if echo "$DIFF" | grep -qE '^(app|components|hooks|lib|public)/'; then
+            web true
+          else
+            web false
+          fi
+
+  # Satu-satunya layanan: Next.js di root repo. Belum ada skrip `test` —
+  # kombinasi yang ada: lint + build (build gagal kalau rute dinamis rusak).
+  test-web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+        env:
+          # prisma.config.ts butuh DATABASE_URL terdefinisi; generate tidak konek.
+          DATABASE_URL: mysql://ci:ci@localhost:3306/ci
+      - run: npm run lint
+      # --webpack: jalur yang sama dengan build Docker (lihat Dockerfile).
+      - run: npx next build --webpack
+        env:
+          DATABASE_URL: mysql://ci:ci@localhost:3306/ci
+          SESSION_SECRET: ci-only-secret
+
+  # --no-git: pindai pohon kerja, bukan riwayat — menangkap rahasia yang sedang
+  # ditambahkan sekarang tanpa menggagalkan setiap PR karena commit purba.
+  # --redact: jangan pernah cetak rahasia ke log. Versi dipatok (bukan latest).
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pindai kebocoran rahasia (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.30.1 \
+            detect --source /repo --no-git --redact --verbose --exit-code 1

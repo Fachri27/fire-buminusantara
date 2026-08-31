@@ -1,0 +1,14 @@
+# Memperluas konfigurasi bawaan gitleaks dengan allowlist jalur EKSAK.
+# Jangan pernah pakai glob seperti *.env.example — satu pola lebar membuka
+# .env sungguhan ikut lolos pindai. Jika template baru punya kredensial
+# placeholder, tambahkan jalurnya di sini secara eksplisit.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Kredensial placeholder di templat/dokumentasi (jalur eksak)"
+paths = [
+  '''(^|/)env\.example$''',
+  '''^deploy/\.env\.prod\.example$''',
+  '''^MINIO_SETUP\.md$''',
+]
