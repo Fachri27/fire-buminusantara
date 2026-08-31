@@ -124,10 +124,12 @@ dump_db() {
   fi
 
   # Dump kosong = kegagalan senyap; lebih baik batalkan deploy daripada
-  # mengira ada cadangan padahal tidak.
-  if [ ! -s "$file" ] || [ "$(gzip -dc "$file" | head -c 1 | wc -c)" -eq 0 ]; then
+  # mengira ada cadangan padahal tidak. Isi dicek lewat gzip -t (integritas)
+  # plus ukuran — BUKAN "gzip -dc | head -c 1": head menutup pipe lebih dulu,
+  # gzip kena SIGPIPE, dan pipefail menandai dump yang sehat sebagai gagal.
+  if [ ! -s "$file" ] || ! gzip -t "$file" 2>/dev/null; then
     rm -f "$file"
-    log "dump pra-deploy kosong"
+    log "dump pra-deploy kosong atau rusak"
     return 1
   fi
 
