@@ -34,5 +34,11 @@ COPY --from=builder /app/public ./public
 # Asuransi kalau pelacakan berkas Next tidak menyalin klien Prisma hasil generate.
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
+# server.js standalone mendengarkan di $HOSTNAME, dan Docker mengisi HOSTNAME
+# dengan ID container (mis. 08aafe8f2476 → 172.21.0.4) — akibatnya port 3000
+# hanya hidup di satu antarmuka: 127.0.0.1 di dalam container mati dan
+# pemetaan port host ikut gagal. 0.0.0.0 membuatnya mendengarkan semuanya.
+ENV HOSTNAME=0.0.0.0 PORT=3000
+
 EXPOSE 3000
 CMD ["node", "server.js"]

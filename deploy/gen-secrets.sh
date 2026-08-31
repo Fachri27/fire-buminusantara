@@ -13,7 +13,7 @@ CHANGED=0
 while IFS= read -r line || [ -n "$line" ]; do
   case "$line" in
     *_SECRET=|*_PASS=)
-      printf '%s%s\n' "${line%=}" "$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-40)"
+      printf '%s%s\n' "$line" "$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-40)"
       CHANGED=$((CHANGED + 1))
       ;;
     *) printf '%s\n' "$line" ;;

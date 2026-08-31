@@ -85,25 +85,55 @@ done
 # DALAM SUBSHELL supaya var yang di-export tidak menimpa interpolasi compose
 # dari file yang barusan ditulis ulang.
 dump_db() {
-  local container
-  container="$(
-    set -a
-    [ -f "$ENV_FILE" ] && . "$ENV_FILE"
-    echo "${DB_CONTAINER:-}"
-  )" || container=""
-  [ -n "$container" ] || { log "DB_CONTAINER kosong — lewati dump pra-deploy"; return 0; }
-  if [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || echo false)" != "true" ]; then
-    log "container DB '$container' tidak berjalan — lewati dump"
-    return 0
-  fi
   mkdir -p "$BACKUP_DIR"
   local file="$BACKUP_DIR/db-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
-  docker exec "$container" sh -c \
-    'exec mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --all-databases 2>/dev/null || exec mysqldump -uroot -p"$MARIADB_ROOT_PASSWORD" --all-databases' \
-    | gzip >"$file"
+
+  # DB_CONTAINER / DATABASE_URL dibaca di DALAM SUBSHELL supaya var yang
+  # di-export tidak menimpa interpolasi compose dari .env yang baru ditulis.
+  local container url
+  container="$(set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; echo "${DB_CONTAINER:-}")" || container=""
+  url="$(set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; echo "${DATABASE_URL:-}")" || url=""
+
+  if [ -n "$container" ]; then
+    # Jalur A: database berjalan sebagai container.
+    if [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || echo false)" != "true" ]; then
+      log "container DB '$container' tidak berjalan — lewati dump"
+      return 0
+    fi
+    docker exec "$container" sh -c \
+      'exec mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --all-databases 2>/dev/null || exec mysqldump -uroot -p"$MARIADB_ROOT_PASSWORD" --all-databases' \
+      | gzip >"$file"
+  elif [ -n "$url" ] && command -v mysqldump >/dev/null 2>&1; then
+    # Jalur B: MariaDB/MySQL native di host — kredensial diambil dari
+    # DATABASE_URL supaya tidak ada rahasia kedua yang harus dijaga.
+    # mysql://user:pass@host:port/nama
+    local rest creds hostport user pass host port nama
+    rest="${url#mysql://}"
+    creds="${rest%%@*}"; hostport="${rest#*@}"
+    user="${creds%%:*}"; pass="${creds#*:}"
+    nama="${hostport#*/}"; hostport="${hostport%%/*}"
+    host="${hostport%%:*}"; port="${hostport#*:}"
+    [ "$port" = "$host" ] && port=3306
+    # Port host tidak dipakai apa adanya: dump jalan DI host, jadi 127.0.0.1.
+    MYSQL_PWD="$(printf '%b' "${pass//%/\\x}")" mysqldump \
+      -h 127.0.0.1 -P "$port" -u "$user" --single-transaction --quick "$nama" \
+      | gzip >"$file"
+  else
+    log "tidak ada DB_CONTAINER maupun mysqldump di host — lewati dump pra-deploy"
+    return 0
+  fi
+
+  # Dump kosong = kegagalan senyap; lebih baik batalkan deploy daripada
+  # mengira ada cadangan padahal tidak.
+  if [ ! -s "$file" ] || [ "$(gzip -dc "$file" | head -c 1 | wc -c)" -eq 0 ]; then
+    rm -f "$file"
+    log "dump pra-deploy kosong"
+    return 1
+  fi
+
   # Simpan 30 terbaru.
   ls -1t "$BACKUP_DIR"/db-*.sql.gz 2>/dev/null | tail -n +$((BACKUP_KEEP + 1)) | xargs -r rm -f
-  log "dump pra-deploy: $file"
+  log "dump pra-deploy: $file ($(du -h "$file" | cut -f1))"
 }
 if ! dump_db; then
   # Gagal dump = jangan lanjut: jalur data-loss ditutup rapat.
