@@ -22,7 +22,7 @@ export default async function TambahPengguna({
   searchParams: Promise<{ galat?: string }>;
 }) {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
   if (sesi.peran !== "admin") redirect("/admin");
 
   const { galat } = await searchParams;

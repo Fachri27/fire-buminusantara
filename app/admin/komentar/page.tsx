@@ -21,7 +21,7 @@ export default async function Komentar({
   searchParams: Promise<{ cari?: string; status?: string; kejadian?: string; halaman?: string; page?: string }>;
 }) {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
 
   const params = await searchParams;
   const cari = params.cari;

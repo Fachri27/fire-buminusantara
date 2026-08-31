@@ -1,0 +1,201 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { bacaSesi, bolehKelola } from "@/lib/sesi";
+import {
+  ambilLaporan, laporanBerikutnya, adaStatus, NAMA_STATUS,
+  type Lampiran, type StatusLaporan,
+} from "@/lib/laporan-publik";
+import { HALAMAN, KopHalaman } from "../../kop-halaman";
+import { TombolVerifikasi } from "../tombol-verifikasi";
+
+export const dynamic = "force-dynamic";
+
+const waktuPanjang = new Intl.DateTimeFormat("id-ID", {
+  weekday: "long", day: "numeric", month: "long", year: "numeric",
+  hour: "2-digit", minute: "2-digit",
+});
+
+const CAP: Record<StatusLaporan, string> = {
+  pending: "cms-cap cms-cap--perhatian",
+  approved: "cms-cap cms-cap--aman",
+  rejected: "cms-cap cms-cap--diam",
+};
+
+export default async function RincianLaporan({
+  params, searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const sesi = await bacaSesi();
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
+
+  const id = Number((await params).id);
+  if (!Number.isInteger(id) || id <= 0) notFound();
+
+  const laporan = await ambilLaporan(id);
+  if (!laporan) notFound();
+
+  // Saringan yang sedang dilihat dibawa lewat query, jadi tombol kembali
+  // mendarat di tab yang sama — bukan melempar peninjau balik ke "Menunggu"
+  // setelah ia sedang menelusuri arsip yang ditolak.
+  const asal = (await searchParams).status ?? "pending";
+  const saringan: StatusLaporan | undefined = adaStatus(asal) ? asal : undefined;
+  const berikutnya = await laporanBerikutnya(id, saringan);
+
+  const kembali = `/admin/laporan?status=${asal}`;
+
+  return (
+    <div className={HALAMAN}>
+      <Link href={kembali} className="cms-mata mb-4 inline-block underline-offset-4 hover:underline">
+        ← Laporan warga
+      </Link>
+
+      <KopHalaman
+        mata={`Laporan ${String(laporan.id).padStart(3, "0")}`}
+        judul={laporan.judul}
+        asli
+      >
+        <TombolVerifikasi
+          id={laporan.id}
+          status={laporan.status}
+          bolehHapus={sesi.peran === "admin"}
+          setelahHapus={kembali}
+        />
+      </KopHalaman>
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
+        <div className="min-w-0">
+          <Bagian judul="Isi laporan">
+            <p className="text-[14.5px] leading-[1.65] whitespace-pre-line text-[var(--jelaga)]">
+              {laporan.deskripsi}
+            </p>
+          </Bagian>
+
+          <Bagian judul={`Lampiran (${laporan.lampiran.length})`}>
+            {laporan.lampiran.length === 0 ? (
+              <p className="text-[13.5px] text-[var(--lirih)]">
+                Pelapor tidak melampirkan foto atau video.
+              </p>
+            ) : (
+              <LampiranPenuh daftar={laporan.lampiran} judul={laporan.judul} />
+            )}
+          </Bagian>
+        </div>
+
+        {/* Keterangan duduk di kolom sendiri: saat memutuskan, yang dibaca
+            berulang adalah lampiran dan ceritanya — data ini cukup ada di
+            pinggir, tidak perlu memotong bacaan di tengah. */}
+        <aside className="lg:border-l lg:border-[var(--garis)] lg:pl-7">
+          <Bagian judul="Keterangan">
+            <dl className="grid gap-3.5">
+              <Baris label="Status">
+                <span className={CAP[laporan.status]}>{NAMA_STATUS[laporan.status]}</span>
+              </Baris>
+
+              <Baris label="Pelapor">
+                {laporan.namaPelapor ?? (
+                  <span className="text-[var(--lirih)] italic">Anonim</span>
+                )}
+              </Baris>
+
+              <Baris label="Dikirim">
+                <span className="cms-angka">
+                  {laporan.dibuat ? waktuPanjang.format(laporan.dibuat) : "—"}
+                </span>
+              </Baris>
+
+              <Baris label="Koordinat">
+                {laporan.lat !== null && laporan.lng !== null ? (
+                  <a href={`https://www.google.com/maps?q=${laporan.lat},${laporan.lng}`}
+                     target="_blank" rel="noreferrer"
+                     className="cms-angka underline-offset-4 hover:underline">
+                    {laporan.lat.toFixed(7)}, {laporan.lng.toFixed(7)} ↗
+                  </a>
+                ) : (
+                  <span className="text-[var(--lirih)]">Tidak diisi</span>
+                )}
+              </Baris>
+
+              <Baris label="Alamat IP">
+                <span className="cms-angka">{laporan.ip ?? "—"}</span>
+              </Baris>
+
+              {laporan.status !== "pending" && (
+                <Baris label="Ditinjau">
+                  <span className="cms-angka">
+                    {laporan.ditinjau ? waktuPanjang.format(laporan.ditinjau) : "—"}
+                  </span>
+                  {laporan.peninjau && (
+                    <span className="mt-0.5 block text-[var(--redup)]">
+                      oleh {laporan.peninjau}
+                    </span>
+                  )}
+                </Baris>
+              )}
+            </dl>
+          </Bagian>
+
+          {berikutnya !== null && (
+            <Link href={`/admin/laporan/${berikutnya}?status=${asal}`}
+                  className="cms-tombol cms-tombol--garis mt-2 w-full justify-center">
+              Laporan berikutnya →
+            </Link>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function Bagian({ judul, children }: { judul: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-8 last:mb-0">
+      <h2 className="cms-mata mb-3 border-b border-[var(--garis)] pb-2">{judul}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Baris({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="cms-mata text-[var(--lirih)]">{label}</dt>
+      <dd className="mt-1 text-[13.5px] text-[var(--jelaga)]">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * Lampiran ukuran baca, bukan keping kecil seperti di daftar.
+ *
+ * Di halaman inilah keputusan diambil, jadi gambarnya digambar sebesar yang
+ * muat — dibatasi tinggi layar supaya foto potret tidak mendorong sisa halaman
+ * jauh ke bawah. Menekan gambar membuka berkas aslinya, ukuran penuh.
+ */
+function LampiranPenuh({ daftar, judul }: { daftar: Lampiran[]; judul: string }) {
+  return (
+    <ul className="grid gap-4">
+      {daftar.map((m, i) => (
+        <li key={m.url}>
+          {m.jenis === "gambar" ? (
+            <a href={m.url} target="_blank" rel="noreferrer"
+               className="block w-fit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
+              <img src={m.url} alt={`Lampiran ${i + 1} — ${judul}`} loading="lazy"
+                   className="max-h-[70svh] w-auto max-w-full rounded-[3px] border border-[var(--garis)]" />
+            </a>
+          ) : (
+            <video src={m.url} controls preload="metadata"
+                   className="max-h-[70svh] w-full max-w-full rounded-[3px] border border-[var(--garis)] bg-black" />
+          )}
+          <p className="cms-mata mt-1.5 text-[var(--lirih)]">
+            {m.jenis === "gambar" ? "Gambar" : "Video"} {i + 1} ·{" "}
+            <a href={m.url} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
+              buka berkas ↗
+            </a>
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}

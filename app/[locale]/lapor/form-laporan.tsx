@@ -1,0 +1,449 @@
+"use client";
+
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "@/lib/batas-laporan";
+import { TEKS_LAPOR, type Bahasa } from "@/lib/bahasa";
+import { kirimLaporan, type KeadaanLapor } from "./aksi";
+
+/** Site key Turnstile. Tanpa ini (pengembangan) widget tidak dirender dan
+ *  verifikasi di server pun dilewati — sama seperti kolom komentar. */
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+
+/**
+ * Jenis berkas ditulis satu per satu, BUKAN "image/*,video/*".
+ *
+ * Dengan daftar eksplisit, iOS mengubah foto HEIC-nya jadi JPEG saat dipilih —
+ * lengkap dengan EXIF-nya — sehingga berkasnya lolos pemeriksaan MIME di
+ * simpanBerkas() dan tetap bisa dibuka petugas. Dengan "image/*" ia mengirim
+ * HEIC apa adanya, dan laporan dari iPhone selalu ditolak.
+ */
+const DITERIMA = "image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm";
+
+type TurnstileInstance = {
+  render: (wadah: HTMLElement, opsi: Record<string, unknown>) => number;
+  reset: (id: number) => void;
+  remove: (id: number | null) => void;
+};
+
+function turnstile(): TurnstileInstance | null {
+  return (window as Window & { turnstile?: TurnstileInstance }).turnstile ?? null;
+}
+
+function ukuranTeks(byte: number): string {
+  if (byte >= 1024 * 1024) return `${(byte / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(byte / 1024))} KB`;
+}
+
+/** Dua berkas dianggap sama kalau nama, ukuran, dan waktu ubahnya sama —
+ *  cukup untuk mencegah kiriman ganda saat pemilih berkas dibuka dua kali. */
+function kunciBerkas(b: File): string {
+  return `${b.name}|${b.size}|${b.lastModified}`;
+}
+
+export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
+  const teks = TEKS_LAPOR[bahasa];
+  const [keadaan, aksi, mengirim] = useActionState<KeadaanLapor, FormData>(kirimLaporan, null);
+
+  /**
+   * Semua isian TERKENDALI oleh React, bukan dibiarkan uncontrolled.
+   *
+   * React mengosongkan <form> setiap kali sebuah form action selesai — juga
+   * ketika aksinya gagal. Dengan isian uncontrolled, satu galat koordinat
+   * membuang seluruh cerita yang baru saja diketik pelapor, dan orang yang
+   * kehilangan tulisannya sekali biasanya tidak mengetik ulang. Nilai yang
+   * dipegang state selamat dari pengosongan itu.
+   */
+  const [judul, setJudul] = useState("");
+  const [deskripsi, setDeskripsi] = useState("");
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
+  const [nama, setNama] = useState("");
+  const [berkas, setBerkas] = useState<File[]>([]);
+  const [anonim, setAnonim] = useState(false);
+  const [galatKlien, setGalatKlien] = useState("");
+  const [mencariLokasi, setMencariLokasi] = useState(false);
+  /** Pratinjau per berkas: key = kunciBerkas(b), nilai = URL objek lokal. */
+  const [pratinjau, setPratinjau] = useState<Record<string, string>>({});
+
+  const berkasRef = useRef<HTMLInputElement | null>(null);
+  const captchaRef = useRef<HTMLDivElement | null>(null);
+  const widgetRef = useRef<number | null>(null);
+  // Semua URL objek yang pernah dibuat, dilepas sekaligus saat komponen
+  // diturunkan — mengosongkan form oleh React tidak mencabut berkasnya.
+  const urlRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    return () => {
+      for (const url of urlRef.current) URL.revokeObjectURL(url);
+      urlRef.current = [];
+    };
+  }, []);
+
+  const berhasil = keadaan?.ok === true;
+  const totalByte = berkas.reduce((n, b) => n + b.size, 0);
+
+  /**
+   * Daftar berkas dipegang React, tapi yang dikirim tetap `input.files` —
+   * form ini menyerahkan FormData bawaan, jadi berkasnya berpindah ke server
+   * tanpa pernah dibaca ulang di klien. Sinkronisasinya lewat DataTransfer,
+   * satu-satunya cara menulis balik ke sebuah <input type="file">.
+   *
+   * `keadaan` ikut jadi kebergantungan: pengosongan form oleh React juga
+   * mengosongkan input berkas, sementara daftar di bawah masih menyebut
+   * nama-nama itu. Tanpa penyusunan ulang di sini, percobaan kirim berikutnya
+   * berangkat TANPA lampiran yang jelas-jelas masih tertulis di layar.
+   */
+  useEffect(() => {
+    const input = berkasRef.current;
+    if (!input) return;
+    const dt = new DataTransfer();
+    for (const b of berkas) dt.items.add(b);
+    input.files = dt.files;
+  }, [berkas, keadaan]);
+
+  const ulangCaptcha = useCallback(() => {
+    const ts = turnstile();
+    if (ts && widgetRef.current !== null) {
+      try {
+        ts.reset(widgetRef.current);
+      } catch {
+        /* widget sudah lepas */
+      }
+    }
+  }, []);
+
+  // Widget dipasang sekali, mode explicit — sama seperti kolom komentar:
+  // kotak captcha tidak ditampilkan kecuali Cloudflare memang menantang.
+  useEffect(() => {
+    if (!SITE_KEY) return;
+    let hidup = true;
+
+    const pasang = () => {
+      const wadah = captchaRef.current;
+      const ts = turnstile();
+      if (!wadah || !hidup) return;
+      if (!ts) {
+        window.setTimeout(pasang, 100);
+        return;
+      }
+      try {
+        ts.remove(widgetRef.current);
+      } catch {
+        /* belum ada widget */
+      }
+      wadah.innerHTML = "";
+      // Tokennya TIDAK disalin ke state React. Turnstile menaruh sendiri satu
+      // <input type="hidden"> bernama `captcha` di dalam wadah ini, dan wadah
+      // ini duduk di dalam <form> — jadi tokennya ikut FormData tanpa perantara,
+      // dan mengosongkannya kembali cukup dengan reset() di bawah.
+      widgetRef.current = ts.render(wadah, {
+        sitekey: SITE_KEY,
+        appearance: "interaction-only",
+        "response-field-name": "captcha",
+      });
+    };
+
+    pasang();
+    return () => {
+      hidup = false;
+    };
+  }, []);
+
+  // Token Turnstile sekali pakai: begitu satu kiriman ditolak, widget harus
+  // meminta token baru — kalau tidak, percobaan berikutnya pasti gagal
+  // verifikasi dengan alasan yang tidak bisa ditebak pengunjung.
+  //
+  // Yang berhasil tidak perlu dibereskan: formnya sudah diganti panel
+  // "laporan terkirim" di bawah, jadi tidak ada isian tersisa untuk dikosongkan.
+  useEffect(() => {
+    if (keadaan === null || keadaan.ok) return;
+    ulangCaptcha();
+  }, [keadaan, ulangCaptcha]);
+
+  function tambahBerkas(dipilih: FileList | null) {
+    if (!dipilih || dipilih.length === 0) return;
+    setGalatKlien("");
+
+    const sudah = new Set(berkas.map(kunciBerkas));
+    const gabungan = [...berkas];
+    const kunciBaru: string[] = [];
+    for (const b of dipilih) {
+      const kunci = kunciBerkas(b);
+      if (!sudah.has(kunci)) {
+        sudah.add(kunci);
+        gabungan.push(b);
+        kunciBaru.push(kunci);
+      }
+    }
+
+    if (gabungan.length > BATAS_BERKAS) {
+      setGalatKlien(teks.terlaluBanyak.replace("{n}", String(BATAS_BERKAS)));
+      return;
+    }
+    // Atap ukuran dicek di sini, bukan dibiarkan sampai server: kiriman yang
+    // melebihi bodySizeLimit gagal di lapisan framework, dan galatnya tidak
+    // memberi tahu apa pun kepada orang yang sedang mengunggah.
+    if (gabungan.reduce((n, b) => n + b.size, 0) > BATAS_TOTAL_BYTE) {
+      setGalatKlien(teks.terlaluBesar);
+      return;
+    }
+
+    // URL pratinjau baru baru dibuat setelah validasi lolos, supaya berkas
+    // yang ditolak (lewat batas) tidak meninggalkan URL yang tertahan.
+    const tambahanUrl: Record<string, string> = {};
+    for (const kunci of kunciBaru) {
+      const b = gabungan.find((x) => kunciBerkas(x) === kunci);
+      if (b) {
+        const url = URL.createObjectURL(b);
+        urlRef.current.push(url);
+        tambahanUrl[kunci] = url;
+      }
+    }
+    if (Object.keys(tambahanUrl).length > 0) {
+      setPratinjau((lama) => ({ ...lama, ...tambahanUrl }));
+    }
+
+    setBerkas(gabungan);
+  }
+
+  function hapusBerkasDipilih(kunci: string, url: string | undefined) {
+    if (url) {
+      URL.revokeObjectURL(url);
+      urlRef.current = urlRef.current.filter((u) => u !== url);
+    }
+    setPratinjau((lama) => {
+      const sisa = { ...lama };
+      delete sisa[kunci];
+      return sisa;
+    });
+    setBerkas((d) => d.filter((x) => kunciBerkas(x) !== kunci));
+  }
+
+  function lokasiSaya() {
+    if (!navigator.geolocation) {
+      setGalatKlien(teks.lokasiGagal);
+      return;
+    }
+    setMencariLokasi(true);
+    setGalatKlien("");
+    navigator.geolocation.getCurrentPosition(
+      (posisi) => {
+        setMencariLokasi(false);
+        // Tujuh angka di belakang koma, sama dengan DECIMAL(10,7) di kolomnya —
+        // lebih dari itu hanya akan dipotong basis data.
+        setLat(posisi.coords.latitude.toFixed(7));
+        setLng(posisi.coords.longitude.toFixed(7));
+      },
+      () => {
+        setMencariLokasi(false);
+        setGalatKlien(teks.lokasiGagal);
+      },
+      { enableHighAccuracy: true, timeout: 10_000 },
+    );
+  }
+
+  if (berhasil) {
+    return (
+      <div role="status" className="rounded-lg border border-hijau/20 bg-hijau/[0.04] p-8 text-center">
+        <p className="text-[20px] font-semibold text-hijau">{teks.berhasilJudul}</p>
+        <p className="mx-auto mt-2 max-w-[46ch] text-[14px] leading-[1.6] text-tinta/70">
+          {teks.berhasilIsi}
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button type="button" onClick={() => window.location.reload()} className={TOMBOL_UTAMA}>
+            {teks.lagi}
+          </button>
+          <Link href={`/${bahasa}`} className={TOMBOL_GARIS}>
+            {teks.kembali}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const galat = galatKlien || (keadaan && !keadaan.ok ? keadaan.galat : "");
+
+  return (
+    <form action={aksi} className="grid gap-7">
+      {galat && (
+        <p role="alert"
+           className="rounded-md border border-api/25 bg-api/[0.06] px-4 py-3 text-[13.5px] text-bara">
+          {galat}
+        </p>
+      )}
+
+      <Bidang id="lapor-judul" label={teks.labelJudul} petunjuk={teks.petunjukJudul} wajib>
+        <input id="lapor-judul" name="judul" required maxLength={255} className={ISIAN}
+               value={judul} onChange={(e) => setJudul(e.target.value)}
+               aria-describedby="lapor-judul-petunjuk" autoComplete="off" />
+      </Bidang>
+
+      <Bidang id="lapor-deskripsi" label={teks.labelDeskripsi} petunjuk={teks.petunjukDeskripsi} wajib>
+        <textarea id="lapor-deskripsi" name="deskripsi" required maxLength={5000} rows={5}
+                  value={deskripsi} onChange={(e) => setDeskripsi(e.target.value)}
+                  aria-describedby="lapor-deskripsi-petunjuk"
+                  className={`${ISIAN} resize-y leading-[1.6]`} />
+      </Bidang>
+
+      <Bidang id="berkas-laporan" label={teks.labelBerkas} petunjuk={teks.petunjukBerkas}>
+        {/* Input aslinya disembunyikan dari mata, bukan dari pembaca layar:
+            tampilan bawaannya berbeda di tiap peramban dan tidak memberi tahu
+            berkas mana saja yang sudah terpilih. Daftar di bawahlah yang
+            melakukan itu. */}
+        <input ref={berkasRef} type="file" name="berkas" multiple accept={DITERIMA}
+               onChange={(e) => tambahBerkas(e.target.files)}
+               aria-describedby="berkas-laporan-petunjuk" className="sr-only" id="berkas-laporan" />
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor="berkas-laporan" className={`${TOMBOL_GARIS} cursor-pointer`}>
+            {teks.pilihBerkas}
+          </label>
+          {berkas.length > 0 && (
+            <span className="text-[12.5px] text-tinta/50">
+              {berkas.length}/{BATAS_BERKAS} · {ukuranTeks(totalByte)}
+            </span>
+          )}
+        </div>
+
+        {berkas.length > 0 && (
+          <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {berkas.map((b) => {
+              const kunci = kunciBerkas(b);
+              const url = pratinjau[kunci];
+              return (
+                <li key={kunci}
+                    className="group relative overflow-hidden rounded-md border border-black/[0.12] bg-black/[0.02]">
+                  <button type="button"
+                          onClick={() => hapusBerkasDipilih(kunci, url)}
+                          aria-label={`${teks.hapusBerkas} ${b.name}`}
+                          className="absolute top-1 right-1 z-[3] grid size-5 cursor-pointer place-items-center rounded-full
+                                     bg-black/60 text-white transition-colors hover:bg-api">
+                    <svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor" className="size-3">
+                      <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                    </svg>
+                  </button>
+                  {url && b.type.startsWith("video/") ? (
+                    // #t=0.5 meminta peramban melompat ke detik itu; tanpa itu
+                    // <video> tanpa poster berhenti di bingkai kosong.
+                    <video src={`${url}#t=0.5`} preload="metadata" muted playsInline
+                           className="h-[86px] w-full object-cover" />
+                  ) : url ? (
+                    <img src={url} alt="" className="h-[86px] w-full object-cover" />
+                  ) : (
+                    <div className="flex h-[86px] w-full items-center justify-center bg-black/[0.06]">
+                      <span className="text-[11px] text-tinta/40">{b.type.startsWith("video/") ? "Video" : "Foto"}</span>
+                    </div>
+                  )}
+                  <p className="truncate px-2 py-1.5 text-[11px] text-tinta/60" title={b.name}>{b.name}</p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <p className="mt-2.5 text-[12px] leading-[1.5] text-tinta/45">{teks.catatanMetadata}</p>
+      </Bidang>
+
+      <Bidang id="lapor-lat" label={teks.labelLokasi} petunjuk={teks.petunjukLokasi}>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="grid gap-1.5">
+            <span className="text-[12px] text-tinta/50">{teks.lat}</span>
+            <input id="lapor-lat" name="lat" inputMode="decimal" placeholder="-1.2345678"
+                   value={lat} onChange={(e) => setLat(e.target.value)}
+                   className={`${ISIAN} w-40`} />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-[12px] text-tinta/50">{teks.lng}</span>
+            <input id="lapor-lng" name="lng" inputMode="decimal" placeholder="113.4567890"
+                   value={lng} onChange={(e) => setLng(e.target.value)}
+                   className={`${ISIAN} w-40`} />
+          </label>
+          <button type="button" onClick={lokasiSaya} disabled={mencariLokasi}
+                  className={`${TOMBOL_GARIS} disabled:opacity-50`}>
+            {mencariLokasi ? teks.mencariLokasi : teks.pakaiLokasi}
+          </button>
+        </div>
+      </Bidang>
+
+      <Bidang id="lapor-nama" label={teks.labelNama}>
+        <input id="lapor-nama" name="nama" maxLength={100} disabled={anonim} autoComplete="name"
+               value={nama} onChange={(e) => setNama(e.target.value)}
+               className={`${ISIAN} disabled:bg-black/[0.03] disabled:text-tinta/35`} />
+        <label className="mt-3 flex w-fit items-center gap-2.5 text-[13.5px]">
+          <input type="checkbox" name="anonim" value="1" checked={anonim}
+                 onChange={(e) => setAnonim(e.target.checked)}
+                 className="size-4 accent-[var(--color-api)]" />
+          {teks.anonim}
+        </label>
+      </Bidang>
+
+      {/* Umpan jebakan: disembunyikan dari mata dan dari pembaca layar, dan
+          tidak bisa difokus lewat Tab — hanya bot yang mengisinya. */}
+      <input type="text" name="website" tabIndex={-1} autoComplete="off"
+             aria-hidden="true" className="hidden" />
+
+      {/* Wadah widget Turnstile — sekaligus tempat kolom `captcha`-nya. Harus
+          tetap di DALAM form supaya tokennya ikut terkirim. */}
+      <div ref={captchaRef} />
+
+      <div className="flex items-center gap-4 border-t border-black/[0.08] pt-6">
+        <button type="submit" disabled={mengirim} className={`${TOMBOL_UTAMA} disabled:opacity-60`}>
+          {mengirim ? teks.mengirim : teks.kirim}
+        </button>
+        <Link href={`/${bahasa}`} className="text-[13px] text-tinta/50 underline-offset-4 hover:underline">
+          {teks.kembali}
+        </Link>
+      </div>
+    </form>
+  );
+}
+
+const ISIAN =
+  "w-full rounded-md border border-black/[0.14] bg-white px-3 py-2.5 text-[14px] text-tinta " +
+  "outline-none transition-colors placeholder:text-tinta/30 focus:border-api/60 " +
+  "focus:ring-2 focus:ring-api/15";
+
+const TOMBOL_UTAMA =
+  "inline-flex items-center rounded-md bg-api px-5 py-2.5 text-[13.5px] font-semibold text-white " +
+  "transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-api";
+
+const TOMBOL_GARIS =
+  "inline-flex items-center rounded-md border border-black/[0.16] bg-white px-4 py-2 text-[13px] " +
+  "font-medium text-tinta transition-colors hover:border-black/30 focus-visible:outline-2 " +
+  "focus-visible:outline-offset-2 focus-visible:outline-api";
+
+/**
+ * Satu bidang isian: label, satu baris petunjuk, lalu isiannya.
+ *
+ * Wadahnya <div> dengan <label for>, BUKAN <label> yang membungkus semuanya —
+ * beberapa bidang di form ini berisi label lain di dalamnya (pemilih berkas,
+ * kotak anonim, pasangan lat/lng), dan label bersarang tidak sah serta membuat
+ * klik jatuh ke kendali yang salah.
+ */
+function Bidang({
+  id, label, petunjuk, wajib = false, children,
+}: {
+  /** id kendali yang dituju label ini. */
+  id: string;
+  label: string;
+  petunjuk?: string;
+  wajib?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-2">
+      <label htmlFor={id} className="text-[13.5px] font-semibold text-tinta">
+        {label}
+        {wajib && <span aria-hidden="true" className="ml-1 text-api">*</span>}
+      </label>
+      {petunjuk && (
+        <p id={`${id}-petunjuk`} className="-mt-1 text-[12.5px] leading-[1.5] text-tinta/50">
+          {petunjuk}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}

@@ -6,7 +6,7 @@ import { aturPersetujuan, hapusKomentarModerasi } from "@/lib/moderasi-komentar"
 
 async function jaga() {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
   return sesi;
 }
 

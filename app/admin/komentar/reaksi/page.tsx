@@ -19,7 +19,7 @@ export default async function Reaksi({
   searchParams: Promise<{ halaman?: string; page?: string }>;
 }) {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
 
   const params = await searchParams;
   const halaman = Math.max(1, parseInt(params.halaman ?? params.page ?? "1", 10) || 1);

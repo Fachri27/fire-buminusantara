@@ -1,6 +1,11 @@
 import { prisma } from "./prisma";
 import kataKasar from "./kata-kasar.json";
 
+// Turnstile dipakai bersama form laporan warga, jadi tinggal di modulnya
+// sendiri. Di-ekspor ulang di sini supaya route komentar tidak perlu ikut
+// berubah alamat impornya.
+export { turnstileSah } from "./turnstile";
+
 /** Model polimorfik dipakai bersama halaman lain di Pasopati; nilainya harus
  *  sama persis dengan yang ditulis Laravel. */
 const TIPE = "App\\Models\\Event";
@@ -142,24 +147,4 @@ export async function simpanKomentar(input: {
       updated_at: new Date(),
     },
   });
-}
-
-/** Cloudflare Turnstile. Tanpa secret yang terpasang, verifikasi dilewati —
- *  supaya pengembangan lokal tidak terhalang, sama seperti di Laravel. */
-export async function turnstileSah(token: string | null, ip: string | null): Promise<boolean> {
-  const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) return true;
-  if (!token) return false;
-
-  try {
-    const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ secret, response: token, ...(ip ? { remoteip: ip } : {}) }),
-    });
-    const data = await r.json();
-    return Boolean(data?.success);
-  } catch {
-    return false;
-  }
 }

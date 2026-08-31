@@ -19,7 +19,7 @@ export default async function Ubah({
   searchParams: Promise<{ galat?: string }>;
 }) {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
 
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
@@ -32,7 +32,7 @@ export default async function Ubah({
   async function kirim(data: FormData) {
     "use server";
     const s = await bacaSesi();
-    if (!s || !bolehKelola(s.peran)) redirect("/admin/masuk");
+    if (!s || !bolehKelola(s.peran)) redirect("/admin/login");
 
     const hasil = await simpanKejadian(data, id);
     if (!hasil.ok) redirect(`/admin/kejadian/${id}?galat=${encodeURIComponent(hasil.galat)}`);

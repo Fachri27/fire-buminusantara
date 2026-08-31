@@ -95,6 +95,9 @@ type Potongan = { awal: number; akhir: number };
 function jawab(badan: ReadableStream, jenis: string, ukuran: number, potongan: Potongan | null) {
   const kepala: Record<string, string> = {
     "content-type": jenis,
+    // Header keamanan untuk konten unggahan (nosniff + CSP "default-src 'none'")
+    // dipasang terpusat di next.config.ts untuk jalur /media — di sini tidak
+    // digandakan supaya tidak muncul dua header dengan nilai berbeda.
     // Tanpa ini browser memutar video dari awal saja: tanpa Range ia tidak bisa
     // melompat ke tengah, dan Safari malah menolak memutarnya sama sekali.
     "accept-ranges": "bytes",

@@ -190,10 +190,10 @@ export function PopupPeta({
             <ul>
               {tampil.map(({ b, i }) => {
                 /* Pratinjau diambil dari media asli kejadian (galeri `media`),
-                   bukan `b.gambar` yang selalu diberi foto bawaan — kartu
-                   kejadian bervideo-galeri tadinya tampil dengan foto dummy
-                   yang sama semua. Foto bawaan hanya cadangan terakhir untuk
-                   kejadian yang sama sekali tanpa media. */
+                   bukan dari `gambar` yang tadinya selalu diberi foto bawaan —
+                   kartu kejadian bervideo-galeri tampil dengan foto dummy yang
+                   sama semua. Kejadian tanpa media sama sekali menampilkan
+                   placeholder lokasi, bukan foto dummy. */
                 const awal = b.media[0];
                 return (
                 <li key={b.id} className="border-b border-black/10 last:border-b-0">
@@ -210,11 +210,23 @@ export function PopupPeta({
                                className="h-[clamp(80px,18vw,120px)] w-[clamp(120px,27vw,190px)] object-cover
                                           transition-transform duration-300 group-hover:scale-105
                                           panggung:h-[130px] panggung:w-[210px]" />
-                      ) : (
-                        <img src={awal?.url ?? b.gambar} alt="" aria-hidden="true"
+                      ) : awal ? (
+                        <img src={awal.url} alt="" aria-hidden="true"
                              className="h-[clamp(80px,18vw,120px)] w-[clamp(120px,27vw,190px)] object-cover
                                         transition-transform duration-300 group-hover:scale-105
                                         panggung:h-[130px] panggung:w-[210px]" />
+                      ) : (
+                        // Tanpa media: tidak menampilkan foto dummy — kotak
+                        // pratinjau memuat petunjuk lokasi saja.
+                        <div aria-hidden="true"
+                             className="flex h-[clamp(80px,18vw,120px)] w-[clamp(120px,27vw,190px)] items-center
+                                        justify-center bg-[linear-gradient(150deg,#eef1f4,#d7dee4)]
+                                        panggung:h-[130px] panggung:w-[210px]">
+                          <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-[10px] font-semibold
+                                           uppercase tracking-wide text-black/45">
+                            {b.pulau || "Belum ada foto"}
+                          </span>
+                        </div>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">

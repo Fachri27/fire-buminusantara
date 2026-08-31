@@ -13,14 +13,14 @@ export default async function Tambah({
   searchParams: Promise<{ galat?: string }>;
 }) {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
 
   const { galat } = await searchParams;
 
   async function kirim(data: FormData) {
     "use server";
     const s = await bacaSesi();
-    if (!s || !bolehKelola(s.peran)) redirect("/admin/masuk");
+    if (!s || !bolehKelola(s.peran)) redirect("/admin/login");
 
     const hasil = await simpanKejadian(data);
     if (!hasil.ok) redirect(`/admin/kejadian/baru?galat=${encodeURIComponent(hasil.galat)}`);

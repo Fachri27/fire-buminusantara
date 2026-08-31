@@ -16,7 +16,7 @@ export default async function DaftarKejadian({
   searchParams: Promise<{ cari?: string; halaman?: string; page?: string }>;
 }) {
   const sesi = await bacaSesi();
-  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/masuk");
+  if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
 
   const params = await searchParams;
   const kata = (params.cari ?? "").trim();

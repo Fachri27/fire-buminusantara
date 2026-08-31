@@ -7,5 +7,5 @@ import { hapusSesi } from "@/lib/sesi";
  *  klien: cookienya httpOnly, jadi hanya server yang bisa mencabutnya. */
 export async function keluar() {
   await hapusSesi();
-  redirect("/admin/masuk");
+  redirect("/admin/login");
 }
