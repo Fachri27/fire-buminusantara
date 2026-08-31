@@ -48,9 +48,18 @@ async function susunGaleri(
     else await hapusBerkas(berkas.path);
   }
 
-  for (const nilai of data.getAll("media_files")) {
+  const kiriman = data.getAll("media_files");
+  console.log("[Galeri] berkas diterima:", kiriman.length, kiriman.map((v) =>
+    v instanceof File ? `${v.name} (${v.size}B, ${v.type})` : `bukan-File: ${typeof v}`));
+
+  for (const nilai of kiriman) {
     const berkas = berkasTerisi(nilai);
-    if (!berkas) continue;
+    if (!berkas) {
+      // Dulu dilewati diam-diam: berkas kosong/bukan-File tidak meninggalkan
+      // jejak apa pun, sehingga "tersimpan tapi tanpa media" tak bisa dilacak.
+      console.warn("[Galeri] entri dilewati (kosong atau bukan File)");
+      continue;
+    }
     const hasil = await simpanBerkasGaleri(berkas);
     if ("galat" in hasil) return { galat: `Media galeri: ${hasil.galat}` };
     media.push(hasil);

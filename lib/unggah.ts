@@ -124,13 +124,23 @@ export async function simpanBerkas(
     const err = error instanceof Error ? error : { message: String(error), name: "Unknown" };
     console.error("[Upload ERROR]", { message: err.message, code: err.name });
 
-    // Fallback ke local storage
+    // Cadangan ke penyimpanan lokal. Ini menyelamatkan berkasnya, TAPI dulu
+    // hasilnya dilaporkan seolah sukses penuh — unggahan yang tidak pernah
+    // sampai ke MinIO terlihat normal di CMS. Sekarang jalur ini dicatat
+    // dengan jelas supaya bisa dibedakan dari unggahan yang benar-benar naik.
     try {
       const penuh = path.join(AKAR_MEDIA, relatif);
       await mkdir(path.dirname(penuh), { recursive: true });
       await writeFile(penuh, isi);
+      console.warn("[Upload FALLBACK] MinIO gagal, berkas disimpan lokal:", {
+        path: penuh, alasanMinio: err.message,
+      });
       return { path: AWALAN_LOKAL + relatif, url: `/media/${relatif}` };
-    } catch {
+    } catch (galatLokal) {
+      console.error("[Upload GAGAL TOTAL]", {
+        minio: err.message,
+        lokal: galatLokal instanceof Error ? galatLokal.message : String(galatLokal),
+      });
       return { galat: err.message || "Gagal menyimpan berkas." };
     }
   }

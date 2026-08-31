@@ -52,18 +52,40 @@ export function FormKejadian({
   const [lng, setLng] = useState(awal.location_lng);
   const [hasil, setHasil] = useState<Lokasi[]>([]);
   const [mencari, setMencari] = useState(false);
+  const [memuatLagi, setMemuatLagi] = useState(false);
+  const [habis, setHabis] = useState(false);
 
-  async function cariLokasi(kata: string) {
-    if (kata.trim().length < 2) { setHasil([]); return; }
-    setMencari(true);
+  // Hasil dibagi 10 halaman; menggulir ke dasar daftar mengambil halaman
+  // berikutnya. `permintaan` membuang jawaban yang sudah ketinggalan ketika
+  // pengguna terus mengetik.
+  const BAGI = 10;
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const permintaan = useRef(0);
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  async function ambil(kata: string, geser: number) {
+    const id = ++permintaan.current;
+    geser === 0 ? setMencari(true) : setMemuatLagi(true);
     try {
-      const r = await fetch(`/api/lokasi?q=${encodeURIComponent(kata)}`);
-      setHasil(r.ok ? (await r.json()).hasil ?? [] : []);
+      const r = await fetch(`/api/lokasi?q=${encodeURIComponent(kata)}&offset=${geser}`);
+      const baru: Lokasi[] = r.ok ? (await r.json()).hasil ?? [] : [];
+      if (id !== permintaan.current) return;
+      setHasil((lama) => (geser === 0 ? baru : [...lama, ...baru]));
+      setHabis(baru.length < BAGI);
     } catch {
-      setHasil([]);
+      if (id === permintaan.current) { setHasil(geser === 0 ? [] : (lama) => lama); setHabis(true); }
     } finally {
-      setMencari(false);
+      if (id === permintaan.current) { setMencari(false); setMemuatLagi(false); }
     }
+  }
+
+  function cariLokasi(kata: string) {
+    clearTimeout(timer.current);
+    const t = kata.trim();
+    if (t.length < 2) { setHasil([]); setHabis(false); return; }
+    // Ditunda sedikit supaya setiap ketikan tidak menembolok database jauh.
+    timer.current = setTimeout(() => ambil(t, 0), 300);
   }
 
   return (
@@ -142,7 +164,15 @@ export function FormKejadian({
           {mencari && <p className="cms-mata mt-2">Mencari…</p>}
 
           {hasil.length > 0 && (
-            <ul className="mt-2 max-h-56 overflow-y-auto rounded-[3px] border border-[var(--garis-tegas)]
+            <ul
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                if (!habis && !memuatLagi &&
+                    el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
+                  ambil(lokasi.trim(), hasil.length);
+                }
+              }}
+              className="mt-2 max-h-56 overflow-y-auto rounded-[3px] border border-[var(--garis-tegas)]
                            bg-[var(--papan)]">
               {hasil.map((h) => (
                 <li key={h.id} className="border-b border-[var(--garis)] last:border-b-0">
@@ -155,13 +185,21 @@ export function FormKejadian({
                           }}
                           className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left
                                      text-[13.5px] hover:bg-white">
-                    <span className="min-w-0 truncate">{h.nama}</span>
+                    <span className="min-w-0 truncate"><Sorot teks={h.nama} kata={lokasi} /></span>
                     <span className="cms-angka shrink-0 text-[11.5px] text-[var(--lirih)]">
                       {h.lat.toFixed(3)}, {h.lng.toFixed(3)}
                     </span>
                   </button>
                 </li>
               ))}
+              {memuatLagi && (
+                <li className="cms-mata px-3 py-2 text-[12px]">Memuat…</li>
+              )}
+              {!habis && !memuatLagi && (
+                <li className="cms-mata px-3 py-2 text-[11.5px] text-[var(--lirih)]">
+                  Gulir ke bawah untuk memuat lagi
+                </li>
+              )}
             </ul>
           )}
         </div>
@@ -226,6 +264,23 @@ function Wajib() {
 
 function Bantuan({ children }: { children: React.ReactNode }) {
   return <p className="mt-1.5 text-[12px] leading-[1.5] text-[var(--lirih)]">{children}</p>;
+}
+
+/** Teks hasil pencarian dengan bagian yang sama dengan ketikan pengguna
+ *  ditebalkan — semua kemunculannya, tidak hanya yang pertama. */
+function Sorot({ teks, kata }: { teks: string; kata: string }) {
+  const k = kata.trim().toLowerCase();
+  if (!k) return <>{teks}</>;
+  const bagian: React.ReactNode[] = [];
+  let pos = 0;
+  for (let n = 0; ; n++) {
+    const i = teks.toLowerCase().indexOf(k, pos);
+    if (i < 0) break;
+    bagian.push(teks.slice(pos, i), <strong key={n}>{teks.slice(i, i + k.length)}</strong>);
+    pos = i + k.length;
+  }
+  bagian.push(teks.slice(pos));
+  return <>{bagian}</>;
 }
 
 function Isian({

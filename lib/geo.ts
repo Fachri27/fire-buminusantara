@@ -30,7 +30,7 @@ function kutip(nama: string): string {
   return nama.split(".").map((b) => `"${b.replace(/"/g, '""')}"`).join(".");
 }
 
-export async function cariLokasi(kata: string, batas = 12): Promise<Lokasi[]> {
+export async function cariLokasi(kata: string, batas = 10, geser = 0): Promise<Lokasi[]> {
   const teks = kata.trim();
   if (teks.length < 2) return [];
 
@@ -55,7 +55,8 @@ export async function cariLokasi(kata: string, batas = 12): Promise<Lokasi[]> {
     FROM ${kutip(tabel)}
     WHERE ${syarat}
     ORDER BY ${kutip(kolomNama)}
-    LIMIT ${Math.max(1, Math.min(50, batas))}
+    LIMIT ${Math.max(1, Math.min(50, Math.trunc(batas)))}
+    OFFSET ${Math.max(0, Math.trunc(geser))}
   `;
 
   try {

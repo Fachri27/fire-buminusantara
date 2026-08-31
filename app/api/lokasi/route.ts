@@ -14,7 +14,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ message: "Tidak berwenang." }, { status: 403 });
   }
 
-  const q = new URL(req.url).searchParams.get("q") ?? "";
-  const hasil = await cariLokasi(q);
+  const url = new URL(req.url);
+  const q = url.searchParams.get("q") ?? "";
+  const geser = Math.max(0, parseInt(url.searchParams.get("offset") ?? "0", 10) || 0);
+  const hasil = await cariLokasi(q, 10, geser);
   return NextResponse.json({ hasil });
 }
