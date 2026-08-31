@@ -82,6 +82,20 @@ jobs:
           # Simpan socket untuk langkah berikutnya (eval tidak menembus langkah).
           echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
 
+      - name: Cek entri known_hosts cocok dengan HOST
+        env:
+          HOST: ${{ secrets.PROD_SSH_HOST }}
+        run: |
+          # ssh mencari known_hosts berdasarkan nama yang diberikan persis —
+          # domain di satu secret, IP di secret lainnya = tidak pernah cocok.
+          # Nilai HOST otomatis dimasker GitHub di log.
+          if grep -q "^$HOST " ~/.ssh/known_hosts; then
+            echo "entri known_hosts untuk '$HOST' ditemukan"
+          else
+            echo "::error::PROD_SSH_HOST ('$HOST') tidak punya entri di PROD_SSH_KNOWN_HOSTS — nama di kedua secret harus persis sama (domain=domain, ip=ip). Entri yang ada: $(awk '{print $1}' ~/.ssh/known_hosts | grep -v '^#' | paste -sd, -)"
+            exit 1
+          fi
+
       - name: Deploy via SSH
         env:
           HOST: ${{ secrets.PROD_SSH_HOST }}
