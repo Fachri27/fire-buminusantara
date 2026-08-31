@@ -18,6 +18,14 @@ ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=""
 ENV NEXT_PUBLIC_MEDIA_URL=$NEXT_PUBLIC_MEDIA_URL \
     NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
+# ID setiap Server Action diturunkan dari kunci ini saat build. Tanpa kunci
+# tetap, tiap build menghasilkan ID baru: tab yang sudah terbuka sebelum deploy
+# mengirim ID lama, server menolak dengan "Failed to find Server Action", dan
+# form gagal senyap — submit tidak melakukan apa pun. Kunci sama = ID stabil
+# lintas deploy.
+ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=""
+ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+
 # ponytail: --webpack — build Turbopack (bawaan Next 16) gagal spawn proses
 # anak di beberapa lingkungan; webpack terverifikasi menghasilkan standalone.
 # Bisa dilepas bila Turbopack build terbukti stabil di CI.
