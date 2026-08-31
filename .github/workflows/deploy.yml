@@ -1,0 +1,94 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      role:
+        type: string
+        description: Role server (menentukan compose file + secrets PROD_*)
+      tags:
+        type: string
+        description: 'Tag image, mis. "WEB_TAG=sha-<sha penuh>"'
+  # Jalur ROLLBACK: dispatch manual dengan tag lama (mis. WEB_TAG=sha-<commit
+  # sebelumnya>) untuk mempin balik box. Bukan jalur cepat — jalan lewat skrip
+  # deploy yang sama, .env.rollback, dan health check.
+  workflow_dispatch:
+    inputs:
+      role:
+        type: string
+        description: Role server
+      tags:
+        type: string
+        description: 'Tag image yang ingin dipasang (untuk rollback: tag lama)'
+
+permissions:
+  contents: read
+
+# Satu role = satu box: dua deploy tidak boleh menyentuh box yang sama
+# bersamaan. Antrikan, jangan dibatalkan.
+concurrency:
+  group: deploy-${{ inputs.role }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Fail closed: input divalidasi SEBELUM dipakai karena diinterpolasi ke
+      # perintah shell remote, dan payload dispatch tidak dipercaya.
+      - name: Validasi input
+        env:
+          ROLE: ${{ inputs.role }}
+          TAGS: ${{ inputs.tags }}
+        run: |
+          case "$ROLE" in
+            prod) ;;
+            *) echo "::error::role tidak dikenal: '$ROLE'"; exit 1 ;;
+          esac
+          echo "$TAGS" | grep -Eq '^[A-Z_]+_TAG=[A-Za-z0-9._-]+( [A-Z_]+_TAG=[A-Za-z0-9._-]+)*$' \
+            || { echo "::error::format tags salah: '$TAGS'"; exit 1; }
+          echo "role=$ROLE tags=$TAGS valid"
+
+      - name: Tulis kunci SSH dan known_hosts terpatok
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Terpatok dari secret — JANGAN ssh-keyscan: itu memercayai apa pun
+          # yang menjawab di hari itu (DNS dibajak = kunci penyerang dipercaya).
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Muat kunci ke ssh-agent (mendukung kunci berpassphrase)
+        env:
+          PASSPHRASE: ${{ secrets.PROD_SSH_KEY_PASSPHRASE }}
+        run: |
+          eval "$(ssh-agent -s)"
+          if [ -n "$PASSPHRASE" ]; then
+            # CI tanpa tty: askpass yang memasok passphrase saat ssh-add bertanya.
+            printf '#!/bin/sh\nprintf "%%s" "$DEPLOY_KEY_PASSPHRASE"\n' > ~/.ssh/askpass.sh
+            chmod 700 ~/.ssh/askpass.sh
+            SSH_ASKPASS=~/.ssh/askpass.sh SSH_ASKPASS_REQUIRE=force \
+              ssh-add ~/.ssh/deploy_key </dev/null
+          else
+            ssh-add ~/.ssh/deploy_key </dev/null
+          fi
+          # Simpan socket untuk langkah berikutnya (eval tidak menembus langkah).
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+      - name: Deploy via SSH
+        env:
+          HOST: ${{ secrets.PROD_SSH_HOST }}
+          USER: ${{ secrets.PROD_SSH_USER }}
+          ROLE: ${{ inputs.role }}
+          TAGS: ${{ inputs.tags }}
+        run: |
+          # Box menjalankan skrip deploy dari repo-nya sendiri — logika deploy
+          # terverSI bersama kode. reset --hard: box tidak boleh punya keadaan
+          # lokal yang menyimpang dari main.
+          ssh -o BatchMode=yes "$USER@$HOST" \
+            "cd /srv/fire && git fetch --quiet origin main && git reset --hard --quiet origin/main && ./deploy/remote-deploy.sh '$ROLE' '$TAGS'"

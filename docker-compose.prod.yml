@@ -1,0 +1,20 @@
+# Stack produksi role "prod". Database (MariaDB milik CMS Laravel), MinIO, dan
+# nginx berjalan di luar stack ini — image di bawah hanya aplikasi Next.js.
+# Port cuma diikat ke 127.0.0.1: host nginx yang menghadap publik.
+services:
+  web:
+    image: ghcr.io/ultramenid/fire-buminusantara:${WEB_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:3000:3000"
+    extra_hosts:
+      # Supaya container bisa menjangkau MariaDB/MinIO yang berjalan di host.
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      # /id dipaksa dynamic → lolos hanya jika app hidup DAN database terjangkau.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/id').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

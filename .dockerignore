@@ -1,0 +1,15 @@
+# Jangan pernah masukkan rahasia ke context build — layer Docker membawa
+# semuanya masuk image, dan image di-push ke registry.
+.env
+.env.*
+
+# Artefak lokal yang tidak dibutuhkan build
+.git
+.next
+node_modules
+media
+public/storage
+backups
+*.tsbuildinfo
+.claude
+next-env.d.ts
