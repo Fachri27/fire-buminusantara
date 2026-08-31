@@ -115,8 +115,12 @@ dump_db() {
     host="${hostport%%:*}"; port="${hostport#*:}"
     [ "$port" = "$host" ] && port=3306
     # Port host tidak dipakai apa adanya: dump jalan DI host, jadi 127.0.0.1.
+    # --no-tablespaces: tanpa ini mysqldump meminta hak PROCESS (server-wide)
+    # hanya untuk membaca info tablespace, yang tidak diperlukan cadangan
+    # InnoDB biasa. Akun aplikasi cukup punya hak atas databasenya sendiri.
     MYSQL_PWD="$(printf '%b' "${pass//%/\\x}")" mysqldump \
-      -h 127.0.0.1 -P "$port" -u "$user" --single-transaction --quick "$nama" \
+      -h 127.0.0.1 -P "$port" -u "$user" \
+      --single-transaction --quick --no-tablespaces "$nama" \
       | gzip >"$file"
   else
     log "tidak ada DB_CONTAINER maupun mysqldump di host — lewati dump pra-deploy"

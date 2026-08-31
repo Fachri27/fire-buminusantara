@@ -398,16 +398,17 @@ function Galeri({ tersimpan }: { tersimpan: ItemMedia[] }) {
       video: f.type.startsWith("video/"),
     }));
 
+    // Urutannya penting: menyetel .value = "" pada input berkas MENGOSONGKAN
+    // .files. Kalau reset dilakukan setelah sinkronkanInput(), berkas yang baru
+    // saja ditulis langsung terhapus dan form terkirim tanpa lampiran —
+    // tersimpan tanpa media, tanpa galat. Jadi reset dulu, sinkron belakangan.
+    if (inputRef.current) inputRef.current.value = "";
+
     setBaru((lama) => {
       const gabungan = [...lama, ...tambahan];
       sinkronkanInput(gabungan);
       return gabungan;
     });
-
-    // Reset nilai input agar memilih berkas tambahan selanjutnya selalu memicu onChange
-    if (inputRef.current) {
-      inputRef.current.value = "";
-    }
   }
 
   function hapusBaru(id: string) {
