@@ -56,20 +56,25 @@ export function Statistik({ daftar }: { daftar: Data[] }) {
         ref={jalurRef}
         onScroll={tandaiGulir}
         className="tanpa-bilah-gulir flex snap-x snap-mandatory gap-[var(--sela)] overflow-x-auto
-                   panggung:justify-between panggung:gap-0 panggung:overflow-visible"
+                   panggung:justify-center panggung:gap-[24px] panggung:overflow-visible"
       >
-        {daftar.map((item) => (
-          <article key={item.label}
-                   className="w-[var(--statistik-lebar)] shrink-0 snap-start bg-white p-[var(--statistik-pias)]
-                              text-left panggung:h-[208px] panggung:w-[307px]">
-            <p className="text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal whitespace-nowrap">
-              • {item.tanggal} •
-            </p>
-            <h3 className="mt-[var(--statistik-jarak-label)] text-[length:var(--ukuran-label)] leading-[1.2] font-bold">
-              {item.label}
-            </h3>
+        {daftar.map((item, i) => (
+          <article key={item.nilai || i}
+                   className="flex w-[var(--statistik-lebar)] shrink-0 snap-start flex-col items-center
+                              justify-center rounded-lg border-2 border-api bg-white p-[var(--statistik-pias)] text-center
+                              panggung:h-[208px] panggung:w-[307px]">
+            {item.tanggal && (
+              <p className="text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal whitespace-nowrap">
+                • {item.tanggal} •
+              </p>
+            )}
+            {item.label && (
+              <h3 className="mt-[var(--statistik-jarak-label)] text-[length:var(--ukuran-label)] leading-[1.2] font-bold">
+                {item.label}
+              </h3>
+            )}
             {item.nilai && (
-              <p className="mt-2 text-[length:var(--ukuran-nilai)] leading-[1.1] font-bold text-api">{item.nilai}</p>
+              <p className="text-[length:var(--ukuran-nilai)] leading-[1.1] font-bold text-api">{item.nilai}</p>
             )}
             {item.keterangan && (
               <p className="mt-1 text-[length:var(--ukuran-catatan)] leading-[1.3] font-normal text-[rgb(26_25_25/0.6)]">
