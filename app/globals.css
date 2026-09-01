@@ -110,7 +110,7 @@
     --panah-ukuran: 80px;
     --panah-ikon: 45px;
 
-    --statistik-pias: 19px 14px;
+    --statistik-pias: 18px;
     --statistik-jarak-label: 41px;
 
     --ukuran-eyebrow: 16px;
@@ -250,7 +250,7 @@ html {
     --ukuran-label: calc(var(--kb-tinggi) * 26 / 1080);
     --ukuran-tanggal: calc(var(--kb-tinggi) * 16 / 1080);
     --ukuran-nilai: calc(var(--kb-tinggi) * 34 / 1080);
-    --statistik-pias: calc(var(--kb-tinggi) * 19 / 1080) calc(var(--kb-lebar) * 14 / 1920);
+    --statistik-pias: calc(var(--kb-tinggi) * 18 / 1080);
     --statistik-jarak-label: calc(var(--kb-tinggi) * 41 / 1080);
   }
 
