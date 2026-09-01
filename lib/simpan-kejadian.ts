@@ -5,7 +5,7 @@ import { bacaBerkasMedia, type BerkasMedia } from "./media";
 export type HasilSimpan = { ok: true; id: number } | { ok: false; galat: string };
 
 /** Slug dari judul, dijamin unik. Angka ditambahkan hanya kalau memang bentrok. */
-async function buatSlug(judul: string, kecualiId?: number): Promise<string> {
+export async function buatSlug(judul: string, kecualiId?: number): Promise<string> {
   const dasar = judul.toLowerCase().normalize("NFKD")
     .replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 200) || "kejadian";
 
@@ -145,5 +145,68 @@ export async function simpanKejadian(data: FormData, id?: number): Promise<Hasil
     return { ok: true, id: Number(baru.id) };
   } catch (e) {
     return { ok: false, galat: e instanceof Error ? e.message : "Gagal menyimpan." };
+  }
+}
+
+export type HasilPromosi = { ok: true; id: number } | { ok: false; galat: string };
+
+/** Input minimal dari sebuah laporan publik yang dinaikkan jadi kejadian. */
+export type LaporanPromosi = {
+  title: string;
+  description: string | null;
+  media: unknown;
+  location_lat: unknown;
+  location_lng: unknown;
+  created_at: Date | null;
+};
+
+/**
+ * Naikkan laporan terverifikasi menjadi baris `events` baru.
+ *
+ * Laporan publik tidak punya kolom yang wajib ada di `events` (tanggal,
+ * teks lokasi, judul EN, slug), jadi dipetakan dengan akal sehat:
+ *  - judul EN memakai judulnya (laporan tidak pernah bilingua).
+ *  - tanggal memakai waktu laporan dibuat.
+ *  - teks lokasi memakai koordinat laporan (format "lat, lng"); kolom ini
+ *    di tabel events wajib, dan wilayah/admin dapat mengubahnya belakangan.
+ *  - lampiran laporan dibawa apa adanya ke kolom media (format sama).
+ */
+export async function promosiKeKejadian(
+  laporan: LaporanPromosi,
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0] = prisma,
+): Promise<HasilPromosi> {
+  const lat = laporan.location_lat === null ? 0 : Number(laporan.location_lat);
+  const lng = laporan.location_lng === null ? 0 : Number(laporan.location_lng);
+  const diketahui = laporan.location_lat !== null && laporan.location_lng !== null;
+  const lokasi = diketahui
+    ? `${(Math.round(lat * 1e6) / 1e6).toFixed(6)}, ${(Math.round(lng * 1e6) / 1e6).toFixed(6)}`
+    : "Lokasi tidak diketahui";
+
+  const slug = await buatSlug(laporan.title);
+
+  try {
+    const baru = await tx.events.create({
+      data: {
+        title_id: laporan.title,
+        title_en: laporan.title,
+        description_id: laporan.description || null,
+        description_en: null,
+        slug,
+        event_date: laporan.created_at ?? new Date(),
+        location: lokasi,
+        location_lat: lat,
+        location_lng: lng,
+        // Lampiran laporan sudah berseri JSON dengan format yang sama persis
+        // dengan events.media — dibawa apa adanya, tanpa disalin/digambar ulang.
+        media: laporan.media ?? undefined,
+        image_en: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      select: { id: true },
+    });
+    return { ok: true, id: Number(baru.id) };
+  } catch (e) {
+    return { ok: false, galat: e instanceof Error ? e.message : "Gagal menaikkan laporan." };
   }
 }

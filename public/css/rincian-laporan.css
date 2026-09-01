@@ -46,6 +46,9 @@
   max-width: 100%;
   height: min(100%, 900px);
   min-height: min(480px, 75svh);
+  /* Jarak antara area media dan rel kanan — keduanya tidak menempel agar
+     video punya napas sendiri terhadap kolom judul/deskripsi/komentar. */
+  gap: clamp(8px, 1vw, 14px);
   overflow: hidden;
   border: 1px solid var(--r-garis);
   border-radius: 8px;
@@ -108,6 +111,26 @@
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+/* Bingkai slide: menempel persis pada rasio ISI media (bukan kotak slide).
+   Rasionya disetel inline dari dimensi asli media (videoWidth/Height atau
+   naturalWidth/Height) via `aspect-ratio`; max-height lalu memotong kedua
+   sisinya lewat aspect-ratio, jadi bingkai selalu = area gambar/video tanpa
+   bilah hitam. Kredit di dalamnya otomatis berada di dalam media. */
+.rincian__slide-bingkai {
+  position: relative;
+  display: flex;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Di dalam bingkai, media mengisi penuh — bingkainya sendiri yang sudah
+   membawa rasio asli media, jadi object-fit: contain tak lagi menambah
+   bilah hitam. */
+.rincian__slide-bingkai > .rincian__slide-media {
+  width: 100%;
+  height: 100%;
 }
 
 /* Tanpa media sama sekali: kotak petunjuk lokasi mengisi kolom medianya */
@@ -264,7 +287,9 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  border-left: 1px solid var(--r-garis);
+  /* Pemisah dengan area media kini berupa jarak grid (gap di .rincian__panel),
+     bukan garis tempel — jadi tidak ada border di sini. */
+  border-radius: 8px;
   background: var(--r-rel);
   color: var(--r-teks);
 }
@@ -752,9 +777,68 @@
   .rincian__media video {
     max-height: 40svh;
   }
+}
 
-  .rincian__rel {
-    border-top: 1px solid var(--r-garis);
-    border-left: 0;
+/* --- Kredit / hak cipta pelapor --------------------------------------------
+   Label tetap di kiri-BAWAH media pada slider pop-up rincian, menampilkan nama
+   pelapor dari `keterangan`. Menggantikan tooltip bawaan (atribut title) yang
+   tak terlihat di sentuh dan tak pernah tampil sendiri.
+
+   Label duduk di dalam bingkai media (.rincian__slide-bingkai) yang menempel
+   pada rasio isi media, jadi ia selalu DI DALAM gambar/video — bukan di
+   bilah hitam pengganjal. Untuk video ia diangkat di atas bilah kendali
+   bawaan peramban lewat varian --di-kendali (pola yang sama dengan
+   .rincian__dots--di-kendali). z-index 2 supaya duduk di atas media tapi
+   tetap di bawah tombol panah (z-index lebih tinggi). */
+.rincian__kredit {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 24px);
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  /* Transisi turun-naik mengikuti muncul-hilangnya bilah kendali video. */
+  transition: bottom 250ms ease;
+}
+
+.rincian__kredit-tanda {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* Slide video: bilah kendali bawaan peramban menghuni dasar media — angkat
+   label ke atasnya, setinggi varian dots yang setara. */
+.rincian__kredit--di-kendali {
+  bottom: 60px;
+}
+
+@media (max-width: 640px) {
+  .rincian__kredit {
+    bottom: 8px;
+    left: 8px;
+    font-size: 11px;
+    padding: 3px 8px;
+  }
+
+  .rincian__kredit--di-kendali {
+    bottom: 60px;
   }
 }
