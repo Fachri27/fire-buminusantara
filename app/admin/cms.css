@@ -295,6 +295,19 @@ textarea.cms-isian { line-height: 1.55; resize: vertical; }
   font-size: 13.5px;
 }
 
+/* ── Kerangka memuat (Skeleton) ─────────────────────────────────────────── */
+
+.cms-skeleton {
+  background: var(--garis);
+  border-radius: var(--jari);
+  animation: cms-kedip 1.4s ease-in-out infinite;
+}
+
+@keyframes cms-kedip {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.75; }
+}
+
 /* ── Peta pintu masuk ───────────────────────────────────────────────────── */
 
 /* Nusantara digambar sekali saat halaman masuk terbuka: garisnya ditarik dari

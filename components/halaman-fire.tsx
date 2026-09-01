@@ -6,19 +6,25 @@ import { gunakanParallax } from "@/hooks/gunakan-parallax";
 import { gunakanKomentar } from "@/hooks/gunakan-komentar";
 import { useKurangiGerak } from "@/hooks/gunakan-korsel";
 import { BAHASA, type Bahasa } from "@/lib/bahasa";
+
+
+
 import { Korsel } from "./korsel";
 import { Peta } from "./peta";
 import { PanelProvinsi } from "./panel-provinsi";
 import { PopupPeta } from "./popup-peta";
 import { UlasanKomentar, FormulirKomentar } from "./kolom-komentar";
 import { SliderRincian } from "./slider-rincian";
+
 import type { Berita } from "@/lib/events";
+import type { Statistik as DataStatistik } from "@/lib/statistik";
 import type { ProvinsiTeratas } from "@/lib/wms";
 
 type Props = {
   berita: Berita[];
   jumlahLaporan: Record<string, number>;
   tigaTeratas: ProvinsiTeratas[];
+  statistik: DataStatistik[];
   kejadianAwal?: Berita | null;
   bahasa?: Bahasa;
 };
@@ -27,6 +33,7 @@ export function HalamanFire({
   berita,
   jumlahLaporan,
   tigaTeratas,
+  statistik,
   kejadianAwal,
   bahasa = "id",
 }: Props) {
@@ -35,6 +42,7 @@ export function HalamanFire({
   const [wilayah, setWilayah] = useState<
     { nama: string; pulau: string | null; asal: { x: number; y: number } } | null
   >(null);
+
 
   gunakanPanggung();
   // Pop-up mana pun yang terbuka menghentikan guliran halaman di belakangnya.
@@ -86,7 +94,7 @@ export function HalamanFire({
 
   return (
     <>
-      <Korsel berita={berita} onBuka={(i) => berita[i] && bukaRincian(berita[i])} />
+      <Korsel berita={berita} statistik={statistik} onBuka={(i) => berita[i] && bukaRincian(berita[i])} />
 
       {/* Layar 2 — peta sebaran. Menggulir naik menutupi hero. */}
       <section

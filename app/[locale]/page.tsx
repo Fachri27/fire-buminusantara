@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ambilBerita, hitungLaporanProvinsi } from "@/lib/events";
 import { ambilTigaTeratas } from "@/lib/wms";
+import { ambilStatistik } from "@/lib/statistik";
 import { HalamanFire } from "@/components/halaman-fire";
 import { KerangkaBeranda } from "@/components/kerangka-beranda";
 import { Nav } from "@/components/nav";
@@ -22,10 +23,11 @@ export function generateStaticParams() {
 // HTML baru tiba setelah seluruh kueri selesai dan pengunjung menatap
 // layar kosong selama itu.
 async function IsiHalaman({ bahasa }: { bahasa: Bahasa }) {
-  const [berita, jumlahLaporan, tigaTeratas] = await Promise.all([
+  const [berita, jumlahLaporan, tigaTeratas, statistik] = await Promise.all([
     ambilBerita(),
     hitungLaporanProvinsi(),
     ambilTigaTeratas(),
+    ambilStatistik(),
   ]);
 
   return (
@@ -33,6 +35,7 @@ async function IsiHalaman({ bahasa }: { bahasa: Bahasa }) {
       berita={berita}
       jumlahLaporan={jumlahLaporan}
       tigaTeratas={tigaTeratas}
+      statistik={statistik}
       bahasa={bahasa}
     />
   );

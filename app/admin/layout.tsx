@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import { IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed } from "next/font/google";
 import { prisma } from "@/lib/prisma";
 import { bacaSesi } from "@/lib/sesi";
@@ -27,6 +28,20 @@ export const metadata: Metadata = {
   description: "Panel admin pengelolaan pantauan karhutla Indonesia.",
 };
 
+const ambilTunggakan = unstable_cache(
+  async () => {
+    const [belumDitinjau, laporanMenunggu] = await Promise.all([
+      prisma.comments.count({
+        where: { commentable_type: "App\\Models\\Event", is_approved: false },
+      }),
+      hitungMenunggu(),
+    ]);
+    return { belumDitinjau, laporanMenunggu };
+  },
+  ["admin-tunggakan"],
+  { revalidate: 15, tags: ["tunggakan"] }
+);
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const sesi = await bacaSesi();
 
@@ -38,16 +53,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   // Angka yang menunggu dikerjakan ditulis di menunya sendiri; itulah hitungan
-  // yang perlu dilihat editor sebelum memilih halaman. Dua kueri kecil, jalan
-  // berbarengan — keduanya ikut setiap render halaman CMS mana pun.
-  const [belumDitinjau, laporanMenunggu] = await Promise.all([
-    prisma.comments.count({
-      where: { commentable_type: "App\\Models\\Event", is_approved: false },
-    }),
-    hitungMenunggu(),
-  ]);
-
-  const tunggakan = { belumDitinjau, laporanMenunggu };
+  // yang perlu dilihat editor sebelum memilih halaman. Dicache 15 detik agar
+  // navigasi antar halaman CMS tidak selalu memukul database berulang kali.
+  const tunggakan = await ambilTunggakan();
 
   return (
     <div className={`cms ${badan.className} ${padat.variable} ${mono.variable} min-h-screen`}>

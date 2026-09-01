@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { bacaSesi, bolehKelola } from "@/lib/sesi";
 import { daftarKomentarModerasi } from "@/lib/moderasi-komentar";
@@ -14,6 +15,19 @@ const PER_HALAMAN = 15;
 const waktu = new Intl.DateTimeFormat("id-ID", {
   day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
 });
+
+const ambilPilihanKejadian = unstable_cache(
+  async () => {
+    const baris = await prisma.events.findMany({
+      orderBy: { event_date: "desc" },
+      take: 100,
+      select: { id: true, title_id: true },
+    });
+    return baris.map((e) => ({ id: Number(e.id), title_id: e.title_id }));
+  },
+  ["admin-pilihan-kejadian"],
+  { revalidate: 60, tags: ["events"] }
+);
 
 export default async function Komentar({
   searchParams,
@@ -37,11 +51,7 @@ export default async function Komentar({
       status: status === "belum" || status === "disetujui" ? status : undefined,
       kejadian: idKejadian,
     }, halaman, PER_HALAMAN),
-    prisma.events.findMany({
-      orderBy: { event_date: "desc" },
-      take: 200,
-      select: { id: true, title_id: true },
-    }),
+    ambilPilihanKejadian(),
   ]);
 
   const totalHalaman = Math.ceil(totalData / PER_HALAMAN);

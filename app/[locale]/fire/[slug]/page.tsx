@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ambilBerita, ambilBeritaSlug, hitungLaporanProvinsi } from "@/lib/events";
 import { ambilTigaTeratas } from "@/lib/wms";
+import { ambilStatistik } from "@/lib/statistik";
 import { HalamanFire } from "@/components/halaman-fire";
 import { KerangkaBeranda } from "@/components/kerangka-beranda";
 import { Nav } from "@/components/nav";
@@ -50,11 +51,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 async function IsiHalaman({ bahasa, slug }: { bahasa: Bahasa; slug: string }) {
-  const [berita, jumlahLaporan, tigaTeratas, kejadian] = await Promise.all([
+  const [berita, jumlahLaporan, tigaTeratas, kejadian, statistik] = await Promise.all([
     ambilBerita(),
     hitungLaporanProvinsi(),
     ambilTigaTeratas(),
     ambilBeritaSlug(slug),
+    ambilStatistik(),
   ]);
 
   if (!kejadian) notFound();
@@ -69,6 +71,7 @@ async function IsiHalaman({ bahasa, slug }: { bahasa: Bahasa; slug: string }) {
       berita={daftarBerita}
       jumlahLaporan={jumlahLaporan}
       tigaTeratas={tigaTeratas}
+      statistik={statistik}
       kejadianAwal={kejadian}
       bahasa={bahasa}
     />

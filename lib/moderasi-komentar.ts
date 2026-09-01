@@ -11,7 +11,7 @@ export type KomentarModerasi = {
   is_approved: boolean;
   ip_address: string | null;
   created_at: Date | null;
-  parent_id: bigint | null;
+  parent_id: number | null;
   event: { id: number; title_id: string } | null;
   jumlahReaksi: number;
 };
@@ -81,7 +81,7 @@ export async function daftarKomentarModerasi(
     is_approved: k.is_approved,
     ip_address: k.ip_address,
     created_at: k.created_at,
-    parent_id: k.parent_id,
+    parent_id: k.parent_id !== null ? Number(k.parent_id) : null,
     event: petaE.get(Number(k.commentable_id))
       ? { id: Number(petaE.get(Number(k.commentable_id))!.id), title_id: petaE.get(Number(k.commentable_id))!.title_id }
       : null,

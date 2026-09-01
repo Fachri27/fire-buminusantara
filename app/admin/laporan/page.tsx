@@ -192,7 +192,7 @@ function Lampiran({ daftar, judul }: { daftar: Lampiran[]; judul: string }) {
           </li>
         ) : (
           <li key={m.url}>
-            <video src={m.url} controls preload="metadata"
+            <video src={m.url} controls preload="none"
                    className="h-24 w-32 rounded-[3px] border border-[var(--garis)] bg-black object-cover" />
           </li>
         ),

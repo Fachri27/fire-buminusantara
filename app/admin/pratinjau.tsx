@@ -21,8 +21,12 @@ export function Pratinjau({
 }) {
   const galeri = bacaBerkasMedia(media);
 
-  // 1. Prioritaskan gambar poster atau foto pertama di galeri
-  const gambarPath = imageId ?? galeri.find((b) => b.type === "image")?.path ?? null;
+  // 1. Prioritaskan gambar poster utama, foto galeri, atau poster video
+  const gambarPath =
+    imageId ??
+    galeri.find((b) => b.type === "image")?.path ??
+    galeri.find((b) => b.type === "video" && b.poster)?.poster ??
+    null;
   const urlGambar = urlMedia(gambarPath);
 
   if (urlGambar) {
@@ -31,12 +35,14 @@ export function Pratinjau({
         src={urlGambar}
         alt=""
         aria-hidden="true"
+        loading="lazy"
+        decoding="async"
         className={`${kelas} object-cover`}
       />
     );
   }
 
-  // 2. Jika tidak ada gambar, tampilkan video asli
+  // 2. Jika tidak ada gambar/poster, tampilkan video asli
   const videoPath = video ?? galeri.find((b) => b.type === "video")?.path ?? null;
   const urlVideo = urlMedia(videoPath);
 
@@ -47,7 +53,7 @@ export function Pratinjau({
           src={urlVideo}
           muted
           playsInline
-          preload="metadata"
+          preload="none"
           className="size-full object-cover pointer-events-none"
         />
         {/* Indikator video di tengah */}

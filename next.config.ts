@@ -34,11 +34,22 @@ const nextConfig: NextConfig = {
   // ke .next/standalone sehingga image produksi tidak perlu node_modules penuh.
   output: "standalone",
 
-  // Batas upload video kejadian 100 MB (sama dengan CMS Laravel)
+  // Batas upload video kejadian 100 MB (sama dengan CMS Laravel). Diberi 1 MB
+  // napas di atas batas klien (BATAS_TOTAL_BYTE = 100 MB di lib/batas-laporan.ts):
+  // body multipart = berkas + bidang isian + boundary, jadi kiriman yang lolos
+  // cek klien tepat di batas masih melebihi atap yang sama nilainya.
   experimental: {
     serverActions: {
-      bodySizeLimit: "100mb",
+      bodySizeLimit: "101mb",
     },
+    // Selama proxy.ts dipakai, Next menyangga body permintaan di memori dan
+    // batas bawaannya 10 MB — sisanya DIPOTONG. Kiriman lapor berlampiran
+    // melewati proxy (matcher hanya mengecualikan _next/admin/api/media), dan
+    // multipart yang terpotong meledak sebagai "Unexpected end of form": 500
+    // polos ber-digest, tanpa pesan apa pun bagi pelapor. Naikkan sampai
+    // menutup bodySizeLimit supaya tidak ada kiriman yang lolos batas klien
+    // tapi terpotong di sini.
+    proxyClientMaxBodySize: "101mb",
   },
 
   async headers() {

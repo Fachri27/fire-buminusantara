@@ -87,6 +87,7 @@ export type HasilUnggah = { path: string; url: string } | { galat: string };
 export async function simpanBerkas(
   berkas: File,
   jenisDiharapkan?: "gambar" | "video",
+  folder?: string,
 ): Promise<HasilUnggah> {
   if (berkas.size === 0) return { galat: "Berkas kosong." };
   if (berkas.size > 100 * 1024 * 1024) return { galat: "Ukuran berkas melebihi 100 MB." };
@@ -107,7 +108,11 @@ export async function simpanBerkas(
 
   const cfg = getConfig();
   // Nama & ekstensi dari hasil deteksi, bukan dari nama berkas kiriman.
-  const relatif = `${info.jenis}/${randomUUID()}.${info.ext}`;
+  // Foldernya ikut jenis berkas (gambar/ atau video/), kecuali bila pemanggil
+  // menyebut sendiri — dipakai poster video, yang ditaruh di poster/ terpisah:
+  // ia turunan server, bukan pilihan pengunggah, dan mencampurnya ke gambar/
+  // membuat isi folder itu tidak lagi bisa diaudit sebagai "kiriman pengguna".
+  const relatif = `${folder ?? info.jenis}/${randomUUID()}.${info.ext}`;
 
   try {
     await getMinioClient().send(
@@ -206,7 +211,15 @@ export async function bingkaiVideo(pathVideo: string): Promise<string | null> {
   if (!pathVideo.startsWith(AWALAN_LOKAL)) return null;
   const relatif = pathVideo.slice(AWALAN_LOKAL.length);
 
-  const kerja = await mkdtemp(path.join(os.tmpdir(), "bingkai-"));
+  // Direktur kerja dibuat di luar try/finally utama: kalau mkdtemp gagal,
+  // tidak ada yang bisa dibersihkan — kembalikan null saja, sesuai janji bahwa
+  // kegagalan poster tidak boleh menggagalkan simpanan berkasnya.
+  let kerja: string;
+  try {
+    kerja = await mkdtemp(path.join(os.tmpdir(), "bingkai-"));
+  } catch {
+    return null;
+  }
   const masukan = path.join(kerja, "masukan");
   const keluaran = path.join(kerja, "bingkai.jpg");
 
@@ -237,6 +250,8 @@ export async function bingkaiVideo(pathVideo: string): Promise<string | null> {
       if (await stat(keluaran).then(() => true).catch(() => false)) {
         const hasil = await simpanBerkas(
           new File([await readFile(keluaran)], "bingkai.jpg", { type: "image/jpeg" }),
+          "gambar",
+          "poster",
         );
         return "galat" in hasil ? null : hasil.path;
       }

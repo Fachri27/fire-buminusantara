@@ -4,11 +4,16 @@ import { useEffect, useRef } from "react";
 import { gunakanKorsel } from "@/hooks/gunakan-korsel";
 import { KartuBerita } from "./kartu-berita";
 import { Statistik } from "./statistik";
-import { ambilStatistik } from "@/lib/statistik";
+import type { Statistik as DataStatistik } from "@/lib/statistik";
 import type { Berita } from "@/lib/events";
 
-export function Korsel({ berita, onBuka }: { berita: Berita[]; onBuka: (i: number) => void }) {
-  const statistik = ambilStatistik();
+export function Korsel({
+  berita, statistik, onBuka,
+}: {
+  berita: Berita[];
+  statistik: DataStatistik[];
+  onBuka: (i: number) => void;
+}) {
   const {
     kartu, aktif, geser, diam, jalurRef, kurangiGerak,
     pindah, keKartu, normalkan, mulaiOtomatis, hentikanOtomatis, setTerlihat,

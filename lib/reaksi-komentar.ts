@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "./prisma";
 
 /** Jenis konten yang dikomentari di /fire. */
@@ -70,32 +71,36 @@ export async function daftarReaksi(halaman = 1, batas = 15): Promise<HasilDaftar
 }
 
 /** Hitung reaksi per kejadian: berapa like & dislike pada semua komentarnya. */
-export async function reaksiPerKejadian() {
-  const hasil = await prisma.comments.groupBy({
-    by: ["commentable_id"],
-    where: { commentable_type: TIPE },
-    _count: { _all: true },
-  });
+export const reaksiPerKejadian = unstable_cache(
+  async () => {
+    const hasil = await prisma.comments.groupBy({
+      by: ["commentable_id"],
+      where: { commentable_type: TIPE },
+      _count: { _all: true },
+    });
 
-  const idKejadian = hasil
-    .map((h) => Number(h.commentable_id))
-    .filter((id) => Number.isFinite(id) && id > 0);
+    const idKejadian = hasil
+      .map((h) => Number(h.commentable_id))
+      .filter((id) => Number.isFinite(id) && id > 0);
 
-  const kejadian = idKejadian.length
-    ? await prisma.events.findMany({
-        where: { id: { in: idKejadian } },
-        select: { id: true, title_id: true },
-      })
-    : [];
+    const kejadian = idKejadian.length
+      ? await prisma.events.findMany({
+          where: { id: { in: idKejadian } },
+          select: { id: true, title_id: true },
+        })
+      : [];
 
-  const petaE = new Map(kejadian.map((e) => [Number(e.id), e]));
+    const petaE = new Map(kejadian.map((e) => [Number(e.id), e]));
 
-  return hasil
-    .map((h) => ({
-      kejadianId: Number(h.commentable_id),
-      jumlahReaksi: h._count._all,
-      judul: petaE.get(Number(h.commentable_id))?.title_id ?? "Kejadian terhapus",
-    }))
-    .filter((x) => x.kejadianId > 0)
-    .sort((a, b) => b.jumlahReaksi - a.jumlahReaksi);
-}
+    return hasil
+      .map((h) => ({
+        kejadianId: Number(h.commentable_id),
+        jumlahReaksi: h._count._all,
+        judul: petaE.get(Number(h.commentable_id))?.title_id ?? "Kejadian terhapus",
+      }))
+      .filter((x) => x.kejadianId > 0)
+      .sort((a, b) => b.jumlahReaksi - a.jumlahReaksi);
+  },
+  ["admin-reaksi-per-kejadian"],
+  { revalidate: 30, tags: ["reactions", "comments"] }
+);
