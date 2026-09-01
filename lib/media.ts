@@ -25,10 +25,21 @@ export function urlMedia(path: string | null): string | null {
 }
 
 /** Satu berkas dalam galeri kejadian, sebagaimana tersimpan di kolom `media`. */
-export type BerkasMedia = { path: string; type: "image" | "video"; poster?: string };
+export type BerkasMedia = {
+  path: string;
+  type: "image" | "video";
+  poster?: string;
+  /** Keterangan gambar dari form CMS — alt/caption per berkas. */
+  keterangan?: string;
+};
 
 /** Satu item galeri yang siap dirender. */
-export type ItemMedia = { jenis: "gambar" | "video"; url: string; poster?: string };
+export type ItemMedia = {
+  jenis: "gambar" | "video";
+  url: string;
+  poster?: string;
+  keterangan?: string;
+};
 
 /**
  * Baca kolom `media` — JSON bebas bentuk dari basis data, jadi tiap entri
@@ -42,12 +53,16 @@ export function bacaBerkasMedia(nilai: unknown): BerkasMedia[] {
   const hasil: BerkasMedia[] = [];
   for (const item of nilai) {
     if (!item || typeof item !== "object") continue;
-    const { path, type, poster } = item as Record<string, unknown>;
+    const { path, type, poster, keterangan } = item as Record<string, unknown>;
     if (typeof path !== "string" || !path) continue;
     if (type !== "image" && type !== "video") continue;
-    hasil.push(
-      typeof poster === "string" && poster ? { path, type, poster } : { path, type },
-    );
+
+    const berkas: BerkasMedia =
+      typeof poster === "string" && poster ? { path, type, poster } : { path, type };
+    if (typeof keterangan === "string" && keterangan.trim()) {
+      berkas.keterangan = keterangan;
+    }
+    hasil.push(berkas);
   }
   return hasil;
 }
@@ -69,9 +84,13 @@ export function itemMedia(
     if (!url) continue;
     if (berkas.type === "video") {
       const poster = berkas.poster ? urlMedia(berkas.poster) : null;
-      galeri.push(poster ? { jenis: "video", url, poster } : { jenis: "video", url });
+      galeri.push(
+        poster
+          ? { jenis: "video", url, poster, keterangan: berkas.keterangan }
+          : { jenis: "video", url, keterangan: berkas.keterangan },
+      );
     } else {
-      galeri.push({ jenis: "gambar", url });
+      galeri.push({ jenis: "gambar", url, keterangan: berkas.keterangan });
     }
     terpakai.push(berkas.path);
   }
@@ -107,8 +126,12 @@ export function itemMedia(
 export function galeriTersimpan(media: unknown): ItemMedia[] {
   return bacaBerkasMedia(media).map((b) => {
     const url = urlMedia(b.path) ?? "";
-    if (b.type !== "video") return { jenis: "gambar" as const, url };
+    if (b.type !== "video") {
+      return { jenis: "gambar" as const, url, keterangan: b.keterangan };
+    }
     const poster = b.poster ? urlMedia(b.poster) : null;
-    return poster ? { jenis: "video" as const, url, poster } : { jenis: "video" as const, url };
+    return poster
+      ? { jenis: "video" as const, url, poster, keterangan: b.keterangan }
+      : { jenis: "video" as const, url, keterangan: b.keterangan };
   });
 }

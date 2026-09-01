@@ -181,7 +181,7 @@ function LampiranPenuh({ daftar, judul }: { daftar: Lampiran[]; judul: string })
           {m.jenis === "gambar" ? (
             <a href={m.url} target="_blank" rel="noreferrer"
                className="block w-fit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
-              <img src={m.url} alt={`Lampiran ${i + 1} — ${judul}`} loading="lazy"
+              <img src={m.url} alt={m.keterangan || `Lampiran ${i + 1} — ${judul}`} loading="lazy"
                    className="max-h-[70svh] w-auto max-w-full rounded-[3px] border border-[var(--garis)]" />
             </a>
           ) : (
@@ -189,7 +189,10 @@ function LampiranPenuh({ daftar, judul }: { daftar: Lampiran[]; judul: string })
                    className="max-h-[70svh] w-full max-w-full rounded-[3px] border border-[var(--garis)] bg-black" />
           )}
           <p className="cms-mata mt-1.5 text-[var(--lirih)]">
-            {m.jenis === "gambar" ? "Gambar" : "Video"} {i + 1} ·{" "}
+            {m.jenis === "gambar" ? "Gambar" : "Video"} {i + 1}
+            {m.keterangan && (
+              <> · <span className="text-[var(--jelaga)] font-medium">{m.keterangan}</span></>
+            )} ·{" "}
             <a href={m.url} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
               buka berkas ↗
             </a>

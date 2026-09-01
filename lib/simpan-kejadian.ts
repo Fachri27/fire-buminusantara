@@ -32,7 +32,10 @@ function berkasTerisi(nilai: FormDataEntryValue | null): File | null {
  * belakangnya. Berkas yang dilepas ikut dibuang dari penyimpanan.
  *
  * Indeks dipakai sebagai penanda — bukan path — supaya nama berkas tidak perlu
- * bolak-balik lewat form, sama seperti `keep_media[]` di CMS Laravel.
+ * bolak-balik lewat form, sama seperti `keep_media[]` di CMS Laravel. Keterangan
+ * tiap berkas mengikuti penanda yang sama: `media_desc_<indeks>` untuk yang
+ * tersimpan, `media_desc_baru` berurutan untuk yang baru (urutan DOM-nya sama
+ * dengan urutan berkas di `media_files`, keduanya mengikuti daftar di form).
  */
 async function susunGaleri(
   data: FormData,
@@ -45,7 +48,9 @@ async function susunGaleri(
   const media: BerkasMedia[] = [];
   for (const [i, berkas] of lama.entries()) {
     if (simpan.has(i)) {
-      media.push(berkas);
+      const ket = String(data.get(`media_desc_${i}`) ?? "").trim();
+      // Keterangan kosong berarti sengaja dikosongkan — jangan pakai yang lama.
+      media.push({ ...berkas, keterangan: ket || undefined });
     } else {
       // Posternya ikut: berkas yatim di bucket tidak merusak apa pun, tapi
       // tidak ada alasan membiarkannya menumpuk.
@@ -58,7 +63,11 @@ async function susunGaleri(
   console.log("[Galeri] berkas diterima:", kiriman.length, kiriman.map((v) =>
     v instanceof File ? `${v.name} (${v.size}B, ${v.type})` : `bukan-File: ${typeof v}`));
 
-  for (const nilai of kiriman) {
+  // Dipasangkan lewat indeks — bukan digeser saat berkas kosong dilewati —
+  // supaya urutan keterangan selalu cocok dengan urutan kiriman berkasnya.
+  const keteranganBaru = data.getAll("media_desc_baru").map((v) => String(v).trim());
+
+  for (const [i, nilai] of kiriman.entries()) {
     const berkas = berkasTerisi(nilai);
     if (!berkas) {
       // Dulu dilewati diam-diam: berkas kosong/bukan-File tidak meninggalkan
@@ -68,7 +77,7 @@ async function susunGaleri(
     }
     const hasil = await simpanBerkasGaleri(berkas);
     if ("galat" in hasil) return { galat: `Media galeri: ${hasil.galat}` };
-    media.push(hasil);
+    media.push({ ...hasil, keterangan: keteranganBaru[i] || undefined });
   }
 
   return { media };

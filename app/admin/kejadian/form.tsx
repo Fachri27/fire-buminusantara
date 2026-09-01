@@ -367,13 +367,77 @@ type ItemBaruGaleri = {
   nama: string;
   url: string;
   video: boolean;
+  /** Bingkai pertama video, ditangkap di peramban — poster pratinjau sebelum tersimpan. */
+  bingkai?: string;
+  keterangan?: string;
 };
+
+/**
+ * Ambil satu bingkai video sebagai gambar statis, langsung di peramban.
+ *
+ * Poster server baru ada SETELAH disimpan; sebelum itu pratinjau galeri tetap
+ * butuh sesuatu yang murah — <video> memaksa peramban mengunduh metadata video
+ * untuk sekadar thumbnail, dan itu yang mau dihindari. Gagal (kodek tidak
+ * didukung, peramban kuno, video rusak) mengembalikan null dan pemanggil
+ * kembali ke <video> seperti dulu.
+ */
+function bingkaiLokal(url: string): Promise<string | null> {
+  return new Promise((selesai) => {
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+
+    // `beres` boleh menyebut `jeda` sebelum deklarasi: ia baru terpanggil
+    // lewat event — selalu setelah baris `const jeda` selesai dieksekusi.
+    const beres = (hasil: string | null) => {
+      clearTimeout(jeda);
+      video.removeAttribute("src");
+      video.load();
+      selesai(hasil);
+    };
+    const jeda = setTimeout(() => beres(null), 8_000);
+
+    video.addEventListener(
+      "seeked",
+      () => {
+        try {
+          const kanvas = document.createElement("canvas");
+          const lebar = video.videoWidth || 340;
+          const tinggi = video.videoHeight || Math.round((lebar * 9) / 16);
+          const skala = Math.min(1, 340 / lebar);
+          kanvas.width = Math.max(1, Math.round(lebar * skala));
+          kanvas.height = Math.max(1, Math.round(tinggi * skala));
+          kanvas.getContext("2d")?.drawImage(video, 0, 0, kanvas.width, kanvas.height);
+          beres(kanvas.toDataURL("image/jpeg", 0.75));
+        } catch {
+          beres(null);
+        }
+      },
+      { once: true },
+    );
+    video.addEventListener("error", () => beres(null), { once: true });
+    video.addEventListener(
+      "loadeddata",
+      () => {
+        // Video lebih pendek dari 0,5 detik tetap kebagian bingkai.
+        video.currentTime = Math.min(0.5, (video.duration || 1) / 2);
+      },
+      { once: true },
+    );
+
+    video.src = url;
+    video.load();
+  });
+}
 
 /**
  * Galeri media: beberapa foto/video per kejadian.
  *
  * Yang sudah tersimpan dirender sebagai kotak centang `keep_media` bernilai
- * INDEKS — melepas centang berarti berkasnya dibuang saat disimpan. Berkas baru
+ * INDEKS — melepas centang berarti berkasnya dibuang saat disimpan. Tiap berkas
+ * punya isian `media_desc_<indeks>` (tersimpan) / `media_desc_baru` (baru,
+ * dijumlah urut sama dengan `media_files`) untuk keterangannya. Berkas baru
  * masuk lewat satu input `media_files` bertipe multiple dan terakumulasi
  * tanpa menghapus berkas yang sudah dipilih sebelumnya.
  */
@@ -381,12 +445,19 @@ function Galeri({ tersimpan }: { tersimpan: ItemMedia[] }) {
   const [baru, setBaru] = useState<ItemBaruGaleri[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // URL objek menahan berkasnya di memori sampai dilepas
+  // URL objek menahan berkasnya di memori sampai dilepas. Pencabutan hanya
+  // saat unmount — cleanup yang jalan di tiap perubahan daftar akan mencabut
+  // URL yang masih dipakai pratinjau (termasuk tangkapan bingkai yang sedang
+  // berjalan). Berkas yang dibuang manual dicabut sendiri di hapusBaru().
+  const rujukBaru = useRef(baru);
+  useEffect(() => {
+    rujukBaru.current = baru;
+  }, [baru]);
   useEffect(() => {
     return () => {
-      baru.forEach((b) => URL.revokeObjectURL(b.url));
+      rujukBaru.current.forEach((b) => URL.revokeObjectURL(b.url));
     };
-  }, [baru]);
+  }, []);
 
   function sinkronkanInput(daftar: ItemBaruGaleri[]) {
     if (!inputRef.current) return;
@@ -410,6 +481,7 @@ function Galeri({ tersimpan }: { tersimpan: ItemMedia[] }) {
       nama: f.name,
       url: URL.createObjectURL(f),
       video: f.type.startsWith("video/"),
+      keterangan: "",
     }));
 
     // Urutannya penting: menyetel .value = "" pada input berkas MENGOSONGKAN
@@ -423,6 +495,18 @@ function Galeri({ tersimpan }: { tersimpan: ItemMedia[] }) {
       sinkronkanInput(gabungan);
       return gabungan;
     });
+
+    // Poster pratinjau untuk video baru ditangkap di belakang; bila berhasil,
+    // kartu video berganti dari <video> ke gambar statis tanpa perlu disimpan.
+    for (const item of tambahan) {
+      if (!item.video) continue;
+      void bingkaiLokal(item.url).then((dataUrl) => {
+        if (!dataUrl) return;
+        setBaru((lama) =>
+          lama.map((b) => (b.id === item.id ? { ...b, bingkai: dataUrl } : b)),
+        );
+      });
+    }
   }
 
   function hapusBaru(id: string) {
@@ -448,41 +532,76 @@ function Galeri({ tersimpan }: { tersimpan: ItemMedia[] }) {
           </p>
           <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {tersimpan.map((m, i) => (
-              <label key={i}
-                     className="group relative cursor-pointer overflow-hidden rounded-[3px]
-                                border border-[var(--garis-tegas)] bg-[var(--papan)]
-                                has-[:focus-visible]:outline has-[:focus-visible]:outline-2
-                                has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--limau)]">
-                <input type="checkbox" name="keep_media" value={i} defaultChecked className="peer sr-only" />
+              <div key={i}
+                   className="overflow-hidden rounded-[3px] border border-[var(--garis-tegas)]
+                              bg-[var(--papan)]">
+                {/* Kotak centang dan gambarnya satu label; isian keterangan
+                    sengaja DI LUAR label — label yang menaungi dua kontrol
+                    membuat klik pada isian ikut menyalakan centangnya. */}
+                <label className="group relative block cursor-pointer
+                                  has-[:focus-visible]:outline has-[:focus-visible]:outline-2
+                                  has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--limau)]">
+                  <input type="checkbox" name="keep_media" value={i} defaultChecked className="peer sr-only" />
 
-                {/* Yang akan dibuang diredupkan dan diberi cap; tanpa penanda
-                    seperti ini, melepas centang tidak terlihat sama sekali. */}
-                <div aria-hidden="true"
-                     className="pointer-events-none absolute inset-0 z-[1] bg-[var(--jelaga)]/55
-                                transition-opacity peer-checked:opacity-0" />
-                <span aria-hidden="true"
-                      className="cms-cap absolute top-1.5 left-1.5 z-[2] border-white bg-[var(--api)] text-white
-                                 opacity-100 transition-opacity peer-checked:opacity-0">
-                  Dibuang
-                </span>
-
-                {m.jenis === "video" ? (
-                  // #t=0.5 meminta peramban melompat ke detik itu; tanpa itu
-                  // <video> tanpa poster berhenti di bingkai kosong dan seluruh
-                  // petak galeri tampak putih.
-                  <video src={`${m.url}#t=0.5`} preload="metadata" muted playsInline
-                         className="h-[86px] w-full object-cover" />
-                ) : (
-                  <img src={m.url} alt={`Media ${i + 1}`} className="h-[86px] w-full object-cover" />
-                )}
-
-                <p className="cms-mata flex items-center justify-between px-2 py-1.5">
-                  <span>{m.jenis === "video" ? "Video" : "Foto"}</span>
-                  <span className="cms-angka text-[11px] text-[var(--jelaga)]">
-                    {String(i + 1).padStart(2, "0")}
+                  {/* Yang akan dibuang diredupkan dan diberi cap; tanpa penanda
+                      seperti ini, melepas centang tidak terlihat sama sekali. */}
+                  <div aria-hidden="true"
+                       className="pointer-events-none absolute inset-0 z-[1] bg-[var(--jelaga)]/55
+                                  transition-opacity peer-checked:opacity-0" />
+                  <span aria-hidden="true"
+                        className="cms-cap absolute top-1.5 left-1.5 z-[2] border-white bg-[var(--api)] text-white
+                                   opacity-100 transition-opacity peer-checked:opacity-0">
+                    Dibuang
                   </span>
-                </p>
-              </label>
+
+                  {m.jenis === "video" ? (
+                    m.poster ? (
+                      <div className="relative">
+                        <img src={m.poster} alt={`Media ${i + 1}`} className="h-[96px] w-full object-cover" />
+                        <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
+                          <span className="flex size-6 items-center justify-center rounded-full bg-black/60 shadow-xs">
+                            <svg viewBox="0 0 20 20" fill="currentColor" className="ml-0.5 size-3">
+                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                            </svg>
+                          </span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex h-[96px] w-full flex-col items-center justify-center bg-[var(--kertas)] text-[var(--redup)]">
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="size-6 opacity-40">
+                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                        </svg>
+                        <span className="cms-mata mt-1 text-[10px]">Video {i + 1}</span>
+                      </div>
+                    )
+                  ) : (
+                    <img src={m.url} alt={`Media ${i + 1}`} className="h-[96px] w-full object-cover" />
+                  )}
+
+                  <p className="cms-mata flex items-center justify-between px-2 py-1.5">
+                    <span>{m.jenis === "video" ? "Video" : "Foto"}</span>
+                    <span className="cms-angka text-[11px] text-[var(--jelaga)]">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                  </p>
+                </label>
+
+                <div className="border-t border-[var(--garis)] bg-[var(--kertas)] p-2">
+                  <label htmlFor={`media_desc_${i}`} className="cms-mata mb-1 block text-[10px] text-[var(--redup)]">
+                    Keterangan media
+                  </label>
+                  <input
+                    id={`media_desc_${i}`}
+                    type="text"
+                    name={`media_desc_${i}`}
+                    defaultValue={m.keterangan ?? ""}
+                    placeholder="Deskripsi / alt teks…"
+                    aria-label={`Keterangan media ${i + 1}`}
+                    className="w-full rounded-[2px] border border-[var(--garis)] bg-white px-2 py-1 text-[11.5px] text-[var(--jelaga)]
+                               outline-none placeholder:text-[var(--lirih)] focus:border-[var(--limau)]"
+                  />
+                </div>
+              </div>
             ))}
           </div>
         </>
@@ -531,19 +650,53 @@ function Galeri({ tersimpan }: { tersimpan: ItemMedia[] }) {
                 </span>
 
                 {b.video ? (
-                  <video
-                    src={`${b.url}#t=0.5`}
-                    preload="metadata"
-                    muted
-                    playsInline
-                    className="h-[86px] w-full object-cover"
-                  />
+                  b.bingkai ? (
+                    <div className="relative">
+                      <img src={b.bingkai} alt="" className="h-[96px] w-full object-cover" />
+                      <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
+                        <span className="flex size-6 items-center justify-center rounded-full bg-black/60 shadow-xs">
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="ml-0.5 size-3">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                          </svg>
+                        </span>
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex h-[96px] w-full flex-col items-center justify-center bg-[var(--kertas)] text-[var(--redup)]">
+                      <svg viewBox="0 0 20 20" fill="currentColor" className="size-6 opacity-40">
+                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                      </svg>
+                      <span className="cms-mata mt-1 text-[10px]">Video</span>
+                    </div>
+                  )
                 ) : (
-                  <img src={b.url} alt="" className="h-[86px] w-full object-cover" />
+                  <img src={b.url} alt="" className="h-[96px] w-full object-cover" />
                 )}
-                <p className="truncate px-2 py-1.5 text-[11px] text-[var(--redup)]" title={b.nama}>
+                <p className="truncate px-2 pt-1.5 text-[11px] text-[var(--redup)]" title={b.nama}>
                   {b.nama}
                 </p>
+
+                <div className="border-t border-[var(--garis)] bg-[var(--kertas)] p-2">
+                  <label htmlFor={`media_desc_baru_${b.id}`} className="cms-mata mb-1 block text-[10px] text-[var(--redup)]">
+                    Keterangan media
+                  </label>
+                  <input
+                    id={`media_desc_baru_${b.id}`}
+                    type="text"
+                    name="media_desc_baru"
+                    value={b.keterangan ?? ""}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBaru((lama) =>
+                        lama.map((item) => (item.id === b.id ? { ...item, keterangan: val } : item)),
+                      );
+                    }}
+                    placeholder="Deskripsi / alt teks…"
+                    aria-label={`Keterangan ${b.nama}`}
+                    className="w-full rounded-[2px] border border-[var(--garis)] bg-white px-2 py-1 text-[11.5px] text-[var(--jelaga)]
+                               outline-none placeholder:text-[var(--lirih)] focus:border-[var(--hijau)]"
+                  />
+                </div>
               </div>
             ))}
           </div>

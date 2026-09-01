@@ -246,7 +246,9 @@ function Rincian({
           </div>
         )}
 
-        <div className="rincian__media kartu-bingkai">
+        <div className={`rincian__media kartu-bingkai ${
+          berita.vertikal ? "rincian__media--tegak" : "rincian__media--lanskap"
+        }`}>
           {berita.media.length > 0 ? (
             <SliderRincian
               key={berita.id}

@@ -41,15 +41,16 @@
 .rincian__panel {
   position: relative;
   display: grid;
-  grid-template-columns: auto minmax(300px, 400px);
-  width: fit-content;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  width: min(96vw, 1300px);
   max-width: 100%;
   height: min(100%, 900px);
-  min-height: min(460px, 72svh);
+  min-height: min(480px, 75svh);
   overflow: hidden;
   border: 1px solid var(--r-garis);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--r-hitam);
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6);
   outline: none;
 }
 
@@ -58,48 +59,125 @@
    disetel setinggi panel, lebarnya mengikuti rasio aslinya. Rekaman vertikal
    tampil vertikal penuh — memenuhi tinggi DAN lebar kotaknya, tanpa bilah
    hitam menganga di kiri-kanannya — dan panel ikut menyempit, menyisakan
-   hanya latar redup pop-up di sekelilingnya.
-
-   Dulu kolom medianya 1fr penuh dengan media width/height auto + batas
-   max-100%: media dirender seukuran aslinya dan hanya pernah diperkecil,
-   sehingga rekaman vertikal kecil melayang di tengah kolom hitam yang lebar.
-
-   Persentase tinggi butuh induk setinggi pasti: .rincian__media memuai ke
-   tinggi baris grid panel, lalu video/img 100% dihitung dari situ. Sebagai
-   grid place-items: center dulu justru bocor — baris auto-nya ikut diisi
-   konten media, 100% terukur dari baris yang membengkak itu, dan video
-   terpotong jadi pita horizontal. Flex dengan align/justify center tidak
-   mengukur baris dari kontennya, jadi aman.
-
-   object-fit: contain tetap ada sebagai pengaman: kalau lebar layar tidak
-   cukup (media lanskap di panel yang sudah mentok max-width), kotaknya
-   menyempit dan contain yang merawat bingkainya. */
+   hanya latar redup pop-up di sekelilingnya. */
 .rincian__media {
   position: relative;
   display: flex;
   min-width: 0;
+  height: 100%;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   background: var(--r-hitam);
 }
 
+.rincian__slider-wadah {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rincian__slider-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+.rincian__slider-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.rincian__slide-media,
 .rincian__media img,
 .rincian__media video {
   display: block;
   width: auto;
   height: 100%;
   max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
 }
 
-/* Tanpa media sama sekali: kotak petunjuk lokasi mengisi kolom medianya —
-   bukan img/video, jadi tidak terkena aturan rasio di atas. Kolomnya fit-content
-   mengikuti media, jadi kotaknya diberi lebar sendiri; kalau tidak, ia menyusut
-   selebar pil tulisannya. Dots penanda slide juga div, tapi absolut dan punya
-   lebar sendiri; jangan ikut direntang. */
-.rincian__media > div:not(.rincian__dots) {
+/* Tanpa media sama sekali: kotak petunjuk lokasi mengisi kolom medianya */
+.rincian__media > div:not(.rincian__dots):not(.rincian__kerangka):not(.rincian__slider-wadah) {
   width: clamp(320px, 55vw, 860px);
+}
+
+/* --- Kerangka pemuatan media ----------------------------------------------
+   Menutupi kotak media sampai foto/video siap, menggunakan gradasi gelap halus
+   agar tidak menyilaukan/berkedip putih di atas latar hitam. */
+.rincian__kerangka {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  z-index: 1;
+  background: linear-gradient(150deg, #18181b, #27272a);
+  animation: denyut-rincian 1.5s ease-in-out infinite;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+
+/* Lanskap: ikut lebar kolom, tingginya mengikuti rasio 16:9 — sama seperti
+   area gambar media 16:9 yang terhambat max-width di kolom yang sempit. */
+.rincian__media--lanskap .rincian__kerangka {
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+/* Tegak: ikut tinggi kolom, lebarnya mengikuti rasio 9/16. */
+.rincian__media--tegak .rincian__kerangka {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: 9 / 16;
+}
+
+/* Rasio cadangan medianya sendiri, dari orientasi kejadian di basis data:
+   `auto` membuat rasio asli berkasnya menang begitu terbaca, jadi nilai ini
+   hanya memegang bentuk kotak (dan lebar panelnya) selama berkasnya
+   diunduh — tanpa itu kotaknya runtuh dan pengunjung hanya disuguhi spinner
+   bawaan peramban. */
+.rincian__media--lanskap img,
+.rincian__media--lanskap video {
+  aspect-ratio: auto 16 / 9;
+}
+
+.rincian__media--tegak img,
+.rincian__media--tegak video {
+  aspect-ratio: auto 9 / 16;
+}
+
+/* Siap: berhenti berdenyut dulu, baru memudar — bukan lenyap seketika di
+   tengah denyutan. */
+.rincian__kerangka.tutup {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes denyut-rincian {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rincian__kerangka {
+    transition: none;
+    animation: none;
+  }
 }
 
 /* --- Slider media --------------------------------------------------------
@@ -112,21 +190,26 @@
   top: 50%;
   z-index: 2;
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   transform: translateY(-50%);
   cursor: pointer;
   place-items: center;
   border-radius: 999px;
   border: 0;
-  background: rgb(0 0 0 / 0.45);
+  background: rgba(0, 0, 0, 0.55);
   color: #fff;
-  backdrop-filter: blur(4px);
-  transition: background-color 0.2s ease;
+  backdrop-filter: blur(8px);
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .rincian__slider-tombol:hover {
-  background: rgb(0 0 0 / 0.65);
+  background: rgba(0, 0, 0, 0.85);
+  transform: translateY(-50%) scale(1.08);
+}
+
+.rincian__slider-tombol:active {
+  transform: translateY(-50%) scale(0.95);
 }
 
 .rincian__slider-tombol svg {
@@ -135,25 +218,39 @@
 }
 
 .rincian__slider-tombol--kiri {
-  left: 12px;
+  left: 14px;
 }
 
 .rincian__slider-tombol--kanan {
-  right: 12px;
+  right: 14px;
 }
 
 .rincian__dots {
   position: absolute;
-  bottom: 14px;
+  bottom: 16px;
   left: 50%;
   z-index: 2;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
+  gap: 6px;
+  padding: 5px 10px;
   border-radius: 999px;
-  background: rgb(0 0 0 / 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+/* Slide video: bilah kendali bawaan peramban menghuni dasar kotak media */
+.rincian__dots--di-kendali {
+  bottom: 60px;
+}
+
+.rincian__dot-item {
+  height: 7px;
+  border-radius: 999px;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -178,14 +275,14 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   border-bottom: 1px solid var(--r-garis);
-  padding: 14px 52px 14px 16px;
+  padding: 16px 56px 16px 22px;
 }
 
 .rincian__keping {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   border-radius: 999px;
   object-fit: cover;
@@ -193,37 +290,29 @@
 }
 
 .rincian__pulau {
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
   line-height: 1.3;
 }
 
 .rincian__tanggal {
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.3;
   color: var(--r-redup);
 }
 
 /* Badan bergulir: kapsi + daftar komentar, persis seperti rujukan yang
-   menggulirkan keduanya bersama.
-
-   `flex: 1` di sini yang memaku kolom kirim di dasar rel. Dulu ada varian
-   --ringkas yang mematikannya selama pengunjung belum masuk, karena sisa
-   ruangnya dipakai ajakan masuk lewat Google yang dipusatkan di tengah. Ajakan
-   itu sudah tidak ada (kolom nama + email kembali dipakai), jadi variannya ikut
-   dilepas: yang tersisa hanya badan yang tidak meregang dan tidak ada apa pun
-   yang mengambil sisa ruangnya — kolom kirim berhenti di tengah rel dengan
-   ruang putih menganga di bawahnya. */
+   menggulirkan keduanya bersama. */
 .rincian__badan {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px;
+  padding: 22px 24px;
 }
 
 .rincian__kapsi {
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
 .rincian__kapsi-isi {
@@ -232,37 +321,41 @@
 }
 
 .rincian__judul {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.45;
   color: var(--r-teks);
 }
 
 .rincian__desc {
-  margin-top: 8px;
-  font-size: 12px;
+  margin-top: 10px;
+  font-size: 13px;
   font-weight: 400;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--r-redup);
   white-space: pre-line;
 }
 
 .rincian__data {
-  margin-top: 10px;
+  margin-top: 16px;
   display: grid;
   gap: 6px;
+  padding: 12px 14px;
+  background: var(--r-sorot);
+  border-radius: 6px;
 }
 
 .rincian__label {
   font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--r-redup);
 }
 
 .rincian__nilai {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 500;
   line-height: 1.5;
   color: var(--r-teks);
 }
@@ -270,38 +363,32 @@
 /* --- Daftar komentar ----------------------------------------------------- */
 .rincian__utas {
   display: grid;
-  gap: 16px;
-  margin-top: 20px;
+  gap: 18px;
+  margin-top: 26px;
 }
 
 .rincian__komen {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
-/* Keping di baris komentar lebih kecil daripada keping laporan di kepala rel.
-   Sebagian besar bobot baris ini datang dari lingkarannya, bukan hurufnya —
-   mengecilkan teks saja tidak membuat barisnya terasa lebih ringkas. Dibatasi
-   ke dalam .rincian__komen supaya keping laporan di kepala & kapsi tidak ikut
-   mengecil. */
+/* Keping di baris komentar */
 .rincian__komen .rincian__keping,
 .rincian__komen .rincian__inisial {
-  width: 26px;
-  height: 26px;
-  font-size: 11px;
+  width: 28px;
+  height: 28px;
+  font-size: 11.5px;
 }
 
-/* Tidak ada foto profil di sini, jadi kepingnya berisi huruf pertama nama —
-   menjaga irama baris rujukan tanpa mengarang identitas. */
 .rincian__inisial {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   place-items: center;
   border-radius: 999px;
   background: var(--r-sorot);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--r-teks);
   text-transform: uppercase;
@@ -312,30 +399,23 @@
   flex: 1;
 }
 
-/* Sengaja lebih kecil dari .rincian__judul (14px). Judul laporan dan isi
-   komentar adalah dua lapis isi yang berbeda; disamakan ukurannya, keduanya
-   berebut perhatian dan rel ini terbaca seperti satu blok datar. */
 .rincian__komen-teks {
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
-/* Tanpa margin: spasi antar bagian datang dari spasi eksplisit di markup
-   ({" "} di kolom-komentar.tsx). Di template Blade Pasopati, jeda baris di
-   antara elemen sudah menghasilkan spasi; JSX menghilangkannya, jadi
-   mengandalkan jeda baris membuat nama dan kalimatnya menempel. */
 .rincian__komen-nama {
   font-weight: 600;
 }
 
-/* Baris kaki: waktu + tombol Balas, sebaris seperti rujukan. */
+/* Baris kaki: waktu + tombol Balas */
 .rincian__komen-kaki {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 4px;
-  font-size: 11px;
+  gap: 16px;
+  margin-top: 6px;
+  font-size: 11.5px;
   color: var(--r-redup);
 }
 
@@ -454,9 +534,9 @@
 .rincian__kirim {
   display: grid;
   flex-shrink: 0;
-  gap: 8px;
+  gap: 10px;
   border-top: 1px solid var(--r-garis);
-  padding: 10px 16px;
+  padding: 14px 22px;
 }
 
 /* Widget Turnstile: dibatasi lebar rel supaya tidak mendorong kolom ketik. */
@@ -468,7 +548,7 @@
 /* Isian nama + email di atas kolom komentar. */
 .rincian__identitas {
   display: flex;
-  gap: 8px;
+  gap: 12px;
 }
 
 .rincian__input {
@@ -476,9 +556,9 @@
   min-width: 0;
   border: 0;
   border-bottom: 1px solid var(--r-garis);
-  padding: 6px 0;
+  padding: 8px 0;
   background: transparent;
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.4;
   color: var(--r-teks);
 }
@@ -495,7 +575,7 @@
 .rincian__baris {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .rincian__jebakan {
@@ -517,10 +597,10 @@
   display: block;
   width: 100%;
   border: 0;
-  padding: 6px 0;
+  padding: 8px 0;
   background: transparent;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.45;
   color: var(--r-teks);
   resize: none;
 }

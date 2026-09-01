@@ -183,17 +183,33 @@ function Lampiran({ daftar, judul }: { daftar: Lampiran[]; judul: string }) {
     <ul className="mt-3 flex flex-wrap gap-2">
       {daftar.map((m, i) =>
         m.jenis === "gambar" ? (
-          <li key={m.url}>
+          <li key={m.url} title={m.keterangan}>
             <a href={m.url} target="_blank" rel="noreferrer"
                className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
-              <img src={m.url} alt={`Lampiran ${i + 1} — ${judul}`} loading="lazy"
+              <img src={m.url} alt={m.keterangan || `Lampiran ${i + 1} — ${judul}`} loading="lazy"
                    className="h-24 w-32 rounded-[3px] border border-[var(--garis)] object-cover" />
             </a>
           </li>
         ) : (
-          <li key={m.url}>
-            <video src={m.url} controls preload="none"
-                   className="h-24 w-32 rounded-[3px] border border-[var(--garis)] bg-black object-cover" />
+          <li key={m.url} title={m.keterangan}>
+            <a href={m.url} target="_blank" rel="noreferrer"
+               className="group relative block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
+              {m.poster ? (
+                <img src={m.poster} alt={m.keterangan || `Lampiran video ${i + 1} — ${judul}`} loading="lazy"
+                     className="h-24 w-32 rounded-[3px] border border-[var(--garis)] object-cover" />
+              ) : (
+                <div className="flex h-24 w-32 flex-col items-center justify-center rounded-[3px] border border-[var(--garis)] bg-[var(--papan)] text-[var(--redup)]">
+                  <span className="cms-mata text-[10px]">Video {i + 1}</span>
+                </div>
+              )}
+              <span className="absolute inset-0 flex items-center justify-center bg-black/20 text-white transition-colors group-hover:bg-black/35">
+                <span className="flex size-7 items-center justify-center rounded-full bg-black/60 shadow-xs backdrop-blur-xs">
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="ml-0.5 size-3.5">
+                    <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                  </svg>
+                </span>
+              </span>
+            </a>
           </li>
         ),
       )}

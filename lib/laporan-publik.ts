@@ -27,7 +27,12 @@ const BATAS_DESKRIPSI = 5000;
 const BATAS_NAMA_PELAPOR = 100;
 
 /** Satu lampiran yang siap ditampilkan di CMS. */
-export type Lampiran = { jenis: "gambar" | "video"; url: string };
+export type Lampiran = {
+  jenis: "gambar" | "video";
+  url: string;
+  poster?: string;
+  keterangan?: string;
+};
 
 /** Satu baris laporan pada halaman verifikasi. */
 export type LaporanPublik = {
@@ -56,7 +61,15 @@ function lampiranDari(media: unknown): Lampiran[] {
   const hasil: Lampiran[] = [];
   for (const berkas of bacaBerkasMedia(media)) {
     const url = urlMedia(berkas.path);
-    if (url) hasil.push({ jenis: berkas.type === "video" ? "video" : "gambar", url });
+    if (url) {
+      const poster = berkas.poster ? urlMedia(berkas.poster) ?? undefined : undefined;
+      hasil.push({
+        jenis: berkas.type === "video" ? "video" : "gambar",
+        url,
+        poster,
+        keterangan: berkas.keterangan,
+      });
+    }
   }
   return hasil;
 }
@@ -148,6 +161,8 @@ export async function simpanLaporanPublik(
     };
   }
 
+  const keteranganMedia = namaPelapor || "anonim";
+
   const media: BerkasMedia[] = [];
   for (const b of berkas) {
     const hasil = await simpanBerkasGaleri(b);
@@ -160,7 +175,7 @@ export async function simpanLaporanPublik(
       }
       return { ok: false, galat: `${b.name}: ${hasil.galat}`, bidang: "berkas" };
     }
-    media.push(hasil);
+    media.push({ ...hasil, keterangan: keteranganMedia });
   }
 
   const sekarang = new Date();

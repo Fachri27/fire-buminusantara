@@ -87,18 +87,22 @@ export function KartuBerita({ k, aktif, kurangiGerak, onPilih, onBuka, onGeserMe
             </p>
           </div>
         </div>
-      ) : (
-        // Varian bawaan: kartu kaca putih, judul & tanggal rata tengah di atas,
-        // foto 3:2 di bawah.
+        ) : (
+        // Varian bawaan: kartu kaca putih, judul & tanggal dipusatkan pada
+        // ruang di atas foto. Pembungkusnya yang mengambil sisa ruang — judul
+        // yang melipat beberapa baris tetap di tengah, bukan menempel di atas
+        // kartu. Di mode aliran pembungkusnya kembali setinggi isi, sebab
+        // kotak medianya sendiri yang meregang (aliran:flex-1).
         <>
-          <p onClick={(e) => { e.stopPropagation(); onBuka(); }}
-             className="w-full cursor-pointer text-center text-[clamp(16px,4.2vw,24px)] leading-[1.2] font-bold text-black">
-            {isi.judul}
-          </p>
-          <p className="mt-4 w-full text-center text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal">
-            • {isi.tanggal} •
-          </p>
-          <div aria-hidden="true" className="flex-1 aliran:hidden" />
+          <div className="flex w-full flex-1 flex-col items-center justify-center aliran:flex-none">
+            <p onClick={(e) => { e.stopPropagation(); onBuka(); }}
+               className="w-full cursor-pointer text-center text-[clamp(16px,4.2vw,24px)] leading-[1.2] font-bold text-black">
+              {isi.judul}
+            </p>
+            <p className="mt-4 w-full text-center text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal">
+              • {isi.tanggal} •
+            </p>
+          </div>
 
           {/* Kotaknya selalu pembungkus ber-posisi, juga untuk foto: titik
               navigasi slider duduk di atasnya. */}
