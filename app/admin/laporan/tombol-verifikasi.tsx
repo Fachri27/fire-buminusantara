@@ -27,6 +27,7 @@ export function TombolVerifikasi({
 }) {
   const [sibuk, mulai] = useTransition();
   const [pastikan, setPastikan] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -35,15 +36,22 @@ export function TombolVerifikasi({
     return () => clearTimeout(jam);
   }, [pastikan]);
 
-  const jalankan = (kerja: () => Promise<void>, pergiKe?: string) =>
+  const jalankan = async (kerja: () => Promise<{ ok: boolean; galat?: string }>, pergiKe?: string) => {
     mulai(async () => {
-      await kerja();
+      const hasil = await kerja();
+      if (!hasil.ok) {
+        setGalat(hasil.galat ?? "Gagal memproses laporan.");
+        return;
+      }
+      setGalat(null);
       if (pergiKe) router.push(pergiKe);
       else router.refresh();
     });
+  };
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
       {status !== "approved" && (
         <button type="button" disabled={sibuk}
                 onClick={() => jalankan(() => aksiStatus(id, "approved"))}
@@ -89,6 +97,10 @@ export function TombolVerifikasi({
             Hapus
           </button>
         )
+      )}
+      </div>
+      {galat && (
+        <p role="alert" className="cms-mata text-red-700">{galat}</p>
       )}
     </div>
   );

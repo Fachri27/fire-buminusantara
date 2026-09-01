@@ -12,10 +12,12 @@ async function jaga() {
   return sesi;
 }
 
-/** Putuskan satu laporan: terverifikasi, ditolak, atau dikembalikan ke antrean. */
+/** Putuskan satu laporan: terverifikasi, ditolak, atau dikembalikan ke antrean.
+ *  Mengembalikan hasilnya supaya antarmuka bisa menampilkan kegagalan (mis.
+ *  kalau laporan terverifikasi gagal naik menjadi kejadian). */
 export async function aksiStatus(id: number, status: StatusLaporan) {
   const sesi = await jaga();
-  await aturStatusLaporan(id, status, sesi.id);
+  return aturStatusLaporan(id, status, sesi.id);
 }
 
 /** Buang laporan beserta lampirannya. Seperti komentar: meninjau boleh editor,
@@ -24,4 +26,5 @@ export async function aksiHapusLaporan(id: number) {
   const sesi = await jaga();
   if (sesi.peran !== "admin") redirect("/admin/laporan");
   await hapusLaporan(id);
+  return { ok: true as const };
 }

@@ -3,6 +3,7 @@ import { bacaBerkasMedia, urlMedia, type BerkasMedia } from "./media";
 import { simpanBerkasGaleri, hapusBerkas } from "./unggah";
 import { turnstileSah } from "./turnstile";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "./batas-laporan";
+import { promosiKeKejadian } from "./simpan-kejadian";
 
 /** Status verifikasi, sama persis dengan enum di basis data. */
 export type StatusLaporan = "pending" | "approved" | "rejected";
@@ -311,22 +312,77 @@ export async function hitungMenunggu(): Promise<number> {
 
 /** Putuskan satu laporan. Siapa yang memutuskan ikut dicatat: keputusan
  *  moderasi harus bisa ditanyakan kembali kepada orangnya. */
+export type HasilAturStatus =
+  | { ok: true; idKejadian: number | null }
+  | { ok: false; galat: string };
+
 export async function aturStatusLaporan(
   id: number,
   status: StatusLaporan,
   olehId: number,
-) {
-  await prisma.public_reports.update({
-    where: { id },
-    data: {
-      status,
-      // Dikembalikan ke antrean = belum ada yang memutuskan; jejak peninjau
-      // sebelumnya ikut dihapus supaya barisnya tidak mengaku sudah ditinjau.
-      reviewed_by: status === "pending" ? null : olehId,
-      reviewed_at: status === "pending" ? null : new Date(),
-      updated_at: new Date(),
-    },
-  });
+): Promise<HasilAturStatus> {
+  // Menolak atau mengembalikan ke antrean hanya mengubah statusnya — tidak
+  // ada kejadian yang dibuat.
+  if (status !== "approved") {
+    await prisma.public_reports.update({
+      where: { id },
+      data: {
+        status,
+        // Dikembalikan ke antrean = belum ada yang memutuskan; jejak peninjau
+        // sebelumnya ikut dihapus supaya barisnya tidak mengaku sudah ditinjau.
+        reviewed_by: status === "pending" ? null : olehId,
+        reviewed_at: status === "pending" ? null : new Date(),
+        updated_at: new Date(),
+      },
+    });
+    return { ok: true, idKejadian: null };
+  }
+
+  // Persetujuan = laporan naik jadi kejadian yang tampil di publik. Keduanya
+  // dibungkus satu transaksi: kalau events gagal dibuat, laporan tidak boleh
+  // terlanjur dianggap "terverifikasi".
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const laporan = await tx.public_reports.findUnique({
+        where: { id },
+        select: {
+          title: true, description: true, media: true,
+          location_lat: true, location_lng: true, created_at: true,
+        },
+      });
+      if (!laporan) return { ok: false as const, galat: "Laporan tidak ditemukan." };
+
+      const promosi = await promosiKeKejadian(
+        {
+          title: laporan.title,
+          description: laporan.description,
+          media: laporan.media,
+          location_lat: laporan.location_lat,
+          location_lng: laporan.location_lng,
+          created_at: laporan.created_at,
+        },
+        tx,
+      );
+      if (!promosi.ok) return promosi;
+
+      await tx.public_reports.update({
+        where: { id },
+        data: {
+          status: "approved",
+          reviewed_by: olehId,
+          reviewed_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      return { ok: true as const, idKejadian: promosi.id };
+    });
+  } catch (e) {
+    return {
+      ok: false,
+      galat: e instanceof Error ? e.message : "Gagal memverifikasi laporan.",
+    };
+  }
 }
 
 /** Buang laporan beserta lampirannya. Berkasnya ikut dihapus dari penyimpanan
