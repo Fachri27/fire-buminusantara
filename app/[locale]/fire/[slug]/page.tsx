@@ -31,7 +31,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     kejadian.deskripsi ||
     `Pantauan karhutla di ${kejadian.lokasi ?? "Indonesia"} (${kejadian.tanggal}).`;
   const gambar = kejadian.poster;
-  const video = kejadian.video;
+  // og:video: kolom `video` lama ATAU video pertama di galeri `media` — kejadian
+  // yang dibuat lewat CMS menaruh videonya di galeri, kolom lamanya kosong.
+  // Tanpa ini, kejadian bervideo-galeri dibagikan tanpa og:video sama sekali.
+  const video = kejadian.video ?? kejadian.media.find((m) => m.jenis === "video")?.url ?? null;
 
   return {
     title: judul,

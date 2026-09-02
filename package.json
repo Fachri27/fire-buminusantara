@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "node prisma/seed.mjs",
+    "backfill:poster": "node prisma/backfill-poster.mjs",
     "seed:media": "node prisma/seed-media.mjs",
     "seed:media:kejadian": "node prisma/seed-media-kejadian.mjs",
     "seed:media:laporan": "node prisma/seed-media-laporan.mjs",
