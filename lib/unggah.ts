@@ -195,17 +195,205 @@ export type KoordinatExif = { lat: number; lng: number };
  * penyimpanan laporan.
  */
 export async function gpsDariBerkas(berkas: File): Promise<KoordinatExif | null> {
+  const buffer = await berkas.arrayBuffer();
+  // exifr tidak mengenal MP4/MOV dan akan melempar — video dialihkan ke parser
+  // QuickTime sendiri, sisanya diserahkan ke exifr (gambar ber-GPS).
+  return tampaknyaVideo(buffer) ? gpsDariVideo(buffer) : gpsDariGambar(buffer);
+}
+
+/** Koordinat GPS dari gambar (lewat exifr). `null` bila tak ada / tak terbaca. */
+async function gpsDariGambar(buffer: ArrayBuffer): Promise<KoordinatExif | null> {
   try {
-    // exifr.gps menerima ArrayBuffer; File diubah dulu supaya tidak bergantung
-    // pada dukungan File sebagai input.
-    const gps = await exifr.gps(await berkas.arrayBuffer());
+    const gps = await exifr.gps(buffer);
     const lat = gps?.latitude;
     const lng = gps?.longitude;
     if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
   } catch {
-    /* bukan gambar / tidak ada EXIF GPS — bukan kegagalan fatal */
+    /* bukan gambar ber-GPS — bukan kegagalan fatal */
   }
   return null;
+}
+
+/** Deteksi cepat MP4/MOV dari magic byte "ftyp" / "moov" di offset 4. */
+function tampaknyaVideo(buffer: ArrayBuffer): boolean {
+  const b = new Uint8Array(buffer);
+  if (b.length < 8) return false;
+  const tipe = String.fromCharCode(b[4], b[5], b[6], b[7]);
+  return tipe === "ftyp" || tipe === "moov";
+}
+
+/**
+ * Ambil koordinat GPS dari video QuickTime/MP4.
+ *
+ * exifr tidak mendukung MP4. Video iPhone menyimpan lokasi sebagai teks
+ * ISO6709 (`+03.5844+098.6758+000.000/`) di dalam box `moov › udta › meta ›
+ * ilst` (key `com.apple.quicktime.location.ISO6709`). Di sini box-box itu
+ * ditelusuri apa adanya, nilai string dikumpulkan, lalu pola ISO6709 dicari.
+ *
+ * Drone (GPS di berkas .srt) dan format lain yang tidak menyimpan lokasi di
+ * box ini tetap `null` — ini bukan parser video umum.
+ */
+function gpsDariVideo(buffer: ArrayBuffer): KoordinatExif | null {
+  try {
+    const dv = new DataView(buffer);
+    const u8 = new Uint8Array(buffer);
+
+    function anakBox(
+      start: number,
+      end: number,
+      tipe: string,
+    ): { start: number; end: number } | null {
+      let o = start;
+      while (o + 8 <= end) {
+        let size = dv.getUint32(o);
+        const type = String.fromCharCode(u8[o + 4], u8[o + 5], u8[o + 6], u8[o + 7]);
+        let hdr = 8;
+        if (size === 1) {
+          size = Number(dv.getBigUint64(o + 8));
+          hdr = 16;
+        } else if (size === 0) {
+          size = end - o;
+        }
+        if (size < hdr || o + size > end) return null;
+        if (type === tipe) return { start: o + hdr, end: o + size };
+        o += size;
+      }
+      return null;
+    }
+
+    const moov = anakBox(0, buffer.byteLength, "moov");
+    const udta = moov && anakBox(moov.start, moov.end, "udta");
+    const meta = udta && anakBox(udta.start, udta.end, "meta");
+    // `meta` adalah fullbox: 4 byte version/flags sebelum anak-anaknya.
+    const ilst = meta && anakBox(meta.start + 4, meta.end, "ilst");
+    if (!ilst) return null;
+
+    // Kumpulkan nilai semua box `data` di dalam ilst. Pada file nyata box
+    // `data` dibungkus entry (mis. `mdta`, `©xyz`, `----`), jadi ditelusuri
+    // rekursif — nilai bisa di kedalaman mana pun.
+    const nilai: string[] = [];
+    function kumpulNilai(o: number, end: number): void {
+      while (o + 8 <= end) {
+        let size = dv.getUint32(o);
+        const type = String.fromCharCode(u8[o + 4], u8[o + 5], u8[o + 6], u8[o + 7]);
+        let hdr = 8;
+        if (size === 1) {
+          size = Number(dv.getBigUint64(o + 8));
+          hdr = 16;
+        } else if (size === 0) {
+          size = end - o;
+        }
+        if (size < hdr || o + size > end) return;
+        // box `data`: 4 byte version/flags + 4 byte locale, lalu isinya.
+        if (type === "data") {
+          const mulai = o + hdr + 8;
+          if (mulai < o + size) {
+            let s = "";
+            for (let i = mulai; i < o + size; i++) s += String.fromCharCode(u8[i]);
+            nilai.push(s.replace(/\0+$/, ""));
+          }
+        } else {
+          kumpulNilai(o + hdr, o + size);
+        }
+        o += size;
+      }
+    }
+    kumpulNilai(ilst.start, ilst.end);
+
+    for (const teks of nilai) {
+      const cocok = teks.match(/([+-][\d.]+[+-][\d.]+[+-][\d.]+\/)/);
+      if (!cocok) continue;
+      const bagian = cocok[1].match(/([+-][\d.]+)/g);
+      if (!bagian || bagian.length < 2) continue;
+      const lat = Number(bagian[0]);
+      const lng = Number(bagian[1]);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+  } catch {
+    /* struk video tak terbaca — bukan kegagalan fatal */
+  }
+  return null;
+}
+
+/** EXIF foto yang menarik bagi peninjau: titik GPS kamera dan waktu pengambilan. */
+export type ExifFoto = { lat?: number; lng?: number; waktu?: string };
+
+/**
+ * Baca byte sebuah berkas tersimpan. Cadangan lokal dulu (jalur yang dipakai
+ * saat MinIO mati), lalu MinIO — sama urutannya dengan bingkaiVideo(). `null`
+ * bila jalurnya bukan milik penyimpanan ini atau tak terjangkau.
+ */
+async function bacaByte(pathSimpan: string): Promise<Buffer | null> {
+  if (!pathSimpan.startsWith(AWALAN_LOKAL)) return null;
+  const relatif = pathSimpan.slice(AWALAN_LOKAL.length);
+  try {
+    return await readFile(path.join(AKAR_MEDIA, relatif));
+  } catch {
+    /* tidak ada salinan lokal */
+  }
+  try {
+    const objek = await getMinioClient().send(
+      new GetObjectCommand({ Bucket: getConfig().bucket, Key: relatif }),
+    );
+    if (!objek.Body) return null;
+    return Buffer.from(await objek.Body.transformToByteArray());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Waktu pengambilan dari EXIF, sebagai jam dinding kamera APA ADANYA.
+ *
+ * EXIF tidak menyimpan zona waktu, jadi stringnya ("2026:09:01 14:30:22")
+ * dibaca mentah dan dibangun sebagai UTC lalu diformat kembali di UTC — dengan
+ * begitu jam yang tampil sama persis dengan yang direkam kamera, baik di server
+ * UTC maupun peramban WIB. Kalau dibiarkan exifr mengubahnya jadi Date, ia
+ * memakai zona mesin dan jamnya bisa bergeser.
+ */
+function waktuExif(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2})/.exec(raw);
+  if (!m) return undefined;
+  const [, y, mo, d, h, mi] = m.map(Number);
+  const dt = new Date(Date.UTC(y, mo - 1, d, h, mi));
+  if (Number.isNaN(dt.getTime())) return undefined;
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "numeric", month: "long", year: "numeric",
+    hour: "2-digit", minute: "2-digit", timeZone: "UTC",
+  }).format(dt);
+}
+
+/**
+ * Baca GPS + waktu pengambilan dari EXIF berkas tersimpan. Dipakai halaman
+ * verifikasi untuk menampilkan bukti kapan & di mana foto diambil.
+ *
+ * `null` bila bukan gambar ber-EXIF atau tak ada satu pun dari kedua data itu —
+ * pemanggil menyembunyikan barisnya, bukan menampilkan kolom kosong.
+ */
+export async function exifDariPath(pathSimpan: string): Promise<ExifFoto | null> {
+  const buf = await bacaByte(pathSimpan);
+  if (!buf) return null;
+  try {
+    const [gps, tags] = await Promise.all([
+      exifr.gps(buf).catch(() => null),
+      exifr
+        .parse(buf, { reviveValues: false, pick: ["DateTimeOriginal", "CreateDate", "ModifyDate"] })
+        .catch(() => null),
+    ]);
+
+    const hasil: ExifFoto = {};
+    if (gps && Number.isFinite(gps.latitude) && Number.isFinite(gps.longitude)) {
+      hasil.lat = gps.latitude;
+      hasil.lng = gps.longitude;
+    }
+    const waktu = waktuExif(tags?.DateTimeOriginal ?? tags?.CreateDate ?? tags?.ModifyDate);
+    if (waktu) hasil.waktu = waktu;
+
+    return hasil.lat !== undefined || hasil.waktu ? hasil : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

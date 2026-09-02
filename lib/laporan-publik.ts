@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { bacaBerkasMedia, urlMedia, type BerkasMedia } from "./media";
-import { simpanBerkasGaleri, hapusBerkas, gpsDariBerkas } from "./unggah";
+import { simpanBerkasGaleri, hapusBerkas, gpsDariBerkas, exifDariPath, type ExifFoto } from "./unggah";
 import { turnstileSah } from "./turnstile";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "./batas-laporan";
 import { promosiKeKejadian } from "./simpan-kejadian";
@@ -33,6 +33,9 @@ export type Lampiran = {
   url: string;
   poster?: string;
   keterangan?: string;
+  /** GPS & waktu pengambilan dari EXIF foto. Hanya diisi di halaman detail
+   *  (ambilLaporan), bukan di daftar — membacanya perlu menarik byte gambarnya. */
+  exif?: ExifFoto;
 };
 
 /** Satu baris laporan pada halaman verifikasi. */
@@ -290,7 +293,34 @@ export async function daftarLaporan(
 /** Satu laporan untuk halaman detail. */
 export async function ambilLaporan(id: number): Promise<LaporanPublik | null> {
   const baris = await prisma.public_reports.findUnique({ where: { id }, select: PILIH });
-  return baris ? keLaporan(baris as BarisLaporan) : null;
+  if (!baris) return null;
+
+  const laporan = keLaporan(baris as BarisLaporan);
+
+  // Perkaya lampiran gambar dengan EXIF (GPS + waktu ambil). Dikerjakan hanya di
+  // sini, bukan di daftar: tiap gambar perlu ditarik byte-nya dari penyimpanan.
+  // Dicocokkan lewat url — lampiranDari() melewati entri yang url-nya tak
+  // terbentuk, jadi indeksnya belum tentu sejajar dengan media mentahnya.
+  const exifPerUrl = new Map<string, ExifFoto>();
+  await Promise.all(
+    bacaBerkasMedia(baris.media)
+      .filter((b) => b.type === "image")
+      .map(async (b) => {
+        const url = urlMedia(b.path);
+        if (!url) return;
+        const exif = await exifDariPath(b.path);
+        if (exif) exifPerUrl.set(url, exif);
+      }),
+  );
+
+  if (exifPerUrl.size > 0) {
+    laporan.lampiran = laporan.lampiran.map((l) => {
+      const exif = exifPerUrl.get(l.url);
+      return exif ? { ...l, exif } : l;
+    });
+  }
+
+  return laporan;
 }
 
 /** Tetangga sebuah laporan dalam antrean yang sedang disaring — dipakai tombol
