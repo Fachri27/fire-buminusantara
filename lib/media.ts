@@ -144,3 +144,18 @@ export function galeriTersimpan(media: unknown): ItemMedia[] {
       : { jenis: "video" as const, url, keterangan: b.keterangan };
   });
 }
+
+/**
+ * Orientasi kartu korsel dari lampiran laporan: pilihan potret/lanskap peninjau
+ * yang tersimpan di JSON media. Yang pertama punya pilihan yang menang — kartu
+ * memang menonjolkan satu media saja, sisanya menumpang di slider.
+ *
+ * Dipetakan ke nilai kolom `events.orientation`: foto potret → "horizontal"
+ * (foto memenuhi kartu), sisanya → "landscape" (foto di bawah teks, bingkai
+ * 3:2). Tanpa pilihan apa pun, jatuh ke "landscape" — sama dengan bawaan
+ * kolomnya. Dipakai promosiKeKejadian() saat laporan naik jadi kejadian.
+ */
+export function orientasiKartu(media: unknown): "horizontal" | "landscape" {
+  const pilihan = bacaBerkasMedia(media).find((b) => b.orientasi)?.orientasi;
+  return pilihan === "potret" ? "horizontal" : "landscape";
+}

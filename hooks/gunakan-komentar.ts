@@ -28,6 +28,7 @@ export function gunakanKomentar(idLaporan: number) {
   const [mengirim, setMengirim] = useState(false);
   const [nama, setNama] = useState("");
   const [email, setEmail] = useState("");
+  const [anonim, setAnonim] = useState(false);
   const [isi, setIsi] = useState("");
   const [balasKe, setBalasKe] = useState<number | null>(null);
   const [balasNama, setBalasNama] = useState("");
@@ -216,8 +217,9 @@ export function gunakanKomentar(idLaporan: number) {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          nama,
-          email,
+          nama: anonim ? "" : nama,
+          email: anonim ? "" : email,
+          anonim,
           isi,
           balas_ke: balasKe,
           website,
@@ -253,13 +255,17 @@ export function gunakanKomentar(idLaporan: number) {
       setDibuka((d) => (d.includes(akar) ? d : [...d, akar]));
     }
     try {
-      localStorage.setItem("komentar_nama", nama);
-      localStorage.setItem("komentar_email", email);
+      // Identitas anonim tidak pernah disimpan — pilihan anonim memang untuk
+      // tidak meninggalkan jejak nama di perangkat ini.
+      if (!anonim) {
+        localStorage.setItem("komentar_nama", nama);
+        localStorage.setItem("komentar_email", email);
+      }
     } catch {
       /* storage mungkin diblokir */
     }
   }, [
-    alamat, akarDari, batalBalas, balasKe, captchaToken,
+    alamat, akarDari, anonim, batalBalas, balasKe, captchaToken,
     email, isi, mengirim, nama, ulangCaptcha, website,
   ]);
 
@@ -267,6 +273,7 @@ export function gunakanKomentar(idLaporan: number) {
     daftar, memuat, mengirim, galat,
     nama, setNama,
     email, setEmail,
+    anonim, setAnonim,
     isi, setIsi,
     website, setWebsite,
     balasKe, balasNama,

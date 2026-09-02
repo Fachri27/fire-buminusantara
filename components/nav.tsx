@@ -95,7 +95,19 @@ export function Nav({ bahasa }: Props) {
           : "border-b border-black/[0.03]"
       }`}
     >
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-end gap-4 px-[var(--pias)]">
+      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-[var(--pias)]">
+        {/* Logo + wordmark — tautan ke beranda dalam bahasa aktif. Ikon sendirian
+            terlihat kecil & sepi di kiri; dipasangkan teks "Fire" jadi kesatuan
+            merek yang mengisi ruang. */}
+        <a href={`/${bahasa}`} aria-label="Fire — beranda"
+           className="flex shrink-0 items-center gap-2">
+          <img src="/assets/img/logo-fire.png" alt="" aria-hidden="true"
+               width={95} height={160} className="h-11 w-auto" />
+          <span className="text-[22px] font-bold leading-none tracking-tight text-tinta">
+            Fire
+          </span>
+        </a>
+
         {/* Menu Navigasi & Penukar Bahasa */}
         <div className="flex items-center gap-4 sm:gap-7">
           <nav aria-label={teks.navigasi} className="flex items-center gap-1 sm:gap-2">

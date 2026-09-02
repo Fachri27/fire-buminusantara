@@ -9,9 +9,36 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
+  // Akar absolut untuk semua metadata ber-URL (og:image, og:url, canonical).
+  // Tanpa ini, og:image kebit sebagai path relatif (/media/...) yang tidak
+  // bisa diambil crawler WhatsApp/Twitter — pratinjau bagikan tautan jadi
+  // kosong. Diambil dari env supaya instance staging bisa menimpanya.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://fire.nusantara.earth"),
   title: "Fire — Pantauan Karhutla Indonesia",
   description:
     "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
+  // Gambar bagikan (WhatsApp/Twitter/Facebook). URL relatif diselesaikan
+  // absolut lewat metadataBase di atas. Halaman /fire/<slug> menimpanya dengan
+  // poster kejadiannya sendiri lewat generateMetadata.
+  openGraph: {
+    title: "Fire — Pantauan Karhutla Indonesia",
+    description:
+      "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
+    url: "/",
+    siteName: "Fire",
+    locale: "id_ID",
+    type: "website",
+    images: [
+      { url: "/assets/img/og-fire.jpg", width: 1200, height: 630, alt: "Fire — Pantauan Karhutla Indonesia" },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Fire — Pantauan Karhutla Indonesia",
+    description:
+      "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
+    images: ["/assets/img/og-fire.jpg"],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

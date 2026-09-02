@@ -9,6 +9,8 @@
     "lint": "eslint",
     "seed": "node prisma/seed.mjs",
     "seed:media": "node prisma/seed-media.mjs",
+    "seed:media:kejadian": "node prisma/seed-media-kejadian.mjs",
+    "seed:media:laporan": "node prisma/seed-media-laporan.mjs",
     "test": "node --test 'lib/**/*.test.ts'"
   },
   "dependencies": {

@@ -109,6 +109,8 @@ type FormProps = {
   setNama: Kendali["setNama"];
   email: Kendali["email"];
   setEmail: Kendali["setEmail"];
+  anonim: Kendali["anonim"];
+  setAnonim: Kendali["setAnonim"];
   isi: Kendali["isi"];
   setIsi: Kendali["setIsi"];
   website: Kendali["website"];
@@ -124,11 +126,11 @@ type FormProps = {
 /** Kolom kirim, dipatok di dasar rel. Cukup isi nama dan email, tidak perlu
  *  login — sama seperti pada proyek Pasopati. */
 export function FormulirKomentar({
-  mengirim, nama, setNama, email, setEmail, isi, setIsi,
+  mengirim, nama, setNama, email, setEmail, anonim, setAnonim, isi, setIsi,
   website, setWebsite, balasKe, balasNama, batalBalas,
   kirim, ketikRef, captchaRef,
 }: FormProps) {
-  const belumLengkap = mengirim || !isi.trim() || !nama.trim() || !email.trim();
+  const belumLengkap = mengirim || !isi.trim() || (!anonim && (!nama.trim() || !email.trim()));
 
   return (
     <form className="rincian__kirim" onSubmit={(e) => { e.preventDefault(); kirim(); }}>
@@ -162,7 +164,8 @@ export function FormulirKomentar({
           type="text"
           maxLength={100}
           placeholder="Nama"
-          required
+          required={!anonim}
+          disabled={anonim}
           value={nama}
           onChange={(e) => setNama(e.target.value)}
         />
@@ -173,15 +176,27 @@ export function FormulirKomentar({
           type="email"
           maxLength={100}
           placeholder="Email"
-          required
+          required={!anonim}
+          disabled={anonim}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
 
+      {/* Pilihan anonim, sama polanya dengan form laporan: isian identitas
+          dimatikan dan kiriman tampil sebagai "Anonim". */}
+      <label className="rincian__anonim">
+        <input
+          type="checkbox"
+          checked={anonim}
+          onChange={(e) => setAnonim(e.target.checked)}
+        />
+        Kirim sebagai anonim
+      </label>
+
       <div className="rincian__baris">
         <span className="rincian__inisial rincian__inisial--kecil" aria-hidden="true">
-          {nama ? nama.charAt(0).toUpperCase() : "?"}
+          {anonim ? "A" : nama ? nama.charAt(0).toUpperCase() : "?"}
         </span>
 
         <label className="rincian__ketik-bungkus">

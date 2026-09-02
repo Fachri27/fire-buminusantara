@@ -58,13 +58,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const nama = String(body.nama ?? "").trim();
   const email = String(body.email ?? "").trim();
   const isi = String(body.isi ?? "").trim();
+  // Anonim meniru form laporan: identitas tidak diminta, nama tampil sebagai
+  // "Anonim" di daftar. Email tetap disimpan null — kolomnya memang nullable.
+  const anonim = Boolean(body.anonim);
+  const namaSimpan = anonim ? "Anonim" : nama;
+  const emailSimpan = anonim ? null : email;
 
   const galat: Record<string, string> = {};
-  if (!nama) galat.nama = "Nama wajib diisi.";
-  else if (nama.length > BATAS_NAMA) galat.nama = `Nama maksimal ${BATAS_NAMA} karakter.`;
-  if (!email) galat.email = "Email wajib diisi.";
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) galat.email = "Format email tidak valid.";
-  else if (email.length > BATAS_NAMA) galat.email = `Email maksimal ${BATAS_NAMA} karakter.`;
+  if (!anonim) {
+    if (!nama) galat.nama = "Nama wajib diisi.";
+    else if (nama.length > BATAS_NAMA) galat.nama = `Nama maksimal ${BATAS_NAMA} karakter.`;
+    if (!email) galat.email = "Email wajib diisi.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) galat.email = "Format email tidak valid.";
+    else if (email.length > BATAS_NAMA) galat.email = `Email maksimal ${BATAS_NAMA} karakter.`;
+  }
   if (!isi) galat.isi = "Komentar wajib diisi.";
   else if (isi.length > BATAS_ISI) galat.isi = `Komentar maksimal ${BATAS_ISI} karakter.`;
 
@@ -79,7 +86,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     ? Number(body.balas_ke)
     : null;
 
-  await simpanKomentar({ eventId: id, nama, email, isi, balasKe, ip });
+  await simpanKomentar({ eventId: id, nama: namaSimpan, email: emailSimpan, isi, balasKe, ip });
 
   return NextResponse.json({ komentar: await daftarKomentar(id) }, { status: 201 });
 }
