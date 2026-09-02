@@ -50,7 +50,15 @@ type Baris = {
 
 function keBerita(e: Baris): Berita {
   const mediaList = itemMedia(e.media, e.image_id, e.video);
-  const poster = urlMedia(e.image_id) ?? (mediaList.find((m) => m.jenis === "gambar")?.url ?? null);
+  // Thumbnail kejadian: gambar utama → foto galeri → poster video (urutan sama
+  // dengan pratinjau admin). Fallback poster video menjaga kejadian yang hanya
+  // bervideo tetap punya thumbnail untuk pratinjau bagikan (og:image) — tanpa
+  // itu, tautannya dibagikan tanpa gambar sama sekali.
+  const poster =
+    urlMedia(e.image_id) ??
+    (mediaList.find((m) => m.jenis === "gambar")?.url ?? null) ??
+    mediaList.find((m) => m.poster)?.poster ??
+    null;
 
   return {
     // BigInt tidak bisa lewat JSON.stringify, dan payload ini menyeberang ke

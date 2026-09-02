@@ -7,6 +7,7 @@ import {
 } from "@/lib/laporan-publik";
 import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { TombolVerifikasi } from "../tombol-verifikasi";
+import { PilihOrientasi } from "../pilih-orientasi";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ export default async function RincianLaporan({
                 Pelapor tidak melampirkan foto atau video.
               </p>
             ) : (
-              <LampiranPenuh daftar={laporan.lampiran} judul={laporan.judul} />
+              <LampiranPenuh id={laporan.id} daftar={laporan.lampiran} judul={laporan.judul} />
             )}
           </Bagian>
         </div>
@@ -173,11 +174,15 @@ function Baris({ label, children }: { label: string; children: React.ReactNode }
  * muat — dibatasi tinggi layar supaya foto potret tidak mendorong sisa halaman
  * jauh ke bawah. Menekan gambar membuka berkas aslinya, ukuran penuh.
  */
-function LampiranPenuh({ daftar, judul }: { daftar: Lampiran[]; judul: string }) {
+function LampiranPenuh({ id, daftar, judul }: { id: number; daftar: Lampiran[]; judul: string }) {
   return (
     <ul className="grid gap-4">
       {daftar.map((m, i) => (
         <li key={m.url}>
+          {/* Orientasi dipilih peninjau: potret atau lanskap. Disimpan ke
+              metadata berkas lewat aksi, dipakai penampil media. */}
+          <PilihOrientasi id={id} url={m.url} nilai={m.orientasi} />
+
           {m.jenis === "gambar" ? (
             <a href={m.url} target="_blank" rel="noreferrer"
                className="block w-fit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
@@ -197,6 +202,29 @@ function LampiranPenuh({ daftar, judul }: { daftar: Lampiran[]; judul: string })
               buka berkas ↗
             </a>
           </p>
+
+          {/* Metadata EXIF foto: kapan & di mana kamera mengambilnya. Berbeda
+              dari koordinat laporan yang bisa diketik pelapor — ini terekam
+              otomatis oleh kamera, jadi bukti yang lebih sulit dikarang. */}
+          {m.exif && (m.exif.waktu || (m.exif.lat != null && m.exif.lng != null)) && (
+            <p className="cms-mata mt-1 text-[var(--lirih)]">
+              <span className="text-[var(--redup)]">EXIF foto —</span>{" "}
+              {m.exif.waktu && (
+                <>diambil <span className="cms-angka text-[var(--jelaga)]">{m.exif.waktu}</span></>
+              )}
+              {m.exif.waktu && m.exif.lat != null && m.exif.lng != null && " · "}
+              {m.exif.lat != null && m.exif.lng != null && (
+                <a
+                  href={`https://www.google.com/maps?q=${m.exif.lat},${m.exif.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="cms-angka text-[var(--jelaga)] underline-offset-4 hover:underline"
+                >
+                  {m.exif.lat.toFixed(5)}, {m.exif.lng.toFixed(5)} ↗
+                </a>
+              )}
+            </p>
+          )}
         </li>
       ))}
     </ul>

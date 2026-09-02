@@ -24,6 +24,10 @@ export function urlMedia(path: string | null): string | null {
   return MEDIA_BASE_URL ? `${MEDIA_BASE_URL}/${path}` : null;
 }
 
+/** Orientasi yang dipilih peninjau saat memverifikasi — dipakai penampil media
+ *  untuk mengatur rasio (mis. potret tampil tinggi, lanskap tampil lebar). */
+export type Orientasi = "potret" | "lanskap";
+
 /** Satu berkas dalam galeri kejadian, sebagaimana tersimpan di kolom `media`. */
 export type BerkasMedia = {
   path: string;
@@ -31,6 +35,8 @@ export type BerkasMedia = {
   poster?: string;
   /** Keterangan gambar dari form CMS — alt/caption per berkas. */
   keterangan?: string;
+  /** Orientasi yang dipilih peninjau (bisa kosong sebelum diverifikasi). */
+  orientasi?: Orientasi;
 };
 
 /** Satu item galeri yang siap dirender. */
@@ -53,7 +59,7 @@ export function bacaBerkasMedia(nilai: unknown): BerkasMedia[] {
   const hasil: BerkasMedia[] = [];
   for (const item of nilai) {
     if (!item || typeof item !== "object") continue;
-    const { path, type, poster, keterangan } = item as Record<string, unknown>;
+    const { path, type, poster, keterangan, orientasi } = item as Record<string, unknown>;
     if (typeof path !== "string" || !path) continue;
     if (type !== "image" && type !== "video") continue;
 
@@ -61,6 +67,9 @@ export function bacaBerkasMedia(nilai: unknown): BerkasMedia[] {
       typeof poster === "string" && poster ? { path, type, poster } : { path, type };
     if (typeof keterangan === "string" && keterangan.trim()) {
       berkas.keterangan = keterangan;
+    }
+    if (orientasi === "potret" || orientasi === "lanskap") {
+      berkas.orientasi = orientasi;
     }
     hasil.push(berkas);
   }
@@ -134,4 +143,19 @@ export function galeriTersimpan(media: unknown): ItemMedia[] {
       ? { jenis: "video" as const, url, poster, keterangan: b.keterangan }
       : { jenis: "video" as const, url, keterangan: b.keterangan };
   });
+}
+
+/**
+ * Orientasi kartu korsel dari lampiran laporan: pilihan potret/lanskap peninjau
+ * yang tersimpan di JSON media. Yang pertama punya pilihan yang menang — kartu
+ * memang menonjolkan satu media saja, sisanya menumpang di slider.
+ *
+ * Dipetakan ke nilai kolom `events.orientation`: foto potret → "horizontal"
+ * (foto memenuhi kartu), sisanya → "landscape" (foto di bawah teks, bingkai
+ * 3:2). Tanpa pilihan apa pun, jatuh ke "landscape" — sama dengan bawaan
+ * kolomnya. Dipakai promosiKeKejadian() saat laporan naik jadi kejadian.
+ */
+export function orientasiKartu(media: unknown): "horizontal" | "landscape" {
+  const pilihan = bacaBerkasMedia(media).find((b) => b.orientasi)?.orientasi;
+  return pilihan === "potret" ? "horizontal" : "landscape";
 }

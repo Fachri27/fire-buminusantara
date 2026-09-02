@@ -178,7 +178,8 @@ function Rincian({
 
   const {
     daftar, memuat, mengirim, galat,
-    nama, setNama, email, setEmail, isi, setIsi, website, setWebsite,
+    nama, setNama, email, setEmail, anonim, setAnonim,
+    isi, setIsi, website, setWebsite,
     balasKe, balasNama, batalBalas, mulaiBalas,
     tampilkanBalasan, alihkanBalasan, sebutanDari, isiTanpaSebutan,
     kirim, ketikRef, captchaRef,
@@ -315,7 +316,9 @@ function Rincian({
 
           <FormulirKomentar
             mengirim={mengirim} nama={nama} setNama={setNama}
-            email={email} setEmail={setEmail} isi={isi} setIsi={setIsi}
+            email={email} setEmail={setEmail}
+            anonim={anonim} setAnonim={setAnonim}
+            isi={isi} setIsi={setIsi}
             website={website} setWebsite={setWebsite}
             balasKe={balasKe} balasNama={balasNama} batalBalas={batalBalas}
             kirim={kirim} ketikRef={ketikRef} captchaRef={captchaRef}

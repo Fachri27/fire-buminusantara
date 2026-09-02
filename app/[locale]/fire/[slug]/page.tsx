@@ -31,6 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     kejadian.deskripsi ||
     `Pantauan karhutla di ${kejadian.lokasi ?? "Indonesia"} (${kejadian.tanggal}).`;
   const gambar = kejadian.poster;
+  const video = kejadian.video;
 
   return {
     title: judul,
@@ -38,7 +39,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: judul,
       description: deskripsi,
-      images: gambar ? [{ url: gambar }] : [],
+      // URL absolut og:url & og:image dijamin oleh metadataBase di root layout.
+      // Tanpa og:url yang absolut, sebagian crawler memperlakukan tautan yang
+      // dibagikan (dengan prefiks /id/ dst.) dan kanoniknya sebagai dua halaman.
+      url: `/${locale}/fire/${slug}`,
+      siteName: "Fire",
+      locale: locale === "en" ? "en_US" : "id_ID",
+      images: gambar ? [{ url: gambar, alt: kejadian.alt }] : [],
+      // og:video: WhatsApp/Twitter kadang memutar mp4 langsung dari pratinjau.
+      // Fallback utamanya tetap og:image di atas (poster video) — jauh lebih
+      // andal di semua perangkat. URL-nya dibuat absolut sendiri: tidak seperti
+      // images, metadataBase TIDAK me-resolve og:video di versi Next ini.
+      videos: video
+        ? [{ url: new URL(video, process.env.NEXT_PUBLIC_SITE_URL || "https://fire.nusantara.earth").toString() }]
+        : [],
       type: "article",
     },
     twitter: {

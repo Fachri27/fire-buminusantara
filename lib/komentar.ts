@@ -118,7 +118,7 @@ export async function daftarKomentar(eventId: number): Promise<Komentar[]> {
  * ditebak.
  */
 export async function simpanKomentar(input: {
-  eventId: number; nama: string; email: string; isi: string;
+  eventId: number; nama: string; email: string | null; isi: string;
   balasKe: number | null; ip: string | null;
 }) {
   const induk = input.balasKe

@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
-import { bacaBerkasMedia, urlMedia, type BerkasMedia } from "./media";
-import { simpanBerkasGaleri, hapusBerkas, gpsDariBerkas } from "./unggah";
+import { bacaBerkasMedia, urlMedia, type BerkasMedia, type Orientasi } from "./media";
+import { simpanBerkasGaleri, hapusBerkas, gpsDariBerkas, exifDariPath, type ExifFoto } from "./unggah";
 import { turnstileSah } from "./turnstile";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "./batas-laporan";
 import { promosiKeKejadian } from "./simpan-kejadian";
@@ -33,6 +33,11 @@ export type Lampiran = {
   url: string;
   poster?: string;
   keterangan?: string;
+  /** Orientasi yang dipilih peninjau saat memverifikasi (kosong = belum). */
+  orientasi?: Orientasi;
+  /** GPS & waktu pengambilan dari EXIF foto. Hanya diisi di halaman detail
+   *  (ambilLaporan), bukan di daftar — membacanya perlu menarik byte gambarnya. */
+  exif?: ExifFoto;
 };
 
 /** Satu baris laporan pada halaman verifikasi. */
@@ -69,6 +74,7 @@ function lampiranDari(media: unknown): Lampiran[] {
         url,
         poster,
         keterangan: berkas.keterangan,
+        orientasi: berkas.orientasi,
       });
     }
   }
@@ -290,7 +296,33 @@ export async function daftarLaporan(
 /** Satu laporan untuk halaman detail. */
 export async function ambilLaporan(id: number): Promise<LaporanPublik | null> {
   const baris = await prisma.public_reports.findUnique({ where: { id }, select: PILIH });
-  return baris ? keLaporan(baris as BarisLaporan) : null;
+  if (!baris) return null;
+
+  const laporan = keLaporan(baris as BarisLaporan);
+
+  // Perkaya lampiran dengan metadata (GPS dari foto & video, waktu dari foto).
+  // Dikerjakan hanya di sini, bukan di daftar: tiap berkas perlu ditarik
+  // byte-nya dari penyimpanan. Dicocokkan lewat url — lampiranDari() melewati
+  // entri yang url-nya tak terbentuk, jadi indeksnya belum tentu sejajar dengan
+  // media mentahnya.
+  const exifPerUrl = new Map<string, ExifFoto>();
+  await Promise.all(
+    bacaBerkasMedia(baris.media).map(async (b) => {
+      const url = urlMedia(b.path);
+      if (!url) return;
+      const exif = await exifDariPath(b.path);
+      if (exif) exifPerUrl.set(url, exif);
+    }),
+  );
+
+  if (exifPerUrl.size > 0) {
+    laporan.lampiran = laporan.lampiran.map((l) => {
+      const exif = exifPerUrl.get(l.url);
+      return exif ? { ...l, exif } : l;
+    });
+  }
+
+  return laporan;
 }
 
 /** Tetangga sebuah laporan dalam antrean yang sedang disaring — dipakai tombol
@@ -411,4 +443,40 @@ export async function hapusLaporan(id: number) {
 
   for (const berkas of bacaBerkasMedia(baris.media)) await hapusBerkas(berkas.path);
   await prisma.public_reports.delete({ where: { id } });
+}
+
+/** Simpan pilihan orientasi (potret/lanskap) satu lampiran saat diverifikasi.
+ *
+ *  `media` adalah larik JSON — kita cari entri yang URL-nya cocok, ubah
+ *  `orientasi`-nya, lalu tulis kembali. Bidang lain (path, type, poster,
+ *  keterangan, EXIF nanti) dibiarkan utuh; entri yang tak dikenal diabaikan.
+ */
+export async function aturOrientasiLaporan(
+  id: number,
+  url: string,
+  orientasi: Orientasi,
+): Promise<{ ok: boolean; galat?: string }> {
+  const baris = await prisma.public_reports.findUnique({
+    where: { id },
+    select: { media: true },
+  });
+  if (!baris) return { ok: false, galat: "Laporan tidak ditemukan." };
+
+  const media = Array.isArray(baris.media) ? [...baris.media] : [];
+  let berubah = false;
+  for (const item of media) {
+    if (!item || typeof item !== "object") continue;
+    const berkas = item as Record<string, unknown>;
+    if (typeof berkas.path !== "string") continue;
+    if (urlMedia(berkas.path) !== url) continue;
+    berkas.orientasi = orientasi;
+    berubah = true;
+  }
+  if (!berubah) return { ok: false, galat: "Lampiran tidak ditemukan." };
+
+  await prisma.public_reports.update({
+    where: { id },
+    data: { media, updated_at: new Date() },
+  });
+  return { ok: true };
 }

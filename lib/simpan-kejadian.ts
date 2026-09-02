@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { simpanBerkasGaleri, hapusBerkas } from "./unggah";
-import { bacaBerkasMedia, type BerkasMedia } from "./media";
+import { bacaBerkasMedia, orientasiKartu, type BerkasMedia } from "./media";
 import { lokasiDariKoordinat } from "./geo";
 
 export type HasilSimpan = { ok: true; id: number } | { ok: false; galat: string };
@@ -173,6 +173,8 @@ export type LaporanPromosi = {
  *    jatuh ke format "lat, lng" (atau "Lokasi tidak diketahui"). Wilayah/admin
  *    dapat mengubahnya belakangan.
  *  - lampiran laporan dibawa apa adanya ke kolom media (format sama).
+ *  - orientasi kartu diambil dari pilihan potret/lanskap peninjau — tanpa itu
+ *    kartunya selalu lanskap dan foto potret terpotong jelek di korsel.
  */
 export async function promosiKeKejadian(
   laporan: LaporanPromosi,
@@ -207,6 +209,7 @@ export async function promosiKeKejadian(
         location: lokasi,
         location_lat: lat,
         location_lng: lng,
+        orientation: orientasiKartu(laporan.media),
         // Lampiran laporan sudah berseri JSON dengan format yang sama persis
         // dengan events.media — dibawa apa adanya, tanpa disalin/digambar ulang.
         media: laporan.media ?? undefined,

@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { bacaSesi, bolehKelola } from "@/lib/sesi";
-import { aturStatusLaporan, hapusLaporan, type StatusLaporan } from "@/lib/laporan-publik";
+import { aturStatusLaporan, hapusLaporan, aturOrientasiLaporan, type StatusLaporan } from "@/lib/laporan-publik";
+import type { Orientasi } from "@/lib/media";
 
 /** Server action terbuka lewat POST langsung, bukan cuma lewat tombol di CMS —
  *  jadi sesinya diperiksa di dalam setiap aksi, bukan sekali di halamannya. */
@@ -27,4 +28,11 @@ export async function aksiHapusLaporan(id: number) {
   if (sesi.peran !== "admin") redirect("/admin/laporan");
   await hapusLaporan(id);
   return { ok: true as const };
+}
+
+/** Simpan pilihan orientasi (potret/lanskap) sebuah lampiran saat diverifikasi.
+ *  Boleh editor maupun admin — meninjau berarti juga menandai orientasinya. */
+export async function aksiOrientasi(id: number, url: string, orientasi: Orientasi) {
+  await jaga();
+  return aturOrientasiLaporan(id, url, orientasi);
 }
