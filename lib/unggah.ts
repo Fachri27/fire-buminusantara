@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import os from "node:os";
 import path from "node:path";
+import exifr from "exifr";
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
 export const AWALAN_LOKAL = "fire/";
@@ -179,6 +180,32 @@ export async function simpanBerkasGaleri(
   return poster
     ? { path: hasil.path, type: "video", poster }
     : { path: hasil.path, type: "video" };
+}
+
+/** Koordinat GPS yang terbaca dari EXIF sebuah berkas, kalau ada. */
+export type KoordinatExif = { lat: number; lng: number };
+
+/**
+ * Ambil koordinat GPS dari metadata EXIF gambar. Berkas disimpan apa adanya
+ * (EXIF utuh), jadi koordinat GPS kamera bisa diambil sebagai cadangan lokasi
+ * saat pelapor tidak mengisinya manual.
+ *
+ * `null` bila berkas bukan gambar ber-GPS, GPS-nya tidak terbaca, atau exifr
+ * gagal — pemanggil harus punya cadangan lain, jangan sampai ini menggagalkan
+ * penyimpanan laporan.
+ */
+export async function gpsDariBerkas(berkas: File): Promise<KoordinatExif | null> {
+  try {
+    // exifr.gps menerima ArrayBuffer; File diubah dulu supaya tidak bergantung
+    // pada dukungan File sebagai input.
+    const gps = await exifr.gps(await berkas.arrayBuffer());
+    const lat = gps?.latitude;
+    const lng = gps?.longitude;
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  } catch {
+    /* bukan gambar / tidak ada EXIF GPS — bukan kegagalan fatal */
+  }
+  return null;
 }
 
 /**

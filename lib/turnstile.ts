@@ -17,11 +17,15 @@ export async function turnstileSah(token: string | null, ip: string | null): Pro
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) {
     // Fail-open HANYA di pengembangan; di produksi tidak ada secret = tidak lolos.
+    console.log("[turnstile] TIDAK ADA secret; NODE_ENV=", process.env.NODE_ENV);
     return process.env.NODE_ENV !== "production";
   }
   // Token Turnstile paling panjang 2048 karakter — yang lebih panjang dari itu
   // pasti bukan token sah, tidak ada gunanya mengirimkannya ke Cloudflare.
-  if (!token || token.length > 2048) return false;
+  if (!token || token.length > 2048) {
+    console.log("[turnstile] token kosong/tidak valid; panjang=", token ? token.length : 0);
+    return false;
+  }
 
   try {
     const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
@@ -33,8 +37,10 @@ export async function turnstileSah(token: string | null, ip: string | null): Pro
       signal: AbortSignal.timeout(10_000),
     });
     const data = await r.json();
+    console.log("[turnstile] siteverify →", data?.success, "err=", JSON.stringify(data?.["error-codes"]));
     return Boolean(data?.success);
-  } catch {
+  } catch (e) {
+    console.log("[turnstile] siteverify EXCEPTION:", (e as Error)?.message);
     return false;
   }
 }

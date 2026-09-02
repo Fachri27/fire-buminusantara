@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { bacaBerkasMedia, urlMedia, type BerkasMedia } from "./media";
-import { simpanBerkasGaleri, hapusBerkas } from "./unggah";
+import { simpanBerkasGaleri, hapusBerkas, gpsDariBerkas } from "./unggah";
 import { turnstileSah } from "./turnstile";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "./batas-laporan";
 import { promosiKeKejadian } from "./simpan-kejadian";
@@ -162,6 +162,20 @@ export async function simpanLaporanPublik(
     };
   }
 
+  // Lokasi manual selalu lebih dihargai: koordinat dari EXIF hanya dipakai
+  // sebagai cadangan kalau pelapor tidak mengisi lat/lng sama sekali. Diambil
+  // dari gambar pertama yang punya metadata GPS.
+  let titikLaporan = titik ?? null;
+  if (!titikLaporan && berkas.length > 0) {
+    for (const b of berkas) {
+      const gps = await gpsDariBerkas(b);
+      if (gps) {
+        titikLaporan = gps;
+        break;
+      }
+    }
+  }
+
   const keteranganMedia = namaPelapor || "anonim";
 
   const media: BerkasMedia[] = [];
@@ -188,8 +202,8 @@ export async function simpanLaporanPublik(
         description: deskripsi,
         media,
         reporter_name: namaPelapor.slice(0, BATAS_NAMA_PELAPOR) || null,
-        location_lat: titik ? titik.lat : null,
-        location_lng: titik ? titik.lng : null,
+        location_lat: titikLaporan ? titikLaporan.lat : null,
+        location_lng: titikLaporan ? titikLaporan.lng : null,
         status: "pending",
         ip_address: ip,
         created_at: sekarang,

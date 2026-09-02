@@ -1,6 +1,7 @@
 import { prisma } from "./prisma";
 import { simpanBerkasGaleri, hapusBerkas } from "./unggah";
 import { bacaBerkasMedia, type BerkasMedia } from "./media";
+import { lokasiDariKoordinat } from "./geo";
 
 export type HasilSimpan = { ok: true; id: number } | { ok: false; galat: string };
 
@@ -167,8 +168,10 @@ export type LaporanPromosi = {
  * teks lokasi, judul EN, slug), jadi dipetakan dengan akal sehat:
  *  - judul EN memakai judulnya (laporan tidak pernah bilingua).
  *  - tanggal memakai waktu laporan dibuat.
- *  - teks lokasi memakai koordinat laporan (format "lat, lng"); kolom ini
- *    di tabel events wajib, dan wilayah/admin dapat mengubahnya belakangan.
+ *  - teks lokasi memakai nama daerah hasil reverse-geocode dari koordinat
+ *    laporan; kalau geo tak terjangkau atau titiknya di luar semua daerah,
+ *    jatuh ke format "lat, lng" (atau "Lokasi tidak diketahui"). Wilayah/admin
+ *    dapat mengubahnya belakangan.
  *  - lampiran laporan dibawa apa adanya ke kolom media (format sama).
  */
 export async function promosiKeKejadian(
@@ -178,9 +181,17 @@ export async function promosiKeKejadian(
   const lat = laporan.location_lat === null ? 0 : Number(laporan.location_lat);
   const lng = laporan.location_lng === null ? 0 : Number(laporan.location_lng);
   const diketahui = laporan.location_lat !== null && laporan.location_lng !== null;
-  const lokasi = diketahui
-    ? `${(Math.round(lat * 1e6) / 1e6).toFixed(6)}, ${(Math.round(lng * 1e6) / 1e6).toFixed(6)}`
-    : "Lokasi tidak diketahui";
+
+  let lokasi: string;
+  if (!diketahui) {
+    lokasi = "Lokasi tidak diketahui";
+  } else {
+    // Reverse geocode opsional & non-blokir: kegagalannya tidak boleh
+    // menggagalkan kenaikan laporan, maka fallback ke koordinat mentah.
+    lokasi =
+      (await lokasiDariKoordinat(lat, lng)) ??
+      `${(Math.round(lat * 1e6) / 1e6).toFixed(6)}, ${(Math.round(lng * 1e6) / 1e6).toFixed(6)}`;
+  }
 
   const slug = await buatSlug(laporan.title);
 

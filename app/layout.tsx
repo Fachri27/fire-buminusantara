@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 
@@ -47,6 +48,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
           <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer />
         )}
+        {/* Google Analytics (gtag.js). Dimuat afterInteractive supaya tidak
+            memblokir render halaman; mount HTML klasik tidak cukup karena
+            `next/script` menangani pemuatan gtag yang asinkron. */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-TDJESR6SNL"
+          strategy="afterInteractive"
+        />
+        <Script id="gtag-init" strategy="afterInteractive" dangerouslySetInnerHTML={{
+          __html: `
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-TDJESR6SNL');
+          `,
+        }} />
       </head>
       <body>{children}</body>
     </html>
