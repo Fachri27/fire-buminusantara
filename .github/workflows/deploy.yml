@@ -106,5 +106,11 @@ jobs:
           # Box menjalankan skrip deploy dari repo-nya sendiri — logika deploy
           # terverSI bersama kode. reset --hard: box tidak boleh punya keadaan
           # lokal yang menyimpang dari main.
-          ssh -o BatchMode=yes "$USER@$HOST" \
-            "cd /srv/fire && git fetch --quiet origin main && git reset --hard --quiet origin/main && ./deploy/remote-deploy.sh '$ROLE' '$TAGS'"
+          ssh -v -o BatchMode=yes \
+            -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
+            "$USER@$HOST" \
+            "export GIT_TERMINAL_PROMPT=0; cd /srv/fire && git fetch origin main && git reset --hard origin/main && ./deploy/remote-deploy.sh '$ROLE' '$TAGS'"
