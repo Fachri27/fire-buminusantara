@@ -128,16 +128,16 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         window.setTimeout(pasang, 100);
         return;
       }
-      try {
-        ts.remove(widgetRef.current);
-      } catch {
-        /* belum ada widget */
-      }
-      wadah.innerHTML = "";
+      // Hanya render kalau wadah ini belum punya widget. Dulu di sini ada
+      // `ts.remove(widgetRef.current)` tanpa syarat — saat render pertama
+      // widgetRef masih null, dan remove(null) membuat Turnstile mencetak
+      // peringatan "Nothing to remove found for the provided container".
+      if (widgetRef.current !== null) return;
+
       // Tokennya TIDAK disalin ke state React. Turnstile menaruh sendiri satu
       // <input type="hidden"> bernama `captcha` di dalam wadah ini, dan wadah
       // ini duduk di dalam <form> — jadi tokennya ikut FormData tanpa perantara,
-      // dan mengosongkannya kembali cukup dengan reset() di bawah.
+      // dan mengosongkannya kembali cukup dengan reset() di tempat lain.
       widgetRef.current = ts.render(wadah, {
         sitekey: SITE_KEY,
         appearance: "interaction-only",
@@ -148,6 +148,18 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     pasang();
     return () => {
       hidup = false;
+      // Bongkar widgetnya saat komponen dilepas (termasuk remount ganda
+      // StrictMode di dev), supaya tidak ada widget yatim dan pemasangan
+      // berikutnya mulai dari wadah bersih.
+      const ts = turnstile();
+      if (ts && widgetRef.current !== null) {
+        try {
+          ts.remove(widgetRef.current);
+        } catch {
+          /* sudah lepas bersama pop-up yang ditutup */
+        }
+        widgetRef.current = null;
+      }
     };
   }, []);
 
