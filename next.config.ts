@@ -34,6 +34,13 @@ const nextConfig: NextConfig = {
   // ke .next/standalone sehingga image produksi tidak perlu node_modules penuh.
   output: "standalone",
 
+  // @prisma/client dan @aws-sdk/client-s3 sudah eksternal secara bawaan, tapi
+  // adapter MariaDB belum: tanpa ini webpack membundelnya ke chunk server, ia
+  // tidak pernah tersalin ke node_modules standalone, dan skrip di prisma/
+  // (backfill-poster.mjs dkk.) yang meng-import-nya secara polos gagal dengan
+  // ERR_MODULE_NOT_FOUND di dalam kontainer produksi.
+  serverExternalPackages: ["@prisma/adapter-mariadb"],
+
   // Batas upload video kejadian 100 MB (sama dengan CMS Laravel). Diberi 1 MB
   // napas di atas batas klien (BATAS_TOTAL_BYTE = 100 MB di lib/batas-laporan.ts):
   // body multipart = berkas + bidang isian + boundary, jadi kiriman yang lolos
