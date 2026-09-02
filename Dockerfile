@@ -44,6 +44,12 @@ FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 
+# ffmpeg dipakai bingkaiVideo() untuk membuat poster (bingkai pertama) tiap
+# video yang diunggah. Tanpa ini di image runtime, poster tidak pernah dibuat:
+# video-saja tampil tanpa thumbnail di korsel, dan pratinjau bagikannya
+# (og:image) jatuh ke logo alih-alih cuplikan videonya.
+RUN apk add --no-cache ffmpeg
+
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
