@@ -109,6 +109,7 @@ jobs:
           ssh -v -o BatchMode=yes \
             -i ~/.ssh/deploy_key \
             -o IdentitiesOnly=yes \
+            -o KexAlgorithms=curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group14-sha256 \
             -o ConnectTimeout=30 \
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=4 \
