@@ -68,3 +68,40 @@ export async function cariLokasi(kata: string, batas = 10, geser = 0): Promise<L
     return [];
   }
 }
+
+/**
+ * Reverse geocode: koordinat → nama daerah (level desa) yang menaunginya.
+ *
+ * Geometrinya di-transform ke EPSG:4326 supaya perbandingan tidak bergantung
+ * pada SRID asli tabel Simontini — kita tidak mengendalikan SRID itu. Titik
+ * dibuat dari (lng, lat) sesuai konvensi PostGIS ST_MakePoint(x=lon, y=lat).
+ *
+ * `null` dikembalikan bila koordinat bukan angka, tidak ada daerah yang
+ * menaunginya, atau database geo tak terjangkau — pemanggil harus punya
+ * cadangan (mis. teks "lat, lng"), jangan sampai reverse yang gagal
+ * menghalangi keputusan yang sudah diambil.
+ */
+export async function lokasiDariKoordinat(lat: number, lng: number): Promise<string | null> {
+  const tabel = process.env.GEO_LOCATION_TABLE;
+  const kolomNama = process.env.GEO_NAME_COLUMN;
+  if (!tabel || !kolomNama) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  const sql = `
+    SELECT ${kutip(kolomNama)} AS nama
+    FROM ${kutip(tabel)}
+    WHERE ST_Contains(
+            ST_Transform(geom, 4326),
+            ST_SetSRID(ST_MakePoint($1::float8, $2::float8), 4326)
+          )
+    LIMIT 1
+  `;
+
+  try {
+    const { rows } = await pool().query(sql, [lng, lat]);
+    const nama = rows[0]?.nama;
+    return typeof nama === "string" && nama.trim() !== "" ? nama.trim() : null;
+  } catch {
+    return null;
+  }
+}
