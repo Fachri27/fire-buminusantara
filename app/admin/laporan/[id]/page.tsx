@@ -179,6 +179,10 @@ function LampiranPenuh({ id, daftar, judul }: { id: number; daftar: Lampiran[]; 
     <ul className="grid gap-4">
       {daftar.map((m, i) => (
         <li key={m.url}>
+          {/* Orientasi dipilih peninjau: potret atau lanskap. Disimpan ke
+              metadata berkas lewat aksi, dipakai penampil media. */}
+          <PilihOrientasi id={id} url={m.url} nilai={m.orientasi} />
+
           {m.jenis === "gambar" ? (
             <a href={m.url} target="_blank" rel="noreferrer"
                className="block w-fit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
@@ -221,10 +225,6 @@ function LampiranPenuh({ id, daftar, judul }: { id: number; daftar: Lampiran[]; 
               )}
             </p>
           )}
-
-          {/* Orientasi dipilih peninjau: potret atau lanskap. Disimpan ke
-              metadata berkas lewat aksi, dipakai penampil media. */}
-          <PilihOrientasi id={id} url={m.url} nilai={m.orientasi} />
         </li>
       ))}
     </ul>
