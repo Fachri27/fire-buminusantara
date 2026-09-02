@@ -27,7 +27,7 @@ async function IsiHalaman({ bahasa }: { bahasa: Bahasa }) {
     ambilBerita(),
     hitungLaporanProvinsi(),
     ambilTigaTeratas(),
-    ambilStatistik(),
+    ambilStatistik(bahasa),
   ]);
 
   return (
