@@ -15,12 +15,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!adaBahasa(locale)) return {};
   const teks = TEKS_LAPOR[locale];
 
+  const judul = `${teks.judulHalaman} — Fire`;
+
   return {
-    title: `${teks.judulHalaman} — Fire`,
+    title: judul,
     description: teks.catatan,
     // Halaman kiriman: tidak ada isi yang perlu diindeks, dan tautan ke form
     // terbuka di hasil pencarian hanya mengundang bot.
     robots: { index: false, follow: true },
+    // openGraph SENGAJA disetel di sini, bukan diwarisi dari root layout: tanpa
+    // ini pratinjau bagikan halaman lapor memakai judul & deskripsi beranda
+    // yang generik. Gambar tetap logo (og-fire.jpg) — halaman form tidak punya
+    // gambar sendiri.
+    openGraph: {
+      title: judul,
+      description: teks.catatan,
+      url: `/${locale}/lapor`,
+      siteName: "Fire",
+      locale: locale === "en" ? "en_US" : "id_ID",
+      type: "website",
+      images: [{ url: "/assets/img/og-fire.jpg", width: 1200, height: 630, alt: "Fire" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: judul,
+      description: teks.catatan,
+      images: ["/assets/img/og-fire.jpg"],
+    },
   };
 }
 
