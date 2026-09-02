@@ -37,7 +37,7 @@ export function PilihOrientasi({
   };
 
   return (
-    <span className="mt-1 inline-flex items-center gap-1">
+    <span className="mt-1 mb-2 inline-flex items-center gap-1">
       <button
         type="button"
         disabled={sibuk}
