@@ -7,6 +7,7 @@ import {
 } from "@/lib/laporan-publik";
 import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { TombolVerifikasi } from "../tombol-verifikasi";
+import { PilihOrientasi } from "../pilih-orientasi";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ export default async function RincianLaporan({
                 Pelapor tidak melampirkan foto atau video.
               </p>
             ) : (
-              <LampiranPenuh daftar={laporan.lampiran} judul={laporan.judul} />
+              <LampiranPenuh id={laporan.id} daftar={laporan.lampiran} judul={laporan.judul} />
             )}
           </Bagian>
         </div>
@@ -173,7 +174,7 @@ function Baris({ label, children }: { label: string; children: React.ReactNode }
  * muat — dibatasi tinggi layar supaya foto potret tidak mendorong sisa halaman
  * jauh ke bawah. Menekan gambar membuka berkas aslinya, ukuran penuh.
  */
-function LampiranPenuh({ daftar, judul }: { daftar: Lampiran[]; judul: string }) {
+function LampiranPenuh({ id, daftar, judul }: { id: number; daftar: Lampiran[]; judul: string }) {
   return (
     <ul className="grid gap-4">
       {daftar.map((m, i) => (
@@ -220,6 +221,10 @@ function LampiranPenuh({ daftar, judul }: { daftar: Lampiran[]; judul: string })
               )}
             </p>
           )}
+
+          {/* Orientasi dipilih peninjau: potret atau lanskap. Disimpan ke
+              metadata berkas lewat aksi, dipakai penampil media. */}
+          <PilihOrientasi id={id} url={m.url} nilai={m.orientasi} />
         </li>
       ))}
     </ul>

@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { bacaBerkasMedia, urlMedia, type BerkasMedia } from "./media";
+import { bacaBerkasMedia, urlMedia, type BerkasMedia, type Orientasi } from "./media";
 import { simpanBerkasGaleri, hapusBerkas, gpsDariBerkas, exifDariPath, type ExifFoto } from "./unggah";
 import { turnstileSah } from "./turnstile";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "./batas-laporan";
@@ -33,6 +33,8 @@ export type Lampiran = {
   url: string;
   poster?: string;
   keterangan?: string;
+  /** Orientasi yang dipilih peninjau saat memverifikasi (kosong = belum). */
+  orientasi?: Orientasi;
   /** GPS & waktu pengambilan dari EXIF foto. Hanya diisi di halaman detail
    *  (ambilLaporan), bukan di daftar — membacanya perlu menarik byte gambarnya. */
   exif?: ExifFoto;
@@ -72,6 +74,7 @@ function lampiranDari(media: unknown): Lampiran[] {
         url,
         poster,
         keterangan: berkas.keterangan,
+        orientasi: berkas.orientasi,
       });
     }
   }
@@ -440,4 +443,40 @@ export async function hapusLaporan(id: number) {
 
   for (const berkas of bacaBerkasMedia(baris.media)) await hapusBerkas(berkas.path);
   await prisma.public_reports.delete({ where: { id } });
+}
+
+/** Simpan pilihan orientasi (potret/lanskap) satu lampiran saat diverifikasi.
+ *
+ *  `media` adalah larik JSON — kita cari entri yang URL-nya cocok, ubah
+ *  `orientasi`-nya, lalu tulis kembali. Bidang lain (path, type, poster,
+ *  keterangan, EXIF nanti) dibiarkan utuh; entri yang tak dikenal diabaikan.
+ */
+export async function aturOrientasiLaporan(
+  id: number,
+  url: string,
+  orientasi: Orientasi,
+): Promise<{ ok: boolean; galat?: string }> {
+  const baris = await prisma.public_reports.findUnique({
+    where: { id },
+    select: { media: true },
+  });
+  if (!baris) return { ok: false, galat: "Laporan tidak ditemukan." };
+
+  const media = Array.isArray(baris.media) ? [...baris.media] : [];
+  let berubah = false;
+  for (const item of media) {
+    if (!item || typeof item !== "object") continue;
+    const berkas = item as Record<string, unknown>;
+    if (typeof berkas.path !== "string") continue;
+    if (urlMedia(berkas.path) !== url) continue;
+    berkas.orientasi = orientasi;
+    berubah = true;
+  }
+  if (!berubah) return { ok: false, galat: "Lampiran tidak ditemukan." };
+
+  await prisma.public_reports.update({
+    where: { id },
+    data: { media, updated_at: new Date() },
+  });
+  return { ok: true };
 }

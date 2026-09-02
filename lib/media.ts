@@ -24,6 +24,10 @@ export function urlMedia(path: string | null): string | null {
   return MEDIA_BASE_URL ? `${MEDIA_BASE_URL}/${path}` : null;
 }
 
+/** Orientasi yang dipilih peninjau saat memverifikasi — dipakai penampil media
+ *  untuk mengatur rasio (mis. potret tampil tinggi, lanskap tampil lebar). */
+export type Orientasi = "potret" | "lanskap";
+
 /** Satu berkas dalam galeri kejadian, sebagaimana tersimpan di kolom `media`. */
 export type BerkasMedia = {
   path: string;
@@ -31,6 +35,8 @@ export type BerkasMedia = {
   poster?: string;
   /** Keterangan gambar dari form CMS — alt/caption per berkas. */
   keterangan?: string;
+  /** Orientasi yang dipilih peninjau (bisa kosong sebelum diverifikasi). */
+  orientasi?: Orientasi;
 };
 
 /** Satu item galeri yang siap dirender. */
@@ -53,7 +59,7 @@ export function bacaBerkasMedia(nilai: unknown): BerkasMedia[] {
   const hasil: BerkasMedia[] = [];
   for (const item of nilai) {
     if (!item || typeof item !== "object") continue;
-    const { path, type, poster, keterangan } = item as Record<string, unknown>;
+    const { path, type, poster, keterangan, orientasi } = item as Record<string, unknown>;
     if (typeof path !== "string" || !path) continue;
     if (type !== "image" && type !== "video") continue;
 
@@ -61,6 +67,9 @@ export function bacaBerkasMedia(nilai: unknown): BerkasMedia[] {
       typeof poster === "string" && poster ? { path, type, poster } : { path, type };
     if (typeof keterangan === "string" && keterangan.trim()) {
       berkas.keterangan = keterangan;
+    }
+    if (orientasi === "potret" || orientasi === "lanskap") {
+      berkas.orientasi = orientasi;
     }
     hasil.push(berkas);
   }
