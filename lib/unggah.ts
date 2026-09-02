@@ -201,7 +201,9 @@ export async function gpsDariBerkas(berkas: File): Promise<KoordinatExif | null>
     const gps = await exifr.gps(await berkas.arrayBuffer());
     const lat = gps?.latitude;
     const lng = gps?.longitude;
-    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    if (typeof lat === "number" && typeof lng === "number" && Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
   } catch {
     /* bukan gambar / tidak ada EXIF GPS — bukan kegagalan fatal */
   }

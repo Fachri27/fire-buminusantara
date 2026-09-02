@@ -142,6 +142,24 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         sitekey: SITE_KEY,
         appearance: "interaction-only",
         "response-field-name": "captcha",
+        "expired-callback": () => {
+          if (widgetRef.current !== null) {
+            try {
+              ts.reset(widgetRef.current);
+            } catch {
+              /* widget sudah lepas */
+            }
+          }
+        },
+        "error-callback": () => {
+          if (widgetRef.current !== null) {
+            try {
+              ts.reset(widgetRef.current);
+            } catch {
+              /* widget sudah lepas */
+            }
+          }
+        },
       });
     };
 
