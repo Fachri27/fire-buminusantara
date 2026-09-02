@@ -157,6 +157,15 @@ async function main() {
       location_lng: null,
       status: "pending",
     },
+    {
+      title: "Demo: foto + video ber-GPS sekaligus",
+      description:
+        "Laporan contoh yang menggabungkan foto ber-GPS EXIF DAN video ber-GPS ISO6709 dalam satu kiriman — untuk memastikan kedua jenis metadata tampil berdampingan di detail laporan.",
+      reporter_name: "Pelapor Demo Gabungan",
+      location_lat: null,
+      location_lng: null,
+      status: "pending",
+    },
   ];
 
   // Berkas media hanya dibuat & ditulis bila ada laporan baru yang akan masuk —
@@ -175,32 +184,55 @@ async function main() {
       mkdir(path.join(AKAR, "video"), { recursive: true }),
     ]);
 
-    // Fotonya: 3°35'04"S 98°40'33"E (Medan), diambil 15-08-2026 09:14.
-    const fotoGps = await fotoBerGps({
+    // Foto & video yang dipakai beberapa laporan. Medan 3°35'04"S 98°40'33"E;
+    // Pekanbaru 0°30'36"S 101°26'52"E — pasangan foto+video memakai titik ini.
+    const fotoMedan = await fotoBerGps({
       latRef: "S", latDms: [3, 35, 4],
       lngRef: "E", lngDms: [98, 40, 33],
       tanggal: "2026:08:15 09:14:22",
     });
+    const fotoPekanbaru = await fotoBerGps({
+      latRef: "S", latDms: [0, 30, 36],
+      lngRef: "E", lngDms: [101, 26, 52],
+      tanggal: "2026:08:20 14:02:45",
+    });
     const fotoPolos = await fotoTanpaGps();
-    const video = videoBerGps("+03.5844+098.6758+000.000/");
+    const videoMedan = videoBerGps("+03.5844+098.6758+000.000/");
+    const videoPekanbaru = videoBerGps("-00.5100+101.4478+000.000/");
 
     // Tiap laporan baru diberi berkas sendiri dengan citra/identitas unik.
+    // Nilainya adalah larik, karena satu laporan boleh memuat beberapa media.
     const byTitle = {
-      "Demo: foto ber-GPS EXIF (Medan)": { berkas: `gambar/${randomUUID()}.jpg`, isi: fotoGps },
-      "Demo: foto tanpa metadata GPS": { berkas: `gambar/${randomUUID()}.jpg`, isi: fotoPolos },
-      "Demo: video ber-GPS ISO6709 (MP4)": { berkas: `video/${randomUUID()}.mp4`, isi: video },
+      "Demo: foto ber-GPS EXIF (Medan)": [
+        { berkas: `gambar/${randomUUID()}.jpg`, isi: fotoMedan, type: "image",
+          keterangan: "Foto demo EXIF GPS" },
+      ],
+      "Demo: foto tanpa metadata GPS": [
+        { berkas: `gambar/${randomUUID()}.jpg`, isi: fotoPolos, type: "image",
+          keterangan: "Foto demo tanpa metadata" },
+      ],
+      "Demo: video ber-GPS ISO6709 (MP4)": [
+        { berkas: `video/${randomUUID()}.mp4`, isi: videoMedan, type: "video",
+          keterangan: "Video demo ISO6709" },
+      ],
+      "Demo: foto + video ber-GPS sekaligus": [
+        { berkas: `gambar/${randomUUID()}.jpg`, isi: fotoPekanbaru, type: "image",
+          keterangan: "Foto demo EXIF GPS (Pekanbaru)" },
+        { berkas: `video/${randomUUID()}.mp4`, isi: videoPekanbaru, type: "video",
+          keterangan: "Video demo ISO6709 (Pekanbaru)" },
+      ],
     };
-    const simpan = akanDibuat.map((l) => byTitle[l.title]);
+    const simpan = akanDibuat.flatMap((l) => byTitle[l.title]);
     await Promise.all(
       simpan.map((s) => writeFile(path.join(AKAR, s.berkas), s.isi)),
     );
 
     for (const l of akanDibuat) {
-      const s = byTitle[l.title];
-      const media = [
-        { path: AWALAN + s.berkas, type: s.berkas.endsWith(".mp4") ? "video" : "image",
-          keterangan: l.title.includes("video") ? "Video demo ISO6709" : "Foto demo EXIF GPS" },
-      ];
+      const media = byTitle[l.title].map((s) => ({
+        path: AWALAN + s.berkas,
+        type: s.type,
+        keterangan: s.keterangan,
+      }));
       await prisma.public_reports.create({
         data: {
           title: l.title,
