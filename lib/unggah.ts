@@ -215,8 +215,8 @@ async function gpsDariGambar(buffer: ArrayBuffer): Promise<KoordinatExif | null>
 }
 
 /** Deteksi cepat MP4/MOV dari magic byte "ftyp" / "moov" di offset 4. */
-function tampaknyaVideo(buffer: ArrayBuffer): boolean {
-  const b = new Uint8Array(buffer);
+function tampaknyaVideo(buffer: ArrayBuffer | Uint8Array): boolean {
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   if (b.length < 8) return false;
   const tipe = String.fromCharCode(b[4], b[5], b[6], b[7]);
   return tipe === "ftyp" || tipe === "moov";
@@ -233,10 +233,10 @@ function tampaknyaVideo(buffer: ArrayBuffer): boolean {
  * Drone (GPS di berkas .srt) dan format lain yang tidak menyimpan lokasi di
  * box ini tetap `null` — ini bukan parser video umum.
  */
-function gpsDariVideo(buffer: ArrayBuffer): KoordinatExif | null {
+function gpsDariVideo(buffer: ArrayBuffer | Uint8Array): KoordinatExif | null {
   try {
-    const dv = new DataView(buffer);
-    const u8 = new Uint8Array(buffer);
+    const u8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
 
     function anakBox(
       start: number,
@@ -365,15 +365,33 @@ function waktuExif(raw: unknown): string | undefined {
 }
 
 /**
- * Baca GPS + waktu pengambilan dari EXIF berkas tersimpan. Dipakai halaman
- * verifikasi untuk menampilkan bukti kapan & di mana foto diambil.
+ * Baca GPS + waktu pengambilan dari metadata berkas tersimpan. Dipakai halaman
+ * verifikasi untuk menampilkan bukti kapan & di mana berkas diambil.
  *
- * `null` bila bukan gambar ber-EXIF atau tak ada satu pun dari kedua data itu —
+ * Foto: EXIF (GPS exifr + waktu) — kamera merekam keduanya. Video: GPS dari box
+ * QuickTime ISO6709 (`gpsDariVideo`); video tidak punya jam EXIF, jadi hanya
+ * koordinat yang bisa ditampilkan.
+ *
+ * `null` bila bukan berkas ber-metadata atau tak ada satu pun dari data itu —
  * pemanggil menyembunyikan barisnya, bukan menampilkan kolom kosong.
  */
 export async function exifDariPath(pathSimpan: string): Promise<ExifFoto | null> {
   const buf = await bacaByte(pathSimpan);
   if (!buf) return null;
+
+  const hasil: ExifFoto = {};
+
+  // Video: hanya GPS, via parser QuickTime ISO6709 (exifr tak mendukung MP4).
+  if (tampaknyaVideo(buf)) {
+    const gps = gpsDariVideo(buf);
+    if (gps && Number.isFinite(gps.lat) && Number.isFinite(gps.lng)) {
+      hasil.lat = gps.lat;
+      hasil.lng = gps.lng;
+    }
+    return hasil.lat !== undefined ? hasil : null;
+  }
+
+  // Foto: GPS + waktu lewat exifr.
   try {
     const [gps, tags] = await Promise.all([
       exifr.gps(buf).catch(() => null),
@@ -382,7 +400,6 @@ export async function exifDariPath(pathSimpan: string): Promise<ExifFoto | null>
         .catch(() => null),
     ]);
 
-    const hasil: ExifFoto = {};
     if (gps && Number.isFinite(gps.latitude) && Number.isFinite(gps.longitude)) {
       hasil.lat = gps.latitude;
       hasil.lng = gps.longitude;

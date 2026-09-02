@@ -297,20 +297,19 @@ export async function ambilLaporan(id: number): Promise<LaporanPublik | null> {
 
   const laporan = keLaporan(baris as BarisLaporan);
 
-  // Perkaya lampiran gambar dengan EXIF (GPS + waktu ambil). Dikerjakan hanya di
-  // sini, bukan di daftar: tiap gambar perlu ditarik byte-nya dari penyimpanan.
-  // Dicocokkan lewat url — lampiranDari() melewati entri yang url-nya tak
-  // terbentuk, jadi indeksnya belum tentu sejajar dengan media mentahnya.
+  // Perkaya lampiran dengan metadata (GPS dari foto & video, waktu dari foto).
+  // Dikerjakan hanya di sini, bukan di daftar: tiap berkas perlu ditarik
+  // byte-nya dari penyimpanan. Dicocokkan lewat url — lampiranDari() melewati
+  // entri yang url-nya tak terbentuk, jadi indeksnya belum tentu sejajar dengan
+  // media mentahnya.
   const exifPerUrl = new Map<string, ExifFoto>();
   await Promise.all(
-    bacaBerkasMedia(baris.media)
-      .filter((b) => b.type === "image")
-      .map(async (b) => {
-        const url = urlMedia(b.path);
-        if (!url) return;
-        const exif = await exifDariPath(b.path);
-        if (exif) exifPerUrl.set(url, exif);
-      }),
+    bacaBerkasMedia(baris.media).map(async (b) => {
+      const url = urlMedia(b.path);
+      if (!url) return;
+      const exif = await exifDariPath(b.path);
+      if (exif) exifPerUrl.set(url, exif);
+    }),
   );
 
   if (exifPerUrl.size > 0) {
