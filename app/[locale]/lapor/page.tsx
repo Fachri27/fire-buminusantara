@@ -15,7 +15,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!adaBahasa(locale)) return {};
   const teks = TEKS_LAPOR[locale];
 
-  const judul = `${teks.judulHalaman} — Fire`;
+  // Judul meta ringkas: "Lapor | Karhutla" (id) / "Report | Wildfire" (en) —
+  // dipakai untuk <title> tab, hasil pencarian, dan judul pratinjau bagikan.
+  const judul = locale === "en" ? "Report | Wildfire" : "Lapor | Karhutla";
 
   return {
     title: judul,

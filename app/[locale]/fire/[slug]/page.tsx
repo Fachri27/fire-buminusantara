@@ -73,7 +73,7 @@ async function IsiHalaman({ bahasa, slug }: { bahasa: Bahasa; slug: string }) {
     hitungLaporanProvinsi(),
     ambilTigaTeratas(),
     ambilBeritaSlug(slug),
-    ambilStatistik(),
+    ambilStatistik(bahasa),
   ]);
 
   if (!kejadian) notFound();
