@@ -1,0 +1,112 @@
+name: Backfill Poster
+
+# Menjalankan prisma/backfill-poster.mjs DI DALAM kontainer web produksi.
+# Skrip itu butuh ffmpeg + node_modules image runtime + env kontainer
+# (DATABASE_URL, MINIO_*) — jadi satu-satunya tempat yang benar untuk
+# menjalankannya adalah `docker compose exec web` di box prod. Box tidak
+# menerima SSH dari luar selain lewat kunci deploy CI, jadi jalurnya lewat
+# workflow ini dengan secrets PROD_* yang sama dengan deploy.yml.
+#
+#   mode=dry   → dry-run, hanya melihat video apa yang akan dibuatkan poster
+#   mode=apply → benar-benar membuat & menyimpan poster (idempoten: video
+#                yang sudah punya poster dilewati)
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        description: "dry = lihat saja; apply = buat & simpan poster"
+        options:
+          - dry
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backfill-poster
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Fail closed: input divalidasi SEBELUM dipakai karena diinterpolasi ke
+      # perintah shell remote, dan payload dispatch tidak dipercaya.
+      - name: Validasi input
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          case "$MODE" in
+            dry|apply) ;;
+            *) echo "::error::mode tidak dikenal: '$MODE'"; exit 1 ;;
+          esac
+          echo "mode=$MODE valid"
+
+      - name: Tulis kunci SSH dan known_hosts terpatok
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Terpatok dari secret — JANGAN ssh-keyscan: itu memercayai apa pun
+          # yang menjawab di hari itu (DNS dibajak = kunci penyerang dipercaya).
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Muat kunci ke ssh-agent (mendukung kunci berpassphrase)
+        env:
+          DEPLOY_KEY_PASSPHRASE: ${{ secrets.PROD_SSH_KEY_PASSPHRASE }}
+        run: |
+          eval "$(ssh-agent -s)"
+          if [ -n "$DEPLOY_KEY_PASSPHRASE" ]; then
+            # CI tanpa tty: askpass yang memasok passphrase saat ssh-add bertanya.
+            printf '#!/bin/sh\nprintf "%%s" "$DEPLOY_KEY_PASSPHRASE"\n' > ~/.ssh/askpass.sh
+            chmod 700 ~/.ssh/askpass.sh
+            SSH_ASKPASS=~/.ssh/askpass.sh SSH_ASKPASS_REQUIRE=force \
+              ssh-add ~/.ssh/deploy_key </dev/null \
+              || { echo "::error::ssh-add gagal — passphrase PROD_SSH_KEY_PASSPHRASE tidak cocok dengan PROD_SSH_KEY"; exit 1; }
+          else
+            ssh-add ~/.ssh/deploy_key </dev/null \
+              || { echo "::error::ssh-add gagal — PROD_SSH_KEY mungkin terenkripsi tapi secret PROD_SSH_KEY_PASSPHRASE belum disetel"; exit 1; }
+          fi
+          # Simpan socket untuk langkah berikutnya (eval tidak menembus langkah).
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+
+      - name: Cek entri known_hosts cocok dengan HOST
+        env:
+          HOST: ${{ secrets.PROD_SSH_HOST }}
+        run: |
+          # ssh mencari known_hosts berdasarkan nama yang diberikan persis —
+          # domain di satu secret, IP di secret lainnya = tidak pernah cocok.
+          if grep -q "^$HOST " ~/.ssh/known_hosts; then
+            echo "entri known_hosts untuk '$HOST' ditemukan"
+          else
+            echo "::error::PROD_SSH_HOST ('$HOST') tidak punya entri di PROD_SSH_KNOWN_HOSTS — nama di kedua secret harus persis sama (domain=domain, ip=ip)."
+            exit 1
+          fi
+
+      - name: Jalankan backfill via SSH
+        env:
+          HOST: ${{ secrets.PROD_SSH_HOST }}
+          USER: ${{ secrets.PROD_SSH_USER }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          # ARGS berasal dari set tertutup hasil validasi — bukan payload bebas.
+          ARGS=""
+          [ "$MODE" = "apply" ] && ARGS="--apply"
+          # Tanpa git reset di box: skrip berada DI DALAM image (COPY prisma/),
+          # dan compose hanya butuh file yml dari checkout yang sudah diperbarui
+          # deploy terakhir. Baca-saja terhadap box selain kerja skrip sendiri.
+          ssh -o BatchMode=yes \
+            -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            -o KexAlgorithms=curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group14-sha256 \
+            -o ConnectTimeout=30 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
+            "$USER@$HOST" \
+            "cd /srv/fire && docker compose -f docker-compose.prod.yml exec -T web node prisma/backfill-poster.mjs $ARGS"
