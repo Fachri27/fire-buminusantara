@@ -6,12 +6,14 @@ import { KartuBerita } from "./kartu-berita";
 import { Statistik } from "./statistik";
 import type { Statistik as DataStatistik } from "@/lib/statistik";
 import type { Berita } from "@/lib/events";
+import type { Bahasa } from "@/lib/bahasa";
 
 export function Korsel({
-  berita, statistik, onBuka,
+  berita, statistik, bahasa = "id", onBuka,
 }: {
   berita: Berita[];
   statistik: DataStatistik[];
+  bahasa?: Bahasa;
   onBuka: (i: number) => void;
 }) {
   const {
@@ -117,6 +119,7 @@ export function Korsel({
             >
               {kartu.map((k, i) => (
                 <KartuBerita key={k.kunci} k={k} aktif={i === aktif} kurangiGerak={kurangiGerak}
+                             bahasa={bahasa}
                              onPilih={() => keKartu(i)} onBuka={() => onBuka(k.asli)}
                              onGeserMedia={mulaiOtomatis} />
               ))}

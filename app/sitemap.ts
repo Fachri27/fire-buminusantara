@@ -1,6 +1,9 @@
 import type { MetadataRoute } from "next";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 3600;
+
 // Base URL terpusat supaya sitemap selalu absolut — crawler menolak URL relatif.
 const BASE_URL = (
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://fire.nusantara.earth"
@@ -11,14 +14,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const statis: MetadataRoute.Sitemap = [
     { url: `${BASE_URL}/id`, changeFrequency: "daily", priority: 1 },
     { url: `${BASE_URL}/en`, changeFrequency: "daily", priority: 1 },
-    // Formulir lapor jarang berubah isinya, cukup diramban ulang mingguan.
-    { url: `${BASE_URL}/id/lapor`, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${BASE_URL}/en/lapor`, changeFrequency: "monthly", priority: 0.8 },
   ];
 
   try {
     // Hanya kolom yang dipakai sitemap — tanpa id BigInt agar lolos serialisasi.
     const events = await prisma.events.findMany({
+      where: { slug: { not: null } },
       select: { slug: true, event_date: true, updated_at: true },
       orderBy: { event_date: "desc" },
     });

@@ -7,8 +7,7 @@ const BASE_URL = (
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    // Situs informasi publik — semua crawler boleh mengindeks semuanya.
-    rules: { userAgent: "*", allow: "/" },
+    rules: { userAgent: "*", allow: "/", disallow: ["/admin", "/admin/", "/api/"] },
     sitemap: `${BASE_URL}/sitemap.xml`,
   };
 }

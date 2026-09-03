@@ -26,6 +26,7 @@ const mono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "CMS Pasopati Fire",
   description: "Panel admin pengelolaan pantauan karhutla Indonesia.",
+  robots: { index: false, follow: false },
 };
 
 const ambilTunggakan = unstable_cache(

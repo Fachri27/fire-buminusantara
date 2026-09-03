@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: PageProps<'/[locale]'>): Prom
     // Path relatif diselesaikan absolut lewat metadataBase di layout akar.
     alternates: {
       canonical: `/${bahasa}`,
-      languages: { id: "/id", en: "/en" },
+      languages: { id: "/id", en: "/en", "x-default": "/id" },
     },
     openGraph: {
       title: teks.judul,
@@ -61,6 +61,12 @@ export async function generateMetadata({ params }: PageProps<'/[locale]'>): Prom
       siteName: "Fire",
       locale: teks.ogLocale,
       type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: teks.judul,
+      description: teks.deskripsi,
+      images: ["/assets/img/og-fire.jpg"],
     },
   };
 }

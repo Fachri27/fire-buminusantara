@@ -98,7 +98,7 @@ export function HalamanFire({
 
   return (
     <>
-      <Korsel berita={berita} statistik={statistik} onBuka={(i) => berita[i] && bukaRincian(berita[i])} />
+      <Korsel berita={berita} statistik={statistik} bahasa={bahasa} onBuka={(i) => berita[i] && bukaRincian(berita[i])} />
 
       {/* Layar 2 — peta sebaran & forecasting. Menggulir naik menutupi hero. */}
       <section

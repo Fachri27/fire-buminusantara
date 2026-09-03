@@ -12,10 +12,20 @@ import { BAHASA } from "@/lib/bahasa";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const adaPrefiks = BAHASA.some((b) => pathname === `/${b}` || pathname.startsWith(`/${b}/`));
-  if (adaPrefiks) return;
+  if (!adaPrefiks) {
+    request.nextUrl.pathname = `/${BAHASA[0]}${pathname === "/" ? "" : pathname}`;
+    return NextResponse.redirect(request.nextUrl, 308);
+  }
 
-  request.nextUrl.pathname = `/${BAHASA[0]}${pathname === "/" ? "" : pathname}`;
-  return NextResponse.redirect(request.nextUrl);
+  const match = pathname.match(/^\/(id|en)(\/|$)/);
+  const locale = match ? match[1] : BAHASA[0];
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-locale", locale);
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {

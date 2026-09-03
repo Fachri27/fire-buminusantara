@@ -71,6 +71,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       languages: {
         id: `/id/fire/${slug}`,
         en: `/en/fire/${slug}`,
+        "x-default": `/id/fire/${slug}`,
       },
     },
     openGraph: {
@@ -157,6 +158,7 @@ async function IsiHalaman({ bahasa, slug }: { bahasa: Bahasa; slug: string }) {
 
   return (
     <>
+      <h1 className="sr-only">{judulSeo}</h1>
       <JsonLd data={beritaLd} />
       <JsonLd data={remahLd} />
       <HalamanFire
@@ -178,7 +180,6 @@ export default async function HalamanKejadian({ params }: Props) {
   return (
     <>
       <Nav bahasa={locale as Bahasa} />
-      <h1 className="sr-only">Pantauan kebakaran hutan dan lahan Indonesia</h1>
       <Suspense fallback={<KerangkaBeranda bahasa={locale as Bahasa} />}>
         <IsiHalaman bahasa={locale as Bahasa} slug={slug} />
       </Suspense>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Script from "next/script";
 import { Poppins } from "next/font/google";
 import "./globals.css";
@@ -41,14 +42,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headerList = await headers();
+  const lang = headerList.get("x-locale") || "id";
+
   // suppressHydrationWarning pada <html>: skrip --skala di <head> menulis
   // atribut style pada <html> SEBELUM hidrasi, jadi React melihat atribut yang
   // tidak ia render dan memperingatkan "server rendered HTML didn't match".
   // Nilai itu memang harus bertahan (bukan dipatch React) — pola yang sama
   // seperti next-themes. Peringatannya dimatikan di elemen ini saja.
   return (
-    <html lang="id" className={poppins.className} suppressHydrationWarning>
+    <html lang={lang} className={poppins.className} suppressHydrationWarning>
       <head>
         {/* Kanvas panggung diskalakan lewat --skala, yang dipasang
             gunakanPanggung() SETELAH hidrasi. Isi yang di-stream masuk bisa

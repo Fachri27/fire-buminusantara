@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { SliderKartu } from "./slider-kartu";
 import type { Kartu } from "@/hooks/gunakan-korsel";
+import type { Bahasa } from "@/lib/bahasa";
 
 // Geometri dan rupa dipecah karena varian video butuh pembungkus ber-posisi
 // (tempat lencana durasi duduk) sedangkan fotonya tidak. Foto dan video tetap
@@ -19,12 +21,13 @@ type Props = {
   k: Kartu;
   aktif: boolean;
   kurangiGerak: boolean;
+  bahasa?: Bahasa;
   onPilih: () => void;
   onBuka: () => void;
   onGeserMedia: () => void;
 };
 
-export function KartuBerita({ k, aktif, kurangiGerak, onPilih, onBuka, onGeserMedia }: Props) {
+export function KartuBerita({ k, aktif, kurangiGerak, bahasa = "id", onPilih, onBuka, onGeserMedia }: Props) {
   const { isi } = k;
   // Kejadian tanpa media apa pun tidak lagi menampilkan foto dummy — kotak
   // medianya diganti petunjuk pola lokasi. `SliderKartu` mengembalikan null
@@ -80,10 +83,22 @@ export function KartuBerita({ k, aktif, kurangiGerak, onPilih, onBuka, onGeserMe
           <div aria-hidden="true"
                className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgb(0_0_0/0.32)_0%,transparent_34%,transparent_50%,rgb(0_0_0/0.62)_100%)]" />
           <div className="pointer-events-none absolute inset-0 flex flex-col justify-end p-[var(--kartu-pias)] text-left text-white">
-            <p onClick={(e) => { e.stopPropagation(); onBuka(); }}
-               className="pointer-events-auto cursor-pointer text-[clamp(14px,3.4vw,20px)] leading-[1.2] font-bold">
-              {isi.judul}
-            </p>
+            <h2 className="contents">
+              <Link
+                href={isi.slug ? `/${bahasa}/fire/${isi.slug}` : `/${bahasa}`}
+                onClick={(e) => {
+                  // Allow middle click / ctrl click / cmd click to open in new tab naturally
+                  if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onBuka();
+                  }
+                }}
+                className="pointer-events-auto cursor-pointer text-[clamp(14px,3.4vw,20px)] leading-[1.2] font-bold no-underline"
+              >
+                {isi.judul}
+              </Link>
+            </h2>
             <p className="mt-2 text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal opacity-90">
               • {isi.tanggal} •
             </p>
@@ -97,10 +112,22 @@ export function KartuBerita({ k, aktif, kurangiGerak, onPilih, onBuka, onGeserMe
         // kotak medianya sendiri yang meregang (aliran:flex-1).
         <>
           <div className="flex w-full flex-1 flex-col items-center justify-center aliran:flex-none">
-            <p onClick={(e) => { e.stopPropagation(); onBuka(); }}
-               className="w-full cursor-pointer text-center text-[clamp(16px,4.2vw,24px)] leading-[1.2] font-bold text-black">
-              {isi.judul}
-            </p>
+            <h2 className="contents">
+              <Link
+                href={isi.slug ? `/${bahasa}/fire/${isi.slug}` : `/${bahasa}`}
+                onClick={(e) => {
+                  // Allow middle click / ctrl click / cmd click to open in new tab naturally
+                  if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onBuka();
+                  }
+                }}
+                className="w-full cursor-pointer text-center text-[clamp(16px,4.2vw,24px)] leading-[1.2] font-bold text-black no-underline"
+              >
+                {isi.judul}
+              </Link>
+            </h2>
             <p className="mt-4 w-full text-center text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal">
               • {isi.tanggal} •
             </p>
