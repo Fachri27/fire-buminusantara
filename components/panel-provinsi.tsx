@@ -186,12 +186,6 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
                       <span className="block text-[length:var(--ukuran-catatan)] leading-[1.4] text-black/45">
                         {p.pulau}
                       </span>
-                      <span className="mt-[clamp(6px,2vw,12px)] flex items-baseline justify-between gap-3">
-                        <span className="text-[length:var(--ukuran-catatan)] text-black/55">Luas kebakaran</span>
-                        <span className="text-[length:var(--ukuran-catatan)] font-bold whitespace-nowrap text-tinta">
-                          {p.luas} ha
-                        </span>
-                      </span>
                     </span>
                   </button>
                 </li>
