@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { gunakanPanggung } from "@/hooks/gunakan-panggung";
 import { gunakanParallax } from "@/hooks/gunakan-parallax";
 import { gunakanKomentar } from "@/hooks/gunakan-komentar";
+import { gunakanSegarOtomatis } from "@/hooks/gunakan-segar-otomatis";
 import { useKurangiGerak } from "@/hooks/gunakan-korsel";
 import { BAHASA, type Bahasa } from "@/lib/bahasa";
 
@@ -45,6 +46,9 @@ export function HalamanFire({
 
 
   gunakanPanggung();
+  // Data halaman menyegar sendiri (tab kembali terlihat + tiap 5 menit) —
+  // pengunjung tak perlu hard reload untuk melihat kejadian terbaru dari CMS.
+  gunakanSegarOtomatis();
   // Pop-up mana pun yang terbuka menghentikan guliran halaman di belakangnya.
   gunakanParallax(sorot !== null || wilayah !== null);
 
