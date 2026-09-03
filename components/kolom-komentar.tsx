@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { gunakanKomentar } from "@/hooks/gunakan-komentar";
 
 type Kendali = ReturnType<typeof gunakanKomentar>;
@@ -105,6 +106,7 @@ export function UlasanKomentar({
 
 type FormProps = {
   mengirim: Kendali["mengirim"];
+  galat: Kendali["galat"];
   nama: Kendali["nama"];
   setNama: Kendali["setNama"];
   email: Kendali["email"];
@@ -121,19 +123,63 @@ type FormProps = {
   kirim: Kendali["kirim"];
   ketikRef: Kendali["ketikRef"];
   captchaRef: Kendali["captchaRef"];
+  pasangCaptcha: Kendali["pasangCaptcha"];
 };
 
 /** Kolom kirim, dipatok di dasar rel. Cukup isi nama dan email, tidak perlu
- *  login — sama seperti pada proyek Pasopati. */
+ *  login — sama seperti pada proyek Pasopati.
+ *
+ *  Di ponsel (≤ 860px — breakpoint yang sama dengan CSS pop-up) formulir
+ *  lengkap tidak muat menempel di dasar rel: yang tampil hanya baris pemicu
+ *  "Tambahkan komentar…", dan menekannya membuka sheet berisi seluruh isian
+ *  (teks, nama, email, anonim, captcha). Di desktop semuanya inline seperti
+ *  semula. */
 export function FormulirKomentar({
-  mengirim, nama, setNama, email, setEmail, anonim, setAnonim, isi, setIsi,
+  mengirim, galat, nama, setNama, email, setEmail, anonim, setAnonim, isi, setIsi,
   website, setWebsite, balasKe, balasNama, batalBalas,
-  kirim, ketikRef, captchaRef,
+  kirim, ketikRef, captchaRef, pasangCaptcha,
 }: FormProps) {
   const belumLengkap = mengirim || !isi.trim() || (!anonim && (!nama.trim() || !email.trim()));
 
-  return (
-    <form className="rincian__kirim" onSubmit={(e) => { e.preventDefault(); kirim(); }}>
+  const [ponsel, setPonsel] = useState(false);
+  const [sheet, setSheet] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 860px)");
+    const terap = () => setPonsel(mq.matches);
+    terap();
+    mq.addEventListener("change", terap);
+    return () => mq.removeEventListener("change", terap);
+  }, []);
+
+  // Menekan "Balas" langsung membuka sheet berisi formulirnya.
+  useEffect(() => {
+    if (ponsel && balasKe !== null) setSheet(true);
+  }, [ponsel, balasKe]);
+
+  // Sheet tutup sendiri setelah komentar berhasil terkirim — tanda suksesnya:
+  // mengirim kembali false DAN isi sudah dikosongkan oleh hook. Bila gagal,
+  // isi masih terisi sehingga sheet tetap terbuka menampilkan pesan galatnya.
+  const kirimSebelumnya = useRef(false);
+  useEffect(() => {
+    if (kirimSebelumnya.current && !mengirim && !isi.trim()) setSheet(false);
+    kirimSebelumnya.current = mengirim;
+  }, [mengirim, isi]);
+
+  // Wadah captcha ikut sheet yang di-mount/unmount — pasang ulang widgetnya
+  // setiap sheet terbuka (pemasangan membuang widget lama lebih dulu).
+  useEffect(() => {
+    if (ponsel && sheet) pasangCaptcha();
+  }, [ponsel, sheet, pasangCaptcha]);
+
+  // Fokus ke kotak ketik begitu sheet terbuka.
+  useEffect(() => {
+    if (ponsel && sheet) ketikRef.current?.focus();
+  }, [ponsel, sheet, ketikRef]);
+
+  // Isian yang sama untuk versi inline dan versi sheet — satu sumber markup.
+  const bidang = (
+    <>
       {/* Umpan jebakan (honeypot): hanya bot yang mengisinya. */}
       <div className="rincian__jebakan" aria-hidden="true">
         <label>
@@ -193,39 +239,107 @@ export function FormulirKomentar({
         />
         Kirim sebagai anonim
       </label>
+    </>
+  );
 
-      <div className="rincian__baris">
-        <span className="rincian__inisial rincian__inisial--kecil" aria-hidden="true">
-          {anonim ? "A" : nama ? nama.charAt(0).toUpperCase() : "?"}
-        </span>
+  const barisKetik = (
+    <div className="rincian__baris">
+      <span className="rincian__inisial rincian__inisial--kecil" aria-hidden="true">
+        {anonim ? "A" : nama ? nama.charAt(0).toUpperCase() : "?"}
+      </span>
 
-        <label className="rincian__ketik-bungkus">
-          <span className="sr-only">Komentar</span>
-          <textarea
-            ref={ketikRef}
-            className="rincian__ketik"
-            rows={1}
-            maxLength={2000}
-            placeholder="Tambahkan komentar…"
-            value={isi}
-            onChange={(e) => setIsi(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                kirim();
-              }
-            }}
-          />
-        </label>
+      <label className="rincian__ketik-bungkus">
+        <span className="sr-only">Komentar</span>
+        <textarea
+          ref={ketikRef}
+          className="rincian__ketik"
+          rows={sheet ? 3 : 1}
+          maxLength={2000}
+          placeholder="Tambahkan komentar…"
+          value={isi}
+          onChange={(e) => setIsi(e.target.value)}
+          onKeyDown={(e) => {
+            // Shift+Enter diperbolehkan membuat baris baru di sheet.
+            if (e.key === "Enter" && (!sheet || !e.shiftKey)) {
+              e.preventDefault();
+              kirim();
+            }
+          }}
+        />
+      </label>
 
+      <button
+        type="submit"
+        className="rincian__tombol-kirim"
+        disabled={belumLengkap}
+      >
+        {mengirim ? "Mengirim…" : "Kirim"}
+      </button>
+    </div>
+  );
+
+  // ── Desktop: formulir lengkap inline di dasar rel, seperti sebelumnya. ──
+  if (!ponsel) {
+    return (
+      <form className="rincian__kirim" onSubmit={(e) => { e.preventDefault(); kirim(); }}>
+        {bidang}
+        {barisKetik}
+      </form>
+    );
+  }
+
+  // ── Ponsel: baris pemicu + sheet formulir. ──
+  return (
+    <>
+      {!sheet && (
         <button
-          type="submit"
-          className="rincian__tombol-kirim"
-          disabled={belumLengkap}
+          type="button"
+          className="rincian__kirim rincian__pemicu"
+          onClick={() => setSheet(true)}
         >
-          {mengirim ? "Mengirim…" : "Kirim"}
+          <span className="rincian__inisial rincian__inisial--kecil" aria-hidden="true">
+            {anonim ? "A" : nama ? nama.charAt(0).toUpperCase() : "?"}
+          </span>
+          <span className="rincian__pemicu-teks">
+            {balasKe !== null ? `Membalas ${balasNama}…` : "Tambahkan komentar…"}
+          </span>
         </button>
-      </div>
-    </form>
+      )}
+
+      {sheet && (
+        <div
+          className="rincian__sheet"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tulis komentar"
+          onClick={(e) => { if (e.target === e.currentTarget) setSheet(false); }}
+        >
+          <form
+            className="rincian__sheet-panel"
+            onSubmit={(e) => { e.preventDefault(); kirim(); }}
+          >
+            <div className="rincian__sheet-kepala">
+              <p className="rincian__sheet-judul">Tulis komentar</p>
+              <button
+                type="button"
+                className="rincian__sheet-tutup"
+                aria-label="Tutup formulir komentar"
+                onClick={() => setSheet(false)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+                     strokeWidth="2" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6 6 18" />
+                </svg>
+              </button>
+            </div>
+
+            {galat && <p className="rincian__galat" role="alert">{galat}</p>}
+
+            {bidang}
+            {barisKetik}
+          </form>
+        </div>
+      )}
+    </>
   );
 }

@@ -102,14 +102,15 @@ export function gunakanKomentar(idLaporan: number) {
 
   // Widget Turnstile dipasang sekali, mode explicit: kotak captcha tidak
   // ditampilkan sama sekali; token tetap dikirim & diperiksa di server.
-  useEffect(() => {
+  // Dibungkus useCallback supaya pemilik sheet (mobile) bisa memasang ulang
+  // widgetnya setiap wadahnya di-mount kembali.
+  const pasangCaptcha = useCallback(() => {
     if (!SITE_KEY) return;
-    let hidup = true;
 
     const pasang = () => {
       const wadah = captchaRef.current;
       const ts = turnstile();
-      if (!wadah || !hidup) return;
+      if (!wadah) return;
       if (!ts) {
         window.setTimeout(pasang, 100);
         return;
@@ -130,9 +131,6 @@ export function gunakanKomentar(idLaporan: number) {
     };
 
     pasang();
-    return () => {
-      hidup = false;
-    };
   }, []);
 
   // Token Turnstile sekali pakai: setelah dikirim — berhasil atau gagal —
@@ -281,6 +279,6 @@ export function gunakanKomentar(idLaporan: number) {
     tampilkanBalasan, alihkanBalasan,
     sebutanDari, isiTanpaSebutan,
     kirim,
-    ketikRef, captchaRef,
+    ketikRef, captchaRef, pasangCaptcha,
   };
 }
