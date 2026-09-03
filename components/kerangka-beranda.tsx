@@ -52,7 +52,7 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
                 <article className="kerangka-beranda__kartu relative z-[1] flex w-[var(--kartu-lebar)]
                                     shrink-0 flex-col rounded-[12px] bg-white/[0.88] p-[var(--kartu-pias)]
                                     text-center shadow-[10px_12px_28px_rgb(0_0_0/0.32)] ring-1
-                                    ring-white/60 backdrop-blur-[7px]">
+                                    ring-white/60">
                   <div className="mx-auto h-[calc(var(--ukuran-label)*1.15)] w-3/4 animate-pulse
                                   rounded-full bg-black/10" />
                   <div className="mx-auto mt-4 h-[calc(var(--ukuran-tanggal)*1.2)] w-1/3 animate-pulse
@@ -93,9 +93,12 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
         {/* ── Layar 2 — peta. Lapisan latarnya disalin dari section aslinya
             supaya peralihan hero→peta terlihat sama; kanvas dan panelnya
             diganti bidang denyut berukuran mirip. */}
-        <section className="kerangka-beranda__layar-peta relative z-[2] flex h-[100svh] min-h-[100svh]
-                            w-full flex-col justify-center overflow-hidden">
-          <div className="kabur-tepi pointer-events-none" />
+        <section
+          data-kabur-tepi
+          className="kerangka-beranda__layar-peta tepi-lunak relative z-[2] flex h-[100svh] min-h-[100svh]
+                            w-full flex-col justify-center overflow-hidden"
+        >
+          <div className="kabur-tepi pointer-events-none" aria-hidden="true" />
           <div className="absolute inset-0 h-full w-full animate-pulse bg-[#0a0f18]/85" />
 
           {/* Kolom pencarian mengambang (khusus mobile, desktop tersembunyi) */}

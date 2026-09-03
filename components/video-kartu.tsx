@@ -33,6 +33,9 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
   const [durasi, setDurasi] = useState("");
   const [usai, setUsai] = useState(false);
   const [siap, setSiap] = useState(false);
+  // timeupdate menembak ~4x/detik; tulis state hanya saat angka detik yang
+  // tampil benar-benar berganti supaya tidak render ulang terus-menerus.
+  const detikTampil = useRef("");
 
   // Poster tunggal ditunggu juga: sekalipun preload-nya "none", peramban
   // menampilkan berkas poster jauh sebelum data video siap, jadi kerangkanya
@@ -57,7 +60,11 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
     const el = ref.current;
     if (!el || !isFinite(el.duration) || el.duration <= 0) return;
     const sisa = el.paused || el.ended ? el.duration : el.duration - el.currentTime;
-    setDurasi(jam(Math.ceil(sisa)));
+    const teks = jam(Math.ceil(sisa));
+    if (teks !== detikTampil.current) {
+      detikTampil.current = teks;
+      setDurasi(teks);
+    }
   }, []);
 
   // Kartu tengah diputar, sisanya berhenti dan mundur ke awal.

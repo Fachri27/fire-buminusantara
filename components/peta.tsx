@@ -47,22 +47,27 @@ export function Peta({ jumlahLaporan, onPilihWilayah }: Props) {
         };
         onPilihWilayah(data.nama, data.pulau ?? null, asal);
       } else if (data.type === "IFRAME_WHEEL") {
-        const deltaY = (data.deltaY || 0) * 0.6;
+        let rawDeltaY = data.deltaY || 0;
+        if (data.deltaMode === 1) rawDeltaY *= 16.67;
+        else if (data.deltaMode === 2) rawDeltaY *= window.innerHeight;
+        const deltaY = rawDeltaY * 0.75;
+
         const lenis = (window as unknown as {
           lenis?: {
             scrollTo: (t: number, opts?: Record<string, unknown>) => void;
             scroll: number;
             targetScroll?: number;
-            limit: number;
+            limit?: number;
           };
         }).lenis;
 
         if (lenis && typeof lenis.scrollTo === "function") {
-          const base = lenis.targetScroll ?? lenis.scroll;
-          const target = Math.max(0, Math.min(lenis.limit, base + deltaY));
-          lenis.scrollTo(target, { duration: 0.9, programmatic: false });
+          const max = lenis.limit ?? (document.documentElement.scrollHeight - window.innerHeight);
+          const current = typeof lenis.targetScroll === "number" ? lenis.targetScroll : lenis.scroll;
+          const target = Math.max(0, Math.min(max, current + deltaY));
+          lenis.scrollTo(target, { programmatic: false });
         } else {
-          window.scrollBy({ top: deltaY, behavior: "smooth" });
+          window.scrollBy({ top: deltaY, behavior: "auto" });
         }
       }
     };
@@ -72,20 +77,24 @@ export function Peta({ jumlahLaporan, onPilihWilayah }: Props) {
   }, [onPilihWilayah, kirimJumlah]);
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#0a0f18]">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className="relative h-full w-full overflow-hidden bg-[#0a0f18]"
+    >
       <iframe
         ref={iframeRef}
         src="/api/forecasting?lat=0.200&lon=118.000&zoom=5"
         title="Peta Sebaran Kualitas Udara dan Angin"
         className="h-full w-full border-0"
         allow="geolocation"
+        onContextMenu={(e) => e.preventDefault()}
         onLoad={() => {
           kirimJumlah();
           setTimeout(() => setMemuat(false), 800);
         }}
       />
       {memuat && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#0a0f18]/60 backdrop-blur-sm transition-opacity duration-500">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#0a0f18]/85 transition-opacity duration-500">
           <div className="flex items-center gap-3 rounded-full bg-black/75 px-5 py-2.5 text-sm text-white/90 shadow-xl ring-1 ring-white/15">
             <svg
               className="h-4 w-4 animate-spin text-amber-500"

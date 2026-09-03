@@ -14,8 +14,6 @@ import { useEffect } from "react";
 export function gunakanParallax(kunciGulir: boolean) {
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      const bagian = document.querySelectorAll<HTMLElement>("[data-kabur-tepi]");
-      bagian.forEach((el) => el.style.setProperty("--kabur-tepi", "0"));
       return;
     }
 
@@ -25,8 +23,8 @@ export function gunakanParallax(kunciGulir: boolean) {
       const Lenis = (await import("lenis")).default;
 
       const lenis = new Lenis({
-        duration: 1.2,
-        wheelMultiplier: 0.65,
+        duration: 1.0,
+        wheelMultiplier: 0.75,
         touchMultiplier: 0.8,
         smoothWheel: true,
         autoRaf: true,
@@ -37,14 +35,37 @@ export function gunakanParallax(kunciGulir: boolean) {
       const elemenDaftar = Array.from(
         document.querySelectorAll<HTMLElement>("[data-kabur-tepi]")
       );
+      let sisaTerakhir = -1;
 
       const perbarui = () => {
         const vh = window.innerHeight;
         if (vh <= 0 || !elemenDaftar.length) return;
+
         for (const el of elemenDaftar) {
           const rect = el.getBoundingClientRect();
           const sisa = Math.max(0, Math.min(1, rect.top / vh));
-          el.style.setProperty("--kabur-tepi", sisa.toFixed(3));
+          const sisaBulat = Math.round(sisa * 1000) / 1000;
+
+          if (sisaBulat !== sisaTerakhir) {
+            sisaTerakhir = sisaBulat;
+
+            // Saat sisa mendekati 0 (peta tiba/docked di atas):
+            // Pasang maskImage: none agar tidak terjadi shader degeneration di Skia GPU
+            // dan peta 100% solid, tajam di bawah navbar tanpa sisa kabur.
+            if (sisaBulat <= 0.005) {
+              el.style.webkitMaskImage = "none";
+              el.style.maskImage = "none";
+              el.style.setProperty("--kabur-tepi", "0");
+            } else if (sisaBulat >= 0.995) {
+              el.style.webkitMaskImage = "none";
+              el.style.maskImage = "none";
+              el.style.setProperty("--kabur-tepi", "0");
+            } else {
+              el.style.webkitMaskImage = "";
+              el.style.maskImage = "";
+              el.style.setProperty("--kabur-tepi", sisaBulat.toFixed(3));
+            }
+          }
         }
       };
 

@@ -157,23 +157,62 @@ html {
   );
 }
 
-/* Tepi atas section 2 dilembutkan selama ia menggulir menutupi hero.
-   Menggunakan overlay gradien halus (.kabur-tepi) tanpa memotong/memasker
-   elemen canvas WebGL agar tidak terjadi flickering atau GPU texture thrashing. */
+/* Integrasi Lenis Smooth Scroll:
+   1. html.lenis dan body diset height auto agar kalkulasi limit scroll akurat.
+   2. iframe dinonaktifkan pointer-events selama guliran halus (.lenis-smooth)
+      agar kursor yang melewati kanvas WebGL tidak memicu hit-test, perataan
+      ulang hover, atau perebutan scroll yang memicu kedipan di Chromium. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* Stabilisasi komposit GPU untuk transisi beranda sticky -> peta:
+   Memastikan kedua section memiliki lapisan komposit stabil tanpa memicu
+   perataan ulang atau robekan tekstur WebGL. */
+#beranda,
+#peta {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* Tepi atas section 2 dilembutkan selama ia menggulir menutupi hero (gaya produksi asli).
+   --kabur-tepi digerakkan Lenis scroll: 1 saat tepi atas section menyentuh
+   tepi bawah viewport, 0 saat tiba di atas. Bentuk sisa*(1-sisa) membuat
+   masker melebar di tengah perjalanan lalu menutup lagi di ujung. */
+.tepi-lunak {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    black calc(var(--kabur-tepi, 0) * (1 - var(--kabur-tepi, 0)) * 200svh)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    black calc(var(--kabur-tepi, 0) * (1 - var(--kabur-tepi, 0)) * 200svh)
+  );
+}
+
 .kabur-tepi {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: clamp(80px, 16vh, 180px);
+  height: calc(var(--kabur-tepi, 0) * (1 - var(--kabur-tepi, 0)) * 200svh);
   pointer-events: none;
   z-index: 10;
+  will-change: height, opacity;
   background: linear-gradient(
     to bottom,
-    rgba(10, 15, 24, calc(var(--kabur-tepi, 0) * 0.95)) 0%,
-    rgba(10, 15, 24, calc(var(--kabur-tepi, 0) * 0.5)) 40%,
+    rgb(255 255 255 / calc(var(--kabur-tepi, 0) * 0.35)) 0%,
     transparent 100%
   );
+  -webkit-mask-image: linear-gradient(#000 0%, #0000 100%);
+  mask-image: linear-gradient(#000 0%, #0000 100%);
 }
 
 /* Strip statistik digulir dengan snap; bilah gulirnya disembunyikan supaya

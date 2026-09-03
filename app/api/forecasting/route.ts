@@ -193,6 +193,18 @@ export async function GET(req: NextRequest) {
               }
             }
           });
+
+          // F. Disable context menu / right click completely
+          window.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }, true);
+          document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }, true);
         })();
       </script>
     `;
@@ -200,6 +212,18 @@ export async function GET(req: NextRequest) {
     // 2. Custom Styles for Windy + Administrative Polygons & Numbers
     const customStyles = `
       <style>
+        /* Suppress context menu */
+        #plugin-contextmenu,
+        .contextmenu,
+        .context-menu,
+        #contextmenu,
+        .leaflet-contextmenu {
+          display: none !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+          opacity: 0 !important;
+        }
+
         /* A. Suppress all layer menu and sidebar elements */
         [data-plugin="rhpane-top"],
         #plugin-rhpane-top,
@@ -322,8 +346,8 @@ export async function GET(req: NextRequest) {
           position: fixed !important;
           top: auto !important;
           right: auto !important;
-          bottom: 105px !important;
-          left: 20px !important;
+          bottom: 16px !important;
+          left: 296px !important;
           z-index: 1000 !important;
           transform: scale(0.8) !important;
           transform-origin: bottom left !important;
@@ -404,7 +428,11 @@ export async function GET(req: NextRequest) {
         path.provinsi-layer {
           cursor: pointer !important;
           pointer-events: auto !important;
-          transition: fill-opacity 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
+          /* Hanya fill-opacity yang dianimasikan: transisi stroke-width
+             menata ulang geometri SVG tiap bingkai dan filter drop-shadow
+             memaksa pass render tambahan — keduanya berkedip di Chromium
+             saat kursor menyapu poligon di atas kanvas WebGL. */
+          transition: fill-opacity 0.2s ease;
         }
 
         .leaflet-pane.leaflet-wilayah-pane path:hover,
@@ -414,7 +442,6 @@ export async function GET(req: NextRequest) {
           stroke-width: 2.5px !important;
           fill: #ffffff !important;
           fill-opacity: 0.18 !important;
-          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
         }
 
         /* J. Number Badges (.peta-angka) */
@@ -451,9 +478,12 @@ export async function GET(req: NextRequest) {
           display: none !important;
         }
 
-        /* Tooltip custom styling */
+        /* Tooltip custom styling.
+           Tanpa backdrop-filter: tooltip mengikuti kursor di atas kanvas
+           WebGL, dan blur yang disampel ulang tiap mousemove berkedip di
+           Chromium — latar solid pekat menggantikannya. */
         .leaflet-tooltip.provinsi-tooltip {
-          background: rgba(20, 16, 15, 0.88) !important;
+          background: rgba(20, 16, 15, 0.94) !important;
           border: 1px solid rgba(255, 255, 255, 0.25) !important;
           color: #ffffff !important;
           border-radius: 8px !important;
@@ -461,7 +491,6 @@ export async function GET(req: NextRequest) {
           font-size: 12px !important;
           font-weight: 600 !important;
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
-          backdrop-filter: blur(8px) !important;
           pointer-events: none !important;
         }
         .leaflet-tooltip.provinsi-tooltip::before {
@@ -483,7 +512,7 @@ export async function GET(req: NextRequest) {
           width: 36px;
           height: 36px;
           border-radius: 8px;
-          background: rgba(20, 16, 15, 0.78);
+          background: rgba(20, 16, 15, 0.9);
           border: 1px solid rgba(255, 255, 255, 0.25);
           color: #ffffff;
           font-size: 20px;
@@ -494,7 +523,6 @@ export async function GET(req: NextRequest) {
           justify-content: center;
           cursor: pointer;
           box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-          backdrop-filter: blur(8px);
           transition: background 0.15s ease, transform 0.15s ease;
           user-select: none;
         }
@@ -527,6 +555,9 @@ export async function GET(req: NextRequest) {
           let daftarAngka = [];
           let hasSyncedTime = false;
           let mapInitialized = false;
+          // Tampilan awal peta: disinkronkan dengan zoom/center asli Windy sampai pengguna berinteraksi
+          let tampilanAwal = { pusat: [parseFloat('${lat}'), parseFloat('${lon}')], zoom: parseInt('${zoom}', 10) };
+          let interaksiPengguna = false;
 
           function disableMapScrollZoom(map) {
             if (!map) return;
@@ -651,20 +682,32 @@ export async function GET(req: NextRequest) {
               map.setView([parseFloat('${lat}'), parseFloat('${lon}')], parseInt('${zoom}', 10));
             } catch (e) {}
 
-            // Buat tombol kontrol zoom kustom (+ / −)
+            // Buat tombol kontrol zoom kustom (+ / − / home)
             if (!document.getElementById('custom-zoom-controls')) {
               const zoomBox = document.createElement('div');
               zoomBox.id = 'custom-zoom-controls';
-              zoomBox.innerHTML = '<button id="btn-zoom-in" type="button" aria-label="Perbesar peta">+</button><button id="btn-zoom-out" type="button" aria-label="Perkecil peta">−</button>';
+              zoomBox.innerHTML = '<button id="btn-zoom-in" type="button" aria-label="Perbesar peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-out" type="button" aria-label="Perkecil peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-home" type="button" aria-label="Kembali ke tampilan awal peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H4a1 1 0 0 1-1-1v-9.5z" /></svg></button>';
               document.body.appendChild(zoomBox);
 
               document.getElementById('btn-zoom-in')?.addEventListener('click', function(e) {
                 e.stopPropagation();
                 if (window.W && window.W.map && window.W.map.map) window.W.map.map.zoomIn(1);
               });
+
               document.getElementById('btn-zoom-out')?.addEventListener('click', function(e) {
                 e.stopPropagation();
                 if (window.W && window.W.map && window.W.map.map) window.W.map.map.zoomOut(1);
+              });
+
+              document.getElementById('btn-zoom-home')?.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (window.W && window.W.map && window.W.map.map) {
+                  const m = window.W.map.map;
+                  // Pada Leaflet/MapLibre wrapper Windy, flyTo meneruskan zoom langsung ke MapLibre tanpa -1
+                  // (sedangkan getZoom() adalah maplibreZoom + 1). Oleh karena itu tampilanAwal.zoom dikurangi 1
+                  // agar hasil flyTo mengembalikan peta tepat ke default zoom (level 5).
+                  m.flyTo(tampilanAwal.pusat, tampilanAwal.zoom - 1, { duration: 1.2 });
+                }
               });
             }
 
@@ -685,7 +728,7 @@ export async function GET(req: NextRequest) {
             // Buat elemen tooltip mengambang khusus
             const tooltipEl = document.createElement('div');
             tooltipEl.id = 'provinsi-tooltip';
-            tooltipEl.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:9999;background:rgba(20,16,15,0.88);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.6);backdrop-filter:blur(8px);font-family:system-ui,-apple-system,sans-serif;';
+            tooltipEl.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:9999;background:rgba(20,16,15,0.94);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.6);font-family:system-ui,-apple-system,sans-serif;';
             document.body.appendChild(tooltipEl);
 
             // Cegah error internal Leaflet di Windy terkait tooltips
@@ -712,37 +755,6 @@ export async function GET(req: NextRequest) {
                 const nama = feature.properties.nama;
                 const pulau = PROVINSI_PULAU[nama] || null;
 
-                layer.on('mouseover', function(e) {
-                  layer.setStyle({
-                    weight: 2.2,
-                    color: '#ffffff',
-                    fillColor: '#ffffff',
-                    fillOpacity: 0.15
-                  });
-                  const jml = currentJumlahLaporan[nama];
-                  const teksJml = typeof jml === 'number' ? jml.toLocaleString('id-ID') + ' laporan' : '';
-                  tooltipEl.innerHTML = '<div>' + nama + (teksJml ? '<br><span style="font-size:11px;opacity:0.85;font-weight:400">' + teksJml + '</span>' : '') + '</div>';
-                  tooltipEl.style.display = 'block';
-                });
-
-                layer.on('mousemove', function(e) {
-                  const orig = e.originalEvent;
-                  if (orig) {
-                    tooltipEl.style.left = (orig.clientX + 14) + 'px';
-                    tooltipEl.style.top = (orig.clientY + 14) + 'px';
-                  }
-                });
-
-                layer.on('mouseout', function() {
-                  layer.setStyle({
-                    weight: 1.2,
-                    color: 'rgba(255, 255, 255, 0.45)',
-                    fillColor: 'transparent',
-                    fillOpacity: 0.02
-                  });
-                  tooltipEl.style.display = 'none';
-                });
-
                 function saatPilih(e) {
                   const orig = e.originalEvent;
                   if (orig && orig.button !== undefined && orig.button !== 0) return;
@@ -750,7 +762,7 @@ export async function GET(req: NextRequest) {
                     orig.stopPropagation();
                   }
                   const asal = orig ? { x: orig.clientX, y: orig.clientY } : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-                  tooltipEl.style.display = 'none';
+                  if (tooltipEl) tooltipEl.style.display = 'none';
                   
                   // Kirim ke parent window untuk membuka popup laporan
                   if (window.parent) {
@@ -767,6 +779,82 @@ export async function GET(req: NextRequest) {
                 layer.on('mousedown', saatPilih);
               }
             }).addTo(map);
+
+            function tagAllPaths() {
+              if (!geoLayer) return;
+              geoLayer.eachLayer(function(l) {
+                if (l.feature && l.feature.properties) {
+                  const n = l.feature.properties.nama;
+                  const p = PROVINSI_PULAU[n] || '';
+                  const el = l.getElement ? l.getElement() : l._path;
+                  if (el) {
+                    el.setAttribute('data-nama', n);
+                    el.setAttribute('data-pulau', p);
+                    el.style.pointerEvents = 'auto';
+                    el.style.cursor = 'pointer';
+                  }
+                }
+              });
+            }
+
+            tagAllPaths();
+            setTimeout(tagAllPaths, 150);
+            setTimeout(tagAllPaths, 600);
+            map.on('zoomend moveend resize', tagAllPaths);
+
+            // Document-level capturing click listener guarantees click capture across all browser pointer engines
+            document.addEventListener('click', function(e) {
+              const path = e.target && e.target.closest ? e.target.closest('path[data-nama], .provinsi-layer') : null;
+              if (!path) return;
+              const nama = path.getAttribute('data-nama');
+              if (!nama) return;
+              const pulau = path.getAttribute('data-pulau') || null;
+
+              e.preventDefault();
+              e.stopPropagation();
+
+              if (tooltipEl) tooltipEl.style.display = 'none';
+
+              if (window.parent) {
+                window.parent.postMessage({
+                  type: 'PILIH_WILAYAH',
+                  nama: nama,
+                  pulau: pulau,
+                  asal: { x: e.clientX, y: e.clientY }
+                }, '*');
+              }
+            }, true);
+
+            // Document-level capturing hover listeners for tooltip
+            document.addEventListener('mouseover', function(e) {
+              const path = e.target && e.target.closest ? e.target.closest('path[data-nama], .provinsi-layer') : null;
+              if (!path) return;
+              const nama = path.getAttribute('data-nama');
+              if (!nama || !tooltipEl) return;
+
+              const jml = currentJumlahLaporan[nama];
+              const teksJml = typeof jml === 'number' ? jml.toLocaleString('id-ID') + ' laporan' : '';
+              tooltipEl.innerHTML = '<div>' + nama + (teksJml ? '<br><span style="font-size:11px;opacity:0.85;font-weight:400">' + teksJml + '</span>' : '') + '</div>';
+              tooltipEl.style.display = 'block';
+              tooltipEl.style.left = (e.clientX + 14) + 'px';
+              tooltipEl.style.top = (e.clientY + 14) + 'px';
+            }, true);
+
+            document.addEventListener('mousemove', function(e) {
+              if (tooltipEl && tooltipEl.style.display === 'block') {
+                tooltipEl.style.left = (e.clientX + 14) + 'px';
+                tooltipEl.style.top = (e.clientY + 14) + 'px';
+              }
+            }, true);
+
+            document.addEventListener('mouseout', function(e) {
+              const fromPath = e.target && e.target.closest ? e.target.closest('path[data-nama], .provinsi-layer') : null;
+              if (!fromPath || !tooltipEl) return;
+              const toPath = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('path[data-nama], .provinsi-layer') : null;
+              // Jika kursor masih di dalam polygon provinsi yang sama, jangan sembunyikan tooltip
+              if (fromPath === toPath) return;
+              tooltipEl.style.display = 'none';
+            }, true);
 
             renderAngka(map);
 
@@ -798,7 +886,7 @@ export async function GET(req: NextRequest) {
               const info = CENTROIDS[data.nama];
               if (info && window.W && window.W.map && window.W.map.map) {
                 const map = window.W.map.map;
-                map.flyTo([info.titik[1], info.titik[0]], 7, { duration: 1.2 });
+                map.flyTo([info.titik[1], info.titik[0]], 6, { duration: 1.2 });
               }
             }
           });
@@ -841,7 +929,8 @@ export async function GET(req: NextRequest) {
               return;
             }
 
-            // Gulir biasa: hentikan zoom pada peta dan teruskan pergerakan scroll ke parent window (Next.js)
+            // Gulir biasa: cegah scrolling peramban bawaan ganda dan teruskan pergerakan scroll ke parent window (Lenis)
+            e.preventDefault();
             e.stopPropagation();
 
             if (window.parent && window.parent !== window) {

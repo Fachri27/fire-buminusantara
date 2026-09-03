@@ -101,7 +101,7 @@ export function HalamanFire({
         id="peta"
         aria-label="Peta sebaran"
         data-kabur-tepi
-        className="relative z-[2] flex h-[100svh] min-h-[100svh] w-full flex-col justify-center overflow-hidden"
+        className="tepi-lunak relative z-[2] flex h-[100svh] min-h-[100svh] w-full flex-col justify-center overflow-hidden"
       >
         {/* Peta forecasting Windy AQI + poligon administratif fullscreen */}
         <div className="kabur-tepi pointer-events-none" aria-hidden="true" />

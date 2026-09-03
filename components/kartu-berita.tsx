@@ -11,10 +11,9 @@ const KOTAK_LANSKAP =
   "mt-[var(--gambar-jarak)] aspect-[3/2] h-auto max-h-[var(--gambar-tinggi-maks)] " +
   "w-[var(--gambar-lebar)] self-center aliran:aspect-auto aliran:min-h-0 aliran:flex-1";
 const RUPA_LANSKAP =
-  "rounded-[10px] object-cover ring-1 ring-black/[0.08] shadow-[0_8px_20px_rgb(0_0_0/0.2)] " +
-  "transition-[filter] duration-[550ms]";
+  "rounded-[10px] object-cover ring-1 ring-black/[0.08] shadow-[0_8px_20px_rgb(0_0_0/0.2)]";
 const MEDIA_VERTIKAL =
-  "kartu-media absolute inset-0 h-full w-full object-cover transition-[filter] duration-[550ms]";
+  "kartu-media absolute inset-0 h-full w-full object-cover";
 
 type Props = {
   k: Kartu;
@@ -33,6 +32,9 @@ export function KartuBerita({ k, aktif, kurangiGerak, onPilih, onBuka, onGeserMe
   const media = isi.media;
   const punyaMedia = media.length > 0;
 
+  // Tanpa backdrop-blur dan tanpa transition filter: keduanya memaksa
+  // Chromium mengambil ulang foto latar tiap bingkai selama animasi 550ms
+  // (putar otomatis tiap 6 detik) — sumber kedipan di Chrome.
   return (
     <article
       onClick={onPilih}
@@ -50,9 +52,9 @@ export function KartuBerita({ k, aktif, kurangiGerak, onPilih, onBuka, onGeserMe
             : "bg-white/90 shadow-[6px_6px_14px_rgb(0_0_0/0.22)]",
         "relative flex h-[var(--kartu-tinggi)] w-[var(--kartu-lebar)] shrink-0",
         "flex-col rounded-[12px] p-[var(--kartu-pias)] text-center",
-        "ring-1 ring-white/60 backdrop-blur-[7px]",
+        "ring-1 ring-white/60",
         "transition-[transform,opacity,background-color]",
-        "duration-[550ms] ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform",
+        "duration-[550ms] ease-[cubic-bezier(0.4,0,0.2,1)]",
       ].join(" ")}
     >
       {isi.vertikal ? (
