@@ -95,23 +95,29 @@ export async function GET(req: NextRequest) {
             });
           } catch(e) {}
 
-          // 0b. Bungkam telemetri/analitik Windy (node.windy.com/.../ga/…).
-          // Beacon ini diblokir ad-blocker peramban lalu reject tanpa ditangani,
-          // membanjiri console dengan "ERR_BLOCKED_BY_CLIENT" + "Uncaught (in
-          // promise) Failed to fetch". Kita cegat SEBELUM ke jaringan dan balas
-          // respons kosong-sukses: tak ada request nyata, tak ada promise yang
-          // menolak. HANYA endpoint analitik (/ga/) yang disasar — data cuaca,
-          // tile peta, dan WebSocket-nya tak tersentuh.
-          var _windyTelemetri = function(u) {
+          // 0b. Bungkam telemetri/analitik Windy (/ga/) dan endpoint privat
+          // (account.windy.com, capalerts, forecast/fragment).
+          // Endpoint-endpoint ini hanya mengizinkan Access-Control-Allow-Origin:
+          // https://www.windy.com, sehingga memicu galat CORS merah di console
+          // saat dijalankan dari origin web kita. Kita cegat SEBELUM ke jaringan
+          // dan balas respons kosong/JSON-sukses agar peta berjalan mulus tanpa CORS error.
+          var _windyBungkam = function(u) {
             try { u = String(u); } catch(e) { return false; }
-            return u.indexOf('node.windy.com') !== -1 && u.indexOf('/ga/') !== -1;
+            return (u.indexOf('node.windy.com') !== -1 && (u.indexOf('/ga/') !== -1 || u.indexOf('/capalerts/') !== -1 || u.indexOf('/forecast/fragment/') !== -1)) ||
+                   (u.indexOf('account.windy.com') !== -1);
           };
           try {
             var _fetchAsli = window.fetch;
             window.fetch = function(input, init) {
               var url = (input && typeof input === 'object' && input.url) ? input.url : input;
-              if (_windyTelemetri(url)) {
-                return Promise.resolve(new Response(null, { status: 200, statusText: 'OK' }));
+              if (_windyBungkam(url)) {
+                var urlStr = String(url);
+                var isJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1 || urlStr.indexOf('/forecast/fragment/') !== -1;
+                return Promise.resolve(new Response(isJson ? '{}' : null, {
+                  status: 200,
+                  statusText: 'OK',
+                  headers: isJson ? { 'Content-Type': 'application/json' } : {}
+                }));
               }
               return _fetchAsli.apply(this, arguments);
             };
@@ -119,14 +125,22 @@ export async function GET(req: NextRequest) {
           try {
             var _xhrOpen = XMLHttpRequest.prototype.open;
             XMLHttpRequest.prototype.open = function(method, url) {
-              this.__windyTelemetri = _windyTelemetri(url);
+              this.__windyBungkam = _windyBungkam(url);
+              var urlStr = String(url);
+              this.__windyIsJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1 || urlStr.indexOf('/forecast/fragment/') !== -1;
               return _xhrOpen.apply(this, arguments);
             };
             var _xhrSend = XMLHttpRequest.prototype.send;
             XMLHttpRequest.prototype.send = function() {
-              if (this.__windyTelemetri) {
+              if (this.__windyBungkam) {
                 var diri = this;
                 setTimeout(function() {
+                  try {
+                    Object.defineProperty(diri, 'status', { value: 200, writable: false });
+                    Object.defineProperty(diri, 'statusText', { value: 'OK', writable: false });
+                    Object.defineProperty(diri, 'responseText', { value: diri.__windyIsJson ? '{}' : '', writable: false });
+                    Object.defineProperty(diri, 'response', { value: diri.__windyIsJson ? '{}' : '', writable: false });
+                  } catch(e) {}
                   try { if (typeof diri.onreadystatechange === 'function') diri.onreadystatechange(); } catch(e) {}
                   try { diri.dispatchEvent(new Event('load')); } catch(e) {}
                   try { diri.dispatchEvent(new Event('loadend')); } catch(e) {}
@@ -140,7 +154,7 @@ export async function GET(req: NextRequest) {
             if (navigator.sendBeacon) {
               var _beaconAsli = navigator.sendBeacon.bind(navigator);
               navigator.sendBeacon = function(url, data) {
-                if (_windyTelemetri(url)) return true;
+                if (_windyBungkam(url)) return true;
                 return _beaconAsli(url, data);
               };
             }

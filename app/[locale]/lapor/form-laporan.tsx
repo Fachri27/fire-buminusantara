@@ -62,6 +62,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const [nama, setNama] = useState("");
   const [berkas, setBerkas] = useState<File[]>([]);
   const [anonim, setAnonim] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
   const [galatKlien, setGalatKlien] = useState("");
   const [mencariLokasi, setMencariLokasi] = useState(false);
   /** Pratinjau per berkas: key = kunciBerkas(b), nilai = URL objek lokal. */
@@ -104,6 +105,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   }, [berkas, keadaan]);
 
   const ulangCaptcha = useCallback(() => {
+    setCaptchaToken("");
     const ts = turnstile();
     if (ts && widgetRef.current !== null) {
       try {
@@ -128,21 +130,19 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         window.setTimeout(pasang, 100);
         return;
       }
-      // Hanya render kalau wadah ini belum punya widget. Dulu di sini ada
-      // `ts.remove(widgetRef.current)` tanpa syarat — saat render pertama
-      // widgetRef masih null, dan remove(null) membuat Turnstile mencetak
-      // peringatan "Nothing to remove found for the provided container".
-      if (widgetRef.current !== null) return;
+      try {
+        ts.remove(widgetRef.current);
+      } catch {
+        /* belum ada widget */
+      }
+      wadah.innerHTML = "";
 
-      // Tokennya TIDAK disalin ke state React. Turnstile menaruh sendiri satu
-      // <input type="hidden"> bernama `captcha` di dalam wadah ini, dan wadah
-      // ini duduk di dalam <form> — jadi tokennya ikut FormData tanpa perantara,
-      // dan mengosongkannya kembali cukup dengan reset() di tempat lain.
       widgetRef.current = ts.render(wadah, {
         sitekey: SITE_KEY,
         appearance: "interaction-only",
-        "response-field-name": "captcha",
+        callback: (token: string) => setCaptchaToken(token),
         "expired-callback": () => {
+          setCaptchaToken("");
           if (widgetRef.current !== null) {
             try {
               ts.reset(widgetRef.current);
@@ -152,6 +152,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
           }
         },
         "error-callback": () => {
+          setCaptchaToken("");
           if (widgetRef.current !== null) {
             try {
               ts.reset(widgetRef.current);
@@ -414,15 +415,23 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
       <input type="text" name="website" tabIndex={-1} autoComplete="off"
              aria-hidden="true" className="hidden" />
 
-      {/* Wadah widget Turnstile — sekaligus tempat kolom `captcha`-nya. Harus
-          tetap di DALAM form supaya tokennya ikut terkirim. */}
+      {/* Wadah widget Turnstile dan input token terverifikasi */}
       <div ref={captchaRef} />
+      <input type="hidden" name="captcha" value={captchaToken} />
 
       {mengirim && <BilahUnggah />}
 
       <div className="flex items-center gap-4 border-t border-black/[0.08] pt-6">
-        <button type="submit" disabled={mengirim} className={`${TOMBOL_UTAMA} disabled:opacity-60`}>
-          {mengirim ? teks.mengirim : teks.kirim}
+        <button
+          type="submit"
+          disabled={mengirim || (Boolean(SITE_KEY) && !captchaToken)}
+          className={`${TOMBOL_UTAMA} disabled:opacity-60`}
+        >
+          {mengirim
+            ? teks.mengirim
+            : Boolean(SITE_KEY) && !captchaToken
+            ? (bahasa === "en" ? "Verifying…" : "Memverifikasi…")
+            : teks.kirim}
         </button>
         <Link href={`/${bahasa}`} className="text-[13px] text-tinta/50 underline-offset-4 hover:underline">
           {teks.kembali}

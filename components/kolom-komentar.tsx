@@ -166,10 +166,10 @@ export function FormulirKomentar({
     kirimSebelumnya.current = mengirim;
   }, [mengirim, isi]);
 
-  // Wadah captcha ikut sheet yang di-mount/unmount — pasang ulang widgetnya
-  // setiap sheet terbuka (pemasangan membuang widget lama lebih dulu).
+  // Wadah captcha di desktop terpasang langsung; di ponsel ikut sheet
+  // yang di-mount/unmount — pasang widget saat wadahnya siap di DOM.
   useEffect(() => {
-    if (ponsel && sheet) pasangCaptcha();
+    if (!ponsel || sheet) pasangCaptcha();
   }, [ponsel, sheet, pasangCaptcha]);
 
   // Fokus ke kotak ketik begitu sheet terbuka.

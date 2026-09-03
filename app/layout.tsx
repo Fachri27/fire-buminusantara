@@ -70,10 +70,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="stylesheet" href="/css/pantauan-kosong.css" />
         <link rel="stylesheet" href="/css/peta-angka.css" />
         <link rel="stylesheet" href="/css/peta-popup.css" />
-        {/* Turnstile untuk kolom komentar pop-up rincian. Tanpa site key (dev),
+        {/* Turnstile untuk kolom komentar pop-up rincian dan form laporan. Tanpa site key (dev),
             widget tidak dirender dan verifikasi di server pun dilewati. */}
         {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
-          <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer />
+          <Script
+            src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+            strategy="beforeInteractive"
+          />
         )}
         {/* Google Analytics (gtag.js). Dimuat afterInteractive supaya tidak
             memblokir render halaman; mount HTML klasik tidak cukup karena
