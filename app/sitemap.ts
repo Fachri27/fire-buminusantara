@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { cacheLife } from "next/cache";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { urlMedia } from "@/lib/media";
 
@@ -9,8 +9,7 @@ const BASE_URL = (
 ).replace(/\/$/, "");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  "use cache";
-  cacheLife("hours");
+  await connection();
 
   // Halaman statis: beranda bilingual lengkap dengan hreflang alternates
   const statis: MetadataRoute.Sitemap = [
