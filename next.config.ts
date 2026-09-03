@@ -22,7 +22,7 @@ const HEADER_KEAMANAN = [
   },
   {
     key: "Content-Security-Policy",
-    value: "frame-ancestors 'none'; frame-src 'self' http://localhost:3001 https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'",
+    value: "frame-ancestors 'none'; frame-src 'self' http://localhost:3001 https://*.windy.com https://windy.com https://challenges.cloudflare.com; base-uri 'self'; object-src 'none'",
   },
 ];
 
