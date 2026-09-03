@@ -9,8 +9,9 @@ import type { NextConfig } from "next";
  * menutup clickjacking dan penyuntikan <base>, tanpa membatasi `script-src`
  * (Next.js menyuntik skrip inline, dan halaman memuat Turnstile + Leaflet dari
  * CDN — CSP script yang keliru akan mematikan halaman, bukan sekadar
- * memperketatnya). `geolocation=(self)` DISENGAJA: form laporan memakai "Pakai
- * lokasi saya".
+ * memperketatnya). `frame-src` memasukkan challenges.cloudflare.com karena
+ * widget Turnstile merender dirinya dalam iframe dari sana. `geolocation=(self)`
+ * DISENGAJA: form laporan memakai "Pakai lokasi saya".
  */
 const HEADER_KEAMANAN = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -22,7 +23,7 @@ const HEADER_KEAMANAN = [
   },
   {
     key: "Content-Security-Policy",
-    value: "frame-ancestors 'none'; frame-src 'self' http://localhost:3001 https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'",
+    value: "frame-ancestors 'none'; frame-src 'self' http://localhost:3001 https://challenges.cloudflare.com https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'",
   },
 ];
 
