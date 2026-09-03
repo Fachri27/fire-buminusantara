@@ -124,14 +124,41 @@ export function gunakanKomentar(idLaporan: number) {
         sitekey: SITE_KEY,
         appearance: "interaction-only",
         callback: (token: string) => setCaptchaToken(token),
-        "expired-callback": () => setCaptchaToken(""),
-        "error-callback": () => setCaptchaToken(""),
+        "expired-callback": () => {
+          setCaptchaToken("");
+          if (widgetRef.current !== null) {
+            try {
+              ts.reset(widgetRef.current);
+            } catch {
+              /* widget sudah lepas bersama pop-up yang ditutup */
+            }
+          }
+        },
+        "error-callback": () => {
+          setCaptchaToken("");
+          if (widgetRef.current !== null) {
+            try {
+              ts.reset(widgetRef.current);
+            } catch {
+              /* widget sudah lepas bersama pop-up yang ditutup */
+            }
+          }
+        },
       });
     };
 
     pasang();
     return () => {
       hidup = false;
+      const ts = turnstile();
+      if (ts && widgetRef.current !== null) {
+        try {
+          ts.remove(widgetRef.current);
+        } catch {
+          /* sudah lepas bersama pop-up yang ditutup */
+        }
+        widgetRef.current = null;
+      }
     };
   }, []);
 

@@ -85,6 +85,20 @@ const nextConfig: NextConfig = {
         ],
       },
       { source: "/((?!media/|api/forecasting).*)", headers: HEADER_KEAMANAN },
+      // Header tanpa-cache untuk dokumen & rute aplikasi: browser, proxy, dan
+      // CDN tidak boleh menahan dokumen HTML usang lintas deploy, sehingga
+      // pengguna tidak perlu hard reload untuk mendapatkan bundel skrip terbaru.
+      // Aset statis ber-hash di _next/static tetap membawa cache immutable bawaan Next.js.
+      {
+        source: "/((?!_next/static|_next/image|media/|api/forecasting).*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, max-age=0, must-revalidate",
+          },
+          { key: "Pragma", value: "no-cache" },
+        ],
+      },
     ];
   },
 };

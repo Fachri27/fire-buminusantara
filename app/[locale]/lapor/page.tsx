@@ -6,6 +6,10 @@ import { FormLaporan } from "./form-laporan";
 
 type Props = { params: Promise<{ locale: string }> };
 
+// Formulir kiriman warga ber-Turnstile: halaman ini tidak boleh di-cache statis
+// agar HTML dan bundle skrip selalu segar tanpa butuh hard reload di produksi.
+export const dynamic = "force-dynamic";
+
 export function generateStaticParams() {
   return BAHASA.map((locale) => ({ locale }));
 }
