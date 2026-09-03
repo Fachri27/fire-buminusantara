@@ -396,13 +396,20 @@ export async function GET(req: NextRequest) {
         }
 
         /* I. Administrative Polygon Styling */
-        .provinsi-layer path {
+        .leaflet-pane.leaflet-wilayah-pane svg {
+          pointer-events: none !important;
+        }
+        .leaflet-pane.leaflet-wilayah-pane path,
+        .provinsi-layer,
+        path.provinsi-layer {
           cursor: pointer !important;
           pointer-events: auto !important;
           transition: fill-opacity 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
         }
 
-        .provinsi-layer path:hover {
+        .leaflet-pane.leaflet-wilayah-pane path:hover,
+        .provinsi-layer:hover,
+        path.provinsi-layer:hover {
           stroke: #ffffff !important;
           stroke-width: 2.5px !important;
           fill: #ffffff !important;

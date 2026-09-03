@@ -93,7 +93,7 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
         {/* ── Layar 2 — peta. Lapisan latarnya disalin dari section aslinya
             supaya peralihan hero→peta terlihat sama; kanvas dan panelnya
             diganti bidang denyut berukuran mirip. */}
-        <section className="kerangka-beranda__layar-peta tepi-lunak relative z-[2] flex h-[100svh] min-h-[100svh]
+        <section className="kerangka-beranda__layar-peta relative z-[2] flex h-[100svh] min-h-[100svh]
                             w-full flex-col justify-center overflow-hidden">
           <div className="kabur-tepi pointer-events-none" />
           <div className="absolute inset-0 h-full w-full animate-pulse bg-[#0a0f18]/85" />
