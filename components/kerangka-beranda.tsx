@@ -93,26 +93,17 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
         {/* ── Layar 2 — peta. Lapisan latarnya disalin dari section aslinya
             supaya peralihan hero→peta terlihat sama; kanvas dan panelnya
             diganti bidang denyut berukuran mirip. */}
-        <section className="kerangka-beranda__layar-peta tepi-lunak relative z-[2] flex min-h-[100svh]
-                            flex-col justify-center overflow-hidden px-[var(--pias)]
-                            pt-[calc(4rem+clamp(32px,8vw,56px))] pb-[clamp(32px,8vw,56px)]
-                            pendek:z-auto pendek:min-h-0">
-          <img src="/assets/img/bg-karhutla.jpg" alt=""
-               className="absolute inset-0 h-full w-full object-cover" />
-          <div className="kabur-tepi" />
-          <div className="kabut-api absolute inset-0" />
+        <section className="kerangka-beranda__layar-peta tepi-lunak relative z-[2] flex h-[100svh] min-h-[100svh]
+                            w-full flex-col justify-center overflow-hidden">
+          <div className="kabur-tepi pointer-events-none" />
+          <div className="absolute inset-0 h-full w-full animate-pulse bg-[#0a0f18]/85" />
 
-          <div className="kerangka-beranda__kanvas relative mx-auto w-full max-w-[940px]">
-            <div className="kerangka-beranda__peta aspect-[2.5] w-full animate-pulse rounded-[10px]
-                            bg-[rgb(20_16_15/0.35)]" />
-          </div>
-
-          {/* Kolom pencarian + satu baris daftar provinsi. */}
-          <div className="kerangka-beranda__panel relative mx-auto mt-[clamp(18px,5vw,28px)] w-full max-w-[940px]">
-            <div className="h-[calc(clamp(12px,3.4vw,16px)*2+var(--ukuran-nama)*1.2)]
-                            rounded-[16px] bg-[#fdf3f2] shadow-[0_3px_16px_rgb(0_0_0/0.16)]" />
-            <div className="mt-[clamp(10px,3vw,16px)] h-[clamp(68px,19vw,106px)] animate-pulse
-                            rounded-[10px] bg-white shadow-[0_4px_18px_rgb(0_0_0/0.16)]" />
+          {/* Kolom pencarian mengambang (khusus mobile, desktop tersembunyi) */}
+          <div className="pointer-events-none absolute inset-x-0 top-[clamp(64px,11vh,92px)] z-[20] flex justify-center px-4 md:hidden panggung:hidden">
+            <div className="w-full max-w-[580px]">
+              <div className="h-[calc(clamp(12px,3.4vw,16px)*2+var(--ukuran-nama)*1.2)]
+                              rounded-[16px] bg-[#fdf3f2] shadow-[0_3px_16px_rgb(0_0_0/0.16)]" />
+            </div>
           </div>
         </section>
       </div>

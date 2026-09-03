@@ -1,0 +1,901 @@
+import { NextRequest, NextResponse } from "next/server";
+import petaProvinsi from "@/public/data/peta-provinsi.json";
+import { inferPulau } from "@/lib/wilayah";
+
+// Centroid daratan terbesar dan kotak batas untuk tiap provinsi (dihitung dari lib/geometri.ts tempatAngka)
+const PUSAT_WILAYAH: Record<string, { titik: [number, number]; kotak: [number, number, number, number] }> = {
+  "Aceh": { titik: [96.9394, 4.2832], kotak: [95.1951, 2.146, 98.2863, 5.6572] },
+  "Bali": { titik: [115.1178, -8.3541], kotak: [114.438, -8.8474, 115.7163, -8.0589] },
+  "Banten": { titik: [106.12, -6.4553], kotak: [105.2182, -6.9952, 106.7759, -5.8854] },
+  "Bengkulu": { titik: [102.3655, -3.5383], kotak: [101.0278, -4.9224, 103.7773, -2.2802] },
+  "DI Yogyakarta": { titik: [110.444, -7.8914], kotak: [110.0118, -8.2029, 110.8361, -7.5366] },
+  "DKI Jakarta": { titik: [106.8355, -6.2047], kotak: [106.6888, -6.3669, 106.9729, -6.0893] },
+  "Gorontalo": { titik: [122.3771, 0.6909], kotak: [121.1686, 0.3259, 123.5272, 1.0453] },
+  "Jambi": { titik: [102.7271, -1.697], kotak: [101.1258, -2.7667, 104.5152, -0.7552] },
+  "Jawa Barat": { titik: [107.6047, -6.9212], kotak: [106.3709, -7.8227, 108.8293, -5.9114] },
+  "Jawa Tengah": { titik: [110.2095, -7.2609], kotak: [108.5564, -8.2104, 111.6946, -6.4066] },
+  "Jawa Timur": { titik: [112.6168, -7.8178], kotak: [110.9045, -8.7807, 114.5913, -6.7529] },
+  "Kalimantan Barat": { titik: [111.158, -0.0686], kotak: [108.8406, -3.0395, 114.2205, 2.065] },
+  "Kalimantan Selatan": { titik: [115.3871, -2.9714], kotak: [114.3471, -4.1719, 116.5589, -1.315] },
+  "Kalimantan Tengah": { titik: [113.4235, -1.6051], kotak: [110.7345, -3.539, 115.847, 0.7775] },
+  "Kalimantan Timur": { titik: [116.4594, 0.4699], kotak: [113.8417, -2.4052, 118.989, 2.6263] },
+  "Kalimantan Utara": { titik: [116.1563, 2.867], kotak: [114.5896, 1.0619, 117.9859, 4.4082] },
+  "Kepulauan Bangka Belitung": { titik: [105.9854, -2.2515], kotak: [105.1067, -3.1122, 106.7983, -1.5187] },
+  "Kepulauan Riau": { titik: [108.2051, 3.9144], kotak: [107.9619, 3.6306, 108.4101, 4.2304] },
+  "Lampung": { titik: [105.0218, -4.9145], kotak: [103.5982, -5.9373, 105.9129, -3.7291] },
+  "Maluku": { titik: [129.4589, -3.1992], kotak: [127.866, -3.8767, 130.8796, -2.779] },
+  "Maluku Utara": { titik: [128.0103, 0.8698], kotak: [127.3987, -0.8872, 128.8473, 2.2041] },
+  "Nusa Tenggara Barat": { titik: [117.755, -8.6772], kotak: [116.7278, -9.1128, 119.1626, -8.0802] },
+  "Nusa Tenggara Timur": { titik: [121.1522, -8.6045], kotak: [119.7994, -8.9596, 123.0215, -8.0651] },
+  "Papua": { titik: [138.7266, -4.5461], kotak: [134.2052, -9.1183, 141.0118, -1.4586] },
+  "Papua Barat": { titik: [133.1416, -2.0976], kotak: [130.9314, -4.2528, 135.2577, -0.3433] },
+  "Riau": { titik: [101.7596, 0.4464], kotak: [100.0537, -1.1211, 103.8117, 2.5295] },
+  "Sulawesi Barat": { titik: [119.3396, -2.4596], kotak: [118.7567, -3.5703, 119.9092, -0.8609] },
+  "Sulawesi Selatan": { titik: [120.1575, -3.6273], kotak: [119.3539, -5.702, 121.8006, -1.8845] },
+  "Sulawesi Tengah": { titik: [121.3787, -1.1778], kotak: [119.431, -3.2711, 123.4521, 1.3485] },
+  "Sulawesi Tenggara": { titik: [121.8307, -3.7935], kotak: [120.8588, -4.8947, 122.9044, -2.7102] },
+  "Sulawesi Utara": { titik: [124.2694, 0.8843], kotak: [123.1173, 0.3126, 125.2425, 1.7548] },
+  "Sumatera Barat": { titik: [100.6486, -0.7005], kotak: [99.162, -2.4822, 101.8785, 0.9057] },
+  "Sumatera Selatan": { titik: [104.1746, -3.2086], kotak: [102.0668, -4.9228, 106.0786, -1.628] },
+  "Sumatera Utara": { titik: [99.1596, 2.3049], kotak: [97.8032, 0.2318, 100.4553, 4.291] },
+};
+
+// Pemetaan nama provinsi ke pulau
+const PROVINSI_PULAU: Record<string, string> = {};
+for (const feature of petaProvinsi.features) {
+  const nama = feature.properties.nama;
+  const pulau = inferPulau(nama);
+  if (pulau) PROVINSI_PULAU[nama] = pulau;
+}
+
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const lat = searchParams.get("lat") || "0.200";
+  const lon = searchParams.get("lon") || "118.000";
+  const zoom = searchParams.get("zoom") || "5";
+
+  const targetUrl = `https://www.windy.com/-Air-quality-index-aqi?cams,aqi,${lat},${lon},${zoom}`;
+
+  try {
+    const resWindy = await fetch(targetUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      cache: "no-store",
+    });
+
+    if (!resWindy.ok) {
+      return new NextResponse(`Windy upstream error: ${resWindy.statusText}`, { status: 502 });
+    }
+
+    const html = await resWindy.text();
+
+    const baseTag = `<base href="https://www.windy.com/">`;
+
+    // 1. Script injected at the VERY TOP of <head> before Windy's scripts execute
+    const preInitScript = `
+      <script>
+        (function() {
+          // 0. Spoof document.referrer to bypass iframe unlegal embed check
+          try {
+            Object.defineProperty(document, 'referrer', {
+              get: function() { return 'https://www.windy.com/'; },
+              configurable: true
+            });
+          } catch(e) {}
+          try {
+            Object.defineProperty(Document.prototype, 'referrer', {
+              get: function() { return 'https://www.windy.com/'; },
+              configurable: true
+            });
+          } catch(e) {}
+
+          // A. Wrap history methods to prevent cross-origin SecurityError caused by <base href>
+          var _origReplace = window.history.replaceState;
+          window.history.replaceState = function(state, title, url) {
+            try {
+              if (typeof url === 'string') {
+                url = url.replace(/^https?:\\/\\/[^\\/]+/, '');
+              }
+              return _origReplace.call(window.history, state, title, url);
+            } catch(e) {}
+          };
+          var _origPush = window.history.pushState;
+          window.history.pushState = function(state, title, url) {
+            try {
+              if (typeof url === 'string') {
+                url = url.replace(/^https?:\\/\\/[^\\/]+/, '');
+              }
+              return _origPush.call(window.history, state, title, url);
+            } catch(e) {}
+          };
+
+          // B. Pre-seed URL path & search before router parses window.location
+          var targetPath = '/-Air-quality-index-aqi';
+          var targetSearch = '?cams,aqi,${lat},${lon},${zoom}';
+          try {
+            if (!window.location.pathname.includes('Air-quality-index') || !window.location.search.includes('aqi')) {
+              window.history.replaceState(null, '', targetPath + targetSearch);
+            }
+          } catch(e) {}
+
+          // C. Pre-seed localStorage
+          try {
+            window.localStorage.setItem('startUpOverlay', JSON.stringify('aqi'));
+            window.localStorage.setItem('startUpLastOverlay', JSON.stringify(true));
+            window.localStorage.setItem('startUpLastProduct', JSON.stringify('cams'));
+            window.localStorage.setItem('product', JSON.stringify('cams'));
+            window.localStorage.setItem('overlay', JSON.stringify('aqi'));
+          } catch(e) {}
+
+          // D. Hook window.W.broadcast to BLOCK unwanted plugins from ever opening
+          window.W = window.W || {};
+          var _b = null;
+          Object.defineProperty(window.W, 'broadcast', {
+            configurable: true,
+            enumerable: true,
+            get: function() { return _b; },
+            set: function(b) {
+              _b = b;
+              if (b && typeof b.emit === 'function') {
+                var origEmit = b.emit;
+                var blocked = {
+                  'rhpane-top': true,
+                  'progress-bar': true,
+                  'search-input': true,
+                  'startup-weather': true,
+                  'startup-promos': true,
+                  'startup-articles': true,
+                  'startup-live-alerts': true,
+                  'startup-pin2hp': true,
+                  'onboarding': true,
+                  'detail': true,
+                  'default-model-selector': true,
+                  'picker': true,
+                  'picker-mobile': true,
+                  'mobile-ui': true,
+                  'menu': true,
+                  'tools': true,
+                  'share': true,
+                  'articles': true,
+                  'warnings': true
+                };
+                b.emit = function(event, name) {
+                  if (event === 'rqstOpen' && blocked[name]) {
+                    return false;
+                  }
+                  return origEmit.apply(this, arguments);
+                };
+                b.fire = b.emit;
+                b.trigger = b.emit;
+              }
+            }
+          });
+
+          // E. Hook window.W.store safely to seed cams & aqi on boot without breaking internal dictionary lookups
+          var _s = null;
+          Object.defineProperty(window.W, 'store', {
+            configurable: true,
+            enumerable: true,
+            get: function() { return _s; },
+            set: function(s) {
+              _s = s;
+              if (s && typeof s.set === 'function') {
+                try {
+                  s.set('product', 'cams');
+                  s.set('overlay', 'aqi');
+                } catch (e) {}
+              }
+            }
+          });
+        })();
+      </script>
+    `;
+
+    // 2. Custom Styles for Windy + Administrative Polygons & Numbers
+    const customStyles = `
+      <style>
+        /* A. Suppress all layer menu and sidebar elements */
+        [data-plugin="rhpane-top"],
+        #plugin-rhpane-top,
+        .rhpane__top-icons,
+        .rhitem--main-menu,
+        .rhpane__overlays-wrapper,
+        .rhpane__overlays-levels,
+        .more-layers,
+        .rhbottom__map-tools,
+        .rhbottom__pois-controls,
+        .rhbottom__checkboxes,
+        .closing-x,
+        [data-plugin="progress-bar"],
+        #plugin-progress-bar,
+        .progress-bar-wrapper,
+        .progress-bar-right,
+        .pb-calendar,
+        .play-pause,
+        .progress-bar,
+        .timecode,
+        #bottom,
+        [data-plugin="search-input"],
+        #plugin-search-input,
+        #search,
+        .search,
+        [data-plugin="startup-weather"],
+        #plugin-startup-weather,
+        .plugin-startup-weather,
+        .top-banner,
+        .rh-banners,
+        #banner,
+        #plugin-promo,
+        .promo-container,
+        .plugin-promo,
+        #fav-alert-menu,
+        #articles,
+        #unlegal-embed,
+        .unlegal-embed,
+        #warnings {
+          display: none !important;
+          opacity: 0 !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+          width: 0 !important;
+          height: 0 !important;
+          max-width: 0 !important;
+          max-height: 0 !important;
+          overflow: hidden !important;
+        }
+
+        /* B. Transparent rhpane container */
+        .rhpane {
+          pointer-events: none !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+
+        /* C. AQI Indicator on BOTTOM-RIGHT */
+        #plugin-rhbottom {
+          position: fixed !important;
+          bottom: 16px !important;
+          right: 20px !important;
+          left: auto !important;
+          top: auto !important;
+          margin: 0 !important;
+          width: 320px !important;
+          z-index: 1000 !important;
+          display: flex !important;
+          pointer-events: auto !important;
+        }
+
+        .rhbottom__legend {
+          display: flex !important;
+          pointer-events: auto !important;
+          margin: 0 !important;
+          width: 320px !important;
+          height: 24px !important;
+          border-radius: 6px !important;
+          overflow: hidden !important;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+          border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        }
+
+        /* D. Copernicus logo on BOTTOM-LEFT */
+        .rhpane__bottom-messages {
+          position: fixed !important;
+          bottom: 16px !important;
+          left: 20px !important;
+          right: auto !important;
+          top: auto !important;
+          z-index: 1000 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          display: flex !important;
+          align-items: center !important;
+          pointer-events: auto !important;
+          transform: none !important;
+          width: 260px !important;
+        }
+
+        .rhpane__bottom-messages img,
+        img[src*="copernicus"] {
+          width: 260px !important;
+          max-width: 260px !important;
+          height: auto !important;
+          display: block !important;
+          filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8)) !important;
+          opacity: 0.95 !important;
+        }
+
+        /* E. Windy logo placed above Copernicus */
+        #logo-wrapper {
+          display: block !important;
+          border: none !important;
+          background: transparent !important;
+        }
+
+        #logo {
+          position: fixed !important;
+          top: auto !important;
+          right: auto !important;
+          bottom: 105px !important;
+          left: 20px !important;
+          z-index: 1000 !important;
+          transform: scale(0.8) !important;
+          transform-origin: bottom left !important;
+          pointer-events: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          opacity: 0.95 !important;
+          display: flex !important;
+          align-items: center !important;
+          visibility: visible !important;
+          transition: opacity 0.2s ease !important;
+        }
+
+        #logo:hover {
+          opacity: 1 !important;
+        }
+
+        #contrib {
+          display: none !important;
+        }
+
+        /* F. Cleanest basemap: Suppress ALL text, city labels, country labels, ocean labels */
+        .labels-layer,
+        .leaflet-gridlayer-feature,
+        [class*="labels-layer"],
+        [class*="gridlayer-feature"],
+        .country-1, .country-2, .country-3,
+        .city-1, .city-2, .city-3,
+        [data-temp]::after {
+          display: none !important;
+          content: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          width: 0 !important;
+          height: 0 !important;
+        }
+
+        /* G. Disable click popups and pickers */
+        #plugin-detail,
+        #plugin-default-model-selector,
+        #plugin-station,
+        #plugin-nearest-stations,
+        #plugin-sounding,
+        #plugin-webcams,
+        #plugin-airports,
+        .plugin-popup,
+        .plugin-desktop-bottom,
+        .plugin-bottom,
+        #picker-dot,
+        .picker-dot,
+        .picker,
+        .location-summary {
+          display: none !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+          opacity: 0 !important;
+          height: 0 !important;
+          max-height: 0 !important;
+          overflow: hidden !important;
+        }
+
+        /* H. Full viewport coverage */
+        html, body, #map-container, #map, #leaflet-map {
+          width: 100vw !important;
+          height: 100vh !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          background-color: #0a0f18 !important;
+        }
+
+        /* I. Administrative Polygon Styling */
+        .provinsi-layer path {
+          cursor: pointer !important;
+          pointer-events: auto !important;
+          transition: fill-opacity 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
+        }
+
+        .provinsi-layer path:hover {
+          stroke: #ffffff !important;
+          stroke-width: 2.5px !important;
+          fill: #ffffff !important;
+          fill-opacity: 0.18 !important;
+          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.4));
+        }
+
+        /* J. Number Badges (.peta-angka) */
+        .peta-angka {
+          width: 0;
+          height: 0;
+          overflow: visible;
+          pointer-events: none;
+        }
+
+        .peta-angka__nilai {
+          position: absolute;
+          top: 0;
+          left: 0;
+          transform: translate(-50%, -50%);
+          white-space: nowrap;
+          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1;
+          font-variant-numeric: tabular-nums;
+          color: #ffffff;
+          text-shadow:
+            0 0 3px rgb(26 25 25 / 0.85),
+            1px 1px 0 rgb(26 25 25 / 0.7),
+            -1px 1px 0 rgb(26 25 25 / 0.7),
+            1px -1px 0 rgb(26 25 25 / 0.7),
+            -1px -1px 0 rgb(26 25 25 / 0.7);
+          pointer-events: none;
+          user-select: none;
+        }
+
+        .peta-angka--bertumpuk {
+          display: none !important;
+        }
+
+        /* Tooltip custom styling */
+        .leaflet-tooltip.provinsi-tooltip {
+          background: rgba(20, 16, 15, 0.88) !important;
+          border: 1px solid rgba(255, 255, 255, 0.25) !important;
+          color: #ffffff !important;
+          border-radius: 8px !important;
+          padding: 6px 12px !important;
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+          backdrop-filter: blur(8px) !important;
+          pointer-events: none !important;
+        }
+        .leaflet-tooltip.provinsi-tooltip::before {
+          border-top-color: rgba(20, 16, 15, 0.88) !important;
+        }
+
+        /* Tombol kontrol zoom kustom */
+        #custom-zoom-controls {
+          position: fixed;
+          right: 20px;
+          top: 86px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          z-index: 999;
+          pointer-events: auto;
+        }
+        #custom-zoom-controls button {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          background: rgba(20, 16, 15, 0.78);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          color: #ffffff;
+          font-size: 20px;
+          line-height: 1;
+          font-weight: 500;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+          backdrop-filter: blur(8px);
+          transition: background 0.15s ease, transform 0.15s ease;
+          user-select: none;
+        }
+        #custom-zoom-controls button:hover {
+          background: rgba(45, 38, 35, 0.9);
+          transform: scale(1.05);
+        }
+        #custom-zoom-controls button:active {
+          transform: scale(0.95);
+        }
+      </style>
+    `;
+
+    // 3. Custom Script: Setup Leaflet Administrative Polygons, sync time, and postMessage Bridge
+    const geoDataJson = JSON.stringify(petaProvinsi);
+    const centroidsJson = JSON.stringify(PUSAT_WILAYAH);
+    const pulauJson = JSON.stringify(PROVINSI_PULAU);
+
+    const customScript = `
+      <script>
+        (function() {
+          const GEO_DATA = ${geoDataJson};
+          const CENTROIDS = ${centroidsJson};
+          const PROVINSI_PULAU = ${pulauJson};
+          const ANGKA_SELA = 4;
+
+          let currentJumlahLaporan = {};
+          let geoLayer = null;
+          let markersLayer = null;
+          let daftarAngka = [];
+          let hasSyncedTime = false;
+          let mapInitialized = false;
+
+          function disableMapScrollZoom(map) {
+            if (!map) return;
+            try {
+              if (map.scrollWheelZoom && typeof map.scrollWheelZoom.disable === 'function') {
+                map.scrollWheelZoom.disable();
+              }
+            } catch (e) {}
+            try {
+              if (map._maplibreMap && map._maplibreMap.scrollZoom && typeof map._maplibreMap.scrollZoom.disable === 'function') {
+                map._maplibreMap.scrollZoom.disable();
+              }
+            } catch (e) {}
+          }
+
+          function enforceLatestAQI() {
+            try {
+              ['detail', 'default-model-selector', 'picker', 'station', 'nearest-stations', 'sounding', 'webcams', 'app-review-dialog', 'onboarding'].forEach(function(name) {
+                var p = window.W.plugins && window.W.plugins[name];
+                if (p) {
+                  p.open = function() { return false; };
+                  if (p.isOpen && typeof p.close === 'function') {
+                    p.close();
+                  }
+                }
+              });
+
+              if (window.W && window.W.map && window.W.map.map) {
+                var m = window.W.map.map;
+                disableMapScrollZoom(m);
+              }
+            } catch (e) {}
+          }
+
+          function perbaruiAngka(map) {
+            if (!map || !daftarAngka.length) return;
+
+            for (const a of daftarAngka) {
+              const el = a.penanda.getElement();
+              if (el) el.classList.remove('peta-angka--bertumpuk');
+            }
+
+            const kotak = daftarAngka.map((a, urut) => {
+              const el = a.penanda.getElement();
+              const isi = el ? el.firstElementChild : null;
+              const pusat = map.latLngToContainerPoint(a.titik);
+              const d = a.kotakDeg;
+              const ka = map.latLngToContainerPoint([d[3], d[0]]);
+              const kb = map.latLngToContainerPoint([d[1], d[2]]);
+              return {
+                urut,
+                x: pusat.x,
+                y: pusat.y,
+                w: (isi ? isi.offsetWidth : 0) + ANGKA_SELA,
+                h: (isi ? isi.offsetHeight : 0) + ANGKA_SELA,
+                luas: Math.abs(kb.x - ka.x) * Math.abs(kb.y - ka.y)
+              };
+            });
+
+            kotak.sort((a, b) => b.luas - a.luas);
+            const ditempatkan = [];
+            for (const c of kotak) {
+              const bertumpuk = ditempatkan.some(
+                t => Math.abs(c.x - t.x) * 2 < c.w + t.w && Math.abs(c.y - t.y) * 2 < c.h + t.h
+              );
+              if (bertumpuk) {
+                const el = daftarAngka[c.urut].penanda.getElement();
+                if (el) el.classList.add('peta-angka--bertumpuk');
+              } else {
+                ditempatkan.push(c);
+              }
+            }
+          }
+
+          function renderAngka(map) {
+            if (!map || typeof L === 'undefined') return;
+            if (markersLayer) {
+              markersLayer.clearLayers();
+            } else {
+              markersLayer = L.layerGroup([], { pane: 'angkaPane' }).addTo(map);
+            }
+            daftarAngka = [];
+
+            for (const [nama, info] of Object.entries(CENTROIDS)) {
+              const jumlah = currentJumlahLaporan[nama];
+              if (typeof jumlah !== 'number') continue;
+
+              const penanda = L.marker([info.titik[1], info.titik[0]], {
+                pane: 'angkaPane',
+                interactive: false,
+                keyboard: false,
+                icon: L.divIcon({
+                  className: 'peta-angka',
+                  iconSize: [0, 0],
+                  html: '<span class="peta-angka__nilai" aria-hidden="true">' + jumlah.toLocaleString('id-ID') + '</span>'
+                })
+              }).addTo(markersLayer);
+
+              daftarAngka.push({
+                penanda,
+                titik: [info.titik[1], info.titik[0]],
+                kotakDeg: info.kotak
+              });
+            }
+
+            setTimeout(() => perbaruiAngka(map), 50);
+          }
+
+          function initAdministrativeMap() {
+            if (mapInitialized) return;
+            if (!window.W || !window.W.map || !window.W.map.map || typeof L === 'undefined') return;
+
+            const map = window.W.map.map;
+            disableMapScrollZoom(map);
+            if (window.W && window.W.store && typeof window.W.store.set === 'function') {
+              try {
+                window.W.store.set('product', 'cams');
+                window.W.store.set('overlay', 'aqi');
+              } catch (e) {}
+            }
+            try {
+              map.setView([parseFloat('${lat}'), parseFloat('${lon}')], parseInt('${zoom}', 10));
+            } catch (e) {}
+
+            // Buat tombol kontrol zoom kustom (+ / −)
+            if (!document.getElementById('custom-zoom-controls')) {
+              const zoomBox = document.createElement('div');
+              zoomBox.id = 'custom-zoom-controls';
+              zoomBox.innerHTML = '<button id="btn-zoom-in" type="button" aria-label="Perbesar peta">+</button><button id="btn-zoom-out" type="button" aria-label="Perkecil peta">−</button>';
+              document.body.appendChild(zoomBox);
+
+              document.getElementById('btn-zoom-in')?.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (window.W && window.W.map && window.W.map.map) window.W.map.map.zoomIn(1);
+              });
+              document.getElementById('btn-zoom-out')?.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (window.W && window.W.map && window.W.map.map) window.W.map.map.zoomOut(1);
+              });
+            }
+
+            // Buat pane khusus untuk wilayah dan angka
+            try {
+              if (!map.getPane('wilayahPane')) {
+                map.createPane('wilayahPane');
+                map.getPane('wilayahPane').style.zIndex = '420';
+              }
+              if (!map.getPane('angkaPane')) {
+                map.createPane('angkaPane');
+                const p = map.getPane('angkaPane');
+                p.style.zIndex = '460';
+                p.style.pointerEvents = 'none';
+              }
+            } catch (e) {}
+
+            // Buat elemen tooltip mengambang khusus
+            const tooltipEl = document.createElement('div');
+            tooltipEl.id = 'provinsi-tooltip';
+            tooltipEl.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:9999;background:rgba(20,16,15,0.88);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.6);backdrop-filter:blur(8px);font-family:system-ui,-apple-system,sans-serif;';
+            document.body.appendChild(tooltipEl);
+
+            // Cegah error internal Leaflet di Windy terkait tooltips
+            try {
+              if (typeof L !== 'undefined' && L.Layer && L.Layer.prototype) {
+                L.Layer.prototype._addTooltipFocusListeners = function() {};
+              }
+            } catch (e) {}
+
+            // Tambahkan GeoJSON Poligon Provinsi (Transparan agar peta bersih, tapi tetap bisa diklik)
+            geoLayer = L.geoJSON(GEO_DATA, {
+              pane: 'wilayahPane',
+              className: 'provinsi-layer',
+              style: function() {
+                return {
+                  fillColor: 'transparent',
+                  fillOpacity: 0.02,
+                  color: 'rgba(255, 255, 255, 0.45)',
+                  weight: 1.2,
+                  opacity: 0.9
+                };
+              },
+              onEachFeature: function(feature, layer) {
+                const nama = feature.properties.nama;
+                const pulau = PROVINSI_PULAU[nama] || null;
+
+                layer.on('mouseover', function(e) {
+                  layer.setStyle({
+                    weight: 2.2,
+                    color: '#ffffff',
+                    fillColor: '#ffffff',
+                    fillOpacity: 0.15
+                  });
+                  const jml = currentJumlahLaporan[nama];
+                  const teksJml = typeof jml === 'number' ? jml.toLocaleString('id-ID') + ' laporan' : '';
+                  tooltipEl.innerHTML = '<div>' + nama + (teksJml ? '<br><span style="font-size:11px;opacity:0.85;font-weight:400">' + teksJml + '</span>' : '') + '</div>';
+                  tooltipEl.style.display = 'block';
+                });
+
+                layer.on('mousemove', function(e) {
+                  const orig = e.originalEvent;
+                  if (orig) {
+                    tooltipEl.style.left = (orig.clientX + 14) + 'px';
+                    tooltipEl.style.top = (orig.clientY + 14) + 'px';
+                  }
+                });
+
+                layer.on('mouseout', function() {
+                  layer.setStyle({
+                    weight: 1.2,
+                    color: 'rgba(255, 255, 255, 0.45)',
+                    fillColor: 'transparent',
+                    fillOpacity: 0.02
+                  });
+                  tooltipEl.style.display = 'none';
+                });
+
+                function saatPilih(e) {
+                  const orig = e.originalEvent;
+                  if (orig && orig.button !== undefined && orig.button !== 0) return;
+                  if (orig && typeof orig.stopPropagation === 'function') {
+                    orig.stopPropagation();
+                  }
+                  const asal = orig ? { x: orig.clientX, y: orig.clientY } : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                  tooltipEl.style.display = 'none';
+                  
+                  // Kirim ke parent window untuk membuka popup laporan
+                  if (window.parent) {
+                    window.parent.postMessage({
+                      type: 'PILIH_WILAYAH',
+                      nama: nama,
+                      pulau: pulau,
+                      asal: asal
+                    }, '*');
+                  }
+                }
+
+                layer.on('click', saatPilih);
+                layer.on('mousedown', saatPilih);
+              }
+            }).addTo(map);
+
+            renderAngka(map);
+
+            map.on('zoomend moveend resize', function() {
+              perbaruiAngka(map);
+            });
+
+            mapInitialized = true;
+
+            // Beri tahu parent bahwa map forecasting sudah siap
+            if (window.parent) {
+              window.parent.postMessage({ type: 'FORECASTING_READY' }, '*');
+            }
+          }
+
+          // Listener pesan dari parent Next.js
+          window.addEventListener('message', function(event) {
+            const data = event.data;
+            if (!data || typeof data !== 'object') return;
+
+            if (data.type === 'SET_JUMLAH') {
+              if (data.jumlahLaporan) {
+                currentJumlahLaporan = data.jumlahLaporan;
+                if (window.W && window.W.map && window.W.map.map) {
+                  renderAngka(window.W.map.map);
+                }
+              }
+            } else if (data.type === 'FOCUS_WILAYAH') {
+              const info = CENTROIDS[data.nama];
+              if (info && window.W && window.W.map && window.W.map.map) {
+                const map = window.W.map.map;
+                map.flyTo([info.titik[1], info.titik[0]], 7, { duration: 1.2 });
+              }
+            }
+          });
+
+          // Intercept click container kosong agar tidak memicu popup bawaan Windy
+          document.addEventListener('click', function(e) {
+            if (e.target && (
+              e.target.closest('.leaflet-wilayahPane-pane') ||
+              e.target.closest('.leaflet-angkaPane-pane') ||
+              e.target.closest('.provinsi-layer') ||
+              e.target.closest('.leaflet-overlay-pane') ||
+              e.target.closest('.leaflet-marker-pane') ||
+              e.target.closest('.peta-angka') ||
+              e.target.closest('#custom-zoom-controls') ||
+              e.target.closest('#logo') ||
+              e.target.closest('#plugin-rhbottom') ||
+              e.target.closest('.rhpane__bottom-messages')
+            )) {
+              return;
+            }
+            if (e.target && (e.target.closest('#map-container') || e.target.tagName === 'CANVAS')) {
+              e.stopImmediatePropagation();
+            }
+          }, true);
+
+          // Tangkap event wheel: cegah zoom peta dan teruskan ke parent window agar halaman dapat di-scroll naik/turun
+          window.addEventListener('wheel', function(e) {
+            // Jika pengguna menekan Ctrl atau Meta (Cmd), izinkan perbesaran peta
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault();
+              e.stopPropagation();
+              if (window.W && window.W.map && window.W.map.map) {
+                const map = window.W.map.map;
+                if (e.deltaY < 0) {
+                  map.zoomIn(0.5);
+                } else {
+                  map.zoomOut(0.5);
+                }
+              }
+              return;
+            }
+
+            // Gulir biasa: hentikan zoom pada peta dan teruskan pergerakan scroll ke parent window (Next.js)
+            e.stopPropagation();
+
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({
+                type: 'IFRAME_WHEEL',
+                deltaY: e.deltaY,
+                deltaX: e.deltaX,
+                deltaMode: e.deltaMode
+              }, '*');
+            }
+          }, { capture: true, passive: false });
+
+          function checkAndInit() {
+            enforceLatestAQI();
+            if (!mapInitialized && window.W && window.W.map && window.W.map.map && typeof L !== 'undefined') {
+              initAdministrativeMap();
+            }
+          }
+
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', checkAndInit);
+          } else {
+            checkAndInit();
+          }
+
+          let checks = 0;
+          const interval = setInterval(() => {
+            checkAndInit();
+            checks++;
+            if (mapInitialized) {
+              clearInterval(interval);
+            }
+          }, 350);
+        })();
+      </script>
+    `;
+
+    let modifiedHtml = html;
+    if (modifiedHtml.includes("<head>")) {
+      modifiedHtml = modifiedHtml.replace("<head>", `<head>${baseTag}${preInitScript}${customStyles}`);
+    } else {
+      modifiedHtml = baseTag + preInitScript + customStyles + modifiedHtml;
+    }
+
+    if (modifiedHtml.includes("</body>")) {
+      modifiedHtml = modifiedHtml.replace("</body>", `${customScript}</body>`);
+    } else {
+      modifiedHtml += customScript;
+    }
+
+    return new Response(modifiedHtml, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=UTF-8",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "X-Frame-Options": "SAMEORIGIN",
+        "Content-Security-Policy": "frame-ancestors 'self'",
+      },
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return new NextResponse(`Error fetching Windy AQI: ${message}`, { status: 500 });
+  }
+}

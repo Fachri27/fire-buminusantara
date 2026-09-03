@@ -66,7 +66,7 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
   };
 
   return (
-    <div className="relative mx-auto mt-[clamp(18px,5vw,28px)] w-full max-w-[940px] panggung:hidden">
+    <div className="relative mx-auto w-full max-w-[940px] md:hidden panggung:hidden">
       <div className="relative z-[6]">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
              strokeLinecap="round"
@@ -116,7 +116,7 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
       {/* Layanan luar yang sama dengan warna peta. Kalau tak terjangkau,
           daftarnya tidak ada isinya — kolom pencarian tetap berguna sendiri. */}
       {teratas.length > 0 && (
-        <>
+        <div className="panggung:hidden">
           <p className="mt-[clamp(16px,4.6vw,26px)] text-[length:var(--ukuran-eyebrow)] leading-[1.2] font-bold
                         tracking-[0.16em] uppercase text-white">
             3 provinsi dengan kebakaran terluas
@@ -157,7 +157,7 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
               );
             })}
           </ul>
-        </>
+        </div>
       )}
     </div>
   );

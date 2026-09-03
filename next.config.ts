@@ -22,7 +22,7 @@ const HEADER_KEAMANAN = [
   },
   {
     key: "Content-Security-Policy",
-    value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'",
+    value: "frame-ancestors 'none'; frame-src 'self' http://localhost:3001 https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'",
   },
 ];
 
@@ -75,7 +75,16 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: "default-src 'none'; sandbox" },
         ],
       },
-      { source: "/((?!media/).*)", headers: HEADER_KEAMANAN },
+      {
+        source: "/api/forecasting",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self'; object-src 'none'" },
+        ],
+      },
+      { source: "/((?!media/|api/forecasting).*)", headers: HEADER_KEAMANAN },
     ];
   },
 };

@@ -96,48 +96,31 @@ export function HalamanFire({
     <>
       <Korsel berita={berita} statistik={statistik} onBuka={(i) => berita[i] && bukaRincian(berita[i])} />
 
-      {/* Layar 2 — peta sebaran. Menggulir naik menutupi hero. */}
+      {/* Layar 2 — peta sebaran & forecasting. Menggulir naik menutupi hero. */}
       <section
         id="peta"
         aria-label="Peta sebaran"
         data-kabur-tepi
-        className="tepi-lunak relative z-[2] flex min-h-[100svh] flex-col justify-center overflow-hidden
-                   px-[var(--pias)] pt-[calc(4rem+clamp(32px,8vw,56px))] pb-[clamp(32px,8vw,56px)]
-                   pendek:z-auto pendek:min-h-0
-                   panggung:block panggung:h-screen panggung:min-h-0 panggung:relative panggung:z-[2] panggung:p-0"
+        className="tepi-lunak relative z-[2] flex h-[100svh] min-h-[100svh] w-full flex-col justify-center overflow-hidden"
       >
-        {/* Dasar section: foto latar layar, lalu gradasi merah di atasnya.
-            Yang tembus pandang adalah wadah Leaflet-nya (.leaflet-container),
-            bukan sectionnya — jadi peta tergambar di atas kedua lapisan ini
-            tanpa alas abu bawaan Leaflet. */}
-        <img src="/assets/img/bg-karhutla.jpg" alt="" aria-hidden="true"
-             className="absolute inset-0 h-full w-full object-cover" />
-        <div className="kabur-tepi" aria-hidden="true" />
-        <div aria-hidden="true" className="kabut-api absolute inset-0" />
+        {/* Peta forecasting Windy AQI + poligon administratif fullscreen */}
+        <div className="kabur-tepi pointer-events-none" aria-hidden="true" />
+        <div className="absolute inset-0 h-full w-full">
+          <Peta
+            jumlahLaporan={jumlahLaporan}
+            onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
+          />
+        </div>
 
-        <div data-kanvas
-             className="relative mx-auto w-full max-w-[940px]
-                        panggung:absolute panggung:top-1/2 panggung:left-1/2 panggung:mx-0
-                        panggung:mt-[-540px] panggung:ml-[-960px] panggung:h-[1080px]
-                        panggung:w-[1920px] panggung:max-w-none panggung:origin-center
-                        panggung:scale-[var(--skala,1)] panggung:overflow-hidden">
-          {/* Geometri persis desain di panggung; rasio 2.5 di mode aliran. */}
-          <div className="relative isolate aspect-[2.5] w-full
-                          panggung:absolute panggung:top-[280.4px] panggung:left-[193.1px]
-                          panggung:aspect-auto panggung:h-[575.8px] panggung:w-[1533.8px]">
-            <Peta
-              jumlahLaporan={jumlahLaporan}
+        {/* Pencarian + tiga teratas melayang di bagian atas layar (khusus mobile, di desktop disembunyikan) */}
+        <div className="pointer-events-none absolute inset-x-0 top-[clamp(64px,11vh,92px)] z-[20] flex justify-center px-4 md:hidden panggung:hidden">
+          <div className="pointer-events-auto w-full max-w-[580px]">
+            <PanelProvinsi
+              teratas={tigaTeratas}
               onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
             />
           </div>
         </div>
-
-        {/* Pencarian + tiga teratas: pengganti mode aliran untuk menekan
-            provinsi langsung di peta, yang di layar sempit terlalu kecil. */}
-        <PanelProvinsi
-          teratas={tigaTeratas}
-          onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
-        />
       </section>
 
       {sorot !== null && (

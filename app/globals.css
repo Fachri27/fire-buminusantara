@@ -162,6 +162,11 @@ html {
    tepi bawah viewport, 0 saat tiba di atas. Bentuk sisa*(1-sisa) membuat
    masker melebar di tengah perjalanan lalu menutup lagi di ujung. */
 .tepi-lunak {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0px,
+    black calc(var(--kabur-tepi, 0) * (1 - var(--kabur-tepi, 0)) * 200svh)
+  );
   mask-image: linear-gradient(
     to bottom,
     transparent 0px,
@@ -181,6 +186,7 @@ html {
     rgb(255 255 255 / calc(var(--kabur-tepi, 0) * 0.35)) 0%,
     transparent 100%
   );
+  -webkit-mask-image: linear-gradient(#000 0%, #0000 100%);
   mask-image: linear-gradient(#000 0%, #0000 100%);
   /* backdrop-filter SENGAJA tidak dipakai di sini.
 
