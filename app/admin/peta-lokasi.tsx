@@ -74,12 +74,18 @@ export function PetaLokasi({ lat, lng, onPilih }: Props) {
       if (batal || !kotakRef.current || petaRef.current) return;
       leafletRef.current = L;
 
+      // Hapus _leaflet_id jika elemen bekas mount sebelumnya masih menempel
+      const el = kotakRef.current as HTMLElement & { _leaflet_id?: number };
+      if (el._leaflet_id) {
+        delete el._leaflet_id;
+      }
+
       const a = Number(lat);
       const b = Number(lng);
       const sah = lat.trim() !== "" && lng.trim() !== ""
         && Number.isFinite(a) && Number.isFinite(b);
 
-      const peta = L.map(kotakRef.current, {
+      const peta = L.map(el, {
         // Roda tetikus milik guliran halaman; zum cukup lewat tombolnya.
         scrollWheelZoom: false,
       }).setView(sah ? [a, b] : PUSAT, sah ? 13 : 5);
@@ -121,7 +127,14 @@ export function PetaLokasi({ lat, lng, onPilih }: Props) {
       setSiap(true);
     })();
 
-    return () => { batal = true; bersihkan?.(); };
+    return () => {
+      batal = true;
+      bersihkan?.();
+      if (petaRef.current) {
+        try { petaRef.current.remove(); } catch {}
+        petaRef.current = null;
+      }
+    };
     // Nilai awal koordinat sengaja hanya dibaca sekali di pemasangan;
     // perubahannya ditangani efek sinkron di bawah.
     // eslint-disable-next-line react-hooks/exhaustive-deps

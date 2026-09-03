@@ -92,6 +92,18 @@ export function gunakanKorsel(berita: Berita[]) {
     kunci.current = false;
   }, [berita.length, gulung, terapkan]);
 
+  const aktifRef = useRef(aktif);
+  useEffect(() => {
+    aktifRef.current = aktif;
+  }, [aktif]);
+
+  // Bersihkan timer pengaman saat unmount
+  useEffect(() => {
+    return () => {
+      if (pengaman.current) clearTimeout(pengaman.current);
+    };
+  }, []);
+
   const pindah = useCallback((arah: number) => {
     if (berita.length < 2 || kunci.current) return;
     kunci.current = true;
@@ -108,6 +120,7 @@ export function gunakanKorsel(berita: Berita[]) {
     if (kurangiGerak) { normalkan(); return; }
     // Jaring pengaman kalau transitionend tak pernah datang (tab di latar,
     // animasi terpotong).
+    if (pengaman.current) clearTimeout(pengaman.current);
     pengaman.current = setTimeout(normalkan, DURASI + 150);
   }, [berita.length, gulung, kurangiGerak, normalkan, terapkan]);
 
@@ -132,17 +145,16 @@ export function gunakanKorsel(berita: Berita[]) {
   useEffect(() => {
     if (!berita.length) return;
     ukur();
-    terapkan(aktif, false);
+    terapkan(aktifRef.current, false);
 
     let tunda: ReturnType<typeof setTimeout> | null = null;
     const saatUbah = () => {
       if (tunda) clearTimeout(tunda);
-      // setTimeout, bukan rAF: ini bukan pekerjaan animasi.
-      tunda = setTimeout(() => { ukur(); terapkan(aktif, false); }, 60);
+      // Gunakan aktifRef terkini agar tidak melompat ke indeks lama saat resize
+      tunda = setTimeout(() => { ukur(); terapkan(aktifRef.current, false); }, 60);
     };
     window.addEventListener("resize", saatUbah);
     return () => { window.removeEventListener("resize", saatUbah); if (tunda) clearTimeout(tunda); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [berita.length, ukur, terapkan]);
 
   // Korsel hanya berjalan selama sectionnya tampak.
@@ -159,9 +171,14 @@ export function gunakanKorsel(berita: Berita[]) {
 
 /** Sekali pasang; nilainya tidak berubah selama halaman hidup. */
 export function useKurangiGerak() {
-  const [kurangi, setKurangi] = useState(false);
+  const [kurangi, setKurangi] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false
+  );
   useEffect(() => {
-    setKurangi(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const saatUbah = (e: MediaQueryListEvent) => setKurangi(e.matches);
+    q.addEventListener("change", saatUbah);
+    return () => q.removeEventListener("change", saatUbah);
   }, []);
   return kurangi;
 }

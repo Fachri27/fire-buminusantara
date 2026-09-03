@@ -30,33 +30,39 @@ function berkasTerisi(nilai: FormDataEntryValue | null): File | null {
 /**
  * Susun galeri hasil form: yang lama dipertahankan hanya kalau kotak
  * "pertahankan"-nya masih tercentang, lalu berkas baru ditambahkan di
- * belakangnya. Berkas yang dilepas ikut dibuang dari penyimpanan.
+ * belakangnya.
  *
- * Indeks dipakai sebagai penanda — bukan path — supaya nama berkas tidak perlu
- * bolak-balik lewat form, sama seperti `keep_media[]` di CMS Laravel. Keterangan
- * tiap berkas mengikuti penanda yang sama: `media_desc_<indeks>` untuk yang
- * tersimpan, `media_desc_baru` berurutan untuk yang baru (urutan DOM-nya sama
- * dengan urutan berkas di `media_files`, keduanya mengikuti daftar di form).
+ * PENTING (Pencegahan Kehilangan Data): Berkas yang dilepas TIDAK LANGSUNG
+ * dihapus di sini, melainkan dicatat ke dalam `dihapus`. Penghapusan fisik
+ * dari S3 HANYA dilakukan setelah transaksi database berhasil di-commit.
+ * Jika berkas baru gagal diunggah atau database gagal menyimpan, berkas lama
+ * tetap utuh dan berkas baru yang sempat terunggah dibersihkan (rollback).
  */
 async function susunGaleri(
   data: FormData,
   lama: BerkasMedia[],
-): Promise<{ media: BerkasMedia[] } | { galat: string }> {
-  const simpan = new Set(
-    data.getAll("keep_media").map((v) => Number(String(v))).filter(Number.isInteger),
+): Promise<
+  | { media: BerkasMedia[]; dihapus: BerkasMedia[]; baruDiupload: BerkasMedia[] }
+  | { galat: string }
+> {
+  const keepEntries = data.getAll("keep_media").map((v) => String(v).trim());
+  const simpanIndex = new Set(
+    keepEntries.map((v) => Number(v)).filter(Number.isInteger),
   );
+  const simpanPath = new Set(keepEntries);
 
   const media: BerkasMedia[] = [];
+  const dihapus: BerkasMedia[] = [];
+  const baruDiupload: BerkasMedia[] = [];
+
   for (const [i, berkas] of lama.entries()) {
-    if (simpan.has(i)) {
+    if (simpanIndex.has(i) || simpanPath.has(berkas.path)) {
       const ket = String(data.get(`media_desc_${i}`) ?? "").trim();
       // Keterangan kosong berarti sengaja dikosongkan — jangan pakai yang lama.
       media.push({ ...berkas, keterangan: ket || undefined });
     } else {
-      // Posternya ikut: berkas yatim di bucket tidak merusak apa pun, tapi
-      // tidak ada alasan membiarkannya menumpuk.
-      await hapusBerkas(berkas.path);
-      await hapusBerkas(berkas.poster);
+      // Tandai untuk dihapus NANTI setelah database berhasil di-commit
+      dihapus.push(berkas);
     }
   }
 
@@ -71,17 +77,24 @@ async function susunGaleri(
   for (const [i, nilai] of kiriman.entries()) {
     const berkas = berkasTerisi(nilai);
     if (!berkas) {
-      // Dulu dilewati diam-diam: berkas kosong/bukan-File tidak meninggalkan
-      // jejak apa pun, sehingga "tersimpan tapi tanpa media" tak bisa dilacak.
       console.warn("[Galeri] entri dilewati (kosong atau bukan File)");
       continue;
     }
     const hasil = await simpanBerkasGaleri(berkas);
-    if ("galat" in hasil) return { galat: `Media galeri: ${hasil.galat}` };
-    media.push({ ...hasil, keterangan: keteranganBaru[i] || undefined });
+    if ("galat" in hasil) {
+      // Rollback: bersihkan berkas yang sudah terlanjur diunggah di iterasi ini
+      for (const b of baruDiupload) {
+        await hapusBerkas(b.path);
+        await hapusBerkas(b.poster);
+      }
+      return { galat: `Media galeri: ${hasil.galat}` };
+    }
+    const entri = { ...hasil, keterangan: keteranganBaru[i] || undefined };
+    baruDiupload.push(entri);
+    media.push(entri);
   }
 
-  return { media };
+  return { media, dihapus, baruDiupload };
 }
 
 /**
@@ -117,7 +130,7 @@ export async function simpanKejadian(data: FormData, id?: number): Promise<Hasil
   if ("galat" in galeri) return { ok: false, galat: galeri.galat };
 
   const slugDiminta = String(data.get("slug") ?? "").trim();
-  const slug = slugDiminta || (await buatSlug(judulId, id));
+  let slug = slugDiminta || (await buatSlug(judulId, id));
 
   const isi = {
     title_id: judulId,
@@ -135,16 +148,52 @@ export async function simpanKejadian(data: FormData, id?: number): Promise<Hasil
   };
 
   try {
-    if (id) {
-      const ubah = await prisma.events.update({ where: { id }, data: isi, select: { id: true } });
-      return { ok: true, id: Number(ubah.id) };
+    let idTersimpan: number;
+    try {
+      if (id) {
+        const ubah = await prisma.events.update({ where: { id }, data: isi, select: { id: true } });
+        idTersimpan = Number(ubah.id);
+      } else {
+        const baru = await prisma.events.create({
+          data: { ...isi, image_en: null, created_at: new Date() },
+          select: { id: true },
+        });
+        idTersimpan = Number(baru.id);
+      }
+    } catch (dbErr: unknown) {
+      const msg = dbErr instanceof Error ? dbErr.message : "";
+      // Jika terjadi tabrakan slug konkuren, coba sekali lagi dengan slug berakhiran acak
+      if ((msg.includes("slug") || msg.includes("Unique constraint")) && !slugDiminta) {
+        slug = `${slug.slice(0, 190)}-${Math.random().toString(36).slice(2, 6)}`;
+        isi.slug = slug;
+        if (id) {
+          const ubah = await prisma.events.update({ where: { id }, data: isi, select: { id: true } });
+          idTersimpan = Number(ubah.id);
+        } else {
+          const baru = await prisma.events.create({
+            data: { ...isi, image_en: null, created_at: new Date() },
+            select: { id: true },
+          });
+          idTersimpan = Number(baru.id);
+        }
+      } else {
+        throw dbErr;
+      }
     }
-    const baru = await prisma.events.create({
-      data: { ...isi, image_en: null, created_at: new Date() },
-      select: { id: true },
-    });
-    return { ok: true, id: Number(baru.id) };
+
+    // Database berhasil disimpan! Sekarang aman menghapus berkas lama dari S3
+    for (const b of galeri.dihapus) {
+      await hapusBerkas(b.path);
+      await hapusBerkas(b.poster);
+    }
+
+    return { ok: true, id: idTersimpan };
   } catch (e) {
+    // Database gagal: bersihkan berkas baru yang sempat terunggah ke S3 agar tidak jadi file yatim
+    for (const b of galeri.baruDiupload) {
+      await hapusBerkas(b.path);
+      await hapusBerkas(b.poster);
+    }
     return { ok: false, galat: e instanceof Error ? e.message : "Gagal menyimpan." };
   }
 }
@@ -197,29 +246,43 @@ export async function promosiKeKejadian(
 
   const slug = await buatSlug(laporan.title);
 
+  const dataKejadian = {
+    title_id: laporan.title,
+    title_en: laporan.title,
+    description_id: laporan.description || null,
+    description_en: null,
+    slug,
+    event_date: laporan.created_at ?? new Date(),
+    location: lokasi,
+    location_lat: lat,
+    location_lng: lng,
+    orientation: orientasiKartu(laporan.media),
+    media: laporan.media ?? undefined,
+    image_en: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  };
+
   try {
-    const baru = await tx.events.create({
-      data: {
-        title_id: laporan.title,
-        title_en: laporan.title,
-        description_id: laporan.description || null,
-        description_en: null,
-        slug,
-        event_date: laporan.created_at ?? new Date(),
-        location: lokasi,
-        location_lat: lat,
-        location_lng: lng,
-        orientation: orientasiKartu(laporan.media),
-        // Lampiran laporan sudah berseri JSON dengan format yang sama persis
-        // dengan events.media — dibawa apa adanya, tanpa disalin/digambar ulang.
-        media: laporan.media ?? undefined,
-        image_en: null,
-        created_at: new Date(),
-        updated_at: new Date(),
-      },
-      select: { id: true },
-    });
-    return { ok: true, id: Number(baru.id) };
+    try {
+      const baru = await tx.events.create({
+        data: dataKejadian,
+        select: { id: true },
+      });
+      return { ok: true, id: Number(baru.id) };
+    } catch (createErr: unknown) {
+      const msg = createErr instanceof Error ? createErr.message : "";
+      if (msg.includes("slug") || msg.includes("Unique constraint")) {
+        // Retry otomatis dengan suffix acak jika slug bentrok di transaksi paralel
+        dataKejadian.slug = `${slug.slice(0, 190)}-${Math.random().toString(36).slice(2, 6)}`;
+        const baru = await tx.events.create({
+          data: dataKejadian,
+          select: { id: true },
+        });
+        return { ok: true, id: Number(baru.id) };
+      }
+      throw createErr;
+    }
   } catch (e) {
     return { ok: false, galat: e instanceof Error ? e.message : "Gagal menaikkan laporan." };
   }

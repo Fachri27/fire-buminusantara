@@ -62,6 +62,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const [nama, setNama] = useState("");
   const [berkas, setBerkas] = useState<File[]>([]);
   const [anonim, setAnonim] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
   const [galatKlien, setGalatKlien] = useState("");
   const [mencariLokasi, setMencariLokasi] = useState(false);
   /** Pratinjau per berkas: key = kunciBerkas(b), nilai = URL objek lokal. */
@@ -70,12 +71,16 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const berkasRef = useRef<HTMLInputElement | null>(null);
   const captchaRef = useRef<HTMLDivElement | null>(null);
   const widgetRef = useRef<number | null>(null);
-  // Semua URL objek yang pernah dibuat, dilepas sekaligus saat komponen
-  // diturunkan — mengosongkan form oleh React tidak mencabut berkasnya.
+  const sedangKirimRef = useRef(false);
+  const lokasiAktifRef = useRef(true);
+  // Semua URL objek yang pernah dibuat, dilepas saat komponen diturunkan
+  // atau saat laporan sukses terkirim.
   const urlRef = useRef<string[]>([]);
 
   useEffect(() => {
+    lokasiAktifRef.current = true;
     return () => {
+      lokasiAktifRef.current = false;
       for (const url of urlRef.current) URL.revokeObjectURL(url);
       urlRef.current = [];
     };
@@ -84,26 +89,39 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const berhasil = keadaan?.ok === true;
   const totalByte = berkas.reduce((n, b) => n + b.size, 0);
 
-  /**
-   * Daftar berkas dipegang React, tapi yang dikirim tetap `input.files` —
-   * form ini menyerahkan FormData bawaan, jadi berkasnya berpindah ke server
-   * tanpa pernah dibaca ulang di klien. Sinkronisasinya lewat DataTransfer,
-   * satu-satunya cara menulis balik ke sebuah <input type="file">.
-   *
-   * `keadaan` ikut jadi kebergantungan: pengosongan form oleh React juga
-   * mengosongkan input berkas, sementara daftar di bawah masih menyebut
-   * nama-nama itu. Tanpa penyusunan ulang di sini, percobaan kirim berikutnya
-   * berangkat TANPA lampiran yang jelas-jelas masih tertulis di layar.
-   */
-  useEffect(() => {
+  const sinkronkanKeInput = useCallback((daftar: File[]) => {
     const input = berkasRef.current;
     if (!input) return;
-    const dt = new DataTransfer();
-    for (const b of berkas) dt.items.add(b);
-    input.files = dt.files;
-  }, [berkas, keadaan]);
+    try {
+      if (typeof DataTransfer !== "undefined") {
+        const dt = new DataTransfer();
+        for (const b of daftar) dt.items.add(b);
+        input.files = dt.files;
+      }
+    } catch {
+      /* peramban tanpa dukungan DataTransfer */
+    }
+  }, []);
+
+  /**
+   * Sinkronisasi berkas React state ke input DOM native.
+   */
+  useEffect(() => {
+    sinkronkanKeInput(berkas);
+  }, [berkas, keadaan, sinkronkanKeInput]);
+
+  // Lepas kunci kirim dan bersihkan blob URL segera setelah status sukses
+  useEffect(() => {
+    sedangKirimRef.current = false;
+    if (keadaan?.ok) {
+      for (const url of urlRef.current) URL.revokeObjectURL(url);
+      urlRef.current = [];
+      setPratinjau({});
+    }
+  }, [keadaan]);
 
   const ulangCaptcha = useCallback(() => {
+    setCaptchaToken("");
     const ts = turnstile();
     if (ts && widgetRef.current !== null) {
       try {
@@ -128,21 +146,19 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         window.setTimeout(pasang, 100);
         return;
       }
-      // Hanya render kalau wadah ini belum punya widget. Dulu di sini ada
-      // `ts.remove(widgetRef.current)` tanpa syarat — saat render pertama
-      // widgetRef masih null, dan remove(null) membuat Turnstile mencetak
-      // peringatan "Nothing to remove found for the provided container".
-      if (widgetRef.current !== null) return;
+      try {
+        ts.remove(widgetRef.current);
+      } catch {
+        /* belum ada widget */
+      }
+      wadah.innerHTML = "";
 
-      // Tokennya TIDAK disalin ke state React. Turnstile menaruh sendiri satu
-      // <input type="hidden"> bernama `captcha` di dalam wadah ini, dan wadah
-      // ini duduk di dalam <form> — jadi tokennya ikut FormData tanpa perantara,
-      // dan mengosongkannya kembali cukup dengan reset() di tempat lain.
       widgetRef.current = ts.render(wadah, {
         sitekey: SITE_KEY,
         appearance: "interaction-only",
-        "response-field-name": "captcha",
+        callback: (token: string) => setCaptchaToken(token),
         "expired-callback": () => {
+          setCaptchaToken("");
           if (widgetRef.current !== null) {
             try {
               ts.reset(widgetRef.current);
@@ -152,6 +168,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
           }
         },
         "error-callback": () => {
+          setCaptchaToken("");
           if (widgetRef.current !== null) {
             try {
               ts.reset(widgetRef.current);
@@ -236,6 +253,8 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     }
 
     setBerkas(gabungan);
+    sinkronkanKeInput(gabungan);
+    if (berkasRef.current) berkasRef.current.value = "";
   }
 
   function hapusBerkasDipilih(kunci: string, url: string | undefined) {
@@ -248,7 +267,9 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
       delete sisa[kunci];
       return sisa;
     });
-    setBerkas((d) => d.filter((x) => kunciBerkas(x) !== kunci));
+    const sisaBerkas = berkas.filter((x) => kunciBerkas(x) !== kunci);
+    setBerkas(sisaBerkas);
+    sinkronkanKeInput(sisaBerkas);
   }
 
   function lokasiSaya() {
@@ -260,6 +281,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     setGalatKlien("");
     navigator.geolocation.getCurrentPosition(
       (posisi) => {
+        if (!lokasiAktifRef.current) return;
         setMencariLokasi(false);
         // Tujuh angka di belakang koma, sama dengan DECIMAL(10,7) di kolomnya —
         // lebih dari itu hanya akan dipotong basis data.
@@ -267,6 +289,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         setLng(posisi.coords.longitude.toFixed(7));
       },
       () => {
+        if (!lokasiAktifRef.current) return;
         setMencariLokasi(false);
         setGalatKlien(teks.lokasiGagal);
       },
@@ -296,7 +319,17 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const galat = galatKlien || (keadaan && !keadaan.ok ? keadaan.galat : "");
 
   return (
-    <form action={aksi} className="grid gap-7">
+    <form
+      action={aksi}
+      onSubmit={(e) => {
+        if (sedangKirimRef.current || mengirim || (Boolean(SITE_KEY) && !captchaToken)) {
+          e.preventDefault();
+          return;
+        }
+        sedangKirimRef.current = true;
+      }}
+      className="grid gap-7"
+    >
       {galat && (
         <p role="alert"
            className="rounded-md border border-api/25 bg-api/[0.06] px-4 py-3 text-[13.5px] text-bara">
@@ -414,15 +447,23 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
       <input type="text" name="website" tabIndex={-1} autoComplete="off"
              aria-hidden="true" className="hidden" />
 
-      {/* Wadah widget Turnstile — sekaligus tempat kolom `captcha`-nya. Harus
-          tetap di DALAM form supaya tokennya ikut terkirim. */}
+      {/* Wadah widget Turnstile dan input token terverifikasi */}
       <div ref={captchaRef} />
+      <input type="hidden" name="captcha" value={captchaToken} />
 
       {mengirim && <BilahUnggah />}
 
       <div className="flex items-center gap-4 border-t border-black/[0.08] pt-6">
-        <button type="submit" disabled={mengirim} className={`${TOMBOL_UTAMA} disabled:opacity-60`}>
-          {mengirim ? teks.mengirim : teks.kirim}
+        <button
+          type="submit"
+          disabled={mengirim || (Boolean(SITE_KEY) && !captchaToken)}
+          className={`${TOMBOL_UTAMA} disabled:opacity-60`}
+        >
+          {mengirim
+            ? teks.mengirim
+            : Boolean(SITE_KEY) && !captchaToken
+            ? (bahasa === "en" ? "Verifying…" : "Memverifikasi…")
+            : teks.kirim}
         </button>
         <Link href={`/${bahasa}`} className="text-[13px] text-tinta/50 underline-offset-4 hover:underline">
           {teks.kembali}

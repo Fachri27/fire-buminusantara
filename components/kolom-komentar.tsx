@@ -166,12 +166,10 @@ export function FormulirKomentar({
     kirimSebelumnya.current = mengirim;
   }, [mengirim, isi]);
 
-  // Pasang widget Turnstile saat WADAHNYA ada: di desktop form tampil inline
-  // sehingga wadah captcha selalu ada; di ponsel wadahnya baru ada saat sheet
-  // terbuka. Sebelumnya hanya (ponsel && sheet), jadi di DESKTOP widget tak
-  // pernah ter-render → token captcha selalu kosong → "Verifikasi captcha
-  // gagal". (Pemasangan membuang widget lama lebih dulu, jadi aman dipanggil
-  // ulang.)
+  // Wadah captcha di desktop terpasang langsung (form inline); di ponsel ikut
+  // sheet yang di-mount/unmount — pasang widget saat wadahnya siap di DOM.
+  // Sebelumnya hanya (ponsel && sheet), jadi di desktop widget tak pernah
+  // ter-render → token kosong → "Verifikasi captcha gagal".
   useEffect(() => {
     if (!ponsel || sheet) pasangCaptcha();
   }, [ponsel, sheet, pasangCaptcha]);
@@ -266,7 +264,9 @@ export function FormulirKomentar({
             // Shift+Enter diperbolehkan membuat baris baru di sheet.
             if (e.key === "Enter" && (!sheet || !e.shiftKey)) {
               e.preventDefault();
-              kirim();
+              if (!belumLengkap && !mengirim) {
+                kirim();
+              }
             }
           }}
         />
@@ -285,7 +285,13 @@ export function FormulirKomentar({
   // ── Desktop: formulir lengkap inline di dasar rel, seperti sebelumnya. ──
   if (!ponsel) {
     return (
-      <form className="rincian__kirim" onSubmit={(e) => { e.preventDefault(); kirim(); }}>
+      <form
+        className="rincian__kirim"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!belumLengkap && !mengirim) kirim();
+        }}
+      >
         {bidang}
         {barisKetik}
       </form>
@@ -320,7 +326,10 @@ export function FormulirKomentar({
         >
           <form
             className="rincian__sheet-panel"
-            onSubmit={(e) => { e.preventDefault(); kirim(); }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!belumLengkap && !mengirim) kirim();
+            }}
           >
             <div className="rincian__sheet-kepala">
               <p className="rincian__sheet-judul">Tulis komentar</p>

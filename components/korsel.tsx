@@ -20,7 +20,7 @@ export function Korsel({
   } = gunakanKorsel(berita);
 
   const sectionRef = useRef<HTMLElement | null>(null);
-  const sentuh = useRef<{ x: number; y: number } | null>(null);
+  const sentuh = useRef<{ x: number; y: number; id: number } | null>(null);
 
   // Korsel berhenti saat sectionnya keluar dari pandangan.
   useEffect(() => {
@@ -77,13 +77,23 @@ export function Korsel({
                  className="relative panggung:absolute panggung:inset-0">
           {/* Jendela: menyembunyikan kartu kembaran di luar kartu utama. */}
           <div
-            onTouchStart={(e) => { const t = e.touches[0]; sentuh.current = { x: t.clientX, y: t.clientY }; }}
+            onTouchStart={(e) => {
+              if (e.touches.length > 1) return;
+              const t = e.touches[0];
+              sentuh.current = { x: t.clientX, y: t.clientY, id: t.identifier };
+            }}
             onTouchEnd={(e) => {
-              const a = sentuh.current; if (!a) return;
-              const t = e.changedTouches[0];
-              const dx = t.clientX - a.x, dy = t.clientY - a.y;
-              // Hanya sapuan mendatar; sapuan tegak itu guliran halaman.
-              if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) pindah(dx < 0 ? 1 : -1);
+              const a = sentuh.current;
+              if (!a) return;
+              const t = Array.from(e.changedTouches).find((touch) => touch.identifier === a.id);
+              if (t) {
+                const dx = t.clientX - a.x, dy = t.clientY - a.y;
+                // Hanya sapuan mendatar; sapuan tegak itu guliran halaman.
+                if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) pindah(dx < 0 ? 1 : -1);
+              }
+              sentuh.current = null;
+            }}
+            onTouchCancel={() => {
               sentuh.current = null;
             }}
             className="relative w-full overflow-hidden pt-[10px] pb-[18px]

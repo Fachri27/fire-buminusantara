@@ -86,7 +86,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     ? Number(body.balas_ke)
     : null;
 
-  await simpanKomentar({ eventId: id, nama: namaSimpan, email: emailSimpan, isi, balasKe, ip });
+  // Batasi spam / request konkuren agresif dari IP yang sama (cooldown 3 detik)
+  if (ip) {
+    const komentarTerakhir = await prisma.comments.findFirst({
+      where: {
+        ip_address: ip,
+        created_at: { gte: new Date(Date.now() - 3000) },
+      },
+      select: { id: true },
+    });
+    if (komentarTerakhir) {
+      return NextResponse.json(
+        { message: "Mohon tunggu beberapa detik sebelum mengirim komentar lagi." },
+        { status: 429 },
+      );
+    }
+  }
+
+  try {
+    await simpanKomentar({ eventId: id, nama: namaSimpan, email: emailSimpan, isi, balasKe, ip });
+  } catch (err: unknown) {
+    const pesan = err instanceof Error ? err.message : "Gagal menyimpan komentar.";
+    return NextResponse.json({ message: pesan }, { status: 422 });
+  }
 
   return NextResponse.json({ komentar: await daftarKomentar(id) }, { status: 201 });
 }
