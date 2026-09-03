@@ -109,12 +109,41 @@ const nextConfig: NextConfig = {
         ],
       },
       { source: "/((?!media/|api/forecasting).*)", headers: HEADER_KEAMANAN },
+      {
+        source: "/assets/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      {
+        source: "/css/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      {
+        source: "/(favicon.ico|icon.png|apple-icon.png)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
       // Header tanpa-cache untuk dokumen & rute aplikasi: browser, proxy, dan
       // CDN tidak boleh menahan dokumen HTML usang lintas deploy, sehingga
       // pengguna tidak perlu hard reload untuk mendapatkan bundel skrip terbaru.
-      // Aset statis ber-hash di _next/static tetap membawa cache immutable bawaan Next.js.
+      // Aset statis ber-hash di _next/static serta berkas publik di assets/ & css/
+      // membawa header cache tersendiri.
       {
-        source: "/((?!_next/static|_next/image|media/|api/forecasting).*)",
+        source:
+          "/((?!_next/static|_next/image|assets/|css/|favicon\\.ico|icon\\.png|apple-icon\\.png|robots\\.txt|sitemap\\.xml|media/|api/forecasting).*)",
         headers: [
           {
             key: "Cache-Control",

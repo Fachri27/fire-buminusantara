@@ -65,6 +65,9 @@ export async function generateMetadata({ params }: PageProps<'/[locale]'>): Prom
       description: teks.deskripsi,
       images: ["/assets/img/og-fire.jpg"],
     },
+    other: {
+      "content-language": bahasa,
+    },
   };
 }
 
@@ -105,9 +108,21 @@ export default async function Halaman({ params }: PageProps<'/[locale]'>) {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "Fire",
+    alternateName:
+      locale === "en"
+        ? "Forest and Land Fire Monitoring in Indonesia"
+        : "Pantauan Karhutla Indonesia",
     url: `${situs}/${locale}`,
     inLanguage: locale,
-    publisher: { "@type": "Organization", name: "Fire", url: situs },
+    publisher: {
+      "@type": "Organization",
+      name: "Fire",
+      url: situs,
+      logo: {
+        "@type": "ImageObject",
+        url: `${situs}/assets/img/og-fire.jpg`,
+      },
+    },
   };
 
   return (

@@ -30,6 +30,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // Lewati internal Next.js, rute tanpa-bahasa (admin/api/media), berkas
-  // statis, dan semua yang berekstensi (favicon.ico dsb.).
-  matcher: ["/((?!_next|admin|api|media|assets|.*\\..*).*)"],
+  // statis, dan semua yang berekstensi (favicon.ico, robots.txt, llms.txt dsb.).
+  matcher: ["/((?!_next|admin|api|media|assets|llms|robots|sitemap|.*\\..*).*)"],
 };

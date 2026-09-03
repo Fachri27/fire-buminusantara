@@ -44,13 +44,11 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
-  if (!adaBahasa(locale)) return {};
+  if (!adaBahasa(locale)) notFound();
 
   const [kejadian, seo] = await Promise.all([ambilBeritaSlug(slug), ambilRincianSeo(slug)]);
   if (!kejadian) {
-    return {
-      title: "Laporan Tidak Ditemukan — Fire",
-    };
+    notFound();
   }
 
   const { judul: judulSeo, deskripsi: deskripsiSeo } = teksSeo(seo, kejadian, locale);
@@ -102,21 +100,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: deskripsi,
       images: gambar ? [gambar] : [],
     },
+    other: {
+      "content-language": locale,
+    },
   };
 }
 
-async function IsiHalaman({ bahasa, slug }: { bahasa: Bahasa; slug: string }) {
+async function IsiHalaman({
+  bahasa,
+  slug,
+  kejadianAwal,
+}: {
+  bahasa: Bahasa;
+  slug: string;
+  kejadianAwal: NonNullable<Awaited<ReturnType<typeof ambilBeritaSlug>>>;
+}) {
   await connection();
-  const [berita, jumlahLaporan, tigaTeratas, kejadian, statistik, seo] = await Promise.all([
+  const [berita, jumlahLaporan, tigaTeratas, statistik, seo] = await Promise.all([
     ambilBerita(),
     hitungLaporanProvinsi(),
     ambilTigaTeratas(),
-    ambilBeritaSlug(slug),
     ambilStatistik(bahasa),
     ambilRincianSeo(slug),
   ]);
 
-  if (!kejadian) notFound();
+  const kejadian = kejadianAwal;
 
   // Pastikan kejadian selalu ada di daftar berita meskipun sudah lama (di luar top 10)
   const daftarBerita = berita.some((b) => b.id === kejadian.id)
@@ -154,9 +162,18 @@ async function IsiHalaman({ bahasa, slug }: { bahasa: Bahasa; slug: string }) {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: bahasa === "en" ? "Home" : "Beranda", item: `${DASAR_SITUS}/` },
-      { "@type": "ListItem", position: 2, name: "Fire", item: `${DASAR_SITUS}/${bahasa}` },
-      { "@type": "ListItem", position: 3, name: judulSeo, item: urlHalaman },
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: bahasa === "en" ? "Home" : "Beranda",
+        item: `${DASAR_SITUS}/${bahasa}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: judulSeo,
+        item: urlHalaman,
+      },
     ],
   };
 
@@ -178,14 +195,20 @@ async function IsiHalaman({ bahasa, slug }: { bahasa: Bahasa; slug: string }) {
 }
 
 export default async function HalamanKejadian({ params }: Props) {
+  await connection();
   const { locale, slug } = await params;
   if (!adaBahasa(locale)) notFound();
+
+  // Validasi slug sebelum memasuki Suspense boundary agar Next.js mengirimkan
+  // HTTP status 404 yang benar alih-alih HTTP 200 soft 404.
+  const kejadian = await ambilBeritaSlug(slug);
+  if (!kejadian) notFound();
 
   return (
     <>
       <Nav bahasa={locale as Bahasa} />
       <Suspense fallback={<KerangkaBeranda bahasa={locale as Bahasa} />}>
-        <IsiHalaman bahasa={locale as Bahasa} slug={slug} />
+        <IsiHalaman bahasa={locale as Bahasa} slug={slug} kejadianAwal={kejadian} />
       </Suspense>
     </>
   );

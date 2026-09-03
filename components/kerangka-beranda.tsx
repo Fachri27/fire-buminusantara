@@ -36,8 +36,11 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
                             flex-col justify-center overflow-hidden
                             px-[var(--pias)] pt-[calc(4rem+clamp(18px,5vw,56px))]
                             pb-[clamp(20px,5vw,56px)] pendek:static pendek:z-auto pendek:min-h-0">
-          <img src="/assets/img/bg-karhutla.jpg" alt="" fetchPriority="high"
-               className="absolute inset-0 h-full w-full object-cover" />
+          <picture className="absolute inset-0 h-full w-full">
+            <source srcSet="/assets/img/bg-karhutla.webp" type="image/webp" />
+            <img src="/assets/img/bg-karhutla.jpg" alt="" aria-hidden="true" fetchPriority="high"
+                 className="h-full w-full object-cover" />
+          </picture>
 
           <div className="kerangka-beranda__kanvas relative mx-auto w-full max-w-[940px]">
             {/* Rak: jendela + tiga slot dengan token kartu yang sama dengan

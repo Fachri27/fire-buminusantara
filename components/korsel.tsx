@@ -64,8 +64,11 @@ export function Korsel({
           Dulu di-oversize (tinggi 180%, top -40%) supaya bisa digeser tanpa
           menyingkap tepi. Karena sekarang tidak digeser sama sekali, ukuran
           lebihnya tidak ada gunanya lagi: cukup menutupi layar persis. */}
-      <img src="/assets/img/bg-karhutla.jpg" alt="" aria-hidden="true" fetchPriority="high"
-           className="absolute inset-0 h-full w-full object-cover" />
+      <picture className="absolute inset-0 h-full w-full">
+        <source srcSet="/assets/img/bg-karhutla.webp" type="image/webp" />
+        <img src="/assets/img/bg-karhutla.jpg" alt="" aria-hidden="true" fetchPriority="high"
+             className="h-full w-full object-cover" />
+      </picture>
 
       <div data-kanvas
            className="relative mx-auto w-full max-w-[940px]

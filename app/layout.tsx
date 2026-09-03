@@ -59,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             resize). Aliran tidak membaca --skala, jadi tak ada efeknya di
             sana. */}
         <script dangerouslySetInnerHTML={{ __html:
-          "(function(){function s(){try{document.documentElement.style.setProperty('--skala',Math.min(window.innerWidth/1920,window.innerHeight/1080))}catch(e){}}s();window.addEventListener('resize',s)})();"
+          "(function(){try{var p=window.location.pathname;if(p==='/en'||p.indexOf('/en/')===0){document.documentElement.lang='en'}}catch(e){}function s(){try{document.documentElement.style.setProperty('--skala',Math.min(window.innerWidth/1920,window.innerHeight/1080))}catch(e){}}s();window.addEventListener('resize',s)})();"
         }} />
         {/* CSS komponen ditulis tangan, di luar Tailwind: pop-up rincian,
             lencana video, angka peta, dan tepi lunak. Dimuat sebagai berkas
@@ -75,7 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
           <Script
             src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
-            strategy="beforeInteractive"
+            strategy="lazyOnload"
           />
         )}
         {/* Google Analytics sengaja TIDAK ditaruh di sini (RootLayout) supaya

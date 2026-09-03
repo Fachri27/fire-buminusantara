@@ -80,14 +80,27 @@ export function SliderKartu({
       )}
 
       {media.length > 1 && (
-        <div className="absolute bottom-2.5 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5">
+        <div className="absolute bottom-1.5 left-1/2 z-20 flex -translate-x-1/2 items-center">
           {media.map((_, i) => (
-            <button key={i} type="button" aria-label={`Media ${i + 1}`}
-                    aria-current={i === kini}
-                    onClick={(e) => { e.stopPropagation(); setIndeks(i); onGeser(); }}
-                    className={`h-2 w-2 rounded-full transition-all ${
-                      i === kini ? "scale-110 bg-white" : "bg-white/50 hover:bg-white/75"
-                    }`} />
+            <button
+              key={i}
+              type="button"
+              aria-label={`Media ${i + 1}`}
+              aria-current={i === kini}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIndeks(i);
+                onGeser();
+              }}
+              className="flex min-h-[28px] min-w-[28px] items-center justify-center p-1"
+            >
+              <span
+                aria-hidden="true"
+                className={`block h-2 w-2 rounded-full transition-all ${
+                  i === kini ? "scale-110 bg-white" : "bg-white/50 hover:bg-white/75"
+                }`}
+              />
+            </button>
           ))}
         </div>
       )}

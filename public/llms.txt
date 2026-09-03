@@ -1,0 +1,14 @@
+# Fire — Pantauan Karhutla Indonesia
+
+> Platform pemantauan dan pelaporan kebakaran hutan dan lahan (karhutla) di Indonesia secara real-time.
+
+## Halaman Utama
+
+- [Beranda (Bahasa Indonesia)](https://fire.nusantara.earth/id): Pantauan kebakaran hutan dan lahan di Indonesia, berita terkini, statistik harian, dan peta sebaran wilayah rawan.
+- [Home (English)](https://fire.nusantara.earth/en): Forest and land fire monitoring in Indonesia, latest news, daily statistics, and hotspot maps.
+- [Lapor Kejadian Karhutla](https://fire.nusantara.earth/id/lapor): Formulir pelaporan publik kebakaran hutan dan lahan.
+
+## Metadata & Sitemap
+
+- [Sitemap XML](https://fire.nusantara.earth/sitemap.xml): Peta situs XML berisi seluruh arsip kejadian karhutla dan halaman publik.
+- [Robots.txt](https://fire.nusantara.earth/robots.txt): Kebijakan perayapan mesin pencari.

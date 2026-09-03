@@ -25,6 +25,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // Halaman kiriman: tidak ada isi yang perlu diindeks, dan tautan ke form
     // terbuka di hasil pencarian hanya mengundang bot.
     robots: { index: false, follow: true },
+    alternates: {
+      canonical: `/${locale}/lapor`,
+      languages: {
+        id: "/id/lapor",
+        en: "/en/lapor",
+        "x-default": "/id/lapor",
+      },
+    },
+    other: {
+      "content-language": locale,
+    },
     // openGraph SENGAJA disetel di sini, bukan diwarisi dari root layout: tanpa
     // ini pratinjau bagikan halaman lapor memakai judul & deskripsi beranda
     // yang generik. Gambar tetap logo (og-fire.jpg) — halaman form tidak punya
