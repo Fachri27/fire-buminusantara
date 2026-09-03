@@ -20,6 +20,8 @@ export function Nav({ bahasa }: Props) {
   const teks = TEKS_NAV[bahasa];
   const [aktif, setAktif] = useState<string>(BAGIAN[0]);
   const [tergulir, setTergulir] = useState(false);
+  /** Menu hamburger di layar kecil — tautan bagian pindah ke sini. */
+  const [menuTerbuka, setMenuTerbuka] = useState(false);
   const lokasi = usePathname();
 
   // Sinkronisasi <html lang> dengan bahasa aktif
@@ -53,6 +55,23 @@ export function Nav({ bahasa }: Props) {
       window.removeEventListener("resize", perbarui);
     };
   }, []);
+
+  // Menu ponsel ditutup lewat Escape, dan tak perlu tersisa terbuka saat
+  // layar membesar ke breakpoint tempat nav inline kembali tampil.
+  useEffect(() => {
+    const lepas = () => setMenuTerbuka(false);
+    window.addEventListener("resize", lepas);
+    return () => window.removeEventListener("resize", lepas);
+  }, []);
+
+  useEffect(() => {
+    if (!menuTerbuka) return;
+    const tombol = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuTerbuka(false);
+    };
+    window.addEventListener("keydown", tombol);
+    return () => window.removeEventListener("keydown", tombol);
+  }, [menuTerbuka]);
 
   /** Tukar prefiks bahasa pada URL */
   const tautanBahasa = useCallback(
@@ -96,21 +115,22 @@ export function Nav({ bahasa }: Props) {
       }`}
     >
       <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-[var(--pias)]">
-        {/* Logo + wordmark — tautan ke beranda dalam bahasa aktif. Ikon sendirian
-            terlihat kecil & sepi di kiri; dipasangkan teks "Fire" jadi kesatuan
-            merek yang mengisi ruang. */}
+        {/* Logo + wordmark — tautan ke beranda dalam bahasa aktif, di pojok
+            kiri bilah. Ikon sendirian terlihat kecil & sepi; dipasangkan teks
+            "Fire" jadi kesatuan merek yang mengisi ruang. Di ponsel "Lapor"
+            pindah ke cluster kanan supaya logo ini punya tempat. */}
         <a href={`/${bahasa}`} aria-label="Fire — beranda"
            className="flex shrink-0 items-center gap-2">
           <img src="/assets/img/logo-fire.png" alt="" aria-hidden="true"
-               width={95} height={160} className="h-11 w-auto" />
-          <span className="text-[22px] font-bold leading-none tracking-tight text-tinta">
+               width={95} height={160} className="h-9 w-auto sm:h-11" />
+          <span className="text-[16px] font-bold leading-none tracking-tight text-tinta sm:text-[22px]">
             Fire
           </span>
         </a>
 
         {/* Menu Navigasi & Penukar Bahasa */}
         <div className="flex items-center gap-4 sm:gap-7">
-          <nav aria-label={teks.navigasi} className="flex items-center gap-1 sm:gap-2">
+          <nav aria-label={teks.navigasi} className="hidden sm:flex items-center gap-1 sm:gap-2">
             {BAGIAN.map((id) => {
               const sedang = aktif === id;
               return (
@@ -137,8 +157,9 @@ export function Nav({ bahasa }: Props) {
             })}
           </nav>
 
-          {/* Jalan masuk ke form laporan warga. Tautan sungguhan, bukan jangkar
-              gulir seperti dua tombol di sebelahnya — halamannya lain. */}
+          {/* Jalan masuk ke form laporan warga — di cluster kanan untuk semua
+              ukuran layar (logo memakai pojok kiri). Tautan sungguhan, bukan
+              jangkar gulir seperti dua tombol di sebelahnya. */}
           <a
             href={`/${bahasa}/lapor`}
             className="rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
@@ -147,7 +168,7 @@ export function Nav({ bahasa }: Props) {
           </a>
 
           {/* Garis Pemisah Tipis */}
-          <div className="h-4 w-[1px] bg-black/10" aria-hidden="true" />
+          <div className="hidden h-4 w-[1px] bg-black/10 sm:block" aria-hidden="true" />
 
           {/* Penukar Bahasa Minimalis */}
           <div
@@ -177,8 +198,61 @@ export function Nav({ bahasa }: Props) {
               );
             })}
           </div>
+
+          {/* Hamburger di pojok kanan — hanya layar kecil, karena nav inline
+              disembunyikan di bawah `sm`: dua tautan bagian pindah ke panel
+              dropdown. */}
+          <button
+            type="button"
+            onClick={() => setMenuTerbuka((b) => !b)}
+            aria-expanded={menuTerbuka}
+            aria-controls="menu-ponsel"
+            aria-label={menuTerbuka ? teks.tutupNavigasi : teks.bukaNavigasi}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta sm:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+          >
+            {/* Garis-garisnya menukar bentuk jadi tanda silang saat terbuka. */}
+            <span aria-hidden="true" className="relative block h-[14px] w-[18px]">
+              <span className={`absolute left-0 top-0 h-[2px] w-full rounded-full bg-current transition-transform duration-200 ${menuTerbuka ? "translate-y-[6px] rotate-45" : ""}`} />
+              <span className={`absolute left-0 top-[6px] h-[2px] w-full rounded-full bg-current transition-opacity duration-200 ${menuTerbuka ? "opacity-0" : ""}`} />
+              <span className={`absolute bottom-0 left-0 h-[2px] w-full rounded-full bg-current transition-transform duration-200 ${menuTerbuka ? "-translate-y-[6px] -rotate-45" : ""}`} />
+            </span>
+          </button>
         </div>
       </div>
+
+      {/* Panel menu ponsel — menggantung dari bilah, hanya di bawah `sm`.
+          Tautannya menutup menu dulu baru menggulir, supaya panel tidak
+          menutupi bagian tujuan saat gulirnya selesai. */}
+      {menuTerbuka && (
+        <nav
+          id="menu-ponsel"
+          aria-label={teks.navigasi}
+          className="sm:hidden absolute top-full left-0 w-full border-b border-black/[0.08] bg-white/95 backdrop-blur-md shadow-[0_8px_20px_-8px_rgba(0,0,0,0.12)]"
+        >
+          <ul className="flex flex-col px-[var(--pias)] py-2">
+            {BAGIAN.map((id) => {
+              const sedang = aktif === id;
+              return (
+                <li key={id}>
+                  <a
+                    href={`#${id}`}
+                    onClick={(e) => {
+                      setMenuTerbuka(false);
+                      keBagian(e, id);
+                    }}
+                    aria-current={sedang ? "page" : undefined}
+                    className={`block rounded-lg px-3 py-3 text-sm font-semibold tracking-wide uppercase transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api ${
+                      sedang ? "text-api" : "text-tinta/70 hover:bg-black/[0.04] hover:text-tinta"
+                    }`}
+                  >
+                    {teks.bagian[id]}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      )}
     </header>
   );
 }

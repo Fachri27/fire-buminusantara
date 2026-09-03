@@ -564,6 +564,89 @@
   padding: 14px 22px;
 }
 
+/* --- Pemicu & sheet komentar (ponsel) --------------------------------------
+   Di layar kecil formulir lengkap tidak muat di dasar rel. Baris pemicu
+   meniru penampilan baris ketik; menekannya membuka sheet formulir penuh.
+   Kelas .rincian__kirim tetap dipakai supaya aturan sticky-dasar rel dari
+   media query ponsel berlaku juga pada pemicunya. */
+.rincian__pemicu {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  cursor: pointer;
+  border: 0;
+  background: var(--r-rel);
+  color: var(--r-redup);
+  font: inherit;
+  text-align: left;
+}
+
+.rincian__pemicu-teks {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--r-sorot);
+  font-size: 14px;
+  color: var(--r-redup);
+}
+
+.rincian__sheet {
+  /* Satu tingkat di atas pop-up rincian (z-46) dan dialog petanya. */
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.55);
+}
+
+.rincian__sheet-panel {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85svh;
+  overflow-y: auto;
+  padding: 14px 20px calc(16px + env(safe-area-inset-bottom));
+  border-radius: 14px 14px 0 0;
+  background: var(--r-rel);
+  box-shadow: 0 -12px 40px -12px rgb(0 0 0 / 0.45);
+}
+
+.rincian__sheet-kepala {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rincian__sheet-judul {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--r-teks);
+}
+
+.rincian__sheet-tutup {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  cursor: pointer;
+  border: 0;
+  border-radius: 999px;
+  background: var(--r-sorot);
+  color: var(--r-teks);
+}
+
+.rincian__sheet-tutup svg {
+  width: 13px;
+  height: auto;
+}
+
+/* Widget Turnstile hanya wadah token — di sheet ia dipasang ulang setiap
+   kali terbuka; kotaknya sendiri interaction-only (nyaris tak terlihat). */
+
 /* Widget Turnstile: dibatasi lebar rel supaya tidak mendorong kolom ketik. */
 .rincian__captcha {
   overflow: hidden;
@@ -626,6 +709,24 @@
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* Di dalam SHEET komentar (ponsel) textarea-nya rows=3 sehingga kotaknya
+   tinggi; dengan align-items:center avatar & tombol "Kirim" melayang ke tengah
+   kotak sementara placeholder ada di atas — terlihat tak rata ("ga enak
+   dilihat"). Sejajarkan ke ATAS, setinggi baris pertama textarea. Hanya di
+   sheet — form desktop (textarea satu baris) tetap center seperti semula. */
+.rincian__sheet-panel .rincian__baris {
+  align-items: flex-start;
+  /* Beri sedikit ruang di atas supaya baris tak mepet dengan tepi/isian di
+     atasnya. */
+  margin-top: 10px;
+}
+.rincian__sheet-panel .rincian__baris > .rincian__inisial--kecil {
+  margin-top: 4px;
+}
+.rincian__sheet-panel .rincian__baris > .rincian__tombol-kirim {
+  margin-top: 8px;
 }
 
 .rincian__jebakan {
@@ -698,7 +799,11 @@
   font-size: 11px;
 }
 
-/* --- Tombol tutup -------------------------------------------------------- */
+/* --- Tombol tutup --------------------------------------------------------
+   Pil kaca gelap dengan ikon putih — sama perlakuannya dengan kapsul kredit
+   di bawah. Tombol-tombol ini menggantung di atas media yang bisa gelap
+   (alas hitam) ATAU terang (foto putih, rel putih di desktop), jadi warnanya
+   tidak boleh bergantung pada apa yang ada di belakangnya. */
 .rincian__tutup {
   position: absolute;
   top: 12px;
@@ -709,19 +814,23 @@
   height: 30px;
   cursor: pointer;
   place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.14);
   border-radius: 999px;
-  background: transparent;
-  color: var(--r-teks);
+  background: rgb(0 0 0 / 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: rgb(255 255 255 / 0.95);
   transition: background-color 0.2s ease;
 }
 
 .rincian__tutup:hover {
-  background: var(--r-sorot);
+  background: rgb(0 0 0 / 0.75);
 }
 
 .rincian__tutup svg {
   width: 15px;
   height: auto;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4));
 }
 
 /* --- Tombol bagikan -------------------------------------------------------
@@ -736,19 +845,23 @@
   height: 30px;
   cursor: pointer;
   place-items: center;
+  border: 1px solid rgb(255 255 255 / 0.14);
   border-radius: 999px;
-  background: transparent;
-  color: var(--r-teks);
+  background: rgb(0 0 0 / 0.5);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: rgb(255 255 255 / 0.95);
   transition: background-color 0.2s ease;
 }
 
 .rincian__bagikan:hover {
-  background: var(--r-sorot);
+  background: rgb(0 0 0 / 0.75);
 }
 
 .rincian__bagikan svg {
   width: 15px;
   height: auto;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4));
 }
 
 .rincian__bagikan:focus-visible {
@@ -801,6 +914,49 @@
   .rincian__media img,
   .rincian__media video {
     max-height: 40svh;
+  }
+
+  /* Ponsel: media terpaku di atas, REL (bagian putih) yang menggulir
+     seluruh isinya — kapsi, daftar komentar, sampai kolom kirim. Sebelumnya
+     hanya .rincian__badan yang bergulir; kolom kirim yang tinggi (isian
+     identitas, captcha, tombol) memakan ruang tetap sehingga sisa area
+     bergulir bisa nyaris nol dan komentar di bawah tak terjangkau. */
+  .rincian__rel {
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Geseran di rel tidak meneruskan gulir ke halaman di belakangnya. */
+    overscroll-behavior: contain;
+  }
+
+  /* Badan kehilangan gulirnya sendiri: ia ikut mengalir utuh di dalam rel
+     yang bergulir. Tanpa ini flex-shrink bawaannya mengecilkannya lagi
+     mengikuti kolom kirim — kembali ke masalah awal. */
+  .rincian__badan {
+    flex: none;
+    overflow: visible;
+  }
+
+  /* Kepala dan kolom ketik ikut mengalir di dalam rel yang bergulir, tapi
+     tetap terlihat: menempel di tepi atas/bawah selama menggulir. */
+  .rincian__kepala {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--r-rel);
+  }
+
+  .rincian__kirim {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    /* Dorong ke DASAR rel saat komentarnya sedikit/tak ada: di flex-column
+       yang mengisi tinggi kartu, margin-top:auto menyerap ruang kosong di
+       atasnya sehingga kolom komentar selalu menempel di bawah. Saat komentar
+       banyak (rel bergulir) tak ada ruang kosong → auto=0, dan sticky bottom
+       tetap membuatnya terlihat. */
+    margin-top: auto;
+    background: var(--r-rel);
   }
 }
 

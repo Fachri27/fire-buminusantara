@@ -478,6 +478,38 @@ export async function GET(req: NextRequest) {
           opacity: 1 !important;
         }
 
+        /* E2. Mobile: tampilkan logo Copernicus & Windy seperti versi desktop,
+           hanya diperkecil dan dirapatkan supaya MUAT di layar sempit dan tak
+           terpotong. Susunan sama seperti desktop: kompas di paling kiri, lalu
+           Copernicus, lalu Windy tepat di sebelahnya. Nilai piksel disetel agar
+           ketiganya berjajar tanpa saling menimpa pada lebar ~360-390px. */
+        @media (max-width: 640px) {
+          /* Di mobile bilah legenda AQI melebar PENUH di dasar peta, jadi logo
+             di bottom:8 tertutup olehnya (kadang tampak hilang). Angkat logo ke
+             ATAS legenda (bottom ~48px) dan naikkan z-index-nya supaya selalu
+             terlihat. Kompas ada di kiri-bawah, jadi logo ditaruh mulai dari
+             kanan kompas. */
+          .rhpane__bottom-messages {
+            left: 58px !important;      /* setelah kompas (~kiri 8px, lebar ~44px) */
+            bottom: 48px !important;    /* di ATAS bilah legenda */
+            width: 140px !important;
+            z-index: 1002 !important;
+          }
+          .rhpane__bottom-messages img,
+          img[src*="copernicus"] {
+            width: 140px !important;
+            max-width: 140px !important;
+          }
+          #logo {
+            left: 202px !important;     /* tepat setelah Copernicus */
+            right: auto !important;
+            bottom: 48px !important;
+            transform: scale(0.6) !important;
+            transform-origin: left bottom !important;
+            z-index: 1002 !important;
+          }
+        }
+
         #contrib {
           display: none !important;
         }
@@ -976,6 +1008,44 @@ export async function GET(req: NextRequest) {
             });
 
             mapInitialized = true;
+
+            // Windy menyembunyikan #logo & .rhpane__bottom-messages sendiri saat
+            // peta di-interact atau panel rhbottom aktif — di ponsel logo
+            // "muncul sebentar lalu hilang". Re-terapkan visibilitasnya secara
+            // berkala: ringan (setiap 600 ms), menimpa properti inline Windy,
+            // dan tidak mengubah perilaku peta lain.
+            setInterval(function() {
+              var el = document.getElementById('logo');
+              if (el) {
+                el.style.display = 'flex';
+                el.style.visibility = 'visible';
+                el.style.opacity = '1';
+              }
+              var wsp = document.querySelector('.rhpane__bottom-messages');
+              if (wsp) {
+                wsp.style.display = 'flex';
+                wsp.style.visibility = 'visible';
+                wsp.style.opacity = '1';
+              }
+              // Logo Copernicus: img src bernama copernicus, mungkin DI LUAR
+              // .rhpane__bottom-messages. Paksa tampil, lalu naik ke atas
+              // sampai ke tengah layar untuk melepas display:none pada rantai
+              // induk (Windy menutup elemen bawah saat peta di-interact).
+              var ci = document.querySelector('img[src*="copernicus"]');
+              if (ci) {
+                ci.style.display = 'block';
+                ci.style.opacity = '1';
+                var c = ci;
+                for (var k = 0; k < 8 && c && c !== document.body; k++) {
+                  if (c.parentElement) c = c.parentElement; else break;
+                  if (c.style && (c.style.display === 'none' || c.style.visibility === 'hidden' || c.style.opacity === '0')) {
+                    c.style.display = 'block';
+                    c.style.visibility = 'visible';
+                    c.style.opacity = '1';
+                  }
+                }
+              }
+            }, 600);
 
             // Beri tahu parent bahwa map forecasting sudah siap
             if (window.parent) {

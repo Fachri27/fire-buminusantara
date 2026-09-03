@@ -165,7 +165,7 @@ function Rincian({
     isi, setIsi, website, setWebsite,
     balasKe, balasNama, batalBalas, mulaiBalas,
     tampilkanBalasan, alihkanBalasan, sebutanDari, isiTanpaSebutan,
-    kirim, ketikRef, captchaRef,
+    kirim, ketikRef, captchaRef, pasangCaptcha,
   } = gunakanKomentar(berita.id);
 
   // Bersihkan timeout saat komponen dibongkar
@@ -298,13 +298,14 @@ function Rincian({
           </div>
 
           <FormulirKomentar
-            mengirim={mengirim} nama={nama} setNama={setNama}
+            mengirim={mengirim} galat={galat} nama={nama} setNama={setNama}
             email={email} setEmail={setEmail}
             anonim={anonim} setAnonim={setAnonim}
             isi={isi} setIsi={setIsi}
             website={website} setWebsite={setWebsite}
             balasKe={balasKe} balasNama={balasNama} batalBalas={batalBalas}
             kirim={kirim} ketikRef={ketikRef} captchaRef={captchaRef}
+            pasangCaptcha={pasangCaptcha}
           />
         </div>
 

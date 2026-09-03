@@ -22,6 +22,8 @@ export const TEKS_NAV = {
     } as Record<string, string>,
     ganti: "Ganti bahasa",
     lapor: "Lapor",
+    bukaNavigasi: "Buka menu",
+    tutupNavigasi: "Tutup menu",
   },
   en: {
     navigasi: "Main navigation",
@@ -32,6 +34,8 @@ export const TEKS_NAV = {
     } as Record<string, string>,
     ganti: "Switch language",
     lapor: "Report",
+    bukaNavigasi: "Open menu",
+    tutupNavigasi: "Close menu",
   },
 } as const satisfies Record<Bahasa, unknown>;
 
