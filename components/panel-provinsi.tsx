@@ -25,6 +25,10 @@ type Props = {
 export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
   const [cari, setCari] = useState("");
   const [siluet, setSiluet] = useState<Record<string, Jalur>>({});
+  // Di mobile panel ini melayang di atas peta; dulu selalu terbuka dan menutupi
+  // peta. Sekarang tertutup secara bawaan — hanya sebuah tombol di sisi kanan —
+  // dan isinya (pencarian + tiga teratas) baru muncul saat tombolnya diketuk.
+  const [terbuka, setTerbuka] = useState(false);
 
   /* Siluet dibangun dari berkas yang sama dengan peta, jadi kunjungan kedua
      mengambilnya dari cache peramban. Gagal memuat bukan alasan menyembunyikan
@@ -65,8 +69,50 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
     });
   };
 
+  // Tertutup: hanya tombol di kanan, peta tak terhalang.
+  if (!terbuka) {
+    return (
+      <div className="flex justify-start md:hidden panggung:hidden">
+        <button
+          type="button"
+          onClick={() => setTerbuka(true)}
+          aria-expanded="false"
+          className="pointer-events-auto flex items-center gap-2 rounded-full bg-api
+                     px-[clamp(14px,4vw,18px)] py-[clamp(9px,2.6vw,12px)]
+                     text-[length:var(--ukuran-catatan)] font-semibold tracking-wide uppercase text-white
+                     shadow-[0_4px_16px_rgb(0_0_0/0.28)] transition-transform active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
+               strokeLinecap="round" className="size-[clamp(16px,4.6vw,20px)]">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.6-3.6" />
+          </svg>
+          Cari provinsi
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="relative mx-auto w-full max-w-[940px] md:hidden panggung:hidden">
+      {/* Tombol tutup — mengembalikan peta yang tak terhalang. */}
+      <div className="mb-[clamp(8px,2.4vw,12px)] flex justify-end">
+        <button
+          type="button"
+          onClick={() => { setTerbuka(false); setCari(""); }}
+          aria-label="Tutup panel provinsi"
+          className="flex items-center gap-1.5 rounded-full bg-white/95 px-[clamp(12px,3.4vw,16px)]
+                     py-[clamp(7px,2vw,10px)] text-[length:var(--ukuran-catatan)] font-semibold text-tinta
+                     shadow-[0_3px_14px_rgb(0_0_0/0.22)] transition-transform active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
+               strokeLinecap="round" className="size-[clamp(15px,4.2vw,18px)]">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+          Tutup
+        </button>
+      </div>
+
       <div className="relative z-[6]">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
              strokeLinecap="round"
