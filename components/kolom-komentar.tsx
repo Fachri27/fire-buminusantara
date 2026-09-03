@@ -166,10 +166,14 @@ export function FormulirKomentar({
     kirimSebelumnya.current = mengirim;
   }, [mengirim, isi]);
 
-  // Wadah captcha ikut sheet yang di-mount/unmount — pasang ulang widgetnya
-  // setiap sheet terbuka (pemasangan membuang widget lama lebih dulu).
+  // Pasang widget Turnstile saat WADAHNYA ada: di desktop form tampil inline
+  // sehingga wadah captcha selalu ada; di ponsel wadahnya baru ada saat sheet
+  // terbuka. Sebelumnya hanya (ponsel && sheet), jadi di DESKTOP widget tak
+  // pernah ter-render → token captcha selalu kosong → "Verifikasi captcha
+  // gagal". (Pemasangan membuang widget lama lebih dulu, jadi aman dipanggil
+  // ulang.)
   useEffect(() => {
-    if (ponsel && sheet) pasangCaptcha();
+    if (!ponsel || sheet) pasangCaptcha();
   }, [ponsel, sheet, pasangCaptcha]);
 
   // Fokus ke kotak ketik begitu sheet terbuka.
