@@ -95,6 +95,65 @@ export async function GET(req: NextRequest) {
             });
           } catch(e) {}
 
+          // 0b. Bungkam telemetri/analitik Windy (node.windy.com/.../ga/…).
+          // Beacon ini diblokir ad-blocker peramban lalu reject tanpa ditangani,
+          // membanjiri console dengan "ERR_BLOCKED_BY_CLIENT" + "Uncaught (in
+          // promise) Failed to fetch". Kita cegat SEBELUM ke jaringan dan balas
+          // respons kosong-sukses: tak ada request nyata, tak ada promise yang
+          // menolak. HANYA endpoint analitik (/ga/) yang disasar — data cuaca,
+          // tile peta, dan WebSocket-nya tak tersentuh.
+          var _windyTelemetri = function(u) {
+            try { u = String(u); } catch(e) { return false; }
+            return u.indexOf('node.windy.com') !== -1 && u.indexOf('/ga/') !== -1;
+          };
+          try {
+            var _fetchAsli = window.fetch;
+            window.fetch = function(input, init) {
+              var url = (input && typeof input === 'object' && input.url) ? input.url : input;
+              if (_windyTelemetri(url)) {
+                return Promise.resolve(new Response(null, { status: 200, statusText: 'OK' }));
+              }
+              return _fetchAsli.apply(this, arguments);
+            };
+          } catch(e) {}
+          try {
+            var _xhrOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function(method, url) {
+              this.__windyTelemetri = _windyTelemetri(url);
+              return _xhrOpen.apply(this, arguments);
+            };
+            var _xhrSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.send = function() {
+              if (this.__windyTelemetri) {
+                var diri = this;
+                setTimeout(function() {
+                  try { if (typeof diri.onreadystatechange === 'function') diri.onreadystatechange(); } catch(e) {}
+                  try { diri.dispatchEvent(new Event('load')); } catch(e) {}
+                  try { diri.dispatchEvent(new Event('loadend')); } catch(e) {}
+                }, 0);
+                return;
+              }
+              return _xhrSend.apply(this, arguments);
+            };
+          } catch(e) {}
+          try {
+            if (navigator.sendBeacon) {
+              var _beaconAsli = navigator.sendBeacon.bind(navigator);
+              navigator.sendBeacon = function(url, data) {
+                if (_windyTelemetri(url)) return true;
+                return _beaconAsli(url, data);
+              };
+            }
+          } catch(e) {}
+          // Jaring pengaman: telan sisa rejection "Failed to fetch" di dalam
+          // iframe peta (konteks ini hanya Windy + skrip peta kita).
+          window.addEventListener('unhandledrejection', function(ev) {
+            try {
+              var m = ev && ev.reason && (ev.reason.message || String(ev.reason));
+              if (m && m.indexOf('Failed to fetch') !== -1) { ev.preventDefault(); }
+            } catch(e) {}
+          });
+
           // A. Wrap history methods to prevent cross-origin SecurityError caused by <base href>
           var _origReplace = window.history.replaceState;
           window.history.replaceState = function(state, title, url) {
@@ -272,6 +331,60 @@ export async function GET(req: NextRequest) {
           max-width: 0 !important;
           max-height: 0 !important;
           overflow: hidden !important;
+        }
+
+        /* A2. Elemen KHUSUS MOBILE Windy — hilangkan semuanya:
+           - "Unduh Aplikasi" (#open-in-app, data-t=MENU_MOBILE)
+           - hamburger merah kanan-bawah + toolbar kanan (home/cari/pin/favorit)
+           Sebagian dibuat runtime saat Windy mendeteksi perangkat mobile, jadi
+           daftar selectornya dibuat menyeluruh. Legenda AQI (#plugin-rhbottom)
+           dan logo tetap ditampilkan oleh aturan di bawah. */
+        #open-in-app,
+        [data-ref="openInApp"],
+        [data-t="MENU_MOBILE"],
+        #mobile-ovr-select,
+        .mobile-ovr-select,
+        [data-ref="mobileOvrSelect"],
+        #mobile-calendar,
+        #plugin-mobile-calendar,
+        #mobile-menu,
+        .mobile-menu,
+        [data-plugin="mobile-menu"],
+        #hamburger,
+        .hamburger,
+        [data-ref="hamburger"],
+        .rhitem__hamburger,
+        /* Toolbar TOUCH/TABLET Windy — plugin "mobile-ui" (lazy-load, muncul saat
+           Windy mendeteksi perangkat sentuh: home/cari/pin/favorit + hamburger
+           merah bulat). Elemen ini BUKAN .rhitem, jadi harus disasar sendiri;
+           #plugin-mobile-ui adalah kontainer pluginnya — menyembunyikannya
+           menghapus seluruh toolbar sekaligus. Selector diverifikasi dari
+           mobile-ui.js Windy v51.1.2. */
+        #plugin-mobile-ui,
+        .mobile-ui,
+        .mobile-ui__icon,
+        .mobile-ui__hamburger-icon,
+        .mobile-ui__avatar,
+        /* Semua tombol toolbar Windy (home / cari / pin / favorit / menu). Di
+           mobile mereka dipindah keluar dari .rhpane__top-icons (yang sudah
+           disembunyikan), jadi disasar langsung. Legenda AQI & logo BUKAN
+           .rhitem, jadi tetap tampil. */
+        .rhitem,
+        [class*="rhitem--"],
+        .rhpane__top-icons,
+        .rhpane__overlays,
+        .rhpane--mobile,
+        .mobile-rhpane,
+        .mobile-toolbar,
+        #mobile-toolbar,
+        .mobile-rh-tools,
+        #plugin-picker-mobile {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          width: 0 !important;
+          height: 0 !important;
         }
 
         /* B. Transparent rhpane container */
