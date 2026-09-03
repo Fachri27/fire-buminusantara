@@ -177,11 +177,6 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
                           className="flex w-full items-center gap-[clamp(10px,3vw,18px)] rounded-[10px] bg-white
                                      p-[clamp(12px,3.6vw,18px)] text-left shadow-[0_4px_18px_rgb(0_0_0/0.16)]
                                      transition hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgb(0_0_0/0.22)]">
-                    <span aria-hidden="true"
-                          className="w-[clamp(14px,4.4vw,24px)] shrink-0 text-center
-                                     text-[length:var(--ukuran-nilai)] leading-[1] font-bold text-black/20">
-                      {p.peringkat}
-                    </span>
                     <Siluet jalur={siluet[nama]}
                             className="h-[clamp(44px,13vw,70px)] w-[clamp(52px,16vw,88px)] shrink-0" />
                     <span className="min-w-0 flex-1">
