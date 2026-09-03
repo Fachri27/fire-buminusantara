@@ -83,13 +83,45 @@ function keBerita(e: Baris): Berita {
 }
 
 /** Sepuluh kejadian terbaru untuk korsel dan pop-up peta. */
+/**
+ * Kejadian untuk korsel beranda, urutan CAMPURAN "terbaru + komentar terbanyak":
+ * kartu pertama (yang disorot di TENGAH korsel) adalah kejadian PALING BARU,
+ * lalu sisanya diurut dari yang KOMENTARNYA PALING BANYAK (seri → yang lebih
+ * baru dulu). Jadi pengunjung langsung melihat laporan terbaru, sekaligus
+ * laporan-laporan yang paling ramai dibahas.
+ */
 export async function ambilBerita(limit = 10): Promise<Berita[]> {
-  const baris = await prisma.events.findMany({
-    orderBy: { event_date: "desc" },
-    take: limit,
-    select: PILIH,
+  const [semua, hitung] = await Promise.all([
+    // event_date bisa seri (beberapa laporan setanggal) — id menaik dipakai
+    // pemecah seri supaya "paling baru" benar-benar yang terakhir dibuat.
+    prisma.events.findMany({ orderBy: [{ event_date: "desc" }, { id: "desc" }], select: PILIH }),
+    // Komentar bersifat polimorfik (commentable_type/_id ala Laravel), bukan
+    // relasi Prisma — jadi jumlahnya dihitung terpisah lewat groupBy.
+    prisma.comments.groupBy({
+      by: ["commentable_id"],
+      where: { commentable_type: "App\\Models\\Event", is_approved: true, commentable_id: { not: null } },
+      _count: true,
+    }),
+  ]);
+
+  const jumlahKomentar = new Map<number, number>();
+  for (const h of hitung) {
+    if (h.commentable_id != null) jumlahKomentar.set(Number(h.commentable_id), h._count);
+  }
+  const komentar = (b: (typeof semua)[number]) => jumlahKomentar.get(Number(b.id)) ?? 0;
+
+  // semua sudah desc menurut tanggal → elemen [0] adalah yang terbaru.
+  const [terbaru, ...sisa] = semua;
+  sisa.sort((a, b) => {
+    const beda = komentar(b) - komentar(a); // komentar terbanyak dulu
+    if (beda !== 0) return beda;
+    const bedaTgl = b.event_date.getTime() - a.event_date.getTime(); // seri → terbaru dulu
+    if (bedaTgl !== 0) return bedaTgl;
+    return Number(b.id) - Number(a.id);
   });
-  return baris.map((b) => keBerita(b as Baris));
+
+  const urut = terbaru ? [terbaru, ...sisa] : sisa;
+  return urut.slice(0, limit).map((b) => keBerita(b as Baris));
 }
 
 /** Satu kejadian lewat permalink /fire/<slug>. */
