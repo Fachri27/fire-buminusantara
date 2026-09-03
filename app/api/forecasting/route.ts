@@ -462,13 +462,20 @@ export async function GET(req: NextRequest) {
           align-items: center !important;
           pointer-events: auto !important;
           transform: none !important;
-          width: 260px !important;
+          width: 115px !important;
+          height: auto !important;
+        }
+
+        .rhpane__bottom-messages a {
+          height: auto !important;
+          display: flex !important;
+          align-items: center !important;
         }
 
         .rhpane__bottom-messages img,
         img[src*="copernicus"] {
-          width: 260px !important;
-          max-width: 260px !important;
+          width: 115px !important;
+          max-width: 115px !important;
           height: auto !important;
           display: block !important;
           filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.8)) !important;
@@ -502,7 +509,7 @@ export async function GET(req: NextRequest) {
           top: auto !important;
           right: auto !important;
           bottom: 16px !important;
-          left: 296px !important;
+          left: 151px !important;
           z-index: 1000 !important;
           transform: scale(0.8) !important;
           transform-origin: bottom left !important;
