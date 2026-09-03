@@ -71,12 +71,16 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const berkasRef = useRef<HTMLInputElement | null>(null);
   const captchaRef = useRef<HTMLDivElement | null>(null);
   const widgetRef = useRef<number | null>(null);
-  // Semua URL objek yang pernah dibuat, dilepas sekaligus saat komponen
-  // diturunkan — mengosongkan form oleh React tidak mencabut berkasnya.
+  const sedangKirimRef = useRef(false);
+  const lokasiAktifRef = useRef(true);
+  // Semua URL objek yang pernah dibuat, dilepas saat komponen diturunkan
+  // atau saat laporan sukses terkirim.
   const urlRef = useRef<string[]>([]);
 
   useEffect(() => {
+    lokasiAktifRef.current = true;
     return () => {
+      lokasiAktifRef.current = false;
       for (const url of urlRef.current) URL.revokeObjectURL(url);
       urlRef.current = [];
     };
@@ -85,24 +89,36 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const berhasil = keadaan?.ok === true;
   const totalByte = berkas.reduce((n, b) => n + b.size, 0);
 
-  /**
-   * Daftar berkas dipegang React, tapi yang dikirim tetap `input.files` —
-   * form ini menyerahkan FormData bawaan, jadi berkasnya berpindah ke server
-   * tanpa pernah dibaca ulang di klien. Sinkronisasinya lewat DataTransfer,
-   * satu-satunya cara menulis balik ke sebuah <input type="file">.
-   *
-   * `keadaan` ikut jadi kebergantungan: pengosongan form oleh React juga
-   * mengosongkan input berkas, sementara daftar di bawah masih menyebut
-   * nama-nama itu. Tanpa penyusunan ulang di sini, percobaan kirim berikutnya
-   * berangkat TANPA lampiran yang jelas-jelas masih tertulis di layar.
-   */
-  useEffect(() => {
+  const sinkronkanKeInput = useCallback((daftar: File[]) => {
     const input = berkasRef.current;
     if (!input) return;
-    const dt = new DataTransfer();
-    for (const b of berkas) dt.items.add(b);
-    input.files = dt.files;
-  }, [berkas, keadaan]);
+    try {
+      if (typeof DataTransfer !== "undefined") {
+        const dt = new DataTransfer();
+        for (const b of daftar) dt.items.add(b);
+        input.files = dt.files;
+      }
+    } catch {
+      /* peramban tanpa dukungan DataTransfer */
+    }
+  }, []);
+
+  /**
+   * Sinkronisasi berkas React state ke input DOM native.
+   */
+  useEffect(() => {
+    sinkronkanKeInput(berkas);
+  }, [berkas, keadaan, sinkronkanKeInput]);
+
+  // Lepas kunci kirim dan bersihkan blob URL segera setelah status sukses
+  useEffect(() => {
+    sedangKirimRef.current = false;
+    if (keadaan?.ok) {
+      for (const url of urlRef.current) URL.revokeObjectURL(url);
+      urlRef.current = [];
+      setPratinjau({});
+    }
+  }, [keadaan]);
 
   const ulangCaptcha = useCallback(() => {
     setCaptchaToken("");
@@ -237,6 +253,8 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     }
 
     setBerkas(gabungan);
+    sinkronkanKeInput(gabungan);
+    if (berkasRef.current) berkasRef.current.value = "";
   }
 
   function hapusBerkasDipilih(kunci: string, url: string | undefined) {
@@ -249,7 +267,9 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
       delete sisa[kunci];
       return sisa;
     });
-    setBerkas((d) => d.filter((x) => kunciBerkas(x) !== kunci));
+    const sisaBerkas = berkas.filter((x) => kunciBerkas(x) !== kunci);
+    setBerkas(sisaBerkas);
+    sinkronkanKeInput(sisaBerkas);
   }
 
   function lokasiSaya() {
@@ -261,6 +281,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     setGalatKlien("");
     navigator.geolocation.getCurrentPosition(
       (posisi) => {
+        if (!lokasiAktifRef.current) return;
         setMencariLokasi(false);
         // Tujuh angka di belakang koma, sama dengan DECIMAL(10,7) di kolomnya —
         // lebih dari itu hanya akan dipotong basis data.
@@ -268,6 +289,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         setLng(posisi.coords.longitude.toFixed(7));
       },
       () => {
+        if (!lokasiAktifRef.current) return;
         setMencariLokasi(false);
         setGalatKlien(teks.lokasiGagal);
       },
@@ -297,7 +319,17 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const galat = galatKlien || (keadaan && !keadaan.ok ? keadaan.galat : "");
 
   return (
-    <form action={aksi} className="grid gap-7">
+    <form
+      action={aksi}
+      onSubmit={(e) => {
+        if (sedangKirimRef.current || mengirim || (Boolean(SITE_KEY) && !captchaToken)) {
+          e.preventDefault();
+          return;
+        }
+        sedangKirimRef.current = true;
+      }}
+      className="grid gap-7"
+    >
       {galat && (
         <p role="alert"
            className="rounded-md border border-api/25 bg-api/[0.06] px-4 py-3 text-[13.5px] text-bara">

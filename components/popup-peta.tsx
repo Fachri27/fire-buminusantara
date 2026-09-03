@@ -40,6 +40,11 @@ export function PopupPeta({
   // eslint-disable-next-line react-hooks/refs
   gunakanTumbuh(panelRef, asal);
   const [tabAktif, setTabAktif] = useState(() => tabDariPulau(pulau) ?? PULAU_TAB[0].kunci);
+  const [prevPulau, setPrevPulau] = useState(pulau);
+  if (pulau !== prevPulau) {
+    setPrevPulau(pulau);
+    setTabAktif(tabDariPulau(pulau) ?? PULAU_TAB[0].kunci);
+  }
   // `dari` dan `sampai` disimpan terpisah karena penyaringnya memakai keduanya.
   const [dari, setDari] = useState("");
   const [sampai, setSampai] = useState("");

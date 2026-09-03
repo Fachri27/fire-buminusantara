@@ -10,26 +10,34 @@ type Props = {
 export function Peta({ jumlahLaporan, onPilihWilayah }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [memuat, setMemuat] = useState(true);
+  const iframeReadyRef = useRef(false);
+  const pendingJumlahRef = useRef(jumlahLaporan);
+  const onPilihRef = useRef(onPilihWilayah);
 
-  // Kirim data jumlah laporan setiap kali berubah atau saat iframe siap
-  const kirimJumlah = useCallback(() => {
+  useEffect(() => {
+    onPilihRef.current = onPilihWilayah;
+  }, [onPilihWilayah]);
+
+  // Kirim data ke iframe
+  const kirimData = useCallback((data: Record<string, unknown>) => {
     if (!iframeRef.current?.contentWindow) return;
     try {
-      iframeRef.current.contentWindow.postMessage(
-        {
-          type: "SET_JUMLAH",
-          jumlahLaporan,
-        },
-        "*",
-      );
+      iframeRef.current.contentWindow.postMessage(data, "*");
     } catch {
       // Abaikan jika belum siap
     }
-  }, [jumlahLaporan]);
+  }, []);
 
+  // Update antrean dan kirim hanya jika iframe sudah siap menerima
   useEffect(() => {
-    kirimJumlah();
-  }, [kirimJumlah]);
+    pendingJumlahRef.current = jumlahLaporan;
+    if (iframeReadyRef.current) {
+      kirimData({
+        type: "SET_JUMLAH",
+        jumlahLaporan,
+      });
+    }
+  }, [jumlahLaporan, kirimData]);
 
   useEffect(() => {
     const saatPesan = (event: MessageEvent) => {
@@ -37,15 +45,22 @@ export function Peta({ jumlahLaporan, onPilihWilayah }: Props) {
       if (!data || typeof data !== "object") return;
 
       if (data.type === "FORECASTING_READY") {
+        iframeReadyRef.current = true;
         setMemuat(false);
-        kirimJumlah();
+        // Kuras data jumlah laporan yang tertunda saat inisialisasi awal
+        if (pendingJumlahRef.current) {
+          kirimData({
+            type: "SET_JUMLAH",
+            jumlahLaporan: pendingJumlahRef.current,
+          });
+        }
       } else if (data.type === "PILIH_WILAYAH") {
         const rect = iframeRef.current?.getBoundingClientRect();
         const asal = {
           x: (rect?.left ?? 0) + (data.asal?.x ?? 0),
           y: (rect?.top ?? 0) + (data.asal?.y ?? 0),
         };
-        onPilihWilayah(data.nama, data.pulau ?? null, asal);
+        onPilihRef.current(data.nama, data.pulau ?? null, asal);
       } else if (data.type === "IFRAME_WHEEL") {
         let rawDeltaY = data.deltaY || 0;
         if (data.deltaMode === 1) rawDeltaY *= 16.67;
@@ -74,7 +89,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah }: Props) {
 
     window.addEventListener("message", saatPesan);
     return () => window.removeEventListener("message", saatPesan);
-  }, [onPilihWilayah, kirimJumlah]);
+  }, [kirimData]);
 
   return (
     <div
@@ -89,8 +104,10 @@ export function Peta({ jumlahLaporan, onPilihWilayah }: Props) {
         allow="geolocation"
         onContextMenu={(e) => e.preventDefault()}
         onLoad={() => {
-          kirimJumlah();
-          setTimeout(() => setMemuat(false), 800);
+          if (iframeReadyRef.current && pendingJumlahRef.current) {
+            kirimData({ type: "SET_JUMLAH", jumlahLaporan: pendingJumlahRef.current });
+          }
+          setTimeout(() => setMemuat(false), 1500);
         }}
       />
       {memuat && (

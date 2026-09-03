@@ -121,30 +121,44 @@ export async function simpanKomentar(input: {
   eventId: number; nama: string; email: string | null; isi: string;
   balasKe: number | null; ip: string | null;
 }) {
-  const induk = input.balasKe
-    ? await prisma.comments.findFirst({
+  return await prisma.$transaction(async (tx) => {
+    let parentId: bigint | null = null;
+    let mentionName: string | null = null;
+
+    if (input.balasKe) {
+      const induk = await tx.comments.findFirst({
         where: {
-          id: input.balasKe, commentable_type: TIPE,
-          commentable_id: input.eventId, is_approved: true,
+          id: input.balasKe,
+          commentable_type: TIPE,
+          commentable_id: input.eventId,
+          is_approved: true,
         },
         select: { id: true, name: true },
-      })
-    : null;
+      });
 
-  await prisma.comments.create({
-    data: {
-      page_id: null,
-      commentable_type: TIPE,
-      commentable_id: input.eventId,
-      name: input.nama,
-      email: input.email,
-      body: saring(input.isi),
-      ip_address: input.ip,
-      is_approved: true,
-      parent_id: induk?.id ?? null,
-      mention_name: induk?.name ?? null,
-      created_at: new Date(),
-      updated_at: new Date(),
-    },
+      if (!induk) {
+        throw new Error("Komentar yang dibalas tidak ditemukan atau telah dihapus.");
+      }
+
+      parentId = induk.id;
+      mentionName = induk.name;
+    }
+
+    return await tx.comments.create({
+      data: {
+        page_id: null,
+        commentable_type: TIPE,
+        commentable_id: input.eventId,
+        name: input.nama,
+        email: input.email,
+        body: saring(input.isi),
+        ip_address: input.ip,
+        is_approved: true,
+        parent_id: parentId,
+        mention_name: mentionName,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
   });
 }

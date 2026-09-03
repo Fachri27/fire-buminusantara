@@ -262,7 +262,9 @@ export function FormulirKomentar({
             // Shift+Enter diperbolehkan membuat baris baru di sheet.
             if (e.key === "Enter" && (!sheet || !e.shiftKey)) {
               e.preventDefault();
-              kirim();
+              if (!belumLengkap && !mengirim) {
+                kirim();
+              }
             }
           }}
         />
@@ -281,7 +283,13 @@ export function FormulirKomentar({
   // ── Desktop: formulir lengkap inline di dasar rel, seperti sebelumnya. ──
   if (!ponsel) {
     return (
-      <form className="rincian__kirim" onSubmit={(e) => { e.preventDefault(); kirim(); }}>
+      <form
+        className="rincian__kirim"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!belumLengkap && !mengirim) kirim();
+        }}
+      >
         {bidang}
         {barisKetik}
       </form>
@@ -316,7 +324,10 @@ export function FormulirKomentar({
         >
           <form
             className="rincian__sheet-panel"
-            onSubmit={(e) => { e.preventDefault(); kirim(); }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!belumLengkap && !mengirim) kirim();
+            }}
           >
             <div className="rincian__sheet-kepala">
               <p className="rincian__sheet-judul">Tulis komentar</p>

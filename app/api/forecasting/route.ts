@@ -136,12 +136,15 @@ export async function GET(req: NextRequest) {
                 var diri = this;
                 setTimeout(function() {
                   try {
+                    Object.defineProperty(diri, 'readyState', { value: 4, writable: false });
                     Object.defineProperty(diri, 'status', { value: 200, writable: false });
                     Object.defineProperty(diri, 'statusText', { value: 'OK', writable: false });
-                    Object.defineProperty(diri, 'responseText', { value: diri.__windyIsJson ? '{}' : '', writable: false });
-                    Object.defineProperty(diri, 'response', { value: diri.__windyIsJson ? '{}' : '', writable: false });
+                    var resPayload = diri.__windyIsJson ? '{"alerts":[],"result":"ok"}' : '';
+                    Object.defineProperty(diri, 'responseText', { value: resPayload, writable: false });
+                    Object.defineProperty(diri, 'response', { value: resPayload, writable: false });
                   } catch(e) {}
                   try { if (typeof diri.onreadystatechange === 'function') diri.onreadystatechange(); } catch(e) {}
+                  try { diri.dispatchEvent(new Event('readystatechange')); } catch(e) {}
                   try { diri.dispatchEvent(new Event('load')); } catch(e) {}
                   try { diri.dispatchEvent(new Event('loadend')); } catch(e) {}
                 }, 0);
@@ -935,7 +938,6 @@ export async function GET(req: NextRequest) {
                 }
 
                 layer.on('click', saatPilih);
-                layer.on('mousedown', saatPilih);
               }
             }).addTo(map);
 

@@ -40,6 +40,25 @@ export function gunakanKomentar(idLaporan: number) {
   const ketikRef = useRef<HTMLTextAreaElement | null>(null);
   const captchaRef = useRef<HTMLDivElement | null>(null);
   const widgetRef = useRef<number | null>(null);
+  const sedangKirimRef = useRef(false);
+  const currentIdRef = useRef(idLaporan);
+
+  useEffect(() => {
+    currentIdRef.current = idLaporan;
+  }, [idLaporan]);
+
+  // Bersihkan widget Turnstile saat hook unmount (pop-up ditutup)
+  useEffect(() => {
+    return () => {
+      const ts = turnstile();
+      if (ts && widgetRef.current !== null) {
+        try {
+          ts.remove(widgetRef.current);
+        } catch {}
+        widgetRef.current = null;
+      }
+    };
+  }, []);
 
   const alamat = `/api/laporan/${idLaporan}/komentar`;
 
@@ -218,10 +237,16 @@ export function gunakanKomentar(idLaporan: number) {
   }, []);
 
   const kirim = useCallback(async () => {
-    if (mengirim || !isi.trim()) return;
+    if (sedangKirimRef.current || mengirim || !isi.trim()) return;
+    if (Boolean(SITE_KEY) && !captchaToken) {
+      setGalat("Verifikasi keamanan belum siap. Tunggu sebentar dan coba lagi.");
+      return;
+    }
+    sedangKirimRef.current = true;
     setMengirim(true);
     setGalat("");
 
+    const targetId = idLaporan;
     let respon: {
       komentar?: Komentar[];
       message?: string;
@@ -245,6 +270,7 @@ export function gunakanKomentar(idLaporan: number) {
       respon = (await r.json().catch(() => null)) ?? null;
       if (!r.ok) throw respon;
     } catch (gagal) {
+      sedangKirimRef.current = false;
       setMengirim(false);
       ulangCaptcha();
       // Pesan validasi dulu, lalu `message`, baru pesan umum — sama seperti
@@ -259,14 +285,19 @@ export function gunakanKomentar(idLaporan: number) {
       return;
     }
 
+    sedangKirimRef.current = false;
+    setMengirim(false);
+    ulangCaptcha();
+
+    // Cegah kontaminasi komentar jika pengguna berpindah laporan sebelum respons tiba
+    if (currentIdRef.current !== targetId) return;
+
     // Balasan baru dibuka otomatis — kalau tidak, kirimannya sendiri tidak
     // kelihatan karena utasnya masih tertutup.
     const akar = akarDari(balasKe);
     setDaftar(respon?.komentar ?? []);
     setIsi("");
-    setMengirim(false);
     batalBalas();
-    ulangCaptcha();
     if (akar !== null) {
       setDibuka((d) => (d.includes(akar) ? d : [...d, akar]));
     }
@@ -282,7 +313,7 @@ export function gunakanKomentar(idLaporan: number) {
     }
   }, [
     alamat, akarDari, anonim, batalBalas, balasKe, captchaToken,
-    email, isi, mengirim, nama, ulangCaptcha, website,
+    email, idLaporan, isi, mengirim, nama, ulangCaptcha, website,
   ]);
 
   return {

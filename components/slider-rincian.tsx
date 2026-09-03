@@ -94,25 +94,30 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
 
   // Cek apakah media awal sudah siap (tanpa reset state antar slide agar tidak berkedip)
   useEffect(() => {
+    let aktif = true;
     const pertama = media[0];
     if (!pertama) return;
 
     if (pertama.jenis === "gambar") {
       const img = new Image();
-      img.onload = () => setAwalSiap(true);
-      img.onerror = () => setAwalSiap(true);
+      img.onload = () => { if (aktif) setAwalSiap(true); };
+      img.onerror = () => { if (aktif) setAwalSiap(true); };
       img.src = pertama.url;
     } else {
       const p = pertama.poster ?? poster;
       if (p) {
         const img = new Image();
-        img.onload = () => setAwalSiap(true);
-        img.onerror = () => setAwalSiap(true);
+        img.onload = () => { if (aktif) setAwalSiap(true); };
+        img.onerror = () => { if (aktif) setAwalSiap(true); };
         img.src = p;
       } else {
-        setAwalSiap(true);
+        if (aktif) setAwalSiap(true);
       }
     }
+
+    return () => {
+      aktif = false;
+    };
   }, [media, poster]);
 
   const geser = useCallback((arah: number) => {

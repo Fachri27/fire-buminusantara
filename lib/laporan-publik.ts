@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { prisma } from "./prisma";
 import { bacaBerkasMedia, urlMedia, type BerkasMedia, type Orientasi } from "./media";
 import { simpanBerkasGaleri, hapusBerkas, gpsDariBerkas, exifDariPath, type ExifFoto } from "./unggah";
@@ -367,36 +368,67 @@ export async function aturStatusLaporan(
   status: StatusLaporan,
   olehId: number,
 ): Promise<HasilAturStatus> {
-  // Menolak atau mengembalikan ke antrean hanya mengubah statusnya — tidak
-  // ada kejadian yang dibuat.
+  const sekarang = new Date();
+
+  // 1. Menolak atau mengembalikan ke antrean hanya mengubah statusnya — tidak
+  // ada kejadian yang dibuat. Gunakan updateMany bersyarat untuk mencegah
+  // race condition penolakan ganda atau menolak laporan yang sudah diverifikasi.
   if (status !== "approved") {
-    await prisma.public_reports.update({
-      where: { id },
+    const hasil = await prisma.public_reports.updateMany({
+      where: {
+        id,
+        status: status === "pending" ? { not: "pending" } : "pending",
+      },
       data: {
         status,
         // Dikembalikan ke antrean = belum ada yang memutuskan; jejak peninjau
         // sebelumnya ikut dihapus supaya barisnya tidak mengaku sudah ditinjau.
         reviewed_by: status === "pending" ? null : olehId,
-        reviewed_at: status === "pending" ? null : new Date(),
-        updated_at: new Date(),
+        reviewed_at: status === "pending" ? null : sekarang,
+        updated_at: sekarang,
       },
     });
+
+    if (hasil.count === 0) {
+      return { ok: false, galat: "Status laporan telah diubah oleh peninjau lain." };
+    }
+
+    try {
+      revalidateTag("tunggakan", "max");
+    } catch {}
     return { ok: true, idKejadian: null };
   }
 
-  // Persetujuan = laporan naik jadi kejadian yang tampil di publik. Keduanya
-  // dibungkus satu transaksi: kalau events gagal dibuat, laporan tidak boleh
-  // terlanjur dianggap "terverifikasi".
+  // 2. Persetujuan = laporan naik jadi kejadian yang tampil di publik.
+  // Gunakan klaim atomik bersyarat (status: "pending") di dalam transaksi
+  // agar tidak ada dua admin yang mempromosikan laporan yang sama secara bersamaan.
   try {
-    return await prisma.$transaction(async (tx) => {
-      const laporan = await tx.public_reports.findUnique({
-        where: { id },
+    const hasil = await prisma.$transaction(async (tx) => {
+      // Ambil laporan sekaligus pastikan statusnya masih 'pending'
+      const laporan = await tx.public_reports.findFirst({
+        where: { id, status: "pending" },
         select: {
           title: true, description: true, media: true,
           location_lat: true, location_lng: true, created_at: true,
         },
       });
-      if (!laporan) return { ok: false as const, galat: "Laporan tidak ditemukan." };
+      if (!laporan) {
+        return { ok: false as const, galat: "Laporan tidak ditemukan atau sudah diverifikasi/ditolak." };
+      }
+
+      // Kunci/klaim baris secara atomik di basis data
+      const klaim = await tx.public_reports.updateMany({
+        where: { id, status: "pending" },
+        data: {
+          status: "approved",
+          reviewed_by: olehId,
+          reviewed_at: sekarang,
+          updated_at: sekarang,
+        },
+      });
+      if (klaim.count === 0) {
+        return { ok: false as const, galat: "Laporan sedang atau telah diverifikasi oleh peninjau lain." };
+      }
 
       const promosi = await promosiKeKejadian(
         {
@@ -409,47 +441,50 @@ export async function aturStatusLaporan(
         },
         tx,
       );
-      if (!promosi.ok) return promosi;
-
-      await tx.public_reports.update({
-        where: { id },
-        data: {
-          status: "approved",
-          reviewed_by: olehId,
-          reviewed_at: new Date(),
-          updated_at: new Date(),
-        },
-      });
+      if (!promosi.ok) {
+        throw new Error(promosi.galat); // Rollback transaksi jika pembuatan kejadian gagal
+      }
 
       return { ok: true as const, idKejadian: promosi.id };
     });
+
+    return hasil;
   } catch (e) {
     return {
       ok: false,
       galat: e instanceof Error ? e.message : "Gagal memverifikasi laporan.",
     };
+  } finally {
+    try {
+      revalidateTag("tunggakan", "max");
+    } catch {}
   }
 }
 
-/** Buang laporan beserta lampirannya. Berkasnya ikut dihapus dari penyimpanan
- *  — laporan yang dibuang biasanya spam, dan spam tidak perlu menyisakan
- *  video 80 MB di bucket. */
+/** Buang laporan beserta lampirannya.
+ *  PENTING: Jangan hapus berkas fisik S3 jika laporan ini sudah disetujui (dipromosikan ke events),
+ *  karena berkas fisik tersebut masih digunakan oleh baris di tabel events! */
 export async function hapusLaporan(id: number) {
   const baris = await prisma.public_reports.findUnique({
     where: { id },
-    select: { media: true },
+    select: { media: true, status: true },
   });
   if (!baris) return;
 
-  for (const berkas of bacaBerkasMedia(baris.media)) await hapusBerkas(berkas.path);
+  if (baris.status !== "approved") {
+    for (const berkas of bacaBerkasMedia(baris.media)) await hapusBerkas(berkas.path);
+  }
   await prisma.public_reports.delete({ where: { id } });
+  try {
+    revalidateTag("tunggakan", "max");
+  } catch {}
 }
 
 /** Simpan pilihan orientasi (potret/lanskap) satu lampiran saat diverifikasi.
  *
  *  `media` adalah larik JSON — kita cari entri yang URL-nya cocok, ubah
- *  `orientasi`-nya, lalu tulis kembali. Bidang lain (path, type, poster,
- *  keterangan, EXIF nanti) dibiarkan utuh; entri yang tak dikenal diabaikan.
+ *  `orientasi`-nya, lalu tulis kembali dengan pengecekan optimistic concurrency
+ *  berdasarkan `updated_at` agar tidak menimpa suntingan editor lain secara senyap.
  */
 export async function aturOrientasiLaporan(
   id: number,
@@ -458,7 +493,7 @@ export async function aturOrientasiLaporan(
 ): Promise<{ ok: boolean; galat?: string }> {
   const baris = await prisma.public_reports.findUnique({
     where: { id },
-    select: { media: true },
+    select: { media: true, updated_at: true },
   });
   if (!baris) return { ok: false, galat: "Laporan tidak ditemukan." };
 
@@ -474,9 +509,15 @@ export async function aturOrientasiLaporan(
   }
   if (!berubah) return { ok: false, galat: "Lampiran tidak ditemukan." };
 
-  await prisma.public_reports.update({
-    where: { id },
+  // Optimistic concurrency: pastikan baris belum dimodifikasi pihak lain
+  const hasil = await prisma.public_reports.updateMany({
+    where: { id, updated_at: baris.updated_at },
     data: { media, updated_at: new Date() },
   });
+
+  if (hasil.count === 0) {
+    return { ok: false, galat: "Konflik perubahan: data telah diperbarui oleh pengguna lain. Silakan muat ulang." };
+  }
+
   return { ok: true };
 }

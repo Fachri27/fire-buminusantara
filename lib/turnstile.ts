@@ -13,6 +13,9 @@
  *     tanpa gejala apa pun. Menutup di produksi memaksa kesalahan itu terlihat
  *     (semua kiriman ditolak) alih-alih membiarkannya jadi lubang senyap.
  */
+// Kunci in-flight untuk mencegah dua permintaan paralel menggunakan token yang sama secara bersamaan
+const tokenInFlight = new Set<string>();
+
 export async function turnstileSah(token: string | null, ip: string | null): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) {
@@ -26,6 +29,14 @@ export async function turnstileSah(token: string | null, ip: string | null): Pro
     console.log("[turnstile] token kosong/tidak valid; panjang=", token ? token.length : 0);
     return false;
   }
+
+  // Tolak jika token ini sedang diverifikasi secara simultan di request paralel lain
+  if (tokenInFlight.has(token)) {
+    console.warn("[turnstile] Permintaan paralel ganda dengan token identik dicegat:", token.slice(0, 16));
+    return false;
+  }
+
+  tokenInFlight.add(token);
 
   try {
     const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
@@ -42,6 +53,8 @@ export async function turnstileSah(token: string | null, ip: string | null): Pro
   } catch (e) {
     console.log("[turnstile] siteverify EXCEPTION:", (e as Error)?.message);
     return false;
+  } finally {
+    tokenInFlight.delete(token);
   }
 }
 

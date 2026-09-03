@@ -44,8 +44,12 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
     if (!poster) return;
     const img = new Image();
     img.onload = () => setSiap(true);
+    img.onerror = () => setSiap(true);
     img.src = poster;
-    return () => { img.onload = null; };
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+    };
   }, [poster]);
 
   // Peristiwa bisa saja terlewat sebelum React memasang pendengarnya; kalau
@@ -81,7 +85,7 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
       return;
     }
     el.pause();
-    if (el.currentTime) el.currentTime = 0;
+    if (el.readyState >= 1 && el.currentTime) el.currentTime = 0;
     setUsai(false);
   }, [aktif, kurangiGerak]);
 
