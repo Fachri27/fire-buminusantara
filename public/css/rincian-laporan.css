@@ -38,6 +38,19 @@
   background: rgb(0 0 0 / 0.82);
 }
 
+/* Saat popup rincian terbuka, iframe peta Windy di belakangnya masih bisa
+   MENANGKAP sentuhan (pan/zoom peta) meski tertutup overlay — quirk iframe di
+   ponsel. Akibatnya menggeser 1-2 jari malah menggerakkan peta, dan menggulir
+   daftar komentar jadi "butuh 3 jari". Selama popup terbuka: matikan sentuhan
+   iframe peta dan kunci gulir halaman di belakang. Keduanya pulih sendiri saat
+   popup ditutup karena .rincian lepas dari DOM (:has berhenti cocok). */
+body:has(.rincian) {
+  overflow: hidden;
+}
+body:has(.rincian) iframe[src*="forecasting"] {
+  pointer-events: none !important;
+}
+
 .rincian__panel {
   position: relative;
   display: grid;
