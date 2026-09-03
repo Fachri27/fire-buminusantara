@@ -439,6 +439,16 @@ export async function GET(req: NextRequest) {
         }
 
         /* D. Copernicus logo on BOTTOM-LEFT */
+        .rhpane,
+        .mobiletablethide.rhpane,
+        #device-mobile .rhpane,
+        #device-tablet .rhpane {
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          pointer-events: none !important;
+        }
+
         .rhpane__bottom-messages {
           position: fixed !important;
           bottom: 16px !important;
@@ -465,14 +475,29 @@ export async function GET(req: NextRequest) {
           opacity: 0.95 !important;
         }
 
-        /* E. Windy logo placed above Copernicus */
-        #logo-wrapper {
+        /* E. Windy logo placed beside Copernicus */
+        #logo-wrapper,
+        [class*="on"] #logo-wrapper,
+        #device-mobile #logo-wrapper,
+        #device-tablet #logo-wrapper,
+        body #logo-wrapper {
           display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          container: none !important;
           border: none !important;
           background: transparent !important;
+          width: auto !important;
+          height: auto !important;
+          pointer-events: none !important;
+          z-index: 1000 !important;
         }
 
-        #logo {
+        #logo,
+        #logo-wrapper #logo,
+        [class*="on"] #logo-wrapper #logo,
+        #device-mobile #logo,
+        #device-tablet #logo {
           position: fixed !important;
           top: auto !important;
           right: auto !important;
@@ -495,32 +520,27 @@ export async function GET(req: NextRequest) {
           opacity: 1 !important;
         }
 
-        /* E2. Mobile: tampilkan logo Copernicus & Windy seperti versi desktop,
-           hanya diperkecil dan dirapatkan supaya MUAT di layar sempit dan tak
-           terpotong. Susunan sama seperti desktop: kompas di paling kiri, lalu
-           Copernicus, lalu Windy tepat di sebelahnya. Nilai piksel disetel agar
-           ketiganya berjajar tanpa saling menimpa pada lebar ~360-390px. */
+        /* E2. Mobile: tampilkan logo Copernicus & Windy berdampingan di kiri-bawah di atas bilah legenda */
         @media (max-width: 640px) {
-          /* Di mobile bilah legenda AQI melebar PENUH di dasar peta, jadi logo
-             di bottom:8 tertutup olehnya (kadang tampak hilang). Angkat logo ke
-             ATAS legenda (bottom ~48px) dan naikkan z-index-nya supaya selalu
-             terlihat. Kompas ada di kiri-bawah, jadi logo ditaruh mulai dari
-             kanan kompas. */
           .rhpane__bottom-messages {
-            left: 58px !important;      /* setelah kompas (~kiri 8px, lebar ~44px) */
-            bottom: 48px !important;    /* di ATAS bilah legenda */
-            width: 140px !important;
+            left: 14px !important;
+            bottom: 40px !important;
+            width: 120px !important;
             z-index: 1002 !important;
           }
           .rhpane__bottom-messages img,
           img[src*="copernicus"] {
-            width: 140px !important;
-            max-width: 140px !important;
+            width: 120px !important;
+            max-width: 120px !important;
           }
-          #logo {
-            left: 202px !important;     /* tepat setelah Copernicus */
+          #logo,
+          #logo-wrapper #logo,
+          [class*="on"] #logo-wrapper #logo,
+          #device-mobile #logo,
+          #device-tablet #logo {
+            left: 144px !important;
             right: auto !important;
-            bottom: 48px !important;
+            bottom: 40px !important;
             transform: scale(0.6) !important;
             transform-origin: left bottom !important;
             z-index: 1002 !important;
@@ -1025,43 +1045,50 @@ export async function GET(req: NextRequest) {
 
             mapInitialized = true;
 
-            // Windy menyembunyikan #logo & .rhpane__bottom-messages sendiri saat
-            // peta di-interact atau panel rhbottom aktif — di ponsel logo
-            // "muncul sebentar lalu hilang". Re-terapkan visibilitasnya secara
-            // berkala: ringan (setiap 600 ms), menimpa properti inline Windy,
-            // dan tidak mengubah perilaku peta lain.
-            setInterval(function() {
-              var el = document.getElementById('logo');
-              if (el) {
-                el.style.display = 'flex';
-                el.style.visibility = 'visible';
-                el.style.opacity = '1';
-              }
-              var wsp = document.querySelector('.rhpane__bottom-messages');
-              if (wsp) {
-                wsp.style.display = 'flex';
-                wsp.style.visibility = 'visible';
-                wsp.style.opacity = '1';
-              }
-              // Logo Copernicus: img src bernama copernicus, mungkin DI LUAR
-              // .rhpane__bottom-messages. Paksa tampil, lalu naik ke atas
-              // sampai ke tengah layar untuk melepas display:none pada rantai
-              // induk (Windy menutup elemen bawah saat peta di-interact).
+            // Pastikan logo Copernicus & logo Windy selalu hadir di DOM dan tampil
+            function pastikanSemuaLogo() {
+              // 1. Copernicus: Windy di mobile tidak menyisipkan logo Copernicus (!C di script internalnya)
               var ci = document.querySelector('img[src*="copernicus"]');
-              if (ci) {
-                ci.style.display = 'block';
-                ci.style.opacity = '1';
-                var c = ci;
-                for (var k = 0; k < 8 && c && c !== document.body; k++) {
-                  if (c.parentElement) c = c.parentElement; else break;
-                  if (c.style && (c.style.display === 'none' || c.style.visibility === 'hidden' || c.style.opacity === '0')) {
-                    c.style.display = 'block';
-                    c.style.visibility = 'visible';
-                    c.style.opacity = '1';
-                  }
+              var wsp = document.querySelector('.rhpane__bottom-messages');
+              if (!ci) {
+                if (!wsp) {
+                  wsp = document.createElement('div');
+                  wsp.className = 'rhpane__bottom-messages';
+                  document.body.appendChild(wsp);
+                }
+                wsp.innerHTML = '<a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" style="display:block;"><img src="https://www.windy.com/img/providers/copernicus-white.svg" alt="Copernicus" style="display:block;" /></a>';
+              }
+
+              // Pastikan rantai induk .rhpane__bottom-messages tidak tertutup display:none
+              if (wsp) {
+                wsp.style.setProperty('display', 'flex', 'important');
+                wsp.style.setProperty('visibility', 'visible', 'important');
+                wsp.style.setProperty('opacity', '1', 'important');
+                var pw = wsp.parentElement;
+                if (pw && pw !== document.body) {
+                  pw.style.setProperty('display', 'block', 'important');
+                  pw.style.setProperty('visibility', 'visible', 'important');
+                  pw.style.setProperty('opacity', '1', 'important');
                 }
               }
-            }, 600);
+
+              // 2. Windy Logo: un-hide logo-wrapper & #logo dari aturan .on... dan container query
+              var lw = document.getElementById('logo-wrapper');
+              if (lw) {
+                lw.style.setProperty('display', 'block', 'important');
+                lw.style.setProperty('visibility', 'visible', 'important');
+                lw.style.setProperty('opacity', '1', 'important');
+              }
+              var el = document.getElementById('logo');
+              if (el) {
+                el.style.setProperty('display', 'flex', 'important');
+                el.style.setProperty('visibility', 'visible', 'important');
+                el.style.setProperty('opacity', '0.95', 'important');
+              }
+            }
+
+            pastikanSemuaLogo();
+            setInterval(pastikanSemuaLogo, 500);
 
             // Beri tahu parent bahwa map forecasting sudah siap
             if (window.parent) {
