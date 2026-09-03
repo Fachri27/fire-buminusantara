@@ -5,8 +5,6 @@ import { simpanKejadian } from "@/lib/simpan-kejadian";
 import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { FormKejadian } from "../form";
 
-export const dynamic = "force-dynamic";
-
 export default async function Tambah({
   searchParams,
 }: {

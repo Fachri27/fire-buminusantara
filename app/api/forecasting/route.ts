@@ -48,8 +48,6 @@ for (const feature of petaProvinsi.features) {
   if (pulau) PROVINSI_PULAU[nama] = pulau;
 }
 
-export const dynamic = "force-dynamic";
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const lat = searchParams.get("lat") || "0.200";

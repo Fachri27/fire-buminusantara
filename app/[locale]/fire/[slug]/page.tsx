@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { ambilBerita, ambilBeritaSlug, hitungLaporanProvinsi } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { JsonLd } from "@/components/json-ld";
@@ -11,7 +12,9 @@ import { KerangkaBeranda } from "@/components/kerangka-beranda";
 import { Nav } from "@/components/nav";
 import { adaBahasa, type Bahasa } from "@/lib/bahasa";
 
-export const dynamic = "force-dynamic";
+// Halaman rincian kejadian dengan slug dinamis dari database (dibuat di CMS kapan saja).
+// Diizinkan blocking (instant = false) agar tidak memblokir prerender build.
+export const instant = false;
 
 // Basis absolut yang sama dengan fallback og:video di bawah — JSON-LD wajib
 // URL absolut, sementara metadataBase hanya me-resolve kolom Metadata.
@@ -103,6 +106,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 async function IsiHalaman({ bahasa, slug }: { bahasa: Bahasa; slug: string }) {
+  await connection();
   const [berita, jumlahLaporan, tigaTeratas, kejadian, statistik, seo] = await Promise.all([
     ambilBerita(),
     hitungLaporanProvinsi(),

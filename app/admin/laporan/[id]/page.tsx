@@ -9,8 +9,6 @@ import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { TombolVerifikasi } from "../tombol-verifikasi";
 import { PilihOrientasi } from "../pilih-orientasi";
 
-export const dynamic = "force-dynamic";
-
 const waktuPanjang = new Intl.DateTimeFormat("id-ID", {
   weekday: "long", day: "numeric", month: "long", year: "numeric",
   hour: "2-digit", minute: "2-digit",

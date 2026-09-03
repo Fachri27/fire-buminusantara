@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { ambilBerita, hitungLaporanProvinsi } from "@/lib/events";
 import { ambilTigaTeratas } from "@/lib/wms";
 import { ambilStatistik } from "@/lib/statistik";
@@ -8,10 +9,6 @@ import { HalamanFire } from "@/components/halaman-fire";
 import { KerangkaBeranda } from "@/components/kerangka-beranda";
 import { Nav } from "@/components/nav";
 import { adaBahasa, type Bahasa } from "@/lib/bahasa";
-
-// Kejadian ditambahkan lewat CMS Laravel, di luar pengetahuan Next.js, jadi
-// halaman ini tidak boleh di-cache statis.
-export const dynamic = "force-dynamic";
 
 // Dua prefiks yang sah — /id dan /en. Segmen lain (mis. /xyz) ditolak
 // lewat notFound() di bawah.
@@ -76,6 +73,7 @@ export async function generateMetadata({ params }: PageProps<'/[locale]'>): Prom
 // HTML baru tiba setelah seluruh kueri selesai dan pengunjung menatap
 // layar kosong selama itu.
 async function IsiHalaman({ bahasa }: { bahasa: Bahasa }) {
+  await connection();
   const [berita, jumlahLaporan, tigaTeratas, statistik] = await Promise.all([
     ambilBerita(),
     hitungLaporanProvinsi(),

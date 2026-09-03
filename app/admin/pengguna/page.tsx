@@ -7,8 +7,6 @@ import { Paginasi } from "../paginasi";
 
 import { users_role } from "@prisma/client";
 
-export const dynamic = "force-dynamic";
-
 const PER_HALAMAN = 15;
 
 const tanggalId = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" });

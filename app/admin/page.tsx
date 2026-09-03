@@ -5,8 +5,6 @@ import { bacaSesi, bolehKelola } from "@/lib/sesi";
 import { HALAMAN, KopHalaman } from "./kop-halaman";
 import { Pratinjau } from "./pratinjau";
 
-export const dynamic = "force-dynamic";
-
 const TIPE = "App\\Models\\Event";
 
 const tanggalPanjang = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric" });

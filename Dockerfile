@@ -26,6 +26,12 @@ ENV NEXT_PUBLIC_MEDIA_URL=$NEXT_PUBLIC_MEDIA_URL \
 ARG NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=""
 ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
 
+# Deployment ID untuk proteksi version skew: diteruskan ke Next.js saat build
+# sehingga aset diberi query ?dpl=<id> dan navigasi klien otomatis me-reload
+# halaman secara penuh bila mendeteksi build baru di server.
+ARG NEXT_DEPLOYMENT_ID=""
+ENV NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID
+
 # ponytail: --webpack — build Turbopack (bawaan Next 16) gagal spawn proses
 # anak di beberapa lingkungan; webpack terverifikasi menghasilkan standalone.
 # Bisa dilepas bila Turbopack build terbukti stabil di CI.

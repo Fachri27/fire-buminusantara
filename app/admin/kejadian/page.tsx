@@ -6,8 +6,6 @@ import { HALAMAN, KopHalaman } from "../kop-halaman";
 import { Paginasi } from "../paginasi";
 import { DaftarTampilan, type ItemKejadian } from "./daftar-tampilan";
 
-export const dynamic = "force-dynamic";
-
 const PER_HALAMAN = 12;
 
 export default async function DaftarKejadian({

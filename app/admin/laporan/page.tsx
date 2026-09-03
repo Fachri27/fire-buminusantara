@@ -9,8 +9,6 @@ import { HALAMAN, KopHalaman } from "../kop-halaman";
 import { Paginasi } from "../paginasi";
 import { TombolVerifikasi } from "./tombol-verifikasi";
 
-export const dynamic = "force-dynamic";
-
 const PER_HALAMAN = 15;
 
 const waktu = new Intl.DateTimeFormat("id-ID", {

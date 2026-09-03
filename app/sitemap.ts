@@ -1,8 +1,6 @@
 import type { MetadataRoute } from "next";
+import { cacheLife } from "next/cache";
 import { prisma } from "@/lib/prisma";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 3600;
 
 // Base URL terpusat supaya sitemap selalu absolut — crawler menolak URL relatif.
 const BASE_URL = (
@@ -10,6 +8,9 @@ const BASE_URL = (
 ).replace(/\/$/, "");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  "use cache";
+  cacheLife("hours");
+
   // Halaman statis: beranda bilingual berubah tiap ada laporan baru.
   const statis: MetadataRoute.Sitemap = [
     { url: `${BASE_URL}/id`, changeFrequency: "daily", priority: 1 },

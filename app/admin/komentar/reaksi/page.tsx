@@ -5,8 +5,6 @@ import { daftarReaksi, reaksiPerKejadian } from "@/lib/reaksi-komentar";
 import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { Paginasi } from "../../paginasi";
 
-export const dynamic = "force-dynamic";
-
 const PER_HALAMAN = 15;
 
 const waktu = new Intl.DateTimeFormat("id-ID", {

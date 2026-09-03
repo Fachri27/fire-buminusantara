@@ -6,8 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { bacaSesi, bolehKelola } from "@/lib/sesi";
 import { HALAMAN, KopHalaman } from "../../kop-halaman";
 
-export const dynamic = "force-dynamic";
-
 /** Pesan galat per kode di ?galat= — dibaca editor, bukan stack trace. */
 const PESAN_GALAT: Record<string, string> = {
   isi: "Nama, email, peran, dan kata sandi wajib diisi.",

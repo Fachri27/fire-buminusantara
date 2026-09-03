@@ -28,8 +28,31 @@ const HEADER_KEAMANAN = [
 ];
 
 const nextConfig: NextConfig = {
+  // Proteksi version skew: Next.js otomatis mendeteksi perubahan deployment ID
+  // di header navigasi/RSC. Bila terdeteksi versi baru (setelah build/deploy baru),
+  // Next.js otomatis melakukan reload browser penuh (MPA navigation) alih-alih
+  // transisi SPA yang terjebak pada chunk atau state lama.
+  deploymentId:
+    process.env.NEXT_DEPLOYMENT_ID ||
+    process.env.WEB_TAG ||
+    (process.env.NODE_ENV === "production"
+      ? (() => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { execSync } = require("node:child_process");
+            return execSync("git rev-parse --short HEAD").toString().trim();
+          } catch {
+            return `${Date.now()}`;
+          }
+        })()
+      : undefined),
+
   // Buang X-Powered-By: Next.js — versi framework tidak perlu diumumkan.
   poweredByHeader: false,
+
+  // Cache Components & Partial Prefetching (Next.js 16.3+)
+  cacheComponents: true,
+  partialPrefetching: true,
 
   // Dipakai Docker (Dockerfile di root): `next build` menyalin server minimal
   // ke .next/standalone sehingga image produksi tidak perlu node_modules penuh.

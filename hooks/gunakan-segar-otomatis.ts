@@ -13,16 +13,28 @@ import { useRouter } from "next/navigation";
  * `router.refresh()` — yang memuat ulang Server Component TANPA me-reload
  * dokumen — tepat saat tab kembali terlihat (balik dari tab/aplikasi lain).
  *
- * Sengaja TANPA interval/timer: refresh terjadi pada satu-satunya momen di
- * mana kesegaran benar-benar penting (user kembali menatap halaman), sehingga
- * tab yang dibiarkan terbuka tapi tak dilihat tidak membebani server sama
- * sekali. State klien (pop-up rincian yang terbuka, ketikan komentar, posisi
- * korsel) tidak hilang: refresh hanya mengganti props dari server.
+ * Ditambah pemulihan otomatis jika terdeteksi `ChunkLoadError` (akibat deploy baru
+ * yang membuang chunk lama saat tab masih terbuka): browser langsung me-reload
+ * halaman penuh untuk mengambil aset dan build terbaru tanpa perlu intervensi manual.
  */
 export function gunakanSegarOtomatis() {
   const router = useRouter();
 
   useEffect(() => {
+    // Tangani bila ada chunk JS yang gagal dimuat (mis. chunk lama 404 setelah deploy baru).
+    // Browser otomatis reload untuk mengambil bundel versi terbaru.
+    const tanganiChunkBasi = (e: ErrorEvent) => {
+      const pesan = e.message || "";
+      if (
+        pesan.includes("ChunkLoadError") ||
+        pesan.includes("Failed to fetch dynamically imported module") ||
+        pesan.includes("Loading chunk")
+      ) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener("error", tanganiChunkBasi);
+
     const saatTerlihat = () => {
       if (document.hidden) return;
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
@@ -30,6 +42,9 @@ export function gunakanSegarOtomatis() {
     };
 
     document.addEventListener("visibilitychange", saatTerlihat);
-    return () => document.removeEventListener("visibilitychange", saatTerlihat);
+    return () => {
+      window.removeEventListener("error", tanganiChunkBasi);
+      document.removeEventListener("visibilitychange", saatTerlihat);
+    };
   }, [router]);
 }

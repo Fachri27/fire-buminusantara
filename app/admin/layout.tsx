@@ -23,6 +23,9 @@ const mono = IBM_Plex_Mono({
   subsets: ["latin"], weight: ["400", "500"], variable: "--huruf-mono",
 });
 
+// CMS routes use authenticated session cookies at request time and are opted out of prerender validation.
+export const instant = false;
+
 export const metadata: Metadata = {
   title: "CMS Pasopati Fire",
   description: "Panel admin pengelolaan pantauan karhutla Indonesia.",

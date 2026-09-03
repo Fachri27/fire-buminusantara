@@ -8,8 +8,6 @@ import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { FormKejadian } from "../form";
 import { TombolHapus } from "./tombol-hapus";
 
-export const dynamic = "force-dynamic";
-
 const tanggalId = new Intl.DateTimeFormat("id-ID", { day: "2-digit", month: "short", year: "numeric" });
 
 export default async function Ubah({

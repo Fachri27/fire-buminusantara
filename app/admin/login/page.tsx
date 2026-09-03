@@ -4,8 +4,6 @@ import { bacaSesi, buatSesi } from "@/lib/sesi";
 import { ambilTigaTeratas } from "@/lib/wms";
 import { bacaNusantara, PetaNusantara } from "../peta-nusantara";
 
-export const dynamic = "force-dynamic";
-
 export default async function Masuk({
   searchParams,
 }: {
