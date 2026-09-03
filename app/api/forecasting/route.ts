@@ -478,6 +478,19 @@ export async function GET(req: NextRequest) {
           opacity: 1 !important;
         }
 
+        /* E2. Mobile: ruang bawah terlalu sempit untuk logo atribusi — dengan
+           posisi piksel tetap desktop (Copernicus 260px + Windy di left:296px)
+           logo Windy melewati tepi kanan lalu terpotong. Di viewport kecil,
+           sembunyikan logo Windy & Copernicus; sisakan legenda AQI (dan kompas
+           Windy, yang di sini tak menimpanya). */
+        @media (max-width: 640px) {
+          .rhpane__bottom-messages,
+          #logo,
+          #logo-wrapper {
+            display: none !important;
+          }
+        }
+
         #contrib {
           display: none !important;
         }
