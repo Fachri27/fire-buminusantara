@@ -950,12 +950,6 @@
     position: sticky;
     bottom: 0;
     z-index: 1;
-    /* Dorong ke DASAR rel saat komentarnya sedikit/tak ada: di flex-column
-       yang mengisi tinggi kartu, margin-top:auto menyerap ruang kosong di
-       atasnya sehingga kolom komentar selalu menempel di bawah. Saat komentar
-       banyak (rel bergulir) tak ada ruang kosong → auto=0, dan sticky bottom
-       tetap membuatnya terlihat. */
-    margin-top: auto;
     background: var(--r-rel);
   }
 }
