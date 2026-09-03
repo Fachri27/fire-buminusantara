@@ -25,7 +25,10 @@ export function gunakanKorsel(berita: Berita[]) {
   const gulung = berita.length >= 3;
   const salinan = gulung ? 3 : 1;
 
-  const [aktif, setAktif] = useState(gulung ? berita.length + 1 : 0);
+  // Mulai di salinan TENGAH pada kartu ke-0 (berita[0]) supaya kartu pertama —
+  // laporan terbaru — yang tersorot di tengah. (Mode non-loop juga memusatkan
+  // berita[0]; sebelumnya loop keliru memakai +1 sehingga memusatkan berita[1].)
+  const [aktif, setAktif] = useState(gulung ? berita.length : 0);
   // null = belum diukur: jalur menempatkan dirinya lewat calc() CSS (lihat
   // korsel.tsx) supaya bingkai PERTAMA hasil SSR sudah di tengah. Tanpa itu
   // isi yang di-stream masuk sempat tergambar dengan geser=0 — seluruh rak
