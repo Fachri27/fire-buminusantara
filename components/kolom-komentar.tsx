@@ -166,8 +166,10 @@ export function FormulirKomentar({
     kirimSebelumnya.current = mengirim;
   }, [mengirim, isi]);
 
-  // Wadah captcha di desktop terpasang langsung; di ponsel ikut sheet
-  // yang di-mount/unmount — pasang widget saat wadahnya siap di DOM.
+  // Wadah captcha di desktop terpasang langsung (form inline); di ponsel ikut
+  // sheet yang di-mount/unmount — pasang widget saat wadahnya siap di DOM.
+  // Sebelumnya hanya (ponsel && sheet), jadi di desktop widget tak pernah
+  // ter-render → token kosong → "Verifikasi captcha gagal".
   useEffect(() => {
     if (!ponsel || sheet) pasangCaptcha();
   }, [ponsel, sheet, pasangCaptcha]);

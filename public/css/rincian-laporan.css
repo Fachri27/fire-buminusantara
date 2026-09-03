@@ -38,6 +38,19 @@
   background: rgb(0 0 0 / 0.82);
 }
 
+/* Saat popup rincian terbuka, iframe peta Windy di belakangnya masih bisa
+   MENANGKAP sentuhan (pan/zoom peta) meski tertutup overlay — quirk iframe di
+   ponsel. Akibatnya menggeser 1-2 jari malah menggerakkan peta, dan menggulir
+   daftar komentar jadi "butuh 3 jari". Selama popup terbuka: matikan sentuhan
+   iframe peta dan kunci gulir halaman di belakang. Keduanya pulih sendiri saat
+   popup ditutup karena .rincian lepas dari DOM (:has berhenti cocok). */
+body:has(.rincian) {
+  overflow: hidden;
+}
+body:has(.rincian) iframe[src*="forecasting"] {
+  pointer-events: none !important;
+}
+
 .rincian__panel {
   position: relative;
   display: grid;
@@ -600,13 +613,22 @@
   align-items: flex-end;
   justify-content: center;
   background: rgb(0 0 0 / 0.55);
+  /* Jaring pengaman: pangkas overflow horizontal apa pun supaya panel tak
+     pernah "lewat layar". */
+  overflow-x: hidden;
 }
 
 .rincian__sheet-panel {
   display: grid;
+  /* minmax(0, 1fr): tanpa ini kolom grid `auto` membesar mengikuti konten yang
+     tak bisa menyusut (textarea/field dengan lebar intrinsik) — "grid blowout"
+     — sehingga panel melebihi lebar layar. box-sizing memastikan padding
+     terhitung DI DALAM width:100%, bukan menambahnya. */
+  grid-template-columns: minmax(0, 1fr);
+  box-sizing: border-box;
   gap: 10px;
   width: 100%;
-  max-width: 560px;
+  max-width: min(560px, 100vw);
   max-height: 85svh;
   overflow-y: auto;
   padding: 14px 20px calc(16px + env(safe-area-inset-bottom));
@@ -747,6 +769,9 @@
   /* Bukan flex: elemen ini anak <label>, bukan anak .rincian__baris. */
   display: block;
   width: 100%;
+  /* Tanpa ini textarea memakai lebar intrinsik dari atribut cols bawaan
+     (~20 karakter) sebagai min-content, memaksa barisnya melebihi layar. */
+  min-width: 0;
   border: 0;
   padding: 8px 0;
   background: transparent;
@@ -950,12 +975,6 @@
     position: sticky;
     bottom: 0;
     z-index: 1;
-    /* Dorong ke DASAR rel saat komentarnya sedikit/tak ada: di flex-column
-       yang mengisi tinggi kartu, margin-top:auto menyerap ruang kosong di
-       atasnya sehingga kolom komentar selalu menempel di bawah. Saat komentar
-       banyak (rel bergulir) tak ada ruang kosong → auto=0, dan sticky bottom
-       tetap membuatnya terlihat. */
-    margin-top: auto;
     background: var(--r-rel);
   }
 }

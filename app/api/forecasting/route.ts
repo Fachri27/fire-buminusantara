@@ -715,6 +715,19 @@ export async function GET(req: NextRequest) {
         #custom-zoom-controls button:active {
           transform: scale(0.95);
         }
+
+        /* MOBILE: satu jari menggulir HALAMAN, cubit untuk zoom peta.
+           Tanpa ini, sapuan vertikal satu jari ditelan peta (geser peta) dan
+           pengunjung tidak bisa kembali ke beranda. touch-action pan-x pan-y
+           menyerahkan sapuan satu jari ke peramban (scroll halaman), sementara
+           pinch-zoom tetap ditangani peta. Diperkuat oleh JS di bawah yang
+           mematikan dragging/dragPan satu jari di perangkat sentuh. */
+        @media (pointer: coarse) {
+          #map-container, #map, #leaflet-map,
+          .leaflet-container, .leaflet-pane, .leaflet-pane canvas {
+            touch-action: pan-x pan-y pinch-zoom !important;
+          }
+        }
       </style>
     `;
 
@@ -751,6 +764,76 @@ export async function GET(req: NextRequest) {
             try {
               if (map._maplibreMap && map._maplibreMap.scrollZoom && typeof map._maplibreMap.scrollZoom.disable === 'function') {
                 map._maplibreMap.scrollZoom.disable();
+              }
+            } catch (e) {}
+            // MOBILE cubit-untuk-zoom: matikan geser SATU jari supaya sapuan
+            // vertikal menggulir halaman (kembali ke beranda), bukan peta.
+            // Cubit (touchZoom/touchZoomRotate) dan tap (klik provinsi) tetap
+            // hidup — yang dimatikan hanya dragging/dragPan satu jari.
+            if (modeSentuh()) {
+              try {
+                if (map.dragging && typeof map.dragging.disable === 'function') {
+                  map.dragging.disable();
+                }
+              } catch (e) {}
+              try {
+                if (map.touchZoom && typeof map.touchZoom.enable === 'function') {
+                  map.touchZoom.enable();
+                }
+              } catch (e) {}
+              try {
+                var ml = map._maplibreMap;
+                if (ml) {
+                  if (ml.dragPan && typeof ml.dragPan.disable === 'function') {
+                    ml.dragPan.disable();
+                  }
+                  if (ml.touchZoomRotate && typeof ml.touchZoomRotate.enable === 'function') {
+                    ml.touchZoomRotate.enable();
+                  } else if (ml.touchZoom && typeof ml.touchZoom.enable === 'function') {
+                    ml.touchZoom.enable();
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+
+          // true di perangkat sentuh (ponsel/tablet), false di desktop.
+          // Laptop layar sentuh tidak ikut: pointer utamanya fine, dan layarnya
+          // besar — hanya layar kecil + sentuh yang dianggap mobile.
+          var _modeSentuh = null;
+          function modeSentuh() {
+            if (_modeSentuh !== null) return _modeSentuh;
+            var hasil = false;
+            try {
+              if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+                hasil = true;
+              }
+            } catch (e) {}
+            if (!hasil) {
+              try {
+                var layarKecil = Math.min(window.screen.width, window.screen.height) < 820;
+                var adaSentuh = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+                if (layarKecil && adaSentuh) hasil = true;
+              } catch (e) {}
+            }
+            _modeSentuh = hasil;
+            return hasil;
+          }
+
+          // Windy bisa mengaktifkan ulang handler geser setelah interaksi —
+          // kunci ulang mode cubit-untuk-zoom. Ringan (tanpa alokasi) supaya
+          // aman dipanggil tiap 600 ms dari interval logo di bawah.
+          function kunciGeserSentuh() {
+            if (!modeSentuh()) return;
+            try {
+              var m = window.W && window.W.map && window.W.map.map;
+              if (!m) return;
+              if (m.dragging && m.dragging.enabled && m.dragging.enabled()) {
+                m.dragging.disable();
+              }
+              var mml = m._maplibreMap;
+              if (mml && mml.dragPan && mml.dragPan.enabled && mml.dragPan.enabled()) {
+                mml.dragPan.disable();
               }
             } catch (e) {}
           }
@@ -1047,6 +1130,9 @@ export async function GET(req: NextRequest) {
 
             // Pastikan logo Copernicus & logo Windy selalu hadir di DOM dan tampil
             function pastikanSemuaLogo() {
+              // Kunci ulang mode cubit-untuk-zoom: Windy bisa mengaktifkan
+              // ulang handler geser satu jari setelah interaksi.
+              kunciGeserSentuh();
               // 1. Copernicus: Windy di mobile tidak menyisipkan logo Copernicus (!C di script internalnya)
               var ci = document.querySelector('img[src*="copernicus"]');
               var wsp = document.querySelector('.rhpane__bottom-messages');
