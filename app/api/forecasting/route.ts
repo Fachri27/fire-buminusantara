@@ -1027,6 +1027,24 @@ export async function GET(req: NextRequest) {
                 wsp.style.visibility = 'visible';
                 wsp.style.opacity = '1';
               }
+              // Logo Copernicus: img src bernama copernicus, mungkin DI LUAR
+              // .rhpane__bottom-messages. Paksa tampil, lalu naik ke atas
+              // sampai ke tengah layar untuk melepas display:none pada rantai
+              // induk (Windy menutup elemen bawah saat peta di-interact).
+              var ci = document.querySelector('img[src*="copernicus"]');
+              if (ci) {
+                ci.style.display = 'block';
+                ci.style.opacity = '1';
+                var c = ci;
+                for (var k = 0; k < 8 && c && c !== document.body; k++) {
+                  if (c.parentElement) c = c.parentElement; else break;
+                  if (c.style && (c.style.display === 'none' || c.style.visibility === 'hidden' || c.style.opacity === '0')) {
+                    c.style.display = 'block';
+                    c.style.visibility = 'visible';
+                    c.style.opacity = '1';
+                  }
+                }
+              }
             }, 600);
 
             // Beri tahu parent bahwa map forecasting sudah siap
