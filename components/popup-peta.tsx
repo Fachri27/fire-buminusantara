@@ -130,10 +130,10 @@ export function PopupPeta({
       });
   }, [berita, tab, dari, sampai]);
 
-  // Kartu yang benar-benar dirender pada mode kartu — lima pertama, bertambah
-  // lima tiap tombol muat lebih banyak, berhenti di sepuluh.
-  const kartuTampak = tampil.slice(0, Math.min(jumlahKartu, MAKS_KARTU));
-  const masihAdaKartu = tampil.length > kartuTampak.length && kartuTampak.length < MAKS_KARTU;
+  // Kartu yang benar-benar dirender pada mode kartu — sepuluh pertama (dua
+  // baris), tiap klik muat lebih banyak menambah satu baris.
+  const kartuTampak = tampil.slice(0, jumlahKartu);
+  const masihAdaKartu = tampil.length > kartuTampak.length;
 
   useEffect(() => {
     const saatTombol = (e: KeyboardEvent) => { if (e.key === "Escape") onTutup(); };
@@ -273,8 +273,8 @@ export function PopupPeta({
                  atas, tanggal + judul di bawah, lokasi menempel di dasar
                  supaya barisan kartu terlihat rapi meski judulnya beda panjang. */
               <>
-              <ul className="grid grid-cols-1 min-[430px]:grid-cols-2 gap-3 sm:gap-4
-                             panggung:grid-cols-3 panggung:gap-[20px] xl:grid-cols-3">
+              <ul className="grid grid-cols-1 min-[430px]:grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3
+                             panggung:grid-cols-5 panggung:gap-[20px] xl:grid-cols-5">
                 {kartuTampak.map(({ b, i }) => {
                   const awal = b.media[0];
                   return (
