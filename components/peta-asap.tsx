@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import Image from "next/image";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -1497,6 +1498,54 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             <span>Pekat</span>
           </div>
         </div>
+
+        {/* Atribusi Resmi & Lisensi Data */}
+        <div className="mt-3 pt-2.5 border-t border-white/10 text-[10px] leading-relaxed text-white/50 space-y-1">
+          <p>
+            Contains modified{" "}
+            <a
+              href="https://atmosphere.copernicus.eu/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/70 hover:text-white underline underline-offset-2 transition-colors"
+            >
+              Copernicus Atmosphere Monitoring Service
+            </a>{" "}
+            information 2026.
+          </p>
+          <p className="text-white/40 text-[9.5px]">
+            Peta dasar: &copy;{" "}
+            <a
+              href="https://s2maps.eu"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
+            >
+              EOX IT Services GmbH
+            </a>{" "}
+            (Sentinel-2 cloudless)
+          </p>
+        </div>
+      </div>
+
+      {/* Logo Copernicus CAMS (Pojok Kiri Bawah - Konsisten dengan Kualitas Udara) */}
+      <div className="pointer-events-auto absolute bottom-24 left-3 z-[400] xl:bottom-4 xl:left-5 flex items-center">
+        <a
+          href="https://atmosphere.copernicus.eu/"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Copernicus Atmosphere Monitoring Service"
+          aria-label="Copernicus Atmosphere Monitoring Service"
+          className="group flex items-center gap-2 rounded-xl bg-black/75 px-2.5 py-1.5 shadow-xl ring-1 ring-white/15 backdrop-blur-md transition-all hover:bg-black hover:ring-white/30 active:scale-95"
+        >
+          <Image
+            src="/assets/img/copernicus-white.svg"
+            alt="Copernicus Atmosphere Monitoring Service"
+            width={120}
+            height={44}
+            className="h-5 sm:h-6 w-auto opacity-90 transition-opacity group-hover:opacity-100 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
+          />
+        </a>
       </div>
 
       {/* Kontrol Linimasa Animasi (Tengah Bawah) */}

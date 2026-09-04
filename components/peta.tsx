@@ -288,6 +288,15 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
                         Riwayat 7 hari ke belakang hingga proyeksi gerak asap 3 hari ke depan (tiap 3 jam).
                       </p>
                     </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Atribusi & Lisensi</span>
+                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-white/65">
+                        Contains modified <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" className="text-white font-medium underline underline-offset-2">Copernicus Atmosphere Monitoring Service</a> information 2026.
+                      </p>
+                      <p className="mt-1 text-[9.5px] leading-normal text-white/45 italic">
+                        Baik Komisi Eropa maupun ECMWF tidak bertanggung jawab atas penggunaan data atau informasi yang disajikan.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -312,6 +321,12 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Cakupan Waktu</span>
                       <p className="mt-0.5 text-[11px] leading-relaxed">
                         Near real-time (menggunakan data aktual yang paling mendekati waktu saat ini).
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Atribusi & Penyedia</span>
+                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-white/65">
+                        Disajikan melalui <a href="https://www.windy.com" target="_blank" rel="noopener noreferrer" className="text-white font-medium underline underline-offset-2">Windy.com</a> dengan integrasi model Copernicus CAMS & ECMWF IFS.
                       </p>
                     </div>
                   </div>
