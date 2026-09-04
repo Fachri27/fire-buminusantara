@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { simpanLaporanPublik, type HasilLapor } from "@/lib/laporan-publik";
 import { ipDari } from "@/lib/turnstile";
@@ -25,5 +26,10 @@ export async function kirimLaporan(
   const kepala = await headers();
   const ip = ipDari(new Request("http://lokal", { headers: kepala }));
 
-  return simpanLaporanPublik(data, ip);
+  const hasil = await simpanLaporanPublik(data, ip);
+  if (hasil.ok || Boolean((hasil as { sukses?: boolean }).sukses)) {
+    revalidatePath("/[locale]", "page");
+    revalidatePath("/[locale]/lapor", "page");
+  }
+  return hasil;
 }

@@ -345,6 +345,10 @@ body:has(.rincian) iframe[src*="forecasting"] {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Roda yang mencapai dasar/tepi badan tidak meneruskan gulir ke halaman
+     di belakangnya (Lenis dikecualikan lewat data-lenis-prevent di .rincian,
+     jadi rantai gulir native peramban yang bekerja di sini). */
+  overscroll-behavior: contain;
   padding: 22px 24px;
 }
 

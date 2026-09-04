@@ -112,12 +112,14 @@ export function HalamanFire({
         <div className="absolute inset-0 h-full w-full">
           <Peta
             jumlahLaporan={jumlahLaporan}
+            berita={berita}
             onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
+            onBukaRincian={bukaRincian}
           />
         </div>
 
         {/* Pencarian + tiga teratas melayang di bagian atas layar (khusus mobile, di desktop disembunyikan) */}
-        <div className="pointer-events-none absolute inset-x-0 top-[clamp(64px,11vh,92px)] z-[20] flex justify-center px-4 md:hidden panggung:hidden">
+        <div className="pointer-events-none absolute inset-x-0 top-[128px] z-[20] flex justify-center px-4 md:hidden panggung:hidden">
           <div className="pointer-events-auto w-full max-w-[580px]">
             <PanelProvinsi
               teratas={tigaTeratas}
@@ -226,7 +228,12 @@ function Rincian({
   }
 
   return (
-    <div className="rincian" onClick={(e) => { if (e.target === e.currentTarget) onTutup(); }}>
+    /* data-lenis-prevent: Lenis yang dihentikan selama pop-up terbuka tetap
+       menelan roda dengan preventDefault; satu atribut di akar ini
+       mengecualikan seluruh panel — rel kanan dan badan komentarnya — dari
+       penangkapan itu, jadi keduanya bisa menggulir secara native. */
+    <div className="rincian" data-lenis-prevent
+         onClick={(e) => { if (e.target === e.currentTarget) onTutup(); }}>
       <div role="dialog" aria-modal="true" aria-label="Rincian laporan karhutla" className="rincian__panel">
         {toastTersalin && (
           <div role="status" className="rincian__toast">

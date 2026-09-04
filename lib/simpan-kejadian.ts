@@ -1,7 +1,17 @@
+import { revalidatePath } from "next/cache";
 import { prisma } from "./prisma";
 import { simpanBerkasGaleri, hapusBerkas } from "./unggah";
 import { bacaBerkasMedia, orientasiKartu, type BerkasMedia } from "./media";
 import { lokasiDariKoordinat } from "./geo";
+
+/** Revalidasi cache halaman beranda dan locale saat data kejadian berubah. */
+export function revalidasiKejadian() {
+  try {
+    revalidatePath("/[locale]", "page");
+    revalidatePath("/id", "page");
+    revalidatePath("/en", "page");
+  } catch {}
+}
 
 export type HasilSimpan = { ok: true; id: number } | { ok: false; galat: string };
 
@@ -198,6 +208,8 @@ export async function simpanKejadian(data: FormData, id?: number, mediaAwal?: Be
       await hapusBerkas(b.poster);
     }
 
+    revalidasiKejadian();
+
     return { ok: true, id: idTersimpan };
   } catch (e) {
     // Database gagal: bersihkan berkas baru yang sempat terunggah ke S3 agar tidak jadi file yatim
@@ -298,6 +310,7 @@ export async function promosiKeKejadian(
         data: dataKejadian,
         select: { id: true },
       });
+      revalidasiKejadian();
       return { ok: true, id: Number(baru.id) };
     } catch (createErr: unknown) {
       const msg = createErr instanceof Error ? createErr.message : "";
@@ -308,6 +321,7 @@ export async function promosiKeKejadian(
           data: dataKejadian,
           select: { id: true },
         });
+        revalidasiKejadian();
         return { ok: true, id: Number(baru.id) };
       }
       throw createErr;
@@ -315,4 +329,13 @@ export async function promosiKeKejadian(
   } catch (e) {
     return { ok: false, galat: e instanceof Error ? e.message : "Gagal menaikkan laporan." };
   }
+}
+
+/**
+ * Hapus kejadian dari basis data beserta revalidasi cache terkait.
+ */
+export async function hapusKejadian(id: number) {
+  const hasil = await prisma.events.delete({ where: { id } });
+  revalidasiKejadian();
+  return hasil;
 }

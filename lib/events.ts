@@ -111,7 +111,12 @@ export async function ambilBerita(limit = 10): Promise<Berita[]> {
   const [semua, hitung] = await Promise.all([
     // event_date bisa seri (beberapa laporan setanggal) — id menaik dipakai
     // pemecah seri supaya "paling baru" benar-benar yang terakhir dibuat.
-    prisma.events.findMany({ where: TAYANG, orderBy: [{ event_date: "desc" }, { id: "desc" }], select: PILIH }),
+    prisma.events.findMany({
+      where: TAYANG,
+      take: Math.max(limit * 2, 100),
+      orderBy: [{ event_date: "desc" }, { id: "desc" }],
+      select: PILIH,
+    }),
     // Komentar bersifat polimorfik (commentable_type/_id ala Laravel), bukan
     // relasi Prisma — jadi jumlahnya dihitung terpisah lewat groupBy.
     prisma.comments.groupBy({

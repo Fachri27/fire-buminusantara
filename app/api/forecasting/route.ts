@@ -50,9 +50,26 @@ for (const feature of petaProvinsi.features) {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const lat = searchParams.get("lat") || "0.200";
-  const lon = searchParams.get("lon") || "118.000";
-  const zoom = searchParams.get("zoom") || "5";
+
+  // 1. Parse lat, lon, and zoom query parameters strictly using Number.parseFloat()
+  const rawLat = Number.parseFloat(searchParams.get("lat") ?? "");
+  const rawLon = Number.parseFloat(searchParams.get("lon") ?? "");
+  const rawZoom = Number.parseFloat(searchParams.get("zoom") ?? "");
+
+  // 2 & 3. Enforce strict geographic boundaries for Indonesia and safe defaults on NaN / non-finite values
+  const safeLat = Number.isNaN(rawLat) || !Number.isFinite(rawLat)
+    ? 0.200
+    : Math.min(Math.max(rawLat, -15.0), 15.0);
+  const safeLon = Number.isNaN(rawLon) || !Number.isFinite(rawLon)
+    ? 118.000
+    : Math.min(Math.max(rawLon, 90.0), 145.0);
+  const safeZoom = Number.isNaN(rawZoom) || !Number.isFinite(rawZoom)
+    ? 5.0
+    : Math.min(Math.max(rawZoom, 3.0), 18.0);
+
+  const lat = safeLat.toFixed(3);
+  const lon = safeLon.toFixed(3);
+  const zoom = safeZoom.toFixed(1);
 
   const targetUrl = `https://www.windy.com/-Air-quality-index-aqi?cams,aqi,${lat},${lon},${zoom}`;
 
@@ -170,11 +187,12 @@ export async function GET(req: NextRequest) {
           });
 
           // A. Wrap history methods to prevent cross-origin SecurityError caused by <base href>
+          var _docOrigin = window.location.origin;
           var _origReplace = window.history.replaceState;
           window.history.replaceState = function(state, title, url) {
             try {
-              if (typeof url === 'string') {
-                url = url.replace(/^https?:\\/\\/[^\\/]+/, '');
+              if (typeof url === 'string' && !url.startsWith('http://') && !url.startsWith('https://')) {
+                url = _docOrigin + (url.startsWith('/') ? url : '/' + url);
               }
               return _origReplace.call(window.history, state, title, url);
             } catch(e) {}
@@ -182,8 +200,8 @@ export async function GET(req: NextRequest) {
           var _origPush = window.history.pushState;
           window.history.pushState = function(state, title, url) {
             try {
-              if (typeof url === 'string') {
-                url = url.replace(/^https?:\\/\\/[^\\/]+/, '');
+              if (typeof url === 'string' && !url.startsWith('http://') && !url.startsWith('https://')) {
+                url = _docOrigin + (url.startsWith('/') ? url : '/' + url);
               }
               return _origPush.call(window.history, state, title, url);
             } catch(e) {}
@@ -194,7 +212,7 @@ export async function GET(req: NextRequest) {
           var targetSearch = '?cams,aqi,${lat},${lon},${zoom}';
           try {
             if (!window.location.pathname.includes('Air-quality-index') || !window.location.search.includes('aqi')) {
-              window.history.replaceState(null, '', targetPath + targetSearch);
+              window.history.replaceState(null, '', _docOrigin + targetPath + targetSearch);
             }
           } catch(e) {}
 
@@ -251,7 +269,7 @@ export async function GET(req: NextRequest) {
             }
           });
 
-          // E. Hook window.W.store safely to seed cams & aqi on boot without breaking internal dictionary lookups
+          // E. Hook window.W.store safely to seed cams & aqi on boot and prevent desync
           var _s = null;
           Object.defineProperty(window.W, 'store', {
             configurable: true,
@@ -264,6 +282,20 @@ export async function GET(req: NextRequest) {
                   s.set('product', 'cams');
                   s.set('overlay', 'aqi');
                 } catch (e) {}
+
+                // Pantau bila product ter-reset kembali ke ecmwf saat overlay adalah aqi:
+                // paksa seketika kembali ke cams agar tile AQI tidak 404 / hitam.
+                if (typeof s.on === 'function') {
+                  try {
+                    s.on('product', function(p) {
+                      if (p !== 'cams' && s.get('overlay') === 'aqi') {
+                        setTimeout(function() {
+                          try { s.set('product', 'cams'); } catch (e) {}
+                        }, 0);
+                      }
+                    });
+                  } catch (e) {}
+                }
               }
             }
           });
@@ -525,30 +557,94 @@ export async function GET(req: NextRequest) {
           opacity: 1 !important;
         }
 
-        /* E2. Mobile: tampilkan logo Copernicus & Windy berdampingan di kiri-bawah di atas bilah legenda */
+        /* E2. Mobile: responsive styles untuk bilah AQI, legenda, dan logo atribusi */
         @media (max-width: 640px) {
-          .rhpane__bottom-messages {
-            left: 14px !important;
-            bottom: 40px !important;
-            width: 120px !important;
+          /* #plugin-rhbottom: Bilah AQI penuh dengan jarak 12px di sisi kiri & kanan */
+          #plugin-rhbottom {
+            width: calc(100% - 24px) !important;
+            left: 12px !important;
+            right: 12px !important;
+            bottom: 12px !important;
+            margin: 0 auto !important;
+            justify-content: center !important;
+          }
+
+          /* .rhbottom__legend: Skala penuh dengan tinggi 22px dan font 10px tanpa meluap */
+          .rhbottom__legend {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 22px !important;
+            font-size: 10px !important;
+            line-height: 22px !important;
+          }
+
+          .rhbottom__legend > *,
+          .rhbottom__legend span,
+          .rhbottom__legend div,
+          .rhbottom__legend p,
+          .rhbottom__legend li,
+          .rhbottom__legend text {
+            font-size: 10px !important;
+            line-height: 22px !important;
+            white-space: nowrap !important;
+          }
+
+          /* Attribution logos (.rhpane / Copernicus & Windy logos):
+             Di mobile ditempatkan di atas bilah AQI pada bottom: 44px */
+          .rhpane {
+            position: fixed !important;
+            bottom: 44px !important;
+            left: 12px !important;
+            right: auto !important;
+            top: auto !important;
+            transform: scale(0.85) !important;
+            transform-origin: bottom left !important;
+            pointer-events: none !important;
             z-index: 1002 !important;
           }
+
+          .rhpane__bottom-messages {
+            position: fixed !important;
+            left: 12px !important;
+            bottom: 44px !important;
+            right: auto !important;
+            top: auto !important;
+            width: 115px !important;
+            transform: scale(0.85) !important;
+            transform-origin: bottom left !important;
+            z-index: 1002 !important;
+          }
+
+          .rhpane .rhpane__bottom-messages {
+            position: relative !important;
+            left: 0 !important;
+            bottom: 0 !important;
+            transform: none !important;
+          }
+
           .rhpane__bottom-messages img,
           img[src*="copernicus"] {
-            width: 120px !important;
-            max-width: 120px !important;
+            width: 115px !important;
+            max-width: 115px !important;
           }
+
           #logo,
           #logo-wrapper #logo,
           [class*="on"] #logo-wrapper #logo,
           #device-mobile #logo,
           #device-tablet #logo {
-            left: 144px !important;
+            left: 122px !important;
             right: auto !important;
-            bottom: 40px !important;
-            transform: scale(0.6) !important;
-            transform-origin: left bottom !important;
+            bottom: 44px !important;
+            top: auto !important;
+            transform: scale(0.68) !important;
+            transform-origin: bottom left !important;
             z-index: 1002 !important;
+          }
+
+          #custom-zoom-controls {
+            right: 12px;
+            top: 80px;
           }
         }
 
@@ -622,43 +718,85 @@ export async function GET(req: NextRequest) {
           transition: fill-opacity 0.2s ease;
         }
 
-        .leaflet-pane.leaflet-wilayah-pane path:hover,
+        .leaflet-wilayahPane-pane path:hover,
+        .leaflet-pane.leaflet-wilayahPane-pane path:hover,
         .provinsi-layer:hover,
         path.provinsi-layer:hover {
           stroke: #ffffff !important;
           stroke-width: 2.5px !important;
           fill: #ffffff !important;
-          fill-opacity: 0.18 !important;
+          fill-opacity: 0.20 !important;
         }
 
-        /* J. Number Badges (.peta-angka) */
+        /* J. Number Badges (.peta-angka) inside polygon centroids */
         .peta-angka {
-          width: 0;
-          height: 0;
-          overflow: visible;
-          pointer-events: none;
+          width: 0 !important;
+          height: 0 !important;
+          overflow: visible !important;
+          pointer-events: none !important;
         }
 
         .peta-angka__nilai {
-          position: absolute;
-          top: 0;
-          left: 0;
-          transform: translate(-50%, -50%);
-          white-space: nowrap;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          font-size: 13px;
-          font-weight: 700;
-          line-height: 1;
-          font-variant-numeric: tabular-nums;
-          color: #ffffff;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          transform: translate(-50%, -50%) !important;
+          white-space: nowrap !important;
+          font-size: 14px !important;
+          font-weight: 700 !important;
+          line-height: 1 !important;
+          font-variant-numeric: tabular-nums !important;
+          color: #fff !important;
           text-shadow:
             0 0 3px rgb(26 25 25 / 0.85),
             1px 1px 0 rgb(26 25 25 / 0.7),
             -1px 1px 0 rgb(26 25 25 / 0.7),
             1px -1px 0 rgb(26 25 25 / 0.7),
-            -1px -1px 0 rgb(26 25 25 / 0.7);
+            -1px -1px 0 rgb(26 25 25 / 0.7) !important;
+          pointer-events: none !important;
+        }
+
+        /* K. Fire Incident Markers from Kejadian API */
+        .marker-titik-kejadian {
+          position: relative;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer !important;
+          pointer-events: auto !important;
+          z-index: 500;
+          transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .marker-titik-kejadian:hover {
+          transform: scale(1.35);
+          z-index: 600;
+        }
+        .marker-titik-kejadian__ping {
+          position: absolute;
+          inset: -4px;
+          border-radius: 9999px;
+          background: rgba(239, 68, 68, 0.45);
+          animation: denyut-kejadian 2s infinite ease-out;
           pointer-events: none;
-          user-select: none;
+        }
+        .marker-titik-kejadian__core {
+          position: relative;
+          width: 22px;
+          height: 22px;
+          border-radius: 9999px;
+          background: linear-gradient(135deg, #f97316 0%, #dc2626 100%);
+          border: 2px solid #ffffff;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.65), 0 0 10px rgba(249, 115, 22, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+        }
+        @keyframes denyut-kejadian {
+          0% { transform: scale(0.8); opacity: 0.9; }
+          100% { transform: scale(2.2); opacity: 0; }
         }
 
         .peta-angka--bertumpuk {
@@ -721,16 +859,14 @@ export async function GET(req: NextRequest) {
           transform: scale(0.95);
         }
 
-        /* MOBILE: satu jari menggulir HALAMAN, cubit untuk zoom peta.
-           Tanpa ini, sapuan vertikal satu jari ditelan peta (geser peta) dan
-           pengunjung tidak bisa kembali ke beranda. touch-action pan-x pan-y
-           menyerahkan sapuan satu jari ke peramban (scroll halaman), sementara
-           pinch-zoom tetap ditangani peta. Diperkuat oleh JS di bawah yang
-           mematikan dragging/dragPan satu jari di perangkat sentuh. */
-        @media (pointer: coarse) {
+        /* MOBILE: Pastikan sentuhan pan dan pinch-to-zoom di perangkat sentuh mulus dan responsif */
+        @media (pointer: coarse), (max-width: 640px) {
           #map-container, #map, #leaflet-map,
           .leaflet-container, .leaflet-pane, .leaflet-pane canvas {
-            touch-action: pan-x pan-y pinch-zoom !important;
+            touch-action: none !important;
+            -webkit-user-select: none !important;
+            user-select: none !important;
+            -webkit-touch-callout: none !important;
           }
         }
       </style>
@@ -771,74 +907,42 @@ export async function GET(req: NextRequest) {
                 map._maplibreMap.scrollZoom.disable();
               }
             } catch (e) {}
-            // MOBILE cubit-untuk-zoom: matikan geser SATU jari supaya sapuan
-            // vertikal menggulir halaman (kembali ke beranda), bukan peta.
-            // Cubit (touchZoom/touchZoomRotate) dan tap (klik provinsi) tetap
-            // hidup — yang dimatikan hanya dragging/dragPan satu jari.
-            if (modeSentuh()) {
-              try {
-                if (map.dragging && typeof map.dragging.disable === 'function') {
-                  map.dragging.disable();
-                }
-              } catch (e) {}
-              try {
-                if (map.touchZoom && typeof map.touchZoom.enable === 'function') {
-                  map.touchZoom.enable();
-                }
-              } catch (e) {}
-              try {
-                var ml = map._maplibreMap;
-                if (ml) {
-                  if (ml.dragPan && typeof ml.dragPan.disable === 'function') {
-                    ml.dragPan.disable();
-                  }
-                  if (ml.touchZoomRotate && typeof ml.touchZoomRotate.enable === 'function') {
-                    ml.touchZoomRotate.enable();
-                  } else if (ml.touchZoom && typeof ml.touchZoom.enable === 'function') {
-                    ml.touchZoom.enable();
-                  }
-                }
-              } catch (e) {}
-            }
-          }
-
-          // true di perangkat sentuh (ponsel/tablet), false di desktop.
-          // Laptop layar sentuh tidak ikut: pointer utamanya fine, dan layarnya
-          // besar — hanya layar kecil + sentuh yang dianggap mobile.
-          var _modeSentuh = null;
-          function modeSentuh() {
-            if (_modeSentuh !== null) return _modeSentuh;
-            var hasil = false;
+            // Pastikan sentuhan geser (panning) dan cubit (pinch-to-zoom) selalu aktif dan mulus di mobile
             try {
-              if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
-                hasil = true;
+              if (map.dragging && typeof map.dragging.enable === 'function') {
+                map.dragging.enable();
               }
             } catch (e) {}
-            if (!hasil) {
-              try {
-                var layarKecil = Math.min(window.screen.width, window.screen.height) < 820;
-                var adaSentuh = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-                if (layarKecil && adaSentuh) hasil = true;
-              } catch (e) {}
-            }
-            _modeSentuh = hasil;
-            return hasil;
+            try {
+              if (map.touchZoom && typeof map.touchZoom.enable === 'function') {
+                map.touchZoom.enable();
+              }
+            } catch (e) {}
+            try {
+              var ml = map._maplibreMap;
+              if (ml) {
+                if (ml.dragPan && typeof ml.dragPan.enable === 'function') {
+                  ml.dragPan.enable();
+                }
+                if (ml.touchZoomRotate && typeof ml.touchZoomRotate.enable === 'function') {
+                  ml.touchZoomRotate.enable();
+                } else if (ml.touchZoom && typeof ml.touchZoom.enable === 'function') {
+                  ml.touchZoom.enable();
+                }
+              }
+            } catch (e) {}
           }
 
-          // Windy bisa mengaktifkan ulang handler geser setelah interaksi —
-          // kunci ulang mode cubit-untuk-zoom. Ringan (tanpa alokasi) supaya
-          // aman dipanggil tiap 600 ms dari interval logo di bawah.
-          function kunciGeserSentuh() {
-            if (!modeSentuh()) return;
+          function pastikanSentuhMulus() {
             try {
               var m = window.W && window.W.map && window.W.map.map;
               if (!m) return;
-              if (m.dragging && m.dragging.enabled && m.dragging.enabled()) {
-                m.dragging.disable();
+              if (m.dragging && typeof m.dragging.enable === 'function' && typeof m.dragging.enabled === 'function' && !m.dragging.enabled()) {
+                m.dragging.enable();
               }
               var mml = m._maplibreMap;
-              if (mml && mml.dragPan && mml.dragPan.enabled && mml.dragPan.enabled()) {
-                mml.dragPan.disable();
+              if (mml && mml.dragPan && typeof mml.dragPan.enable === 'function' && typeof mml.dragPan.isEnabled === 'function' && !mml.dragPan.isEnabled()) {
+                mml.dragPan.enable();
               }
             } catch (e) {}
           }
@@ -1008,17 +1112,17 @@ export async function GET(req: NextRequest) {
               }
             } catch (e) {}
 
-            // Tambahkan GeoJSON Poligon Provinsi (Transparan agar peta bersih, tapi tetap bisa diklik)
+            // Tambahkan GeoJSON Poligon Provinsi
             geoLayer = L.geoJSON(GEO_DATA, {
               pane: 'wilayahPane',
               className: 'provinsi-layer',
               style: function() {
                 return {
-                  fillColor: 'transparent',
-                  fillOpacity: 0.02,
-                  color: 'rgba(255, 255, 255, 0.45)',
-                  weight: 1.2,
-                  opacity: 0.9
+                  fillColor: '#ffffff',
+                  fillOpacity: 0.04,
+                  color: 'rgba(255, 255, 255, 0.70)',
+                  weight: 1.5,
+                  opacity: 0.95
                 };
               },
               onEachFeature: function(feature, layer) {
@@ -1102,8 +1206,10 @@ export async function GET(req: NextRequest) {
               if (!nama || !tooltipEl) return;
 
               const jml = currentJumlahLaporan[nama];
-              const teksJml = typeof jml === 'number' ? jml.toLocaleString('id-ID') + ' laporan' : '';
-              tooltipEl.innerHTML = '<div>' + nama + (teksJml ? '<br><span style="font-size:11px;opacity:0.85;font-weight:400">' + teksJml + '</span>' : '') + '</div>';
+              const teksJml = typeof jml === 'number' && jml > 0
+                ? '<span style="color:#ef4444;font-weight:700;">' + jml.toLocaleString('id-ID') + ' laporan karhutla</span>'
+                : '<span style="color:rgba(255,255,255,0.65);">Tidak ada laporan karhutla</span>';
+              tooltipEl.innerHTML = '<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">' + nama + '</div><div style="font-size:11px;">' + teksJml + '</div>';
               tooltipEl.style.display = 'block';
               tooltipEl.style.left = (e.clientX + 14) + 'px';
               tooltipEl.style.top = (e.clientY + 14) + 'px';
@@ -1135,9 +1241,8 @@ export async function GET(req: NextRequest) {
 
             // Pastikan logo Copernicus & logo Windy selalu hadir di DOM dan tampil
             function pastikanSemuaLogo() {
-              // Kunci ulang mode cubit-untuk-zoom: Windy bisa mengaktifkan
-              // ulang handler geser satu jari setelah interaksi.
-              kunciGeserSentuh();
+              // Pastikan interaksi sentuh geser/cubit selalu aktif di mobile
+              pastikanSentuhMulus();
               // 1. Copernicus: Windy di mobile tidak menyisipkan logo Copernicus (!C di script internalnya)
               var ci = document.querySelector('img[src*="copernicus"]');
               var wsp = document.querySelector('.rhpane__bottom-messages');
@@ -1204,6 +1309,22 @@ export async function GET(req: NextRequest) {
               if (info && window.W && window.W.map && window.W.map.map) {
                 const map = window.W.map.map;
                 map.flyTo([info.titik[1], info.titik[0]], 6, { duration: 1.2 });
+              }
+            } else if (data.type === 'WINDY_ACTIVE') {
+              if (window.W && window.W.store && typeof window.W.store.set === 'function') {
+                try {
+                  if (window.W.store.get('product') !== 'cams') {
+                    window.W.store.set('product', 'cams');
+                  }
+                  if (window.W.store.get('overlay') !== 'aqi') {
+                    window.W.store.set('overlay', 'aqi');
+                  }
+                } catch(e) {}
+              }
+              if (window.W && window.W.map && window.W.map.map) {
+                try {
+                  window.W.map.map.invalidateSize();
+                } catch(e) {}
               }
             }
           });
