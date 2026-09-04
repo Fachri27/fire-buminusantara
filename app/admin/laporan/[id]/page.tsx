@@ -10,6 +10,7 @@ import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { Segarkan } from "../../segarkan";
 import { TombolVerifikasi } from "../tombol-verifikasi";
 import { PilihOrientasi } from "../pilih-orientasi";
+import { SuntingLaporan } from "../sunting-laporan";
 
 const waktuPanjang = new Intl.DateTimeFormat("id-ID", {
   weekday: "long", day: "numeric", month: "long", year: "numeric",
@@ -78,9 +79,19 @@ export default async function RincianLaporan({
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
         <div className="min-w-0">
           <Bagian judul="Isi laporan">
-            <p className="text-[14.5px] leading-[1.65] whitespace-pre-line text-[var(--jelaga)]">
-              {laporan.deskripsi}
-            </p>
+            <SuntingLaporan
+              id={laporan.id}
+              judul={laporan.judul}
+              judulEn={laporan.judulEn}
+              deskripsi={laporan.deskripsi}
+              deskripsiEn={laporan.deskripsiEn}
+              lokasi={laporan.lokasi}
+              statusKejadian={laporan.statusKejadian}
+              lat={laporan.lat}
+              lng={laporan.lng}
+              diperbarui={laporan.diperbarui ? waktuPanjang.format(laporan.diperbarui) : null}
+              terkunci={laporan.status !== "pending"}
+            />
           </Bagian>
 
           <Bagian judul={`Lampiran (${laporan.lampiran.length})`}>

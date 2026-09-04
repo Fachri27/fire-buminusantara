@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Pemuat } from "../pemuat";
 import { aksiSetujui, aksiHapus } from "./actions";
 
 /**
@@ -39,15 +40,17 @@ export function AksiKomentar({
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2">
       {disetujui ? (
-        <button type="button" disabled={sibuk}
+        <button type="button" disabled={sibuk} aria-busy={sibuk}
                 onClick={() => jalankan(() => aksiSetujui(id, false))}
                 className="cms-tombol cms-tombol--garis cms-tombol--kecil">
+          {sibuk && <Pemuat />}
           Sembunyikan
         </button>
       ) : (
-        <button type="button" disabled={sibuk}
+        <button type="button" disabled={sibuk} aria-busy={sibuk}
                 onClick={() => jalankan(() => aksiSetujui(id, true))}
                 className="cms-tombol cms-tombol--utama cms-tombol--kecil">
+          {sibuk && <Pemuat />}
           Setujui
         </button>
       )}
@@ -55,9 +58,10 @@ export function AksiKomentar({
       {bolehHapus && (
         pastikan ? (
           <span className="flex items-center gap-2">
-            <button type="button" disabled={sibuk}
+            <button type="button" disabled={sibuk} aria-busy={sibuk}
                     onClick={() => jalankan(() => aksiHapus(id))}
                     className="cms-tombol cms-tombol--bahaya-isi cms-tombol--kecil">
+              {sibuk && <Pemuat />}
               Ya, hapus
             </button>
             <button type="button" onClick={() => setPastikan(false)}
@@ -66,8 +70,9 @@ export function AksiKomentar({
             </button>
           </span>
         ) : (
-          <button type="button" disabled={sibuk} onClick={() => setPastikan(true)}
+          <button type="button" disabled={sibuk} aria-busy={sibuk} onClick={() => setPastikan(true)}
                   className="cms-tombol cms-tombol--bahaya cms-tombol--kecil">
+            {sibuk && <Pemuat />}
             Hapus
           </button>
         )

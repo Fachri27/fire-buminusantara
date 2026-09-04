@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { cacheLife, cacheTag } from "next/cache";
-import { ambilBerita, ambilBeritaSlug, hitungLaporanProvinsi } from "@/lib/events";
+import { ambilBerita, ambilBeritaSlug, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { JsonLd } from "@/components/json-ld";
 import { ambilTigaTeratas } from "@/lib/wms";
@@ -24,8 +24,8 @@ const DASAR_SITUS = process.env.NEXT_PUBLIC_SITE_URL || "https://fire.nusantara.
 // Kolom SEO mentah (EN + tanggal) belum ada di tipe Berita lib/events.ts —
 // diambil langsung di sini supaya tak menyentuh berkas milik agen lain.
 async function ambilRincianSeo(slug: string) {
-  return prisma.events.findUnique({
-    where: { slug },
+  return prisma.events.findFirst({
+    where: { slug, ...TAYANG },
     select: { title_en: true, description_en: true, event_date: true, updated_at: true },
   });
 }

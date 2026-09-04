@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { daftarKomentar, simpanKomentar } from "@/lib/komentar";
 import { ipDari, turnstileSah } from "@/lib/turnstile";
 import { prisma } from "@/lib/prisma";
+import { TAYANG } from "@/lib/events";
 
 /**
  * Komentar pada satu laporan karhutla.
@@ -17,7 +18,8 @@ const BATAS_ISI = 2000;
 const BATAS_NAMA = 100;
 
 async function eventAda(id: number) {
-  return Boolean(await prisma.events.findUnique({ where: { id }, select: { id: true } }));
+  // Kejadian draft belum tayang — tidak boleh menerima komentar publik.
+  return Boolean(await prisma.events.findFirst({ where: { id, ...TAYANG }, select: { id: true } }));
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

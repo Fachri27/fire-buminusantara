@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { rapikanLokasi, inferProvinsi } from "@/lib/wilayah";
 import { bacaBerkasMedia } from "@/lib/media";
 import { Pratinjau } from "../pratinjau";
+import { TombolTayang } from "./tombol-tayang";
 
 export type ItemKejadian = {
   id: number;
@@ -16,6 +18,7 @@ export type ItemKejadian = {
   video: string | null;
   media: unknown;
   orientation: string;
+  status: string;
 };
 
 const tanggalId = new Intl.DateTimeFormat("id-ID", {
@@ -46,7 +49,7 @@ export function DaftarTampilan({ daftar }: { daftar: ItemKejadian[] }) {
     }
   }, []);
 
-  function gantiMode(m: "list" | "card") {
+    function gantiMode(m: "list" | "card") {
     setMode(m);
     try {
       localStorage.setItem("cms_kejadian_tampilan", m);
@@ -54,9 +57,7 @@ export function DaftarTampilan({ daftar }: { daftar: ItemKejadian[] }) {
       // Abaikan jika localStorage tidak tersedia
     }
   }
-
-  return (
-    <div>
+  return (    <div>
       {/* Pengalih Tampilan List vs Card */}
       <div className="mb-4 flex items-center justify-end gap-1.5">
         <span className="cms-mata mr-1.5 text-[11px] text-[var(--lirih)]">Tampilan:</span>
@@ -131,6 +132,7 @@ export function DaftarTampilan({ daftar }: { daftar: ItemKejadian[] }) {
                     >
                       {e.title_id}
                     </Link>
+                    {e.status === "draft" && <span className="cms-cap cms-cap--perhatian">Draft</span>}
                     {e.video && <span className="cms-cap cms-cap--diam">Video</span>}
                     {galeri > 0 && (
                       <span className="cms-cap cms-cap--diam">
@@ -150,12 +152,15 @@ export function DaftarTampilan({ daftar }: { daftar: ItemKejadian[] }) {
 
                 <span className="cms-mata hidden shrink-0 sm:block">{e.orientation}</span>
 
-                <Link
-                  href={`/admin/kejadian/${e.id}`}
-                  className="cms-tombol cms-tombol--garis cms-tombol--kecil shrink-0"
-                >
-                  Ubah
-                </Link>
+                <div className="flex shrink-0 items-center gap-2">
+                  <TombolTayang id={e.id} status={e.status} />
+                  <Link
+                    href={`/admin/kejadian/${e.id}`}
+                    className="cms-tombol cms-tombol--garis cms-tombol--kecil"
+                  >
+                    Ubah
+                  </Link>
+                </div>
               </li>
             );
           })}
@@ -183,6 +188,9 @@ export function DaftarTampilan({ daftar }: { daftar: ItemKejadian[] }) {
                       kelas="h-full w-full object-cover"
                     />
                     <div className="absolute top-2 right-2 flex flex-wrap gap-1">
+                      {e.status === "draft" && (
+                        <span className="cms-cap cms-cap--perhatian bg-white/90 shadow-xs">Draft</span>
+                      )}
                       {e.video && <span className="cms-cap cms-cap--diam bg-white/90 shadow-xs">Video</span>}
                       {galeri > 0 && (
                         <span className="cms-cap cms-cap--diam bg-white/90 shadow-xs">
@@ -225,16 +233,24 @@ export function DaftarTampilan({ daftar }: { daftar: ItemKejadian[] }) {
                 </div>
 
                 {/* Footer Kartu */}
-                <div className="flex items-center justify-between border-t border-[var(--garis)] bg-[var(--papan)] px-3.5 py-2.5">
-                  <span className="cms-angka text-[11.5px] text-[var(--lirih)]">
+                {/* Kartu di kisi 4 kolom hanya selebar ~230px — ID + dua tombol
+                    tidak akan pernah muat sebaris. Dibiarkan membungkus, bukan
+                    dipaksa sebaris: memaksanya membuat tombol terpotong tepi
+                    kartu, dan tombol yang terpotong tidak bisa ditekan. */}
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2
+                                border-t border-[var(--garis)] bg-[var(--papan)] px-3.5 py-2.5">
+                  <span className="cms-angka shrink-0 text-[11.5px] whitespace-nowrap text-[var(--lirih)]">
                     ID #{String(e.id).padStart(3, "0")}
                   </span>
-                  <Link
-                    href={`/admin/kejadian/${e.id}`}
-                    className="cms-tombol cms-tombol--garis cms-tombol--kecil"
-                  >
-                    Ubah
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <TombolTayang id={e.id} status={e.status} />
+                    <Link
+                      href={`/admin/kejadian/${e.id}`}
+                      className="cms-tombol cms-tombol--garis cms-tombol--kecil shrink-0"
+                    >
+                      Ubah
+                    </Link>
+                  </div>
                 </div>
               </article>
             );

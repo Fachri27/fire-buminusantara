@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Wajib, Bantuan, Isian, IsianPanjang, IsianKoordinat } from "../isian";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { PetaLokasi } from "../peta-lokasi";
+import { CariLokasi } from "../cari-lokasi";
 import { BilahUnggah } from "@/components/bilah-unggah";
+import { Pemuat } from "../pemuat";
 import { DatePicker } from "@/components/ui/date-picker";
 import type { ItemMedia } from "@/lib/media";
 
@@ -15,11 +18,11 @@ export type NilaiAwal = {
   event_date: string; location: string;
   location_lat: string; location_lng: string;
   orientation: string;
+  /** "draft" | "published". Kejadian baru lahir sebagai draft. */
+  status: string;
   /** Galeri yang sudah tersimpan, urut sama dengan indeks `keep_media`. */
   galeri: ItemMedia[];
 };
-
-type Lokasi = { id: string; nama: string; lat: number; lng: number };
 
 /** Saran "ikuti pin": nama tempat tepat di titik koordinat saat ini. */
 type SaranTitik = { nama: string; negara: string | null };
@@ -58,19 +61,12 @@ export function FormKejadian({
   const [lokasi, setLokasi] = useState(awal.location);
   const [lat, setLat] = useState(awal.location_lat);
   const [lng, setLng] = useState(awal.location_lng);
-  const [hasil, setHasil] = useState<Lokasi[]>([]);
-  const [mencari, setMencari] = useState(false);
-  const [memuatLagi, setMemuatLagi] = useState(false);
-  const [habis, setHabis] = useState(false);
   const [saran, setSaran] = useState<SaranTitik | null>(null);
   const [mengenali, setMengenali] = useState(false);
 
   // Hasil dibagi 10 halaman; menggulir ke dasar daftar mengambil halaman
   // berikutnya. `permintaan` membuang jawaban yang sudah ketinggalan ketika
   // pengguna terus mengetik.
-  const BAGI = 10;
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const permintaan = useRef(0);
   // Saran mengikuti TITIK (pin, ketikan koordinat, hasil pencarian) — bukan
   // teks lokasi. Debounce + nomor permintaan sendiri, terpisah dari pencarian
   // teks di atas, supaya keduanya bisa berjalan tanpa saling membatalkan.
@@ -80,10 +76,9 @@ export function FormKejadian({
   // supaya editor melihat teksnya terisi (tanpa ini tombolnya tampak mati).
   const lokasiRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => () => {
-    clearTimeout(timer.current);
-    clearTimeout(tundaSaran.current);
-  }, []);
+  // Debounce pencarian teks kini milik <CariLokasi>; yang tersisa di sini
+  // hanya penunda saran "ikuti pin".
+  useEffect(() => () => clearTimeout(tundaSaran.current), []);
 
   // Setiap titik berubah (termasuk nilai awal saat form dibuka): kenali nama
   // tempatnya dan tawarkan lewat tombol — tidak diisi otomatis, editor yang
@@ -117,30 +112,6 @@ export function FormKejadian({
     }, 700);
     return () => clearTimeout(tundaSaran.current);
   }, [lat, lng]);
-
-  async function ambil(kata: string, geser: number) {
-    const id = ++permintaan.current;
-    if (geser === 0) setMencari(true); else setMemuatLagi(true);
-    try {
-      const r = await fetch(`/api/lokasi?q=${encodeURIComponent(kata)}&offset=${geser}`);
-      const baru: Lokasi[] = r.ok ? (await r.json()).hasil ?? [] : [];
-      if (id !== permintaan.current) return;
-      setHasil((lama) => (geser === 0 ? baru : [...lama, ...baru]));
-      setHabis(baru.length < BAGI);
-    } catch {
-      if (id === permintaan.current) { setHasil(geser === 0 ? [] : (lama) => lama); setHabis(true); }
-    } finally {
-      if (id === permintaan.current) { setMencari(false); setMemuatLagi(false); }
-    }
-  }
-
-  function cariLokasi(kata: string) {
-    clearTimeout(timer.current);
-    const t = kata.trim();
-    if (t.length < 2) { setHasil([]); setHabis(false); return; }
-    // Ditunda sedikit supaya setiap ketikan tidak menembolok database jauh.
-    timer.current = setTimeout(() => ambil(t, 0), 300);
-  }
 
   return (
     <form action={aksi}>
@@ -202,61 +173,28 @@ export function FormKejadian({
           </div>
         </div>
 
+        {/* Keadaan tayang berdiri sendiri, bukan diselipkan di antara isian
+            teks: ia bukan properti kejadian melainkan keputusan apakah publik
+            sudah boleh melihatnya. */}
         <div>
-          <label htmlFor="location" className="cms-mata mb-1.5 block">
-            Lokasi<Wajib />
-          </label>
-          <input id="location" name="location" required value={lokasi} ref={lokasiRef}
-                  onChange={(e) => { setLokasi(e.target.value); cariLokasi(e.target.value); }}
-                 placeholder="Ketik nama tempat, mis. Kubu Raya"
-                 autoComplete="off" className="cms-isian w-full" />
+          <label htmlFor="status" className="cms-mata mb-1.5 block">Keadaan tayang</label>
+          <select id="status" name="status" defaultValue={awal.status} className="cms-isian w-full sm:max-w-[320px]">
+            <option value="draft">Draft — hanya terlihat di CMS</option>
+            <option value="published">Publish — tayang di situs publik</option>
+          </select>
           <Bantuan>
-            Pilih dari hasil pencarian supaya provinsinya terbaca — itu yang menentukan
-            angka di peta dan pulau pada kartu.
+            Draft tidak muncul di korsel, peta, sitemap, maupun permalink-nya —
+            permalink kejadian draft menjawab 404 sampai dipublikasikan.
           </Bantuan>
-
-          {mencari && <p className="cms-mata mt-2">Mencari…</p>}
-
-          {hasil.length > 0 && (
-            <ul
-              onScroll={(e) => {
-                const el = e.currentTarget;
-                if (!habis && !memuatLagi &&
-                    el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
-                  ambil(lokasi.trim(), hasil.length);
-                }
-              }}
-              className="mt-2 max-h-56 overflow-y-auto rounded-[3px] border border-[var(--garis-tegas)]
-                           bg-[var(--papan)]">
-              {hasil.map((h) => (
-                <li key={h.id} className="border-b border-[var(--garis)] last:border-b-0">
-                  <button type="button"
-                          onClick={() => {
-                            // Koordinat ikut dari baris yang sama — kalau diisi
-                            // sendiri, titik di peta bisa tidak cocok dengan
-                            // nama lokasinya.
-                            setLokasi(h.nama); setLat(String(h.lat)); setLng(String(h.lng)); setHasil([]);
-                          }}
-                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left
-                                     text-[13.5px] hover:bg-white">
-                    <span className="min-w-0 truncate"><Sorot teks={h.nama} kata={lokasi} /></span>
-                    <span className="cms-angka shrink-0 text-[11.5px] text-[var(--lirih)]">
-                      {h.lat.toFixed(3)}, {h.lng.toFixed(3)}
-                    </span>
-                  </button>
-                </li>
-              ))}
-              {memuatLagi && (
-                <li className="cms-mata px-3 py-2 text-[12px]">Memuat…</li>
-              )}
-              {!habis && !memuatLagi && (
-                <li className="cms-mata px-3 py-2 text-[11.5px] text-[var(--lirih)]">
-                  Gulir ke bawah untuk memuat lagi
-                </li>
-              )}
-            </ul>
-          )}
         </div>
+
+        <CariLokasi
+          label="Lokasi" nama="location" nilai={lokasi} wajib
+          onUbah={setLokasi}
+          onPilih={(n, a, b) => { setLokasi(n); setLat(String(a)); setLng(String(b)); }}
+          ref={lokasiRef}
+          bantuan="Pilih dari hasil pencarian supaya provinsinya terbaca — itu yang menentukan angka di peta dan pulau pada kartu."
+        />
 
         {/* Pemilih titik langsung di peta — jalur ketiga di samping hasil
             pencarian dan isian koordinat manual. Ketiganya menulis ke dua
@@ -306,8 +244,8 @@ export function FormKejadian({
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <IsianTerkendali label="Latitude" nama="location_lat" nilai={lat} onUbah={setLat} />
-          <IsianTerkendali label="Longitude" nama="location_lng" nilai={lng} onUbah={setLng} />
+          <IsianKoordinat label="Latitude" nama="location_lat" nilai={lat} onUbah={setLat} wajib />
+          <IsianKoordinat label="Longitude" nama="location_lng" nilai={lng} onUbah={setLng} wajib />
         </div>
       </Bagian>
 
@@ -332,7 +270,9 @@ function AksiSimpan({ sedangUbah }: { sedangUbah: boolean }) {
     <div className="sticky bottom-0 -mx-5 mt-8 flex flex-wrap items-center gap-3 border-t
                     border-[var(--garis-tegas)] bg-[var(--kertas)] px-5 py-3 lg:-mx-10 lg:px-10">
       {pending && <BilahUnggah />}
-      <button type="submit" disabled={pending} className="cms-tombol cms-tombol--utama">
+      <button type="submit" disabled={pending} aria-busy={pending}
+              className="cms-tombol cms-tombol--utama">
+        {pending && <Pemuat />}
         {sedangUbah ? "Simpan perubahan" : "Tambah kejadian"}
       </button>
       <Link href="/admin/kejadian" className="cms-mata px-1 underline-offset-4 hover:underline">
@@ -353,95 +293,6 @@ function Bagian({ nomor, judul, children }: { nomor: string; judul: string; chil
       </div>
       <div className="grid gap-5">{children}</div>
     </section>
-  );
-}
-
-function Wajib() {
-  return <span aria-hidden="true" className="text-[var(--api)]"> *</span>;
-}
-
-function Bantuan({ children }: { children: React.ReactNode }) {
-  return <p className="mt-1.5 text-[12px] leading-[1.5] text-[var(--lirih)]">{children}</p>;
-}
-
-/** Teks hasil pencarian dengan bagian yang sama dengan ketikan pengguna
- *  ditebalkan — semua kemunculannya, tidak hanya yang pertama. */
-function Sorot({ teks, kata }: { teks: string; kata: string }) {
-  const k = kata.trim().toLowerCase();
-  if (!k) return <>{teks}</>;
-  const bagian: React.ReactNode[] = [];
-  let pos = 0;
-  for (let n = 0; ; n++) {
-    const i = teks.toLowerCase().indexOf(k, pos);
-    if (i < 0) break;
-    bagian.push(teks.slice(pos, i), <strong key={n}>{teks.slice(i, i + k.length)}</strong>);
-    pos = i + k.length;
-  }
-  bagian.push(teks.slice(pos));
-  return <>{bagian}</>;
-}
-
-function Isian({
-  label,
-  nama,
-  nilai,
-  value,
-  onChange,
-  tipe = "text",
-  wajib,
-  bantuan,
-  mono,
-}: {
-  label: string;
-  nama: string;
-  nilai?: string;
-  value?: string;
-  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  tipe?: string;
-  wajib?: boolean;
-  bantuan?: string;
-  mono?: boolean;
-}) {
-  return (
-    <div>
-      <label htmlFor={nama} className="cms-mata mb-1.5 block">
-        {label}{wajib && <Wajib />}
-      </label>
-      <input
-        id={nama}
-        name={nama}
-        type={tipe}
-        {...(value !== undefined ? { value, onChange } : { defaultValue: nilai, onChange })}
-        required={wajib}
-        className={`cms-isian w-full ${mono ? "cms-angka" : ""}`}
-      />
-      {bantuan && <Bantuan>{bantuan}</Bantuan>}
-    </div>
-  );
-}
-
-function IsianPanjang({ label, nama, nilai, bantuan }: {
-  label: string; nama: string; nilai: string; bantuan?: string;
-}) {
-  return (
-    <div>
-      <label htmlFor={nama} className="cms-mata mb-1.5 block">{label}</label>
-      <textarea id={nama} name={nama} rows={4} defaultValue={nilai} className="cms-isian w-full" />
-      {bantuan && <Bantuan>{bantuan}</Bantuan>}
-    </div>
-  );
-}
-
-function IsianTerkendali({ label, nama, nilai, onUbah }: {
-  label: string; nama: string; nilai: string; onUbah: (v: string) => void;
-}) {
-  return (
-    <div>
-      <label htmlFor={nama} className="cms-mata mb-1.5 block">{label}<Wajib /></label>
-      <input id={nama} name={nama} type="number" step="any" required
-             value={nilai} onChange={(e) => onUbah(e.target.value)}
-             className="cms-isian cms-angka w-full" />
-    </div>
   );
 }
 

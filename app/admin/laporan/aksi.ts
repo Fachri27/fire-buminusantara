@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { bacaSesi, bolehKelola } from "@/lib/sesi";
-import { aturStatusLaporan, hapusLaporan, aturOrientasiLaporan, type StatusLaporan } from "@/lib/laporan-publik";
+import {
+  aturStatusLaporan, hapusLaporan, aturOrientasiLaporan, suntingLaporan,
+  type StatusLaporan,
+} from "@/lib/laporan-publik";
 import type { Orientasi } from "@/lib/media";
 
 /** Server action terbuka lewat POST langsung, bukan cuma lewat tombol di CMS —
@@ -28,6 +31,21 @@ export async function aksiHapusLaporan(id: number) {
   if (sesi.peran !== "admin") redirect("/admin/laporan");
   await hapusLaporan(id);
   return { ok: true as const };
+}
+
+/** Rapikan judul, deskripsi, dan koordinat laporan sebelum diverifikasi.
+ *  Boleh editor maupun admin: merapikan adalah bagian dari meninjau. */
+export async function aksiSuntingLaporan(
+  id: number,
+  masukan: {
+    judul: string; judulEn: string;
+    deskripsi: string; deskripsiEn: string;
+    lokasi: string; statusKejadian: string;
+    lat: string; lng: string;
+  },
+) {
+  await jaga();
+  return suntingLaporan(id, masukan);
 }
 
 /** Simpan pilihan orientasi (potret/lanskap) sebuah lampiran saat diverifikasi.

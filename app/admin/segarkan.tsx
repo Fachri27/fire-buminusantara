@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Pemuat } from "./pemuat";
 
 /**
  * Tombol muat-ulang manual CMS.
@@ -20,10 +21,12 @@ export function Segarkan({ label = "Muat ulang", lebar = false }: { label?: stri
     <button
       type="button"
       disabled={menunggu}
+      aria-busy={menunggu}
       onClick={() => mulai(() => router.refresh())}
       className={`cms-tombol cms-tombol--garis cms-tombol--kecil${lebar ? " w-full justify-center" : ""}`}
     >
-      {menunggu ? "Memuat…" : label}
+      {menunggu && <Pemuat />}
+      {label}
     </button>
   );
 }

@@ -32,6 +32,7 @@ export default async function DaftarKejadian({
       select: {
         id: true, title_id: true, slug: true, event_date: true,
         location: true, image_id: true, video: true, media: true, orientation: true,
+        status: true,
       },
     }),
   ]);
@@ -47,6 +48,7 @@ export default async function DaftarKejadian({
     image_id: e.image_id,
     video: e.video,
     media: e.media,
+    status: e.status,
     orientation: e.orientation,
   }));
 

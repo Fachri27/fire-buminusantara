@@ -47,11 +47,16 @@ model events {
   location_lng     Decimal            @db.Decimal(10, 7)
   location_geojson Json?
   orientation      events_orientation @default(landscape)
+  /// draft = tersimpan di CMS tapi belum tampil di situs publik.
+  /// Bawaannya published supaya kejadian yang sudah ada tidak menghilang
+  /// begitu kolom ini ditambahkan.
+  status           events_status      @default(published)
   created_at       DateTime?          @db.Timestamp(0)
   updated_at       DateTime?          @db.Timestamp(0)
 
   @@index([event_date], map: "events_event_date_index")
   @@index([orientation], map: "events_orientation_index")
+  @@index([status], map: "events_status_index")
 }
 
 model comments {
@@ -112,6 +117,11 @@ enum events_orientation {
   horizontal
 }
 
+enum events_status {
+  draft
+  published
+}
+
 // ── Laporan warga ────────────────────────────────────────────────────────────
 // Tabel MILIK CMS ini, bukan warisan Laravel — tapi namanya tetap Inggris dan
 // snake_case seperti tetangganya, karena ia duduk di basis data yang sama dan
@@ -125,7 +135,15 @@ enum events_orientation {
 model public_reports {
   id            BigInt                @id @default(autoincrement()) @db.UnsignedBigInt
   title         String                @db.VarChar(255)
+  /// Judul & deskripsi Inggris, plus nama tempat — semuanya dirapikan kurator
+  /// sebelum verifikasi, bukan dikirim pelapor. Kosong = promosi memakai
+  /// perilaku lama (judul ID disalin, deskripsi EN null, lokasi di-geocode).
+  title_en      String?               @db.VarChar(255)
   description   String                @db.Text
+  description_en String?              @db.Text
+  /// Nama tempat pilihan kurator. Kosong = promosi me-reverse-geocode sendiri
+  /// dari koordinat, seperti sebelumnya.
+  location      String?               @db.VarChar(255)
   /// Lampiran: [{ path, type: "image" | "video" }] — bentuknya sama persis
   /// dengan events.media, jadi bacaBerkasMedia() dipakai bersama.
   media         Json?
@@ -136,6 +154,8 @@ model public_reports {
   location_lat  Decimal?              @db.Decimal(10, 7)
   location_lng  Decimal?              @db.Decimal(10, 7)
   status        public_reports_status @default(pending)
+  /// Keadaan tayang yang dituju kejadian hasil promosi — bukan status laporan.
+  event_status  events_status         @default(published)
   ip_address    String?               @db.VarChar(45)
   reviewed_by   BigInt?               @db.UnsignedBigInt
   reviewed_at   DateTime?             @db.Timestamp(0)
