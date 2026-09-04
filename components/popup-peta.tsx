@@ -319,16 +319,16 @@ export function PopupPeta({
                 })}
               </ul>
               {masihAdaKartu && (
-                /* Muat lebih banyak: lima kartu berikutnya per klik (maksimum
-                   sepuluh), tanpa gulir ulang dari atas — daftar yang sudah
-                   tampak tak bergeser. */
+                /* Muat lebih banyak: satu baris (lima kartu) berikutnya per
+                   klik, tanpa gulir ulang dari atas — daftar yang sudah tampak
+                   tak bergeser. */
                 <div className="mt-4 flex flex-col items-center gap-2 sm:mt-5 panggung:mt-[22px]">
                   <p className="text-[length:var(--ukuran-catatan)] text-black/55">
                     Menampilkan {kartuTampak.length} dari {tampil.length} laporan
                   </p>
                   <button
                     type="button"
-                    onClick={() => setJumlahKartu((n) => Math.min(n + BATAS_KARTU, MAKS_KARTU))}
+                    onClick={() => setJumlahKartu((n) => n + KARTU_PER_BARIS)}
                     className="flex min-h-[38px] cursor-pointer items-center gap-1.5 rounded-lg border border-black/15
                                bg-white px-4 py-1.5 text-xs sm:text-sm font-semibold text-tinta shadow-xs
                                transition-colors hover:border-black/30 hover:bg-black/[0.03]
