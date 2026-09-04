@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { galeriTersimpan } from "@/lib/media";
 import { bacaSesi, bolehKelola } from "@/lib/sesi";
+import { updateTag } from "next/cache";
 import { simpanKejadian } from "@/lib/simpan-kejadian";
 import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { FormKejadian } from "../form";
@@ -34,6 +35,9 @@ export default async function Ubah({
 
     const hasil = await simpanKejadian(data, id);
     if (!hasil.ok) redirect(`/admin/kejadian/${id}?galat=${encodeURIComponent(hasil.galat)}`);
+    try {
+      updateTag("kejadian");
+    } catch {}
     redirect("/admin/kejadian");
   }
 
@@ -43,6 +47,9 @@ export default async function Ubah({
     // Menghapus hanya untuk admin — editor boleh menulis, tidak membuang.
     if (!s || s.peran !== "admin") redirect("/admin/kejadian");
     await prisma.events.delete({ where: { id } });
+    try {
+      updateTag("kejadian");
+    } catch {}
     redirect("/admin/kejadian");
   }
 

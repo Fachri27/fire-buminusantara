@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 /**
  * Penyegar otomatis halaman publik — supaya pengunjung tidak perlu hard reload.
  *
- * Halaman kita `force-dynamic`, jadi datanya segar setiap kali dimuat. Tapi
- * selama pengunjung berdiam di satu halaman (SPA, tanpa navigasi), props dari
- * Server Component tidak pernah diperbarui: kejadian baru yang masuk lewat CMS
- * tidak akan muncul sampai halaman dimuat ulang. Hook ini memanggil
+ * Di bawah Cache Components setiap halaman dinamis secara bawaan, jadi datanya
+ * segar setiap kali dimuat — dulu itu dijamin ekspor `force-dynamic`, yang kini
+ * sudah tidak ada di mana pun. Tapi selama pengunjung berdiam di satu halaman
+ * (SPA, tanpa navigasi), props dari Server Component tidak pernah diperbarui:
+ * kejadian baru yang masuk lewat CMS tidak akan muncul sampai halaman dimuat
+ * ulang. Hook ini memanggil
  * `router.refresh()` — yang memuat ulang Server Component TANPA me-reload
  * dokumen — tepat saat tab kembali terlihat (balik dari tab/aplikasi lain).
  *

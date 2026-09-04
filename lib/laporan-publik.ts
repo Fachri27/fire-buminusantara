@@ -468,6 +468,9 @@ export async function aturStatusLaporan(
   } finally {
     try {
       updateTag("tunggakan");
+      // Laporan yang disetujui naik jadi kejadian publik baru — metadata slug
+      // di halaman rincian di-cache, jadi tagnya ikut dibatalkan di sini.
+      updateTag("kejadian");
     } catch {}
     umumkanTunggakan();
   }

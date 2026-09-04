@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { bacaSesi, bolehKelola } from "@/lib/sesi";
+import { updateTag } from "next/cache";
 import { simpanKejadian } from "@/lib/simpan-kejadian";
 import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { FormKejadian } from "../form";
@@ -22,6 +23,11 @@ export default async function Tambah({
 
     const hasil = await simpanKejadian(data);
     if (!hasil.ok) redirect(`/admin/kejadian/baru?galat=${encodeURIComponent(hasil.galat)}`);
+    // Metadata slug di halaman publik di-cache; tanpa ini pratinjau bagikan
+    // kejadian baru bisa basi sampai cache-nya kedaluwarsa sendiri.
+    try {
+      updateTag("kejadian");
+    } catch {}
     redirect("/admin/kejadian");
   }
 

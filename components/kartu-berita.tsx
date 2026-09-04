@@ -86,6 +86,11 @@ export function KartuBerita({ k, aktif, kurangiGerak, bahasa = "id", onPilih, on
             <h2 className="contents">
               <Link
                 href={isi.slug ? `/${bahasa}/fire/${isi.slug}` : `/${bahasa}`}
+                // href-nya untuk crawler dan klik-tengah; navigasi in-app
+                // sengaja lewat pop-up di bawah, jadi rute tujuannya tidak
+                // pernah benar-benar dikunjungi dari sini. Memprefetch-nya
+                // hanya membuang kerja server per kartu.
+                prefetch={false}
                 onClick={(e) => {
                   // Allow middle click / ctrl click / cmd click to open in new tab naturally
                   if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
@@ -115,6 +120,11 @@ export function KartuBerita({ k, aktif, kurangiGerak, bahasa = "id", onPilih, on
             <h2 className="contents">
               <Link
                 href={isi.slug ? `/${bahasa}/fire/${isi.slug}` : `/${bahasa}`}
+                // href-nya untuk crawler dan klik-tengah; navigasi in-app
+                // sengaja lewat pop-up di bawah, jadi rute tujuannya tidak
+                // pernah benar-benar dikunjungi dari sini. Memprefetch-nya
+                // hanya membuang kerja server per kartu.
+                prefetch={false}
                 onClick={(e) => {
                   // Allow middle click / ctrl click / cmd click to open in new tab naturally
                   if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {

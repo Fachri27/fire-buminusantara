@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { cacheLife, cacheTag } from "next/cache";
 import { ambilBerita, ambilBeritaSlug, hitungLaporanProvinsi } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { JsonLd } from "@/components/json-ld";
@@ -42,11 +43,36 @@ type Props = {
   params: Promise<{ locale: string; slug: string }>;
 };
 
+/**
+ * Bahan metadata satu kejadian, di-cache.
+ *
+ * Tanpa cache, generateMetadata membaca database saat prerender dan rute ini
+ * jadi blocking. Insight yang muncul adalah `blocking-prerender-current-time`
+ * — dan `Date.now()`-nya bukan milik kode ini melainkan milik driver database;
+ * dibuktikan dengan bisect sampai ke kueri Prisma telanjang. Yang salah bukan
+ * jam yang dibaca, melainkan pembacaan tanpa cache-nya.
+ *
+ * Ditandai "kejadian": setiap penyimpanan, promosi laporan, dan penghapusan di
+ * CMS memanggil updateTag("kejadian"), jadi judul dan deskripsi pratinjau
+ * bagikan tidak pernah basi meski di-cache.
+ *
+ * Slug tak dikenal ikut di-cache sebagai null — itu memang yang diinginkan:
+ * 404 tetap 404 sampai kejadiannya benar-benar dibuat, dan pembuatannya
+ * membatalkan tag ini.
+ */
+async function ambilMetaKejadian(slug: string) {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("kejadian");
+  const [kejadian, seo] = await Promise.all([ambilBeritaSlug(slug), ambilRincianSeo(slug)]);
+  return { kejadian, seo };
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
   if (!adaBahasa(locale)) notFound();
 
-  const [kejadian, seo] = await Promise.all([ambilBeritaSlug(slug), ambilRincianSeo(slug)]);
+  const { kejadian, seo } = await ambilMetaKejadian(slug);
   if (!kejadian) {
     notFound();
   }
