@@ -172,9 +172,9 @@ export function PopupPeta({
               terbaca seperti dua kelompok tab yang berbeda. Bilah gulirnya
               disembunyikan — yang menandai masih ada lanjutannya adalah label
               yang terpotong di tepi. */}
-          <div ref={relRef} role="tablist" aria-label="Pulau"
-               className="tanpa-bilah-gulir flex w-full min-w-0 items-center gap-4 overflow-x-auto
-                          panggung:w-auto panggung:justify-end panggung:overflow-visible">
+          <div ref={relRef} role="tablist" aria-label="Pulau" data-lenis-prevent
+                className="tanpa-bilah-gulir flex w-full min-w-0 items-center gap-4 overflow-x-auto
+                           panggung:w-auto panggung:justify-end panggung:overflow-visible">
             {PULAU_TAB.map((t) => (
               <button key={t.kunci} type="button" role="tab"
                       aria-selected={tabAktif === t.kunci}
@@ -189,8 +189,13 @@ export function PopupPeta({
           </div>
         </div>
 
-        {/* Daftar berita */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-[clamp(14px,3.4vw,20px)] panggung:px-[28px]">
+        {/* Daftar berita — data-lenis-prevent WAJIB: pop-up dibuka bersama
+            lenis.stop(), dan Lenis mencegat-preventDefault SEMUA gestur gulir
+            (roda maupun sentuh) yang tidak berlabel ini. Tanpa label, daftar
+            tidak bisa digulir sama sekali saat pop-up terbuka. overscroll-
+            contain menahan rantai gulir agar tidak bocor ke halaman belakang. */}
+        <div data-lenis-prevent
+             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[clamp(14px,3.4vw,20px)] panggung:px-[28px]">
           {tampil.length > 0 ? (
             <ul>
               {tampil.map(({ b, i }) => {

@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { Tunggakan } from "@/lib/tunggakan";
+import { gunakanTunggakan } from "./tunggakan-hidup";
+import { Segarkan } from "./segarkan";
 
 const TAUTAN: { href: string; label: string; tepat?: boolean; admin?: boolean }[] = [
   { href: "/admin", label: "Ringkasan", tepat: true },
@@ -39,8 +42,12 @@ function Tunggak({ jumlah, terang }: { jumlah: number; terang: boolean }) {
 
 /** Angka tunggakan per halaman. Dulu hanya komentar yang punya, jadi lencananya
  *  ditulis langsung di satu cabang if; sekarang ada dua antrean, dan
- *  menambahkan cabang kedua akan mengundang cabang ketiga. */
-export type Tunggakan = { belumDitinjau: number; laporanMenunggu: number };
+ *  menambahkan cabang kedua akan mengundang cabang ketiga.
+ *
+ *  Bentuknya tinggal di lib/tunggakan.ts sekarang: rute aliran SSE dan layout
+ *  server sama-sama memakainya, dan tak satu pun boleh mengimpor modul klien
+ *  ini demi sebuah tipe. */
+export type { Tunggakan };
 
 function tunggakanUntuk(href: string, t: Tunggakan): number {
   if (href === "/admin/komentar") return t.belumDitinjau;
@@ -50,6 +57,8 @@ function tunggakanUntuk(href: string, t: Tunggakan): number {
 
 export function MenuAdmin({ tunggakan, peran }: { tunggakan: Tunggakan; peran: string }) {
   const jalur = usePathname();
+  // Angka hidup dari aliran SSE; prop server jadi cadangannya.
+  const angka = gunakanTunggakan(tunggakan);
 
   return (
     <nav aria-label="Bagian CMS" className="flex flex-col">
@@ -59,7 +68,7 @@ export function MenuAdmin({ tunggakan, peran }: { tunggakan: Tunggakan; peran: s
           <Link key={t.href} href={t.href} aria-current={aktif ? "page" : undefined}
                 className="cms-tautan">
             {t.label}
-            <Tunggak jumlah={tunggakanUntuk(t.href, tunggakan)} terang />
+            <Tunggak jumlah={tunggakanUntuk(t.href, angka)} terang />
           </Link>
         );
       })}
@@ -69,13 +78,14 @@ export function MenuAdmin({ tunggakan, peran }: { tunggakan: Tunggakan; peran: s
 
 export function MenuAdminAtas({ tunggakan, peran }: { tunggakan: Tunggakan; peran: string }) {
   const jalur = usePathname();
+  const angka = gunakanTunggakan(tunggakan);
 
   return (
     <nav aria-label="Bagian CMS"
          className="tanpa-bilah-gulir flex gap-1 overflow-x-auto border-t border-white/10 px-2 py-1.5">
       {tautannya(peran).map((t) => {
         const aktif = sedangDibuka(jalur, t);
-        const menunggu = tunggakanUntuk(t.href, tunggakan);
+        const menunggu = tunggakanUntuk(t.href, angka);
         return (
           <Link key={t.href} href={t.href} aria-current={aktif ? "page" : undefined}
                 className={`cms-mata shrink-0 rounded-[3px] px-2.5 py-1.5 whitespace-nowrap transition-colors ${
@@ -88,6 +98,11 @@ export function MenuAdminAtas({ tunggakan, peran }: { tunggakan: Tunggakan; pera
           </Link>
         );
       })}
+      {/* Segarkan di ujung baris gulir — satu tombol untuk semua halaman
+          sempit, sama seperti di kaki sidebar desktop. */}
+      <span className="flex shrink-0 items-center pl-1">
+        <Segarkan label="Segarkan" />
+      </span>
     </nav>
   );
 }

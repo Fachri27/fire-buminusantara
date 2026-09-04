@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -58,29 +59,76 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function HalamanLapor({ params }: Props) {
-  const { locale } = await params;
-  if (!adaBahasa(locale)) notFound();
-
-  const bahasa = locale as Bahasa;
-  const teks = TEKS_LAPOR[bahasa];
-
+// Kerangka halaman SENGAJA tidak async dan tidak menyentuh `params`: App Shell
+// rute ini dipakai bersama /id/lapor dan /en/lapor, jadi membaca segmen
+// [locale] di sini mengikat shell-nya ke satu URL (insight
+// instant-shell-url-data). Alas dan geometri kolom tetap tinggal di shell;
+// yang berbahasa turun ke dalam <Suspense>.
+export default function HalamanLapor({ params }: Props) {
   return (
     // <html> berlatar gelap untuk panggung beranda; halaman ini bidang tulis,
     // jadi ia membawa alas terangnya sendiri.
     <div className="min-h-screen bg-[#faf8f5] text-tinta">
-      <KopLapor bahasa={bahasa} />
+      <Suspense fallback={<KerangkaKop />}>
+        <KopLokal params={params} />
+      </Suspense>
 
       <main className="mx-auto w-full max-w-[680px] px-[var(--pias)] pt-10 pb-20">
-        <h1 className="text-[clamp(24px,6vw,32px)] leading-tight font-semibold">
-          {teks.judulHalaman}
-        </h1>
-        <p className="mt-3 mb-9 max-w-[52ch] text-[14px] leading-[1.6] text-tinta/60">
-          {teks.catatan}
-        </p>
-
-        <FormLaporan bahasa={bahasa} />
+        <Suspense fallback={<KerangkaIsi />}>
+          <IsiLapor params={params} />
+        </Suspense>
       </main>
+    </div>
+  );
+}
+
+async function KopLokal({ params }: Props) {
+  const { locale } = await params;
+  // Backstop: proxy.ts sudah menjamin prefiks /id atau /en sebelum permintaan
+  // sampai ke sini, jadi cabang ini praktis tak terjangkau.
+  if (!adaBahasa(locale)) notFound();
+  return <KopLapor bahasa={locale} />;
+}
+
+async function IsiLapor({ params }: Props) {
+  const { locale } = await params;
+  if (!adaBahasa(locale)) notFound();
+  const teks = TEKS_LAPOR[locale];
+
+  return (
+    <>
+      <h1 className="text-[clamp(24px,6vw,32px)] leading-tight font-semibold">
+        {teks.judulHalaman}
+      </h1>
+      <p className="mt-3 mb-9 max-w-[52ch] text-[14px] leading-[1.6] text-tinta/60">
+        {teks.catatan}
+      </p>
+
+      <FormLaporan bahasa={locale} />
+    </>
+  );
+}
+
+/** Bilah kosong setinggi kepala aslinya (h-16, sticky): isi di bawahnya tidak
+ *  melompat saat kepala berbahasa menggantikannya. */
+function KerangkaKop() {
+  return (
+    <header className="sticky top-0 z-50 h-16 w-full border-b border-black/[0.06]
+                       bg-white/85 backdrop-blur-md" />
+  );
+}
+
+/** Judul dan catatan menahan tingginya sendiri supaya formulir di bawahnya
+ *  tidak bergeser. Teksnya tidak bisa tahu bahasa halaman — itu data URL —
+ *  jadi bawaannya Indonesia, sama seperti KerangkaBeranda. */
+function KerangkaIsi() {
+  return (
+    <div role="status">
+      <p className="sr-only">Memuat formulir laporan…</p>
+      <div aria-hidden="true">
+        <div className="h-[clamp(24px,6vw,32px)] w-3/4 animate-pulse rounded bg-black/[0.06]" />
+        <div className="mt-3 mb-9 h-[42px] max-w-[52ch] animate-pulse rounded bg-black/[0.04]" />
+      </div>
     </div>
   );
 }

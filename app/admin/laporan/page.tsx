@@ -5,8 +5,10 @@ import {
   daftarLaporan, adaStatus, NAMA_STATUS,
   type Lampiran, type StatusLaporan,
 } from "@/lib/laporan-publik";
+import { peringatanLokasi } from "@/lib/provinsi-titik";
 import { HALAMAN, KopHalaman } from "../kop-halaman";
 import { Paginasi } from "../paginasi";
+import { Segarkan } from "../segarkan";
 import { TombolVerifikasi } from "./tombol-verifikasi";
 
 const PER_HALAMAN = 15;
@@ -73,6 +75,7 @@ export default async function Laporan({
           })}
         </nav>
         <p className="cms-angka ml-auto text-[12.5px] text-[var(--lirih)]">{total} laporan</p>
+        <Segarkan />
       </div>
 
       {daftar.length === 0 ? (
@@ -106,6 +109,16 @@ export default async function Laporan({
                       )}
                       {l.status === "rejected" && (
                         <span className="cms-cap cms-cap--diam">Ditolak</span>
+                      )}
+                      {/* Kewajaran lokasi dicek di daftar juga, bukan cuma di
+                          halaman detail: peninjau yang memverifikasi langsung
+                          dari baris ini harus melihat sinyal yang sama.
+                          Murni komputasi lokal (Turf + teks), 15 baris tak
+                          menambah beban berarti. */}
+                      {peringatanLokasi(l.lat, l.lng, `${l.judul}\n${l.deskripsi}`) !== null && (
+                        <span className="cms-cap cms-cap--perhatian" title="Koordinat janggal — buka detail untuk penjelasannya">
+                          Cek lokasi
+                        </span>
                       )}
                     </div>
 

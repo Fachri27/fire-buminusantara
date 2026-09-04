@@ -1,4 +1,4 @@
-import data from "./wilayah-data.json";
+import data from "./wilayah-data.json" with { type: "json" };
 
 /**
  * Pembacaan wilayah dari kolom `location` sebuah kejadian.

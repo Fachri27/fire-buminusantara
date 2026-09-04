@@ -6,6 +6,8 @@
  * bukan cuma nama layer — atributnya berbeda: kabupaten memakai level_4 (nama)
  * + luas, provinsi memakai level_3 (nama) + deforestas.
  */
+import { cacheLife } from "next/cache";
+
 export const WMS_URL = "https://aws.simontini.id/geoserver/wms";
 export const WFS_URL = "https://aws.simontini.id/geoserver/wfs";
 export const WMS_LAYER = "proteus:PROVINSI_STADI_2025";
@@ -90,7 +92,21 @@ export type ProvinsiTeratas = {
 
 /** Tiga provinsi dengan luas kebakaran terbesar. Urut menurun dengan null
  *  dikecualikan — tanpa filter itu server menaruh nilai kosong lebih dulu. */
-export async function ambilTigaTeratas(): Promise<ProvinsiTeratas[]> {
+/**
+ * Pengambilan yang di-cache. SENGAJA tanpa try/catch: kalau GeoServer gagal,
+ * galatnya harus lolos ke pemanggil supaya TIDAK ADA yang tersimpan. Menaruh
+ * `catch { return [] }` di dalam sini berarti satu gangguan sesaat membekukan
+ * daftar kosong selama sejam penuh.
+ */
+async function tigaTeratasTercache(): Promise<ProvinsiTeratas[]> {
+  "use cache";
+  // Dulu `next: { revalidate: 3600 }` pada fetch-nya. Di bawah Cache Components
+  // opsi cache pada fetch pindah ke sini sebagai cacheLife; profil "hours"
+  // adalah padanan terdekat satu jam. Angka luas kebakaran per provinsi
+  // berubah paling cepat harian, jadi itu lebih dari cukup — dan tanpa cache
+  // setiap kunjungan menunggu GeoServer.
+  cacheLife("hours");
+
   const params = new URLSearchParams({
     service: "WFS", version: "1.1.0", request: "GetFeature",
     typeName: WMS_LAYER,
@@ -101,24 +117,25 @@ export async function ambilTigaTeratas(): Promise<ProvinsiTeratas[]> {
     CQL_FILTER: `${BIDANG_LUAS} IS NOT NULL`,
   });
 
+  // Batas waktunya ada supaya layanan yang menggantung tidak ikut
+  // menggantungkan render halaman — daftar kosong lebih baik.
+  const r = await fetch(`${WFS_URL}?${params}`, {
+    signal: AbortSignal.timeout(6000),
+  });
+  const data = await r.json();
+  return (data?.features ?? []).map(
+    (f: { properties: Record<string, string | number> }, i: number) => ({
+      peringkat: i + 1,
+      nama: String(f.properties[BIDANG_NAMA]),
+      pulau: String(f.properties[BIDANG_PULAU]),
+      luas: Math.round(Number(f.properties[BIDANG_LUAS])).toLocaleString("id-ID"),
+    }),
+  );
+}
+
+export async function ambilTigaTeratas(): Promise<ProvinsiTeratas[]> {
   try {
-    // Halaman ini force-dynamic, jadi tanpa revalidate setiap kunjungan
-    // menunggu GeoServer; angkanya sendiri berubah paling cepat harian.
-    // Batas waktunya ada supaya layanan yang menggantung tidak ikut
-    // menggantungkan render halaman — daftar kosong lebih baik.
-    const r = await fetch(`${WFS_URL}?${params}`, {
-      next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(6000),
-    });
-    const data = await r.json();
-    return (data?.features ?? []).map(
-      (f: { properties: Record<string, string | number> }, i: number) => ({
-        peringkat: i + 1,
-        nama: String(f.properties[BIDANG_NAMA]),
-        pulau: String(f.properties[BIDANG_PULAU]),
-        luas: Math.round(Number(f.properties[BIDANG_LUAS])).toLocaleString("id-ID"),
-      }),
-    );
+    return await tigaTeratasTercache();
   } catch {
     return [];
   }

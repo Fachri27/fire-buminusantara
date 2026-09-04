@@ -65,6 +65,9 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const [captchaToken, setCaptchaToken] = useState("");
   const [galatKlien, setGalatKlien] = useState("");
   const [mencariLokasi, setMencariLokasi] = useState(false);
+  /** Dari mana lat/lng terisi terakhir: "foto" = GPS foto (caption kecil),
+   *  null = ketikan/geolokasi (tanpa caption). */
+  const [sumberLokasi, setSumberLokasi] = useState<"foto" | null>(null);
   /** Pratinjau per berkas: key = kunciBerkas(b), nilai = URL objek lokal. */
   const [pratinjau, setPratinjau] = useState<Record<string, string>>({});
 
@@ -73,6 +76,15 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const widgetRef = useRef<number | null>(null);
   const sedangKirimRef = useRef(false);
   const lokasiAktifRef = useRef(true);
+  // Nilai lat/lng terkini untuk pengecekan di dalam callback async (isi GPS
+  // foto): state yang dibaca langsung bisa basi setelah await. Diselaraskan
+  // di efek (bukan saat render) agar tidak melanggar aturan refs React.
+  const latRef = useRef(lat);
+  const lngRef = useRef(lng);
+  useEffect(() => {
+    latRef.current = lat;
+    lngRef.current = lng;
+  });
   // Semua URL objek yang pernah dibuat, dilepas saat komponen diturunkan
   // atau saat laporan sukses terkirim.
   const urlRef = useRef<string[]>([]);
@@ -255,6 +267,44 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     setBerkas(gabungan);
     sinkronkanKeInput(gabungan);
     if (berkasRef.current) berkasRef.current.value = "";
+
+    // GPS foto → isi lat/lng yang masih kosong (tanpa menimpa ketikan atau
+    // "lokasi saya"). exifr diimpor dinamis supaya tidak memberatkan bundel
+    // awal halaman. Video dilewati di sini (GPS-nya hanya dibaca server);
+    // foto tanpa GPS dilewati diam-diam — server tetap mencoba saat terima.
+    if (latRef.current.trim() === "" && lngRef.current.trim() === "") {
+      void isiDariGpsFoto(gabungan);
+    }
+  }
+
+  /** Baca GPS dari foto pertama yang punya; isi field bila masih kosong. */
+  async function isiDariGpsFoto(daftar: File[]) {
+    try {
+      const { default: exifr } = await import("exifr");
+      for (const b of daftar) {
+        if (!b.type.startsWith("image/")) continue;
+        const gps = (await exifr.gps(b).catch(() => null)) as {
+          latitude?: unknown; longitude?: unknown;
+        } | null;
+        if (
+          !gps || typeof gps.latitude !== "number" || typeof gps.longitude !== "number" ||
+          !Number.isFinite(gps.latitude) || !Number.isFinite(gps.longitude)
+        ) {
+          continue;
+        }
+        if (!lokasiAktifRef.current) return;
+        // Pengguna mungkin mengetik manual selama pembacaan berlangsung —
+        // jangan timpa isian yang sudah ada saat ini.
+        if (latRef.current.trim() !== "" || lngRef.current.trim() !== "") return;
+        // Tujuh desimal, sama seperti "lokasi saya" dan kolom DECIMAL(10,7).
+        setLat(gps.latitude.toFixed(7));
+        setLng(gps.longitude.toFixed(7));
+        setSumberLokasi("foto");
+        return;
+      }
+    } catch {
+      /* tanpa GPS: biarkan kosong */
+    }
   }
 
   function hapusBerkasDipilih(kunci: string, url: string | undefined) {
@@ -287,6 +337,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         // lebih dari itu hanya akan dipotong basis data.
         setLat(posisi.coords.latitude.toFixed(7));
         setLng(posisi.coords.longitude.toFixed(7));
+        setSumberLokasi(null);
       },
       () => {
         if (!lokasiAktifRef.current) return;
@@ -414,13 +465,13 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
           <label className="grid gap-1.5">
             <span className="text-[12px] text-tinta/50">{teks.lat}</span>
             <input id="lapor-lat" name="lat" inputMode="decimal" placeholder="-1.2345678"
-                   value={lat} onChange={(e) => setLat(e.target.value)}
+                   value={lat} onChange={(e) => { setLat(e.target.value); setSumberLokasi(null); }}
                    className={`${ISIAN} w-40`} />
           </label>
           <label className="grid gap-1.5">
             <span className="text-[12px] text-tinta/50">{teks.lng}</span>
             <input id="lapor-lng" name="lng" inputMode="decimal" placeholder="113.4567890"
-                   value={lng} onChange={(e) => setLng(e.target.value)}
+                   value={lng} onChange={(e) => { setLng(e.target.value); setSumberLokasi(null); }}
                    className={`${ISIAN} w-40`} />
           </label>
           <button type="button" onClick={lokasiSaya} disabled={mencariLokasi}
@@ -428,6 +479,9 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
             {mencariLokasi ? teks.mencariLokasi : teks.pakaiLokasi}
           </button>
         </div>
+        {sumberLokasi === "foto" && (
+          <p className="mt-1.5 text-[12px] text-tinta/50">{teks.lokasiDariFoto}</p>
+        )}
       </Bidang>
 
       <Bidang id="lapor-nama" label={teks.labelNama}>
