@@ -75,7 +75,13 @@ export async function generateMetadata({ params }: PageProps<'/[locale]'>): Prom
 // seketika, sementara data di bawah ini masih diambil. Tanpa pemisahan ini
 // HTML baru tiba setelah seluruh kueri selesai dan pengunjung menatap
 // layar kosong selama itu.
-async function IsiHalaman({ bahasa }: { bahasa: Bahasa }) {
+//
+// `params` DI-AWAIT DI SINI, bukan di komponen halaman: App Shell di bawah
+// Partial Prefetching dipakai bersama /id dan /en, jadi pembacaan data URL
+// harus berada di dalam <Suspense>.
+async function IsiHalaman({ params }: Pick<PageProps<'/[locale]'>, 'params'>) {
+  const { locale } = await params;
+  const bahasa: Bahasa = adaBahasa(locale) ? locale : "id";
   await connection();
   const [berita, jumlahLaporan, tigaTeratas, statistik] = await Promise.all([
     ambilBerita(),
@@ -95,8 +101,14 @@ async function IsiHalaman({ bahasa }: { bahasa: Bahasa }) {
   );
 }
 
-export default async function Halaman({ params }: PageProps<'/[locale]'>) {
+// Kepala halaman yang bergantung locale — JSON-LD, Nav, dan H1. Ketiganya
+// membaca segmen [locale], jadi mereka pun harus berada di dalam <Suspense>:
+// App Shell rute /[locale] dipakai bersama /id dan /en, dan data URL di
+// luar boundary mengikatnya ke satu URL (insight instant-shell-url-data).
+async function KepalaLokal({ params }: Pick<PageProps<'/[locale]'>, 'params'>) {
   const { locale } = await params;
+  // Backstop: proxy.ts sudah menjamin prefiks /id atau /en sebelum permintaan
+  // sampai ke sini, jadi cabang ini praktis tak terjangkau.
   if (!adaBahasa(locale)) notFound();
 
   // Basis absolut disamakan dengan metadataBase di layout akar supaya URL
@@ -135,7 +147,10 @@ export default async function Halaman({ params }: PageProps<'/[locale]'>) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(skemaSitus) }}
       />
-      <Nav bahasa={locale as Bahasa} />
+      {/* Nav membaca pathname (data URL) — sudah tercakup boundary di atas.
+          Bilahnya fixed h-16 dan isi halaman sudah menghitung jarak aman
+          darinya, jadi fallback kosong tidak menggeser apa pun. */}
+      <Nav bahasa={locale} />
       {/* H1 ikut bahasa halaman — satu H1 berbahasa salah per URL merusak
           relevansi kata kunci untuk versi Inggrisnya. */}
       <h1 className="sr-only">
@@ -143,10 +158,25 @@ export default async function Halaman({ params }: PageProps<'/[locale]'>) {
           ? "Forest and land fire monitoring in Indonesia"
           : "Pantauan kebakaran hutan dan lahan Indonesia"}
       </h1>
+    </>
+  );
+}
+
+// Kerangka halaman SENGAJA tidak async dan tidak menyentuh `params`: semua
+// yang bergantung URL turun ke dalam <Suspense> di bawah, sehingga App Shell
+// rute ini tetap bisa diprerender sekali dan dipakai ulang oleh /id dan /en.
+export default function Halaman({ params }: PageProps<'/[locale]'>) {
+  return (
+    <>
+      <Suspense fallback={null}>
+        <KepalaLokal params={params} />
+      </Suspense>
       {/* Kerangka pemuatan menahan geometri dua layar supaya isi yang
-          menggantikannya tidak menggeser tata letak saat data tiba. */}
-      <Suspense fallback={<KerangkaBeranda bahasa={locale as Bahasa} />}>
-        <IsiHalaman bahasa={locale as Bahasa} />
+          menggantikannya tidak menggeser tata letak saat data tiba. Fallback
+          tidak boleh tahu locale (itu data URL), jadi KerangkaBeranda memakai
+          bawaannya — yang berbeda hanya teks sr-only "Memuat…". */}
+      <Suspense fallback={<KerangkaBeranda />}>
+        <IsiHalaman params={params} />
       </Suspense>
     </>
   );

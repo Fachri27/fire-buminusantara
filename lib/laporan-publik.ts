@@ -1,5 +1,6 @@
-import { revalidateTag } from "next/cache";
+import { updateTag } from "next/cache";
 import { prisma } from "./prisma";
+import { umumkanTunggakan } from "./loket-tunggakan";
 import { bacaBerkasMedia, urlMedia, type BerkasMedia, type Orientasi } from "./media";
 import { simpanBerkasGaleri, hapusBerkas, gpsDariBerkas, exifDariPath, type ExifFoto } from "./unggah";
 import { turnstileSah } from "./turnstile";
@@ -228,6 +229,12 @@ export async function simpanLaporanPublik(
     };
   }
 
+  // Antrean "Laporan Warga" baru saja bertambah satu. Tidak ada updateTag di
+  // sini — hitungannya memang tak di-cache — tapi tab CMS yang sedang terbuka
+  // perlu diberi tahu, kalau tidak lencananya baru berubah pada navigasi
+  // berikutnya.
+  umumkanTunggakan();
+
   return { ok: true };
 }
 
@@ -394,8 +401,12 @@ export async function aturStatusLaporan(
     }
 
     try {
-      revalidateTag("tunggakan", "max");
+      // Segera kedaluwarsa (bukan stale-while-revalidate): angka tunggakan di
+      // menu harus berubah pada refresh berikutnya, bukan pada muat ulang
+      // setelahnya. revalidateTag(tag, "max") memberi jendela basi terpanjang.
+      updateTag("tunggakan");
     } catch {}
+    umumkanTunggakan();
     return { ok: true, idKejadian: null };
   }
 
@@ -456,8 +467,9 @@ export async function aturStatusLaporan(
     };
   } finally {
     try {
-      revalidateTag("tunggakan", "max");
+      updateTag("tunggakan");
     } catch {}
+    umumkanTunggakan();
   }
 }
 
@@ -476,8 +488,9 @@ export async function hapusLaporan(id: number) {
   }
   await prisma.public_reports.delete({ where: { id } });
   try {
-    revalidateTag("tunggakan", "max");
+    updateTag("tunggakan");
   } catch {}
+  umumkanTunggakan();
 }
 
 /** Simpan pilihan orientasi (potret/lanskap) satu lampiran saat diverifikasi.
