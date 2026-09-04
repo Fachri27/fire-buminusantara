@@ -39,22 +39,6 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
     onPilihRef.current = onPilihWilayah;
   }, [onPilihWilayah]);
 
-  // Deteksi layar mobile (< 640px) untuk mengatur zoom awal peta Windy yang optimal
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const periksaUkuran = () => {
-      if (hasOpenedWindy) return;
-      const isMobile = window.innerWidth < 640;
-      setWindySrc(
-        isMobile
-          ? "/api/forecasting?lat=-1.000&lon=118.000&zoom=3.8"
-          : "/api/forecasting?lat=0.200&lon=118.000&zoom=5"
-      );
-    };
-    periksaUkuran();
-    window.addEventListener("resize", periksaUkuran);
-    return () => window.removeEventListener("resize", periksaUkuran);
-  }, [hasOpenedWindy]);
 
   // Aktifkan pemuatan iframe saat pertama kali beralih ke mode Windy
   const handlePilihMode = (m: "asap" | "windy") => {
@@ -321,7 +305,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Data</span>
                       <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Indeks Kualitas Udara (<strong className="text-white font-medium">AQI</strong>) sensor darat + CAMS, dipadukan hembusan angin model <strong className="text-white font-medium">ECMWF IFS</strong>.
+                        Indeks Kualitas Udara (<strong className="text-white font-medium">AQI</strong>) berbasis model atmosfer <strong className="text-white font-medium">Copernicus CAMS</strong>, dipadukan hembusan angin model <strong className="text-white font-medium">ECMWF IFS</strong>.
                       </p>
                     </div>
                     <div>

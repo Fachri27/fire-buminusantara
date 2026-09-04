@@ -221,6 +221,33 @@ function getInitialMapPos(): { center: [number, number]; zoom: number } {
   };
 }
 
+const SINKRON_SELESAI_KEY = "cams_sebaran_asap_selesai";
+const METADATA_CACHE_KEY = "cams_sebaran_asap_metadata";
+
+function cekSelesaiSesi(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return sessionStorage.getItem(SINKRON_SELESAI_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function ambilMetadataSesi(): ZarrMetadataResponse | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(METADATA_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Modul-level cache agar frame & metadata bertahan saat navigasi antar-halaman
+let globalZarrMetadata: ZarrMetadataResponse | null = null;
+const globalFrameCache: Record<string, Uint8Array> = {};
+let globalSyncSelesai = false;
+
 export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange }: Props) {
   const wadahPetaRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -243,18 +270,29 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   }, [jumlahLaporan]);
 
   // Status linimasa
-  const [linimasa, setLinimasa] = useState<ZarrTimestepMeta[]>(buatLinimasaDefault);
+  const [linimasa, setLinimasa] = useState<ZarrTimestepMeta[]>(() => {
+    if (globalZarrMetadata?.timesteps?.length) return globalZarrMetadata.timesteps;
+    const sesi = ambilMetadataSesi();
+    if (sesi?.timesteps?.length) {
+      globalZarrMetadata = sesi;
+      return sesi.timesteps;
+    }
+    return buatLinimasaDefault();
+  });
   const [indeksAktif, setIndeksAktif] = useState(0);
   const [memutar, setMemutar] = useState(true);
   const [kecepatan, setKecepatan] = useState<1 | 2>(1);
-  const [jumlahFrameTerunduh, setJumlahFrameTerunduh] = useState(0);
+  const [jumlahFrameTerunduh, setJumlahFrameTerunduh] = useState(() => Object.keys(globalFrameCache).length);
   const [gayaVisual, setGayaVisual] = useState<"copernicus" | "sh_Oranges_aod" | "sh_all_aod">("copernicus");
   const [legendaTerbuka, setLegendaTerbuka] = useState(false);
 
   // Status sinkronisasi data sebaran asap (Fullscreen Blocking Overlay)
-  const [sedangSync, setSedangSync] = useState(true);
-  const [statusSync, setStatusSync] = useState("Menghubungkan ke satelit…");
-  const [progresSync, setProgresSync] = useState(0);
+  // Bila data sudah lengkap di memori atau sesi sebelumnya, jangan tampilkan overlay blocking
+  const [sedangSync, setSedangSync] = useState(() => {
+    if (globalSyncSelesai) return false;
+    return !cekSelesaiSesi();
+  });
+  const [progresSync, setProgresSync] = useState(() => (globalSyncSelesai || cekSelesaiSesi() ? 100 : 5));
   const [galatSync, setGalatSync] = useState<string | null>(null);
   const [waktuTungguLama, setWaktuTungguLama] = useState(false);
   const syncRunningRef = useRef(false);
@@ -267,16 +305,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
   // Pantau durasi tunggu agar pengguna dapat melewati jika koneksi lambat
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    if (sedangSync) {
-      timer = setTimeout(() => {
-        setWaktuTungguLama(true);
-      }, 10000);
-    } else {
-      setWaktuTungguLama(false);
-    }
+    if (!sedangSync) return;
+    const timer = setTimeout(() => {
+      setWaktuTungguLama(true);
+    }, 10000);
     return () => {
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
     };
   }, [sedangSync]);
 
@@ -298,7 +332,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const currentMixValRef = useRef<number>(0);
 
   // Cache buffer biner Uint8Array (405,900 bytes per frame global 900x451)
-  const frameCacheRef = useRef<Record<string, Uint8Array>>({});
+  const frameCacheRef = useRef<Record<string, Uint8Array>>(globalFrameCache);
 
   // Animation loop timing
   const progressRef = useRef<number>(0);
@@ -407,6 +441,10 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     if (frameCacheRef.current[key]) {
       return frameCacheRef.current[key];
     }
+    if (globalFrameCache[key]) {
+      frameCacheRef.current[key] = globalFrameCache[key];
+      return globalFrameCache[key];
+    }
     const ongoing = inFlightRequestsRef.current.get(key);
     if (ongoing) {
       return ongoing;
@@ -420,6 +458,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         if (!res.ok) return null;
         const arrayBuf = await res.arrayBuffer();
         const u8 = new Uint8Array(arrayBuf);
+        globalFrameCache[key] = u8;
         frameCacheRef.current[key] = u8;
         setJumlahFrameTerunduh((prev) => prev + 1);
         if (mapRef.current) {
@@ -445,17 +484,64 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   // Sinkronisasi data sebaran asap: memuat metadata dan frame linimasa
   const sinkronkanSebaranAsap = useCallback(
     async (paksaRefresh = false) => {
-      setGalatSync(null);
-      setWaktuTungguLama(false);
-      setSedangSync(true);
-      setProgresSync(5);
-      setStatusSync("Menghubungkan ke satelit Copernicus CAMS…");
-      syncRunningRef.current = true;
-
       if (paksaRefresh) {
-        frameCacheRef.current = {};
+        setGalatSync(null);
+        setWaktuTungguLama(false);
+        setSedangSync(true);
+        setProgresSync(5);
+        globalSyncSelesai = false;
+        globalZarrMetadata = null;
+        for (const k of Object.keys(globalFrameCache)) {
+          delete globalFrameCache[k];
+        }
+        try {
+          sessionStorage.removeItem(SINKRON_SELESAI_KEY);
+          sessionStorage.removeItem(METADATA_CACHE_KEY);
+        } catch {}
+        frameCacheRef.current = globalFrameCache;
         setJumlahFrameTerunduh(0);
+      } else {
+        // Jika data sudah pernah tersinkronisasi di sesi browser atau di memori modul
+        const sudahSelesai = globalSyncSelesai || cekSelesaiSesi();
+        const cachedMeta = globalZarrMetadata || ambilMetadataSesi();
+        if (sudahSelesai && cachedMeta?.timesteps?.length) {
+          globalSyncSelesai = true;
+          globalZarrMetadata = cachedMeta;
+          setLinimasa(cachedMeta.timesteps);
+          setSedangSync(false);
+          setProgresSync(100);
+
+          // Muat frame aktif jika belum ada di memori WebGL
+          const activeIndex = Math.min(Math.floor(progressRef.current), cachedMeta.timesteps.length - 1);
+          const activeStep = cachedMeta.timesteps[activeIndex] || cachedMeta.timesteps[0];
+          if (activeStep) {
+            await muatFrame(activeStep);
+            if (mapRef.current) {
+              mapRef.current.triggerRepaint();
+            }
+          }
+
+          // Unduh frame sisa di latar belakang secara hening tanpa memunculkan popup blocking
+          const totalFrames = cachedMeta.timesteps.length;
+          let nextIndex = 0;
+          const CONCURRENCY = 4;
+          const workerBg = async () => {
+            while (nextIndex < totalFrames) {
+              const cur = nextIndex++;
+              const step = cachedMeta.timesteps[cur];
+              if (step) {
+                const k = `${step.timeChunk}_${step.step}_${step.timeInner}`;
+                if (!frameCacheRef.current[k]) {
+                  await muatFrame(step);
+                }
+              }
+            }
+          };
+          Promise.all(Array.from({ length: Math.min(CONCURRENCY, totalFrames) }, () => workerBg())).catch(() => {});
+          return;
+        }
       }
+      syncRunningRef.current = true;
 
       try {
         const url = paksaRefresh
@@ -473,6 +559,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         }
 
         const totalFrames = data.timesteps.length;
+        globalZarrMetadata = data;
         setLinimasa(data.timesteps);
 
         // Muat frame aktif awal agar shader WebGL langsung terisi tanpa jeda
@@ -499,7 +586,6 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
               selesai++;
               const persen = Math.min(99, Math.round((selesai / totalFrames) * 100));
               setProgresSync(persen);
-              setStatusSync(`Mengunduh data partikel asap (${selesai}/${totalFrames})…`);
             }
           }
         };
@@ -510,16 +596,22 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         );
         await Promise.all(workers);
 
+        globalSyncSelesai = true;
+        try {
+          sessionStorage.setItem(SINKRON_SELESAI_KEY, "true");
+          sessionStorage.setItem(METADATA_CACHE_KEY, JSON.stringify(data));
+        } catch {}
+
         setProgresSync(100);
-        setStatusSync(`Seluruh data sebaran asap siap (${totalFrames}/${totalFrames})!`);
 
         setTimeout(() => {
           setSedangSync(false);
+          setWaktuTungguLama(false);
           syncRunningRef.current = false;
           if (mapRef.current) {
             mapRef.current.triggerRepaint();
           }
-        }, 350);
+        }, 200);
       } catch (err) {
         console.error("[PetaAsap] Gagal sinkronisasi sebaran asap:", err);
         setGalatSync(
@@ -534,7 +626,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
   // Jalankan sinkronisasi penuh saat komponen terpasang
   useEffect(() => {
-    sinkronkanSebaranAsap(false);
+    let batal = false;
+    const t = setTimeout(() => {
+      if (!batal) sinkronkanSebaranAsap(false);
+    }, 0);
+    return () => {
+      batal = true;
+      clearTimeout(t);
+    };
   }, [sinkronkanSebaranAsap]);
 
   // Inisialisasi MapLibre GL & Custom WebGL Layer
@@ -1004,6 +1103,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     };
 
     const container = wadahPetaRef.current;
+    const tooltipEl = tooltipElRef.current;
     container.addEventListener("wheel", handleWheel, { passive: false });
 
     return () => {
@@ -1011,8 +1111,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       angkaMarkersRef.current.forEach((m) => m.marker.remove());
       angkaMarkersRef.current = [];
       renderAngkaRef.current = null;
-      if (tooltipElRef.current) {
-        tooltipElRef.current.style.display = "none";
+      if (tooltipEl) {
+        tooltipEl.style.display = "none";
       }
       delete (window as unknown as { _maplibreMap?: maplibregl.Map })._maplibreMap;
       map.remove();
@@ -1270,7 +1370,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             strokeWidth="2.3"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className={sedangSync ? "animate-spin text-api" : ""}
+            className={sedangSync ? "animate-spin text-fuchsia-400" : ""}
           >
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
           </svg>
@@ -1409,7 +1509,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
               <button
                 type="button"
                 onClick={() => setMemutar(!memutar)}
-                className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-full bg-api text-white shadow-md shadow-api/30 hover:opacity-90 active:scale-95 transition-all"
+                className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-full bg-gradient-to-r from-[#86198f] to-[#b90d84] text-white shadow-md shadow-purple-950/60 ring-1 ring-fuchsia-400/40 hover:brightness-110 active:scale-95 transition-all"
                 aria-label={memutar ? "Jeda animasi sebaran asap" : "Putar animasi sebaran asap"}
               >
                 {memutar ? (
@@ -1581,7 +1681,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 <button
                   type="button"
                   onClick={() => sinkronkanSebaranAsap(true)}
-                  className="rounded-lg bg-api px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                  className="rounded-lg bg-gradient-to-r from-[#86198f] to-[#b90d84] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-purple-950/60 ring-1 ring-fuchsia-400/40 transition-opacity hover:opacity-90"
                 >
                   Coba Lagi
                 </button>
@@ -1607,7 +1707,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 stroke="currentColor"
                 strokeWidth="2.5"
                 strokeLinecap="round"
-                className="animate-spin text-api"
+                className="animate-spin text-fuchsia-400"
               >
                 <circle cx="12" cy="12" r="9" className="opacity-20" />
                 <path d="M12 3a9 9 0 0 1 9 9" />
@@ -1617,14 +1717,17 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
               </p>
               <div className="h-1 w-52 overflow-hidden rounded-full bg-white/15">
                 <div
-                  className="h-full rounded-full bg-api transition-all duration-200 ease-out"
+                  className="h-full rounded-full bg-gradient-to-r from-[#86198f] to-[#b90d84] transition-all duration-200 ease-out"
                   style={{ width: `${progresSync}%` }}
                 />
               </div>
               {waktuTungguLama && (
                 <button
                   type="button"
-                  onClick={() => setSedangSync(false)}
+                  onClick={() => {
+                    setSedangSync(false);
+                    setWaktuTungguLama(false);
+                  }}
                   className="text-xs font-medium text-white/50 underline underline-offset-2 transition-colors hover:text-white"
                 >
                   Lewati
@@ -1645,8 +1748,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           border-radius: 9999px;
           background: linear-gradient(
             to right,
-            var(--color-api) 0%,
-            var(--color-api) var(--progress-percent, 0%),
+            #86198f 0%,
+            #b90d84 var(--progress-percent, 0%),
             rgba(255, 255, 255, 0.15) var(--progress-percent, 0%),
             rgba(255, 255, 255, 0.15) 100%
           );
@@ -1664,7 +1767,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           height: 13px;
           border-radius: 50%;
           background: #ffffff;
-          border: 2px solid var(--color-api);
+          border: 2px solid #b90d84;
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
           cursor: grab;
           transition: transform 0.12s ease, box-shadow 0.12s ease;
@@ -1675,14 +1778,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         .timeline-slider:active::-webkit-slider-thumb {
           cursor: grabbing;
           transform: scale(1.25);
-          box-shadow: 0 0 0 4px rgba(230, 0, 18, 0.25);
+          box-shadow: 0 0 0 4px rgba(185, 13, 132, 0.35);
         }
         .timeline-slider::-moz-range-thumb {
           width: 13px;
           height: 13px;
           border-radius: 50%;
           background: #ffffff;
-          border: 2px solid var(--color-api);
+          border: 2px solid #b90d84;
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
           cursor: grab;
         }

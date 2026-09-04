@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { usePonsel } from "@/hooks/use-media-query";
 import type { gunakanKomentar } from "@/hooks/gunakan-komentar";
 
 type Kendali = ReturnType<typeof gunakanKomentar>;
@@ -141,30 +142,22 @@ export function FormulirKomentar({
 }: FormProps) {
   const belumLengkap = mengirim || !isi.trim() || (!anonim && (!nama.trim() || !email.trim()));
 
-  const [ponsel, setPonsel] = useState(false);
-  const [sheet, setSheet] = useState(false);
+  const ponsel = usePonsel();
+  const [sheetBukaManual, setSheetBukaManual] = useState(false);
+  // Sheet terbuka jika dibuka manual atau saat membalas komentar di ponsel
+  const sheet = sheetBukaManual || (ponsel && balasKe !== null);
 
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 860px)");
-    const terap = () => setPonsel(mq.matches);
-    terap();
-    mq.addEventListener("change", terap);
-    return () => mq.removeEventListener("change", terap);
-  }, []);
+  const tutupSheet = () => {
+    setSheetBukaManual(false);
+    if (balasKe !== null) batalBalas();
+  };
 
-  // Menekan "Balas" langsung membuka sheet berisi formulirnya.
-  useEffect(() => {
-    if (ponsel && balasKe !== null) setSheet(true);
-  }, [ponsel, balasKe]);
-
-  // Sheet tutup sendiri setelah komentar berhasil terkirim — tanda suksesnya:
-  // mengirim kembali false DAN isi sudah dikosongkan oleh hook. Bila gagal,
-  // isi masih terisi sehingga sheet tetap terbuka menampilkan pesan galatnya.
-  const kirimSebelumnya = useRef(false);
-  useEffect(() => {
-    if (kirimSebelumnya.current && !mengirim && !isi.trim()) setSheet(false);
-    kirimSebelumnya.current = mengirim;
-  }, [mengirim, isi]);
+  const tanganiKirim = async () => {
+    if (!belumLengkap && !mengirim) {
+      await kirim();
+      setSheetBukaManual(false);
+    }
+  };
 
   // Wadah captcha di desktop terpasang langsung (form inline); di ponsel ikut
   // sheet yang di-mount/unmount — pasang widget saat wadahnya siap di DOM.
@@ -264,9 +257,7 @@ export function FormulirKomentar({
             // Shift+Enter diperbolehkan membuat baris baru di sheet.
             if (e.key === "Enter" && (!sheet || !e.shiftKey)) {
               e.preventDefault();
-              if (!belumLengkap && !mengirim) {
-                kirim();
-              }
+              tanganiKirim();
             }
           }}
         />
@@ -289,7 +280,7 @@ export function FormulirKomentar({
         className="rincian__kirim"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!belumLengkap && !mengirim) kirim();
+          tanganiKirim();
         }}
       >
         {bidang}
@@ -305,7 +296,7 @@ export function FormulirKomentar({
         <button
           type="button"
           className="rincian__kirim rincian__pemicu"
-          onClick={() => setSheet(true)}
+          onClick={() => setSheetBukaManual(true)}
         >
           <span className="rincian__inisial rincian__inisial--kecil" aria-hidden="true">
             {anonim ? "A" : nama ? nama.charAt(0).toUpperCase() : "?"}
@@ -322,13 +313,13 @@ export function FormulirKomentar({
           role="dialog"
           aria-modal="true"
           aria-label="Tulis komentar"
-          onClick={(e) => { if (e.target === e.currentTarget) setSheet(false); }}
+          onClick={(e) => { if (e.target === e.currentTarget) tutupSheet(); }}
         >
           <form
             className="rincian__sheet-panel"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!belumLengkap && !mengirim) kirim();
+              tanganiKirim();
             }}
           >
             <div className="rincian__sheet-kepala">
@@ -337,7 +328,7 @@ export function FormulirKomentar({
                 type="button"
                 className="rincian__sheet-tutup"
                 aria-label="Tutup formulir komentar"
-                onClick={() => setSheet(false)}
+                onClick={tutupSheet}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
                      strokeWidth="2" strokeLinecap="round">

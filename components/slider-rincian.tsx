@@ -110,8 +110,6 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
         img.onload = () => { if (aktif) setAwalSiap(true); };
         img.onerror = () => { if (aktif) setAwalSiap(true); };
         img.src = p;
-      } else {
-        if (aktif) setAwalSiap(true);
       }
     }
 

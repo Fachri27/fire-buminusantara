@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useKurangiGerak } from "./use-media-query";
 import type { Berita } from "@/lib/events";
 
 const DURASI = 550; // ms, selaras dengan durasi transisi pada jalur
@@ -79,16 +80,14 @@ export function gunakanKorsel(berita: Berita[]) {
     if (pengaman.current) { clearTimeout(pengaman.current); pengaman.current = null; }
     if (!gulung) { kunci.current = false; return; }
 
-    setAktif((a) => {
-      const n = berita.length;
-      // Kembalikan indeks ke set tengah tanpa animasi supaya geser tak habis.
-      if (a < n || a >= n * 2) {
-        const baru = (a % n) + n;
-        terapkan(baru, false);
-        return baru;
-      }
-      return a;
-    });
+    const a = aktifRef.current;
+    const n = berita.length;
+    // Kembalikan indeks ke set tengah tanpa animasi supaya geser tak habis.
+    if (a < n || a >= n * 2) {
+      const baru = (a % n) + n;
+      terapkan(baru, false);
+      setAktif(baru);
+    }
     kunci.current = false;
   }, [berita.length, gulung, terapkan]);
 
@@ -170,15 +169,4 @@ export function gunakanKorsel(berita: Berita[]) {
 }
 
 /** Sekali pasang; nilainya tidak berubah selama halaman hidup. */
-export function useKurangiGerak() {
-  const [kurangi, setKurangi] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)").matches : false
-  );
-  useEffect(() => {
-    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const saatUbah = (e: MediaQueryListEvent) => setKurangi(e.matches);
-    q.addEventListener("change", saatUbah);
-    return () => q.removeEventListener("change", saatUbah);
-  }, []);
-  return kurangi;
-}
+export { useKurangiGerak } from "./use-media-query";

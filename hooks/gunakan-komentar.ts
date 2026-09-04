@@ -26,8 +26,22 @@ export function gunakanKomentar(idLaporan: number) {
   const [daftar, setDaftar] = useState<Komentar[]>([]);
   const [memuat, setMemuat] = useState(false);
   const [mengirim, setMengirim] = useState(false);
-  const [nama, setNama] = useState("");
-  const [email, setEmail] = useState("");
+  const [nama, setNama] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      return localStorage.getItem("komentar_nama") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [email, setEmail] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      return localStorage.getItem("komentar_email") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [anonim, setAnonim] = useState(false);
   const [isi, setIsi] = useState("");
   const [balasKe, setBalasKe] = useState<number | null>(null);
@@ -36,6 +50,18 @@ export function gunakanKomentar(idLaporan: number) {
   const [website, setWebsite] = useState("");
   const [galat, setGalat] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
+
+  const [prevId, setPrevId] = useState(idLaporan);
+  if (idLaporan !== prevId) {
+    setPrevId(idLaporan);
+    setMemuat(true);
+    setGalat("");
+    setBalasKe(null);
+    setBalasNama("");
+    setDibuka([]);
+    setDaftar([]);
+    setCaptchaToken("");
+  }
 
   const ketikRef = useRef<HTMLTextAreaElement | null>(null);
   const captchaRef = useRef<HTMLDivElement | null>(null);
@@ -67,25 +93,9 @@ export function gunakanKomentar(idLaporan: number) {
     setBalasNama("");
   }, []);
 
-  // Pulihkan nama & email dari localStorage supaya tidak mengetik ulang setiap
-  // kali membuka pop-up.
-  useEffect(() => {
-    try {
-      setNama(localStorage.getItem("komentar_nama") ?? "");
-      setEmail(localStorage.getItem("komentar_email") ?? "");
-    } catch {
-      /* storage mungkin diblokir */
-    }
-  }, [idLaporan]);
-
-  // Ambil komentar laporan ini; daftar lama dibersihkan saat ganti laporan.
+  // Ambil komentar laporan ini
   useEffect(() => {
     let batal = false;
-    setMemuat(true);
-    setGalat("");
-    batalBalas();
-    setDibuka([]);
-    setDaftar([]);
 
     fetch(alamat, { headers: { Accept: "application/json" } })
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
@@ -103,12 +113,10 @@ export function gunakanKomentar(idLaporan: number) {
     return () => {
       batal = true;
     };
-  }, [alamat, batalBalas]);
+  }, [alamat]);
 
-  // Token captcha bekas laporan lain harus dibuang — widget Turnstile dibuat
-  // sekali untuk seluruh rel, tidak mengikuti ganti laporan.
+  // Reset widget Turnstile saat ganti laporan
   useEffect(() => {
-    setCaptchaToken("");
     const ts = turnstile();
     if (ts && widgetRef.current !== null) {
       try {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { VideoKartu } from "./video-kartu";
 import type { ItemMedia } from "@/lib/media";
 
@@ -40,16 +40,6 @@ export function SliderKartu({
   // batas akan merender undefined.
   const kini = indeks < media.length ? indeks : 0;
 
-  // Kerangka pemuatan untuk foto: tampil sampai berkasnya termuat. Keadaan dari
-  // foto sebelumnya tidak berlaku saat media berganti, jadi tiap perpindahan
-  // indeks menyuruhnya tampil lagi — foto yang sudah tersangkut di tembolok
-  // diloloskan lewat `complete`.
-  const [fotoSiap, setFotoSiap] = useState(false);
-  const refFoto = useRef<HTMLImageElement | null>(null);
-  useEffect(() => {
-    setFotoSiap(refFoto.current?.complete ?? true);
-  }, [kini]);
-
   const m = media[kini];
   if (!m) return null;
 
@@ -64,19 +54,8 @@ export function SliderKartu({
         <VideoKartu key={`v${kini}`} src={m.url} poster={m.poster ?? poster} label={label} aktif={aktif}
                     kurangiGerak={kurangiGerak} className={kelasMedia} onBuka={onBuka} />
       ) : (
-        <>
-          <img key={`g${kini}`} ref={refFoto} src={m.url} alt={label} loading="eager"
-               decoding="async"
-               onLoad={() => setFotoSiap(true)}
-               onError={() => setFotoSiap(true)}
-               onClick={(e) => { if (aktif) { e.stopPropagation(); onBuka(); } }}
-               className={`${kelasMedia} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`} />
-
-          {/* Kerangka yang sama dengan milik video: menutup kotak sampai
-              fotonya benar-benar termuat (atau gagal — menunggu lebih lama
-              tidak akan mengubah apa pun). */}
-          <div aria-hidden="true" className={`kartu-kerangka ${fotoSiap ? "tutup" : ""}`} />
-        </>
+        <FotoKartu key={`g${kini}`} src={m.url} alt={label} aktif={aktif}
+                   className={kelasMedia} onBuka={onBuka} />
       )}
 
       {media.length > 1 && (
@@ -104,6 +83,42 @@ export function SliderKartu({
           ))}
         </div>
       )}
+    </>
+  );
+}
+
+function FotoKartu({
+  src,
+  alt,
+  aktif,
+  className,
+  onBuka,
+}: {
+  src: string;
+  alt: string;
+  aktif: boolean;
+  className: string;
+  onBuka: () => void;
+}) {
+  const [fotoSiap, setFotoSiap] = useState(false);
+  return (
+    <>
+      <img
+        src={src}
+        alt={alt}
+        loading="eager"
+        decoding="async"
+        onLoad={() => setFotoSiap(true)}
+        onError={() => setFotoSiap(true)}
+        onClick={(e) => {
+          if (aktif) {
+            e.stopPropagation();
+            onBuka();
+          }
+        }}
+        className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`}
+      />
+      <div aria-hidden="true" className={`kartu-kerangka ${fotoSiap ? "tutup" : ""}`} />
     </>
   );
 }

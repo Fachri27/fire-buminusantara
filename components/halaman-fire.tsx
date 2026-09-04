@@ -5,7 +5,7 @@ import { gunakanPanggung } from "@/hooks/gunakan-panggung";
 import { gunakanParallax } from "@/hooks/gunakan-parallax";
 import { gunakanKomentar } from "@/hooks/gunakan-komentar";
 import { gunakanSegarOtomatis } from "@/hooks/gunakan-segar-otomatis";
-import { useKurangiGerak } from "@/hooks/gunakan-korsel";
+import { useKurangiGerak } from "@/hooks/use-media-query";
 import { BAHASA, type Bahasa } from "@/lib/bahasa";
 
 

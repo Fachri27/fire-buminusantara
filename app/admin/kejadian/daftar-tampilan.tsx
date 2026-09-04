@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { rapikanLokasi, inferProvinsi } from "@/lib/wilayah";
 import { bacaBerkasMedia } from "@/lib/media";
 import { Pratinjau } from "../pratinjau";
@@ -27,32 +26,42 @@ const tanggalId = new Intl.DateTimeFormat("id-ID", {
   year: "numeric",
 });
 
+const EVENT_TAMPILAN = "cms_kejadian_tampilan_ubah";
+
+function langgananTampilan(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("storage", callback);
+  window.addEventListener(EVENT_TAMPILAN, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(EVENT_TAMPILAN, callback);
+  };
+}
+
+function snapshotTampilan(): "list" | "card" {
+  try {
+    const tersimpan = localStorage.getItem("cms_kejadian_tampilan");
+    return tersimpan === "card" ? "card" : "list";
+  } catch {
+    return "list";
+  }
+}
+
+function serverSnapshotTampilan(): "list" | "card" {
+  return "list";
+}
+
 export function DaftarTampilan({ daftar }: { daftar: ItemKejadian[] }) {
-  // Selalu "list" pada render pertama: server tidak punya localStorage,
-  // sedangkan membaca localStorage di inisialisasi state membuat klien yang
-  // pernah memilih "card" me-render pohon berbeda dari server → hydration
-  // failed di /admin/kejadian. Pilihan tersimpan diselaraskan di efek bawah
-  // (setelah hidrasi); nilainya sama ("list") berarti React melewatkannya
-  // tanpa render ulang.
-  const [mode, setMode] = useState<"list" | "card">("list");
+  const mode = useSyncExternalStore(
+    langgananTampilan,
+    snapshotTampilan,
+    serverSnapshotTampilan
+  );
 
-  useEffect(() => {
-    try {
-      const tersimpan = localStorage.getItem("cms_kejadian_tampilan");
-      // Sinkronisasi pasca-hidrasi yang disengaja (pola resmi React untuk
-      // nilai khusus-klien seperti localStorage): render pertama harus sama
-      // dengan server, pilihan tersimpan diterapkan setelahnya.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (tersimpan === "list" || tersimpan === "card") setMode(tersimpan);
-    } catch {
-      // Abaikan jika localStorage tidak dapat diakses
-    }
-  }, []);
-
-    function gantiMode(m: "list" | "card") {
-    setMode(m);
+  function gantiMode(m: "list" | "card") {
     try {
       localStorage.setItem("cms_kejadian_tampilan", m);
+      window.dispatchEvent(new Event(EVENT_TAMPILAN));
     } catch {
       // Abaikan jika localStorage tidak tersedia
     }

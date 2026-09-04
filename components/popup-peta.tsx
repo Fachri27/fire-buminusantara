@@ -63,9 +63,12 @@ export function PopupPeta({
   // saat tab pulau atau saringan tanggal berganti — daftar barunya, hitungannya
   // baru.
   const [jumlahKartu, setJumlahKartu] = useState(KARTU_AWAL);
-  useEffect(() => {
+  const [kunciSaringanSebelumnya, setKunciSaringanSebelumnya] = useState(() => `${tabAktif}:${dari}:${sampai}`);
+  const kunciSaringanKini = `${tabAktif}:${dari}:${sampai}`;
+  if (kunciSaringanKini !== kunciSaringanSebelumnya) {
+    setKunciSaringanSebelumnya(kunciSaringanKini);
     setJumlahKartu(KARTU_AWAL);
-  }, [tabAktif, dari, sampai]);
+  }
 
   const adaSaringan = Boolean(dari || sampai);
   const hapusTanggal = () => {
@@ -278,37 +281,39 @@ export function PopupPeta({
                 {kartuTampak.map(({ b, i }) => {
                   const awal = b.media[0];
                   return (
-                    <li key={b.id}>
+                    <li key={b.id} className="flex">
                       <button type="button" onClick={() => onBukaRincian(i)}
-                              className="group flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-[10px]
-                                         bg-white text-left shadow-[0_1px_3px_rgb(0_0_0/0.08)] ring-1 ring-black/10
-                                         transition-[transform,box-shadow] duration-300
-                                         hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgb(0_0_0/0.14)]
+                              className="group flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-xl
+                                         border border-black/[0.08] bg-white text-left shadow-xs
+                                         transition-all duration-200 ease-out
+                                         hover:-translate-y-1 hover:border-black/15 hover:shadow-[0_10px_24px_rgb(0_0_0/0.08)]
                                          active:translate-y-0">
                         <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-black/5">
                           <PratinjauMedia awal={awal} pulau={b.pulau}
                                           kelas="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         </div>
-                        <div className="flex flex-1 flex-col p-3 sm:p-3.5">
-                          <p className="text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal text-black/60
-                                        transition-colors group-hover:text-black/80">
-                            • {b.tanggal} •
-                          </p>
-                          <p className="mt-1.5 text-[length:var(--ukuran-judul)] leading-[1.3]
-                                        font-bold text-tinta transition-colors group-hover:text-api line-clamp-3">
-                            {b.judul}
-                          </p>
+                        <div className="flex flex-1 flex-col justify-between p-3 sm:p-3.5">
+                          <div>
+                            <p className="text-[11px] sm:text-xs font-medium text-black/45 transition-colors group-hover:text-black/60">
+                              {b.tanggal}
+                            </p>
+                            <h3 className="mt-1 text-[13.5px] sm:text-[14px] font-semibold leading-snug
+                                           text-tinta transition-colors group-hover:text-api line-clamp-2 sm:line-clamp-3">
+                              {b.judul}
+                            </h3>
+                          </div>
                           {b.lokasi && (
-                            <div className="mt-auto pt-3">
-                              <p className="flex items-start gap-1.5 border-t border-black/[0.06] pt-2
-                                            text-[length:var(--ukuran-catatan)] leading-[1.35] text-black/55">
+                            <div className="mt-3 pt-2.5 border-t border-black/[0.06]">
+                              <p className="flex items-start gap-1.5 text-[11px] sm:text-[11.5px] leading-snug text-black/50">
                                 <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
                                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                                     className="mt-[1px] size-3 shrink-0">
+                                     className="mt-0.5 size-3 shrink-0 text-black/40 transition-colors group-hover:text-black/60">
                                   <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />
                                   <circle cx="12" cy="10" r="3" />
                                 </svg>
-                                <span className="line-clamp-2">{b.lokasi}</span>
+                                <span className="line-clamp-2 transition-colors group-hover:text-black/70" title={b.lokasi}>
+                                  {b.lokasi}
+                                </span>
                               </p>
                             </div>
                           )}
@@ -366,12 +371,19 @@ export function PopupPeta({
                                              panggung:h-[130px] panggung:w-[210px]" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal text-black/60
-                                    transition-colors group-hover:text-black/80">
-                        • {b.tanggal} •
-                      </p>
-                      <p className="mt-1 sm:mt-[clamp(6px,1.8vw,12px)] text-[length:var(--ukuran-judul)] leading-[1.25]
-                                    font-bold text-tinta transition-colors group-hover:text-api panggung:mt-[10px]">
+                      <div className="flex flex-wrap items-center gap-x-2 text-xs text-black/50">
+                        <span className="font-medium text-black/50 transition-colors group-hover:text-black/70">
+                          {b.tanggal}
+                        </span>
+                        {b.lokasi && (
+                          <>
+                            <span className="text-black/25">·</span>
+                            <span className="truncate text-black/45">{b.lokasi}</span>
+                          </>
+                        )}
+                      </div>
+                      <p className="mt-1 sm:mt-1.5 text-sm sm:text-base font-semibold leading-snug
+                                    text-tinta transition-colors group-hover:text-api">
                         {b.judul}
                       </p>
                     </div>

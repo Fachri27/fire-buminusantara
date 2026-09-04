@@ -1,8 +1,10 @@
 import Blosc from "numcodecs/blosc";
 
 const ZARR_BASE_URL =
+  process.env.CAMS_ZARR_BASE_URL ||
   "https://arco.datastores.ecmwf.int/cadl-arco-time-001/arco/cams_global_atmospheric_composition_forecasts/sfc-multiforecast/timeChunked.zarr";
-const ZARR_TOKEN = "fire-watch-827a2651-8e26-4bc1-ac44-9351fcb916af";
+const ZARR_TOKEN =
+  process.env.CAMS_ZARR_TOKEN || "fire-watch-827a2651-8e26-4bc1-ac44-9351fcb916af";
 
 // Global geospatial grid dimensions for ECMWF CAMS ARCO Zarr (omaod550)
 // Lat: 90°N -> -90°S (step 0.4°, 451 rows)
@@ -331,10 +333,10 @@ export async function getZarrFrame(timeChunk: number, step: number, timeInner: n
     }
   }
 
-  // Cache for 2 hours
+  // Cache for 4 hours (overlaps seamlessly with 3-hour cron schedule)
   frameCache.set(cacheKey, {
     buffer: result,
-    expiresAt: now + 2 * 3600 * 1000,
+    expiresAt: now + 4 * 3600 * 1000,
   });
 
   return result;

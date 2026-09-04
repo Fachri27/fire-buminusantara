@@ -13,12 +13,11 @@ export default function ErrorBoundary({
 }) {
   const params = useParams();
   const locale = (params?.locale === "en" ? "en" : "id") as "id" | "en";
-  const [timestamp, setTimestamp] = useState<string>("");
+  const [timestamp] = useState<string>(() => new Date().toISOString());
 
   useEffect(() => {
     // Audit telemetry error to console
     console.error("Telemetry error boundary caught exception:", error);
-    setTimestamp(new Date().toISOString());
   }, [error]);
 
   const isEn = locale === "en";

@@ -41,6 +41,8 @@
   --color-laut: #e6e3de;
   --color-merah-psp: #e3061d;
   --color-merah-psp-dalam: #c10518;
+  --color-asap: #b90d84;
+  --color-asap-gelap: #86198f;
 
   /* Tangga warna choropleth peta, dari paling sepi ke paling padat. */
   --color-peta-0: #e8f0b5;

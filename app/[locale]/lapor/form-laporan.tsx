@@ -44,7 +44,6 @@ function kunciBerkas(b: File): string {
 
 export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   const teks = TEKS_LAPOR[bahasa];
-  const [keadaan, aksi, mengirim] = useActionState<KeadaanLapor, FormData>(kirimLaporan, null);
 
   /**
    * Semua isian TERKENDALI oleh React, bukan dibiarkan uncontrolled.
@@ -98,6 +97,38 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     };
   }, []);
 
+  const ulangCaptcha = useCallback(() => {
+    setCaptchaToken("");
+    const ts = turnstile();
+    if (ts && widgetRef.current !== null) {
+      try {
+        ts.reset(widgetRef.current);
+      } catch {
+        /* widget sudah lepas */
+      }
+    }
+  }, []);
+
+  const [keadaan, aksi, mengirim] = useActionState<KeadaanLapor, FormData>(
+    async (sebelumnya: KeadaanLapor, data: FormData) => {
+      try {
+        const hasil = await kirimLaporan(sebelumnya, data);
+        if (hasil?.ok) {
+          for (const url of urlRef.current) URL.revokeObjectURL(url);
+          urlRef.current = [];
+          setPratinjau({});
+          setBerkas([]);
+        } else {
+          ulangCaptcha();
+        }
+        return hasil;
+      } finally {
+        sedangKirimRef.current = false;
+      }
+    },
+    null
+  );
+
   const berhasil = keadaan?.ok === true;
   const totalByte = berkas.reduce((n, b) => n + b.size, 0);
 
@@ -122,27 +153,6 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     sinkronkanKeInput(berkas);
   }, [berkas, keadaan, sinkronkanKeInput]);
 
-  // Lepas kunci kirim dan bersihkan blob URL segera setelah status sukses
-  useEffect(() => {
-    sedangKirimRef.current = false;
-    if (keadaan?.ok) {
-      for (const url of urlRef.current) URL.revokeObjectURL(url);
-      urlRef.current = [];
-      setPratinjau({});
-    }
-  }, [keadaan]);
-
-  const ulangCaptcha = useCallback(() => {
-    setCaptchaToken("");
-    const ts = turnstile();
-    if (ts && widgetRef.current !== null) {
-      try {
-        ts.reset(widgetRef.current);
-      } catch {
-        /* widget sudah lepas */
-      }
-    }
-  }, []);
 
   // Widget dipasang sekali, mode explicit — sama seperti kolom komentar:
   // kotak captcha tidak ditampilkan kecuali Cloudflare memang menantang.
@@ -210,16 +220,6 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
     };
   }, []);
 
-  // Token Turnstile sekali pakai: begitu satu kiriman ditolak, widget harus
-  // meminta token baru — kalau tidak, percobaan berikutnya pasti gagal
-  // verifikasi dengan alasan yang tidak bisa ditebak pengunjung.
-  //
-  // Yang berhasil tidak perlu dibereskan: formnya sudah diganti panel
-  // "laporan terkirim" di bawah, jadi tidak ada isian tersisa untuk dikosongkan.
-  useEffect(() => {
-    if (keadaan === null || keadaan.ok) return;
-    ulangCaptcha();
-  }, [keadaan, ulangCaptcha]);
 
   function tambahBerkas(dipilih: FileList | null) {
     if (!dipilih || dipilih.length === 0) return;

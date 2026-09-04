@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "public/assets/**",
   ]),
   {
     files: ["hooks/**/*.ts"],
@@ -21,12 +22,8 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    // Temuan set-state-in-effect yang tersisa (pola matchMedia/subscribe
-    // di hooks/ dan components/video-kartu.tsx) nyata tapi tidak melanggar
-    // aturan runtime — tahan sebagai warning sampai ditulis ulang pakai
-    // useSyncExternalStore.
     rules: {
-      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/set-state-in-effect": "error",
     },
   },
 ]);

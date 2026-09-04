@@ -52,12 +52,6 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
     };
   }, [poster]);
 
-  // Peristiwa bisa saja terlewat sebelum React memasang pendengarnya; kalau
-  // bingkainya sudah terkandung, kerangka langsung ditutup.
-  useEffect(() => {
-    if (ref.current && ref.current.readyState >= 2) setSiap(true);
-  }, []);
-
   /** Selama berjalan yang ditampilkan SISA waktunya; sebelum diputar dan
    *  sesudah habis, durasi penuhnya. */
   const catat = useCallback(() => {
@@ -80,13 +74,11 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
     el.muted = true;
 
     if (aktif && !kurangiGerak) {
-      setUsai(false);
       el.play().catch(() => {}); // ditolak mode hemat daya: poster tetap tampil
       return;
     }
     el.pause();
     if (el.readyState >= 1 && el.currentTime) el.currentTime = 0;
-    setUsai(false);
   }, [aktif, kurangiGerak]);
 
   const ulang = useCallback((e: React.MouseEvent) => {
@@ -109,6 +101,7 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
         muted
         playsInline
         preload={poster ? "none" : "metadata"}
+        onPlay={() => setUsai(false)}
         onLoadedMetadata={() => {
           catat();
           // Mode kurangi gerak tidak memutar otomatis — menunggu canplay
