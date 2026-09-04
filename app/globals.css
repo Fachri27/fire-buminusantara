@@ -1,11 +1,10 @@
 @import "tailwindcss";
-/* Leaflet diimpor DI SINI, bukan di dalam komponen peta.
-
-   Dulu dimuat lewat `await import("leaflet/dist/leaflet.css")` bersama
-   pustakanya, jadi selalu masuk SETELAH berkas ini — dan `background: #ddd`
-   bawaannya mengalahkan override .leaflet-container di bawah, sehingga peta
-   tetap beralas abu. Ditarik ke sini supaya urutannya pasti. */
-@import "leaflet/dist/leaflet.css";
+@import "../public/css/rincian-laporan.css";
+@import "../public/css/kartu-kursor.css";
+@import "../public/css/kartu-video.css";
+@import "../public/css/pantauan-kosong.css";
+@import "../public/css/peta-angka.css";
+@import "../public/css/peta-popup.css";
 
 /* ── Mode tampilan ────────────────────────────────────────────────────────
    Dua tata letak, bukan sekadar breakpoint responsif biasa:
@@ -117,7 +116,9 @@
     --ukuran-label: 26px;
     --ukuran-nilai: 34px;
     --ukuran-pulau: 26px;
-    --ukuran-judul: 26px;
+    /* Judul daftar di pop-up peta: 26px dinilai terlalu besar untuk baris
+       daftar — satu anak tangga di atas tanggal saja. */
+    --ukuran-judul: 18px;
     --ukuran-judul-lanskap: 22px;
     --ukuran-tanggal: 16px;
     --ukuran-catatan: 15px;

@@ -54,6 +54,10 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
 
+  images: {
+    formats: ["image/avif", "image/webp"],
+  },
+
   // Dipakai Docker (Dockerfile di root): `next build` menyalin server minimal
   // ke .next/standalone sehingga image produksi tidak perlu node_modules penuh.
   output: "standalone",
@@ -128,6 +132,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/data/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
+      },
+      {
         source: "/(favicon.ico|icon.png|apple-icon.png)",
         headers: [
           {
@@ -143,7 +156,7 @@ const nextConfig: NextConfig = {
       // membawa header cache tersendiri.
       {
         source:
-          "/((?!_next/static|_next/image|assets/|css/|favicon\\.ico|icon\\.png|apple-icon\\.png|robots\\.txt|sitemap\\.xml|media/|api/forecasting).*)",
+          "/((?!_next/static|_next/image|assets/|css/|favicon\\.ico|icon\\.png|apple-icon\\.png|robots\\.txt|sitemap\\.xml|media/|api/forecasting|api/sebaran-asap|data/).*)",
         headers: [
           {
             key: "Cache-Control",

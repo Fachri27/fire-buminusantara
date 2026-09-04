@@ -61,15 +61,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html:
           "(function(){try{var p=window.location.pathname;if(p==='/en'||p.indexOf('/en/')===0){document.documentElement.lang='en'}}catch(e){}function s(){try{document.documentElement.style.setProperty('--skala',Math.min(window.innerWidth/1920,window.innerHeight/1080))}catch(e){}}s();window.addEventListener('resize',s)})();"
         }} />
-        {/* CSS komponen ditulis tangan, di luar Tailwind: pop-up rincian,
-            lencana video, angka peta, dan tepi lunak. Dimuat sebagai berkas
-            statis supaya tetap satu berkas per komponen seperti di Pasopati. */}
-        <link rel="stylesheet" href="/css/rincian-laporan.css" />
-        <link rel="stylesheet" href="/css/kartu-kursor.css" />
-        <link rel="stylesheet" href="/css/kartu-video.css" />
-        <link rel="stylesheet" href="/css/pantauan-kosong.css" />
-        <link rel="stylesheet" href="/css/peta-angka.css" />
-        <link rel="stylesheet" href="/css/peta-popup.css" />
         {/* Turnstile untuk kolom komentar pop-up rincian dan form laporan. Tanpa site key (dev),
             widget tidak dirender dan verifikasi di server pun dilewati. */}
         {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (

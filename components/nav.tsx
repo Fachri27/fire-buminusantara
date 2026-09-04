@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BAHASA, TEKS_NAV, type Bahasa } from "@/lib/bahasa";
 
@@ -119,14 +120,14 @@ export function Nav({ bahasa }: Props) {
             kiri bilah. Ikon sendirian terlihat kecil & sepi; dipasangkan teks
             "Fire" jadi kesatuan merek yang mengisi ruang. Di ponsel "Lapor"
             pindah ke cluster kanan supaya logo ini punya tempat. */}
-        <a href={`/${bahasa}`} aria-label="Fire — beranda"
+        <Link href={`/${bahasa}`} aria-label="Fire — beranda"
            className="flex shrink-0 items-center gap-2">
           <img src="/assets/img/logo-fire.png" alt="" aria-hidden="true"
                width={95} height={160} className="h-9 w-auto sm:h-11" />
           <span className="text-[16px] font-bold leading-none tracking-tight text-tinta sm:text-[22px]">
             Fire
           </span>
-        </a>
+        </Link>
 
         {/* Menu Navigasi & Penukar Bahasa */}
         <div className="flex items-center gap-4 sm:gap-7">
@@ -160,12 +161,12 @@ export function Nav({ bahasa }: Props) {
           {/* Jalan masuk ke form laporan warga — di cluster kanan untuk semua
               ukuran layar (logo memakai pojok kiri). Tautan sungguhan, bukan
               jangkar gulir seperti dua tombol di sebelahnya. */}
-          <a
+          <Link
             href={`/${bahasa}/lapor`}
             className="rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
           >
             {teks.lapor}
-          </a>
+          </Link>
 
           {/* Garis Pemisah Tipis */}
           <div className="hidden h-4 w-[1px] bg-black/10 sm:block" aria-hidden="true" />
@@ -187,14 +188,15 @@ export function Nav({ bahasa }: Props) {
                   {kode}
                 </span>
               ) : (
-                <a
+                <Link
                   key={kode}
                   href={tautanBahasa(kode)}
+                  prefetch={false}
                   aria-label={`${teks.ganti} (${kode.toUpperCase()})`}
                   className="rounded-full px-2.5 py-0.5 uppercase text-tinta/50 transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"
                 >
                   {kode}
-                </a>
+                </Link>
               );
             })}
           </div>
@@ -250,6 +252,15 @@ export function Nav({ bahasa }: Props) {
                 </li>
               );
             })}
+            <li className="mt-1 border-t border-black/[0.06] pt-1">
+              <Link
+                href={`/${bahasa}/lapor`}
+                onClick={() => setMenuTerbuka(false)}
+                className="block rounded-lg px-3 py-3 text-sm font-semibold tracking-wide uppercase text-api transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+              >
+                {teks.lapor}
+              </Link>
+            </li>
           </ul>
         </nav>
       )}

@@ -19,6 +19,8 @@ export type Berita = {
    *  dengan foto yang sama dan terlihat seolah kartunya tertukar. */
   poster: string | null;
   lokasi: string | null;
+  lat: number | null;
+  lng: number | null;
   /** Deskripsi laporan (description_id), ditampilkan di pop-up rincian. */
   deskripsi: string | null;
   /** Galeri media untuk slider kartu dan pop-up. Selalu terisi selama kejadian
@@ -38,12 +40,15 @@ const tanggalId = new Intl.DateTimeFormat("id-ID", {
 
 const PILIH = {
   id: true, slug: true, title_id: true, description_id: true, event_date: true, location: true,
+  location_lat: true, location_lng: true,
   image_id: true, video: true, media: true, orientation: true,
 } as const;
 
 type Baris = {
   id: bigint; slug: string | null; title_id: string; description_id: string | null;
-  event_date: Date; location: string; image_id: string | null; video: string | null;
+  event_date: Date; location: string;
+  location_lat: unknown; location_lng: unknown;
+  image_id: string | null; video: string | null;
   media: unknown;
   orientation: string;
 };
@@ -76,6 +81,8 @@ function keBerita(e: Baris): Berita {
     video: urlMedia(e.video),
     poster,
     lokasi: rapikanLokasi(e.location),
+    lat: e.location_lat != null ? Number(e.location_lat) : null,
+    lng: e.location_lng != null ? Number(e.location_lng) : null,
     deskripsi: e.description_id,
     media: mediaList,
     vertikal: e.orientation === "horizontal",
@@ -94,7 +101,11 @@ export async function ambilBerita(limit = 10): Promise<Berita[]> {
   const [semua, hitung] = await Promise.all([
     // event_date bisa seri (beberapa laporan setanggal) — id menaik dipakai
     // pemecah seri supaya "paling baru" benar-benar yang terakhir dibuat.
-    prisma.events.findMany({ orderBy: [{ event_date: "desc" }, { id: "desc" }], select: PILIH }),
+    prisma.events.findMany({
+      take: Math.max(limit * 2, 100),
+      orderBy: [{ event_date: "desc" }, { id: "desc" }],
+      select: PILIH,
+    }),
     // Komentar bersifat polimorfik (commentable_type/_id ala Laravel), bukan
     // relasi Prisma — jadi jumlahnya dihitung terpisah lewat groupBy.
     prisma.comments.groupBy({

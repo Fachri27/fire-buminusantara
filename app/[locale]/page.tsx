@@ -16,6 +16,10 @@ export function generateStaticParams() {
   return [{ locale: "id" }, { locale: "en" }];
 }
 
+// Diizinkan blocking (instant = false) agar pembacaan URL params locale di level halaman
+// tidak memicu peringatan Cache Components Instant Navigation.
+export const instant = false;
+
 // Judul/deskripsi dinilai crawler per URL (/id vs /en), jadi versi Inggris
 // diterjemahkan penuh — bukan fallback bahasa Indonesia.
 const TEKS_BERANDA: Record<Bahasa, { judul: string; deskripsi: string; ogLocale: string }> = {
