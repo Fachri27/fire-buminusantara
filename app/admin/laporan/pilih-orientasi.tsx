@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Orientasi } from "@/lib/media";
 import { aksiOrientasi } from "./aksi";
+import { Pemuat } from "../pemuat";
 
 /** Pilihan orientasi satu lampiran saat diverifikasi.
  *
@@ -40,7 +41,7 @@ export function PilihOrientasi({
     <span className="mt-1 mb-2 inline-flex items-center gap-1">
       <button
         type="button"
-        disabled={sibuk}
+        disabled={sibuk} aria-busy={sibuk}
         onClick={() => pilih("potret")}
         aria-pressed={nilai === "potret"}
         className={`cms-mata rounded-sm border px-1.5 py-0.5 ${
@@ -53,7 +54,7 @@ export function PilihOrientasi({
       </button>
       <button
         type="button"
-        disabled={sibuk}
+        disabled={sibuk} aria-busy={sibuk}
         onClick={() => pilih("lanskap")}
         aria-pressed={nilai === "lanskap"}
         className={`cms-mata rounded-sm border px-1.5 py-0.5 ${
@@ -64,6 +65,8 @@ export function PilihOrientasi({
       >
         Lanskap
       </button>
+      {sibuk && <span className="ml-1 text-[var(--lirih)]"><Pemuat /></span>}
+
       {galat && <span className="cms-mata text-red-700">{galat}</span>}
     </span>
   );

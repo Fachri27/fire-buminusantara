@@ -46,7 +46,14 @@ export type Lampiran = {
 export type LaporanPublik = {
   id: number;
   judul: string;
+  /** Rapian kurator. Kosong = promosi menyalin judul Indonesia, seperti dulu. */
+  judulEn: string;
   deskripsi: string;
+  deskripsiEn: string;
+  /** Nama tempat pilihan kurator. Kosong = promosi me-reverse-geocode sendiri. */
+  lokasi: string;
+  /** Keadaan tayang yang dituju kejadian hasil promosi. */
+  statusKejadian: string;
   lampiran: Lampiran[];
   /** null = pelapor memilih anonim. */
   namaPelapor: string | null;
@@ -55,6 +62,8 @@ export type LaporanPublik = {
   status: StatusLaporan;
   ip: string | null;
   dibuat: Date | null;
+  /** Terakhir disunting kurator lewat form perapian. */
+  diperbarui: Date | null;
   ditinjau: Date | null;
   peninjau: string | null;
 };
@@ -244,14 +253,19 @@ export type HasilDaftarLaporan = { daftar: LaporanPublik[]; total: number };
  *  kalau keduanya memilih sendiri-sendiri, halaman detail cepat atau lambat
  *  ketinggalan satu kolom yang sudah tampil di daftar. */
 const PILIH = {
-  id: true, title: true, description: true, media: true,
+  id: true, title: true, title_en: true, description: true, description_en: true,
+  location: true, event_status: true, media: true,
   reporter_name: true, location_lat: true, location_lng: true,
-  status: true, ip_address: true, created_at: true, reviewed_at: true,
+  status: true, ip_address: true, created_at: true, updated_at: true, reviewed_at: true,
   peninjau: { select: { name: true } },
 } as const;
 
 type BarisLaporan = {
-  id: bigint; title: string; description: string; media: unknown;
+  id: bigint; title: string; title_en?: string | null;
+  description: string; description_en?: string | null;
+  location?: string | null; event_status?: string;
+  media: unknown;
+  updated_at?: Date | null;
   reporter_name: string | null;
   location_lat: unknown; location_lng: unknown;
   status: StatusLaporan; ip_address: string | null;
@@ -272,7 +286,12 @@ function keLaporan(r: BarisLaporan): LaporanPublik {
     lng: r.location_lng === null ? null : Number(r.location_lng),
     status: r.status,
     ip: r.ip_address,
+    judulEn: r.title_en ?? "",
+    deskripsiEn: r.description_en ?? "",
+    lokasi: r.location ?? "",
+    statusKejadian: r.event_status ?? "published",
     dibuat: r.created_at,
+    diperbarui: r.updated_at ?? null,
     ditinjau: r.reviewed_at,
     peninjau: r.peninjau?.name ?? null,
   };
@@ -364,6 +383,90 @@ export async function hitungMenunggu(): Promise<number> {
   return prisma.public_reports.count({ where: { status: "pending" } });
 }
 
+/** Hasil penyuntingan laporan oleh kurator. */
+export type HasilSuntingLaporan = { ok: true } | { ok: false; galat: string };
+
+/**
+ * Rapikan isi laporan sebelum diverifikasi.
+ *
+ * Teks pelapor sering datang apa adanya — judul huruf kecil semua, deskripsi
+ * berantakan, koordinat salah ketik. Yang naik jadi kejadian publik adalah
+ * NILAI DI BARIS INI (promosi membacanya ulang di dalam transaksi), jadi
+ * merapikannya di sini berarti merapikan halaman publiknya sekaligus.
+ *
+ * Hanya laporan yang belum diputuskan yang boleh disunting: arsip yang sudah
+ * diverifikasi atau ditolak harus tetap sebagaimana adanya saat diputuskan.
+ * Batas panjangnya disamakan dengan jalur kiriman publik — tidak ada gunanya
+ * kurator bisa menyimpan yang pelapor sendiri ditolak menyimpannya.
+ */
+export async function suntingLaporan(
+  id: number,
+  masukan: {
+    judul: string; judulEn: string;
+    deskripsi: string; deskripsiEn: string;
+    lokasi: string; statusKejadian: string;
+    lat: string; lng: string;
+  },
+): Promise<HasilSuntingLaporan> {
+  const judul = masukan.judul.trim();
+  const judulEn = masukan.judulEn.trim();
+  const deskripsi = masukan.deskripsi.trim();
+  const deskripsiEn = masukan.deskripsiEn.trim();
+  const lokasi = masukan.lokasi.trim();
+  // Nilai asing jatuh ke draft: gagal ke arah TIDAK menayangkan.
+  const statusKejadian =
+    masukan.statusKejadian === "published" ? ("published" as const) : ("draft" as const);
+
+  if (!judul) return { ok: false, galat: "Judul tidak boleh kosong." };
+  if (judul.length > BATAS_JUDUL) return { ok: false, galat: `Judul maksimal ${BATAS_JUDUL} karakter.` };
+  if (!deskripsi) return { ok: false, galat: "Deskripsi tidak boleh kosong." };
+  if (deskripsi.length > BATAS_DESKRIPSI)
+    return { ok: false, galat: `Deskripsi maksimal ${BATAS_DESKRIPSI} karakter.` };
+
+  // Bidang Inggris dan nama tempat boleh kosong — hanya panjangnya yang dijaga,
+  // dengan batas yang sama dengan kolom kejadian tujuannya.
+  if (judulEn.length > BATAS_JUDUL) return { ok: false, galat: `Judul (EN) maksimal ${BATAS_JUDUL} karakter.` };
+  if (deskripsiEn.length > BATAS_DESKRIPSI)
+    return { ok: false, galat: `Deskripsi (EN) maksimal ${BATAS_DESKRIPSI} karakter.` };
+  if (lokasi.length > BATAS_JUDUL) return { ok: false, galat: `Lokasi maksimal ${BATAS_JUDUL} karakter.` };
+
+  // Koordinat boleh dikosongkan — sebagian pelapor memang tidak mengirimkannya.
+  // Yang tidak boleh: satu terisi dan satunya tidak, atau di luar jangkauan.
+  const adaLat = masukan.lat.trim() !== "";
+  const adaLng = masukan.lng.trim() !== "";
+  if (adaLat !== adaLng) return { ok: false, galat: "Isi latitude dan longitude sekaligus, atau kosongkan keduanya." };
+
+  let lat: number | null = null;
+  let lng: number | null = null;
+  if (adaLat) {
+    lat = Number(masukan.lat);
+    lng = Number(masukan.lng);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90)
+      return { ok: false, galat: "Latitude harus angka antara -90 dan 90." };
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180)
+      return { ok: false, galat: "Longitude harus angka antara -180 dan 180." };
+  }
+
+  const hasil = await prisma.public_reports.updateMany({
+    where: { id, status: "pending" },
+    data: {
+      title: judul,
+      title_en: judulEn || null,
+      description: deskripsi,
+      description_en: deskripsiEn || null,
+      location: lokasi || null,
+      event_status: statusKejadian,
+      location_lat: lat,
+      location_lng: lng,
+      updated_at: new Date(),
+    },
+  });
+  if (hasil.count === 0) {
+    return { ok: false, galat: "Laporan sudah diputuskan peninjau lain — suntingan tidak disimpan." };
+  }
+  return { ok: true };
+}
+
 /** Putuskan satu laporan. Siapa yang memutuskan ikut dicatat: keputusan
  *  moderasi harus bisa ditanyakan kembali kepada orangnya. */
 export type HasilAturStatus =
@@ -419,7 +522,8 @@ export async function aturStatusLaporan(
       const laporan = await tx.public_reports.findFirst({
         where: { id, status: "pending" },
         select: {
-          title: true, description: true, media: true,
+          title: true, title_en: true, description: true, description_en: true,
+          location: true, event_status: true, media: true,
           location_lat: true, location_lng: true, created_at: true,
         },
       });
@@ -444,7 +548,11 @@ export async function aturStatusLaporan(
       const promosi = await promosiKeKejadian(
         {
           title: laporan.title,
+          title_en: laporan.title_en,
           description: laporan.description,
+          description_en: laporan.description_en,
+          location: laporan.location,
+          event_status: laporan.event_status,
           media: laporan.media,
           location_lat: laporan.location_lat,
           location_lng: laporan.location_lng,

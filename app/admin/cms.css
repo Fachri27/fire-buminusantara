@@ -264,12 +264,34 @@ textarea.cms-isian { line-height: 1.55; resize: vertical; }
 .cms-tombol--bahaya-isi:hover:not(:disabled) { background: var(--bara); border-color: var(--bara); }
 
 /* Tombol di dalam tulang punggung gelap. */
+/* HANYA untuk alas gelap (tulang punggung). Warnanya nyaris putih — di atas
+   kertas terang tombolnya hilang sama sekali. Untuk aksi sekunder di halaman,
+   pakai .cms-tombol--redup di bawah. */
 .cms-tombol--sunyi {
   background: transparent;
   border-color: #ffffff40;
   color: #e8e7de;
 }
 .cms-tombol--sunyi:hover:not(:disabled) { background: #ffffff1a; border-color: #ffffff99; color: #fff; }
+
+/* Pasangan --sunyi untuk alas terang: hadir dan terbaca, tapi tidak bersaing
+   perhatian dengan aksi utama di sebelahnya. Dipakai tindakan yang jarang
+   diambil tapi harus selalu tersedia, mis. mengembalikan laporan ke antrean. */
+.cms-tombol--redup {
+  background: transparent;
+  /* Kuietnya datang dari TEPI yang samar, bukan dari teks yang dipudarkan.
+     Teks redup di atas kertas terang hanya sampai rasio 4.48 — di bawah ambang
+     WCAG AA 4.5, dan itu terlihat: tombolnya nyaris hilang. Tintanya penuh,
+     hierarkinya tetap terjaga karena tepinya lebih tipis dari --garis-tegas
+     milik tombol garis biasa. */
+  border-color: var(--garis);
+  color: var(--jelaga);
+}
+.cms-tombol--redup:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--garis-tegas);
+  color: var(--jelaga);
+}
 
 .cms-tombol--kecil { padding: 5px 11px; font-size: 12.5px; }
 

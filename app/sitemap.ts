@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { TAYANG } from "@/lib/events";
 import { urlMedia } from "@/lib/media";
 
 // Base URL terpusat supaya sitemap selalu absolut — crawler menolak URL relatif.
@@ -44,7 +45,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   try {
     // Hanya kolom yang dipakai sitemap — tanpa id BigInt agar lolos serialisasi
     const events = await prisma.events.findMany({
-      where: { slug: { not: null } },
+      // Draft belum tayang, jadi tidak boleh diberitahukan ke mesin pencari.
+      where: { slug: { not: null }, ...TAYANG },
       select: { slug: true, image_id: true, event_date: true, updated_at: true },
       orderBy: { event_date: "desc" },
     });

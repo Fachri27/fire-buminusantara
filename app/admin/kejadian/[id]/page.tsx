@@ -80,6 +80,7 @@ export default async function Ubah({
           location: e.location,
           location_lat: String(e.location_lat), location_lng: String(e.location_lng),
           orientation: e.orientation,
+          status: e.status,
           galeri: galeriTersimpan(e.media),
         }} />
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition, type Dispatch, type SetStateAction 
 import { useRouter } from "next/navigation";
 import type { StatusLaporan } from "@/lib/laporan-publik";
 import { aksiStatus, aksiHapusLaporan } from "./aksi";
+import { Pemuat } from "../pemuat";
 
 /** Aksi yang sedang menunggu konfirmasi kedua di barisnya. */
 type Tindakan = "approved" | "rejected" | "pending" | "hapus";
@@ -91,7 +92,7 @@ export function TombolVerifikasi({
           setPastikan={setPastikan}
           label="Kembalikan"
           ya="Ya, kembalikan"
-          className="cms-tombol cms-tombol--sunyi cms-tombol--kecil"
+          className="cms-tombol cms-tombol--redup cms-tombol--kecil"
           onPasti={() => jalankan(() => aksiStatus(id, "pending"))}
         />
       )}
@@ -99,9 +100,10 @@ export function TombolVerifikasi({
       {bolehHapus && (
         pastikan === "hapus" ? (
           <span className="flex items-center gap-2">
-            <button type="button" disabled={sibuk}
+            <button type="button" disabled={sibuk} aria-busy={sibuk}
                     onClick={() => jalankan(() => aksiHapusLaporan(id), setelahHapus)}
                     className="cms-tombol cms-tombol--bahaya-isi cms-tombol--kecil">
+              {sibuk && <Pemuat />}
               Ya, hapus
             </button>
             <button type="button" onClick={() => setPastikan(null)}
@@ -151,7 +153,8 @@ function TombolPasti({
   }
   return (
     <span className="flex items-center gap-2">
-      <button type="button" disabled={sibuk} onClick={onPasti} className={className}>
+      <button type="button" disabled={sibuk} aria-busy={sibuk} onClick={onPasti} className={className}>
+        {sibuk && <Pemuat />}
         {ya}
       </button>
       <button type="button" onClick={() => setPastikan(null)}

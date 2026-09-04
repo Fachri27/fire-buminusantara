@@ -92,6 +92,15 @@ function keBerita(e: Baris): Berita {
 
 /** Sepuluh kejadian terbaru untuk korsel dan pop-up peta. */
 /**
+ * Saringan tayang. SATU tempat kebenaran untuk semua kueri publik di berkas
+ * ini: kejadian berstatus draft tersimpan di CMS tapi tidak boleh bocor ke
+ * korsel, permalink, sitemap, maupun angka peta.
+ *
+ * Kueri CMS SENGAJA tidak memakainya — kurator justru harus melihat draft.
+ */
+export const TAYANG = { status: "published" } as const;
+
+/**
  * Kejadian untuk korsel beranda, urutan CAMPURAN "terbaru + komentar terbanyak":
  * kartu pertama (yang disorot di TENGAH korsel) adalah kejadian PALING BARU,
  * lalu sisanya diurut dari yang KOMENTARNYA PALING BANYAK (seri → yang lebih
@@ -102,7 +111,7 @@ export async function ambilBerita(limit = 10): Promise<Berita[]> {
   const [semua, hitung] = await Promise.all([
     // event_date bisa seri (beberapa laporan setanggal) — id menaik dipakai
     // pemecah seri supaya "paling baru" benar-benar yang terakhir dibuat.
-    prisma.events.findMany({ orderBy: [{ event_date: "desc" }, { id: "desc" }], select: PILIH }),
+    prisma.events.findMany({ where: TAYANG, orderBy: [{ event_date: "desc" }, { id: "desc" }], select: PILIH }),
     // Komentar bersifat polimorfik (commentable_type/_id ala Laravel), bukan
     // relasi Prisma — jadi jumlahnya dihitung terpisah lewat groupBy.
     prisma.comments.groupBy({
@@ -134,7 +143,9 @@ export async function ambilBerita(limit = 10): Promise<Berita[]> {
 
 /** Satu kejadian lewat permalink /fire/<slug>. */
 export async function ambilBeritaSlug(slug: string): Promise<Berita | null> {
-  const baris = await prisma.events.findUnique({ where: { slug }, select: PILIH });
+  // findFirst, bukan findUnique: slug tetap unik, tapi saringan tayang harus
+  // ikut masuk where — draft yang di-permalink-kan langsung harus 404.
+  const baris = await prisma.events.findFirst({ where: { slug, ...TAYANG }, select: PILIH });
   return baris ? keBerita(baris as Baris) : null;
 }
 
@@ -153,7 +164,7 @@ export async function hitungLaporanProvinsi(): Promise<Record<string, number>> {
     PROVINSI_PETA_NAMA.map((n) => [n, 0]),
   );
 
-  const baris = await prisma.events.findMany({ select: { location: true } });
+  const baris = await prisma.events.findMany({ where: TAYANG, select: { location: true } });
   for (const { location } of baris) {
     const provinsi = inferProvinsi(location);
     // Lokasi yang tidak menyebut provinsi mana pun sengaja tidak dihitung —

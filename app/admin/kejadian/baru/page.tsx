@@ -57,6 +57,9 @@ export default async function Tambah({
           event_date: new Date().toISOString().slice(0, 10),
           location: "", location_lat: "", location_lng: "",
           orientation: "landscape",
+          // Kejadian yang ditulis manual dimulai sebagai draft: kurator
+          // merapikannya dulu, baru memutuskan menayangkannya.
+          status: "draft",
           galeri: [],
         }} />
     </div>
