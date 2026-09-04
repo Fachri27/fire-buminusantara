@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 export default function GlobalError({
   error,
@@ -187,7 +188,7 @@ export default function GlobalError({
               Coba Pulihkan Sesi
             </button>
 
-            <a
+            <Link
               href="/id"
               style={{
                 cursor: "pointer",
@@ -228,7 +229,7 @@ export default function GlobalError({
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
               Kembali ke Beranda
-            </a>
+            </Link>
           </div>
         </main>
       </body>

@@ -1014,7 +1014,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       if (tooltipElRef.current) {
         tooltipElRef.current.style.display = "none";
       }
-      delete (window as any)._maplibreMap;
+      delete (window as unknown as { _maplibreMap?: maplibregl.Map })._maplibreMap;
       map.remove();
       mapRef.current = null;
     };
