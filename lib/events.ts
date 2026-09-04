@@ -19,6 +19,9 @@ export type Berita = {
    *  dengan foto yang sama dan terlihat seolah kartunya tertukar. */
   poster: string | null;
   lokasi: string | null;
+  /** Koordinat kejadian — kolomnya NOT NULL di basis data, selalu ada. */
+  lat: number;
+  lng: number;
   /** Deskripsi laporan (description_id), ditampilkan di pop-up rincian. */
   deskripsi: string | null;
   /** Galeri media untuk slider kartu dan pop-up. Selalu terisi selama kejadian
@@ -38,12 +41,14 @@ const tanggalId = new Intl.DateTimeFormat("id-ID", {
 
 const PILIH = {
   id: true, slug: true, title_id: true, description_id: true, event_date: true, location: true,
+  location_lat: true, location_lng: true,
   image_id: true, video: true, media: true, orientation: true,
 } as const;
 
 type Baris = {
   id: bigint; slug: string | null; title_id: string; description_id: string | null;
-  event_date: Date; location: string; image_id: string | null; video: string | null;
+  event_date: Date; location: string; location_lat: unknown; location_lng: unknown;
+  image_id: string | null; video: string | null;
   media: unknown;
   orientation: string;
 };
@@ -76,6 +81,9 @@ function keBerita(e: Baris): Berita {
     video: urlMedia(e.video),
     poster,
     lokasi: rapikanLokasi(e.location),
+    // Decimal Prisma, bukan number — dijadikan number sekali di sini seperti id.
+    lat: Number(e.location_lat),
+    lng: Number(e.location_lng),
     deskripsi: e.description_id,
     media: mediaList,
     vertikal: e.orientation === "horizontal",

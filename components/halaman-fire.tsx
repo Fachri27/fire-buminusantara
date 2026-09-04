@@ -253,7 +253,7 @@ function Rincian({
           )}
         </div>
 
-        <div className="rincian__rel">
+        <div className="rincian__rel" data-lenis-prevent>
           <div className="rincian__kepala">
             {/* Hanya thumbnail asli kejadian ini. `gambar` punya cadangan satu foto
                 bawaan yang sama untuk semua kejadian tanpa thumbnail, jadi
@@ -271,7 +271,7 @@ function Rincian({
             </div>
           </div>
 
-          <div className="rincian__badan">
+          <div className="rincian__badan" data-lenis-prevent>
             {/* Kapsi: judul, deskripsi, dan lokasi. Pulau dan tanggal sudah
                 ditampilkan di kepala pop-up; tidak perlu digandakan. */}
             <div className="rincian__kapsi">
@@ -285,6 +285,18 @@ function Rincian({
                     <div>
                       <p className="rincian__label">Lokasi</p>
                       <p className="rincian__nilai">{berita.lokasi}</p>
+                      {/* Titik koordinat menyertai nama lokasi — buktinya bisa
+                          diperiksa silang (tempel ke peta), dan pola galat
+                          "S tertinggal ketik" terlihat langsung dari tandanya. */}
+                      <a
+                        href={`https://www.google.com/maps?q=${berita.lat},${berita.lng}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rincian__koordinat"
+                        title="Buka titik di Google Maps"
+                      >
+                        {berita.lat.toFixed(6)}, {berita.lng.toFixed(6)} ↗
+                      </a>
                     </div>
                   </div>
                 )}

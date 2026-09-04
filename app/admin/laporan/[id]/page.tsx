@@ -5,7 +5,9 @@ import {
   ambilLaporan, laporanBerikutnya, adaStatus, NAMA_STATUS,
   type Lampiran, type StatusLaporan,
 } from "@/lib/laporan-publik";
+import { peringatanLokasi } from "@/lib/provinsi-titik";
 import { HALAMAN, KopHalaman } from "../../kop-halaman";
+import { Segarkan } from "../../segarkan";
 import { TombolVerifikasi } from "../tombol-verifikasi";
 import { PilihOrientasi } from "../pilih-orientasi";
 
@@ -44,6 +46,15 @@ export default async function RincianLaporan({
 
   const kembali = `/admin/laporan?status=${asal}`;
 
+  // Kewajaran lokasi dicek untuk SEMUA laporan yang dibuka — pola galat "S
+  // tertinggal ketik" hanya terlihat di sini, sebelum promosi mengunci
+  // koordinat dan nama daerahnya ke kejadian publik.
+  const peringatan = peringatanLokasi(
+    laporan.lat,
+    laporan.lng,
+    `${laporan.judul}\n${laporan.deskripsi}`,
+  );
+
   return (
     <div className={HALAMAN}>
       <Link href={kembali} className="cms-mata mb-4 inline-block underline-offset-4 hover:underline">
@@ -61,6 +72,7 @@ export default async function RincianLaporan({
           bolehHapus={sesi.peran === "admin"}
           setelahHapus={kembali}
         />
+        <Segarkan />
       </KopHalaman>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -119,6 +131,15 @@ export default async function RincianLaporan({
               <Baris label="Alamat IP">
                 <span className="cms-angka">{laporan.ip ?? "—"}</span>
               </Baris>
+
+              {peringatan !== null && (
+                <div className="cms-baris cms-baris--perhatian p-3">
+                  <p className="cms-cap cms-cap--perhatian">Periksa lokasi</p>
+                  <p className="mt-1.5 text-[13px] leading-[1.55] text-[var(--redup)]">
+                    {peringatan}
+                  </p>
+                </div>
+              )}
 
               {laporan.status !== "pending" && (
                 <Baris label="Ditinjau">

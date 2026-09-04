@@ -21,6 +21,12 @@ export type NilaiAwal = {
 
 type Lokasi = { id: string; nama: string; lat: number; lng: number };
 
+/** Saran "ikuti pin": nama tempat tepat di titik koordinat saat ini. */
+type SaranTitik = { nama: string; negara: string | null };
+
+/** Kode negara yang umum muncul di sekitar sini; selebihnya tampil apa adanya. */
+const NEGARA: Record<string, string> = { id: "Indonesia", my: "Malaysia" };
+
 function buatSlug(teks: string): string {
   return teks
     .toLowerCase()
@@ -56,6 +62,8 @@ export function FormKejadian({
   const [mencari, setMencari] = useState(false);
   const [memuatLagi, setMemuatLagi] = useState(false);
   const [habis, setHabis] = useState(false);
+  const [saran, setSaran] = useState<SaranTitik | null>(null);
+  const [mengenali, setMengenali] = useState(false);
 
   // Hasil dibagi 10 halaman; menggulir ke dasar daftar mengambil halaman
   // berikutnya. `permintaan` membuang jawaban yang sudah ketinggalan ketika
@@ -63,8 +71,52 @@ export function FormKejadian({
   const BAGI = 10;
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const permintaan = useRef(0);
+  // Saran mengikuti TITIK (pin, ketikan koordinat, hasil pencarian) — bukan
+  // teks lokasi. Debounce + nomor permintaan sendiri, terpisah dari pencarian
+  // teks di atas, supaya keduanya bisa berjalan tanpa saling membatalkan.
+  const tundaSaran = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const mintaSaran = useRef(0);
+  // Kolom Lokasi duduk jauh di atas peta; sehabis Pakai, gulirkan ke sana
+  // supaya editor melihat teksnya terisi (tanpa ini tombolnya tampak mati).
+  const lokasiRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => () => {
+    clearTimeout(timer.current);
+    clearTimeout(tundaSaran.current);
+  }, []);
+
+  // Setiap titik berubah (termasuk nilai awal saat form dibuka): kenali nama
+  // tempatnya dan tawarkan lewat tombol — tidak diisi otomatis, editor yang
+  // memutuskan. Titik yang tidak dikenali (tengah laut) membersihkan saran.
+  // Semua setState di dalam callback timer (bukan badan efek) supaya tidak
+  // memicu render beruntun.
+  useEffect(() => {
+    clearTimeout(tundaSaran.current);
+    tundaSaran.current = setTimeout(async () => {
+      const id = ++mintaSaran.current;
+      const a = Number(lat);
+      const b = Number(lng);
+      if (lat.trim() === "" || lng.trim() === "" || !Number.isFinite(a) || !Number.isFinite(b)) {
+        if (id !== mintaSaran.current) return;
+        setSaran(null);
+        setMengenali(false);
+        return;
+      }
+      if (id === mintaSaran.current) setMengenali(true);
+      try {
+        const r = await fetch(`/api/lokasi/balik?lat=${a}&lng=${b}`);
+        const j = r.ok ? await r.json() : null;
+        if (id !== mintaSaran.current) return;
+        const s = j?.saran;
+        setSaran(s?.ada ? { nama: String(s.nama), negara: s.negara ?? null } : null);
+      } catch {
+        if (id === mintaSaran.current) setSaran(null);
+      } finally {
+        if (id === mintaSaran.current) setMengenali(false);
+      }
+    }, 700);
+    return () => clearTimeout(tundaSaran.current);
+  }, [lat, lng]);
 
   async function ambil(kata: string, geser: number) {
     const id = ++permintaan.current;
@@ -154,8 +206,8 @@ export function FormKejadian({
           <label htmlFor="location" className="cms-mata mb-1.5 block">
             Lokasi<Wajib />
           </label>
-          <input id="location" name="location" required value={lokasi}
-                 onChange={(e) => { setLokasi(e.target.value); cariLokasi(e.target.value); }}
+          <input id="location" name="location" required value={lokasi} ref={lokasiRef}
+                  onChange={(e) => { setLokasi(e.target.value); cariLokasi(e.target.value); }}
                  placeholder="Ketik nama tempat, mis. Kubu Raya"
                  autoComplete="off" className="cms-isian w-full" />
           <Bantuan>
@@ -219,6 +271,38 @@ export function FormKejadian({
             Tekan peta untuk menaruh titik, geser penandanya untuk merapikan.
             Hasil pencarian dan isian koordinat ikut menggerakkan peta.
           </Bantuan>
+
+          {/* Saran mengikuti pin: nama tempat tepat di titik itu (desa
+              Simontini, atau kampung/jalan OSM bila di luar poligon desa).
+              Tidak diisi otomatis — editor menekan Pakai bila cocok. Titik di
+              luar Indonesia diberi peringatan, bukan disembunyikan: pin di
+              perbatasan memang bisa jatuh di negara tetangga. */}
+          {mengenali && <p className="cms-mata mt-2">Mengenali titik…</p>}
+          {saran !== null && !mengenali && (
+            <div className="cms-baris mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 p-2.5">
+              <p className="min-w-0 flex-1 text-[13px] text-[var(--redup)]">
+                <span className="cms-mata mr-2">Di titik ini</span>
+                {saran.nama}
+              </p>
+              <button type="button"
+                      onClick={() => {
+                        setLokasi(saran.nama);
+                        // Kolomnya di luar layar (di atas peta) — bawa ke
+                        // pandangan supaya jelas tombolnya bekerja.
+                        lokasiRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        lokasiRef.current?.focus({ preventScroll: true });
+                      }}
+                      className="cms-tombol cms-tombol--kecil">
+                Pakai
+              </button>
+            </div>
+          )}
+          {saran !== null && saran.negara !== null && saran.negara !== "id" && (
+            <p className="mt-2 text-[12.5px] leading-[1.5] text-[var(--api)]">
+              Titik ini di luar Indonesia ({NEGARA[saran.negara] ?? saran.negara.toUpperCase()}) —
+              periksa pin sebelum disimpan.
+            </p>
+          )}
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">

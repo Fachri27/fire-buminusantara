@@ -22,7 +22,17 @@ const mono = IBM_Plex_Mono({
   subsets: ["latin"], weight: ["400", "500"], variable: "--huruf-mono",
 });
 
-// CMS routes use authenticated session cookies at request time and are opted out of prerender validation.
+// instant = false: disengaja — seluruh CMS bergerbang sesi.
+//
+// Setiap halaman di bawah sini memanggil bacaSesi() di puncaknya lalu
+// redirect ke /admin/login; membungkus pembacaan itu dalam <Suspense> justru
+// melumpuhkan gerbangnya. Di layout, flag ini menutup seluruh subpohon saat
+// build — navigasi klien tetap divalidasi per segmen di dev, jadi tiap
+// halaman CMS masih memunculkan insight blocking-prerender-dynamic di
+// overlay. Itu diharapkan, bukan kebocoran.
+//
+// Memindahkan gerbangnya ke proxy.ts adalah perbaikan arsitektur tersendiri,
+// bukan pekerjaan Cache Components.
 export const instant = false;
 
 export const metadata: Metadata = {

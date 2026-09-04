@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { rapikanLokasi, inferProvinsi } from "@/lib/wilayah";
 import { bacaBerkasMedia } from "@/lib/media";
@@ -25,16 +25,26 @@ const tanggalId = new Intl.DateTimeFormat("id-ID", {
 });
 
 export function DaftarTampilan({ daftar }: { daftar: ItemKejadian[] }) {
-  const [mode, setMode] = useState<"list" | "card">(() => {
-    if (typeof window === "undefined") return "list";
+  // Selalu "list" pada render pertama: server tidak punya localStorage,
+  // sedangkan membaca localStorage di inisialisasi state membuat klien yang
+  // pernah memilih "card" me-render pohon berbeda dari server → hydration
+  // failed di /admin/kejadian. Pilihan tersimpan diselaraskan di efek bawah
+  // (setelah hidrasi); nilainya sama ("list") berarti React melewatkannya
+  // tanpa render ulang.
+  const [mode, setMode] = useState<"list" | "card">("list");
+
+  useEffect(() => {
     try {
       const tersimpan = localStorage.getItem("cms_kejadian_tampilan");
-      if (tersimpan === "list" || tersimpan === "card") return tersimpan;
+      // Sinkronisasi pasca-hidrasi yang disengaja (pola resmi React untuk
+      // nilai khusus-klien seperti localStorage): render pertama harus sama
+      // dengan server, pilihan tersimpan diterapkan setelahnya.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (tersimpan === "list" || tersimpan === "card") setMode(tersimpan);
     } catch {
       // Abaikan jika localStorage tidak dapat diakses
     }
-    return "list";
-  });
+  }, []);
 
   function gantiMode(m: "list" | "card") {
     setMode(m);

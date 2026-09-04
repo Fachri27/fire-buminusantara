@@ -33,8 +33,9 @@ const TEKS_BERANDA: Record<Bahasa, { judul: string; deskripsi: string; ogLocale:
   },
 };
 
-// Metadata per locale — halaman ini force-dynamic, jadi generateMetadata
-// berjalan per permintaan tanpa menambah biaya cache baru.
+// Metadata per locale — cangkang statis di-prerender, isi dinamis mengalir
+// lewat connection() di IsiHalaman, jadi generateMetadata tidak menambah
+// biaya cache baru.
 export async function generateMetadata({ params }: PageProps<'/[locale]'>): Promise<Metadata> {
   const { locale } = await params;
   // Segmen tak dikenal tetap 404 lewat notFound() di bawah; metadata butuh
