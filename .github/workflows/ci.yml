@@ -88,6 +88,13 @@ jobs:
           # prisma.config.ts butuh DATABASE_URL terdefinisi; generate tidak konek.
           DATABASE_URL: mysql://ci:ci@localhost:3306/ci
       - run: npm run lint
+      # WAJIB sebelum tsc: `PageProps`, `LayoutProps`, dan `RouteContext` adalah
+      # tipe global yang DIBANGKITKAN Next ke .next/types — di checkout bersih
+      # folder itu belum ada, dan tsc gagal dengan "Cannot find name
+      # 'PageProps'". Di mesin pengembang tidak terlihat karena .next sudah
+      # terisi build sebelumnya. `typegen` membuatnya tanpa build penuh (~0,4
+      # detik), jadi urutan gerbang termurah-dulu tetap terjaga.
+      - run: npx next typegen
       - run: npx tsc --noEmit
       # Tanpa DB: test node:test hanya menyentuh lib murni (wilayah, bahasa,
       # media, …). Yang butuh DB/S3 sengaja tidak ada di pola lib/**/*.test.ts.
