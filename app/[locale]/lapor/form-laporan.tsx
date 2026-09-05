@@ -377,6 +377,15 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
           e.preventDefault();
           return;
         }
+        // Bukti visual wajib: tanpa satu berkas pun laporan tidak bisa
+        // diverifikasi petugas. Dicek di sini (pesan langsung di bawah form)
+        // dan di server (menolak kiriman yang mengakali klien).
+        if (berkas.length === 0) {
+          e.preventDefault();
+          setGalatKlien(teks.berkasWajib);
+          document.getElementById("berkas-laporan")?.focus();
+          return;
+        }
         sedangKirimRef.current = true;
       }}
       className="grid gap-7"
@@ -401,7 +410,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
                   className={`${ISIAN} resize-y leading-[1.6]`} />
       </Bidang>
 
-      <Bidang id="berkas-laporan" label={teks.labelBerkas} petunjuk={teks.petunjukBerkas}>
+      <Bidang id="berkas-laporan" label={teks.labelBerkas} petunjuk={teks.petunjukBerkas} wajib>
         {/* Input aslinya disembunyikan dari mata, bukan dari pembaca layar:
             tampilan bawaannya berbeda di tiap peramban dan tidak memberi tahu
             berkas mana saja yang sudah terpilih. Daftar di bawahlah yang
