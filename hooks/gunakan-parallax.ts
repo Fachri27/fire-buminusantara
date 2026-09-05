@@ -84,20 +84,25 @@ export function gunakanParallax(kunciGulir: boolean) {
     return () => bersihkan?.();
   }, []);
 
-  // Pop-up aktif: hentikan guliran Lenis
+  // Pop-up aktif: hentikan guliran Lenis dan kunci gulir html & body di belakangnya
   useEffect(() => {
     const lenis = (window as unknown as { lenis?: { stop(): void; start(): void } }).lenis;
-    if (!lenis) {
-      if (kunciGulir) {
-        const awal = document.body.style.overflow;
-        document.body.style.overflow = "hidden";
-        return () => {
-          document.body.style.overflow = awal;
-        };
-      }
-      return;
+    if (kunciGulir) {
+      lenis?.stop();
+      const awalBody = document.body.style.overflow;
+      const awalHtml = document.documentElement.style.overflow;
+      const awalOverscroll = document.documentElement.style.overscrollBehavior;
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+      document.documentElement.style.overscrollBehavior = "none";
+      return () => {
+        document.body.style.overflow = awalBody;
+        document.documentElement.style.overflow = awalHtml;
+        document.documentElement.style.overscrollBehavior = awalOverscroll;
+        lenis?.start();
+      };
+    } else {
+      lenis?.start();
     }
-    if (kunciGulir) lenis.stop();
-    else lenis.start();
   }, [kunciGulir]);
 }

@@ -15,6 +15,17 @@
  * transform-origin.
  */
 
+/* Kunci gulir halaman dan matikan event pada peta di belakang saat popup peta terbuka */
+html:has(.peta-popup),
+body:has(.peta-popup) {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+body:has(.peta-popup) #peta,
+body:has(.peta-popup) iframe[src*="forecasting"] {
+  pointer-events: none !important;
+}
+
 .peta-popup {
   /* Ditahan sampai js/peta.js melepasnya. Panel ini lahir berbarengan dengan
      daftar beritanya, flatpickr, dan penguncian gulir halaman (body overflow,
@@ -30,20 +41,24 @@
 
 .peta-popup--jalan {
   animation-play-state: running;
-  /* Dipasang satu frame SEBELUM animasi mulai, bukan bersamaan: petunjuk ini
-     hanya berguna kalau compositor sempat menyiapkan lapisannya lebih dulu.
-     Tanpa lapisan sendiri, tiap frame mengecat ulang panel selebar layar di
-     atas peta Leaflet yang penuh poligon. */
   will-change: transform, opacity;
 }
 
-/* Selesai: animasinya dilepas sama sekali, dan bersamanya lapisan compositor
-   yang tidak lagi ada gunanya ditahan di memori. `animation: none` memulangkan
-   elemen ke keadaan wajarnya — scale 1, opacity 1 — sama dengan bingkai
-   terakhir, jadi tidak ada lompatan. */
+/* Selesai: transform HARUS dikembalikan ke none mutlak!
+   JANGAN gunakan transform: translateZ(0) di sini.
+   Pada elemen position: fixed, transform apapun (termasuk translateZ)
+   membuat browser engine (Chromium/WebKit) menerapkan offset gulir
+   secara desinkron, menyebabkan SELURUH panel fixed bergetar/flicker
+   saat kursor mouse wheel/trackpad digerakkan. */
 .peta-popup--diam {
-  animation: none;
-  will-change: auto;
+  animation: none !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+/* Wadah gulir internal: cegah kebocoran gulir & scroll chaining */
+.peta-popup [data-lenis-prevent] {
+  overscroll-behavior: contain;
 }
 
 @keyframes peta-popup-tumbuh {

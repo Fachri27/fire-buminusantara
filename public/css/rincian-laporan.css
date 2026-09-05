@@ -44,9 +44,12 @@
    daftar komentar jadi "butuh 3 jari". Selama popup terbuka: matikan sentuhan
    iframe peta dan kunci gulir halaman di belakang. Keduanya pulih sendiri saat
    popup ditutup karena .rincian lepas dari DOM (:has berhenti cocok). */
+html:has(.rincian),
 body:has(.rincian) {
-  overflow: hidden;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
 }
+body:has(.rincian) #peta,
 body:has(.rincian) iframe[src*="forecasting"] {
   pointer-events: none !important;
 }

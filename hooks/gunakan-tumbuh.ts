@@ -51,6 +51,9 @@ export function gunakanTumbuh(
     const saatSelesai = (e: AnimationEvent) => {
       if (e.target !== el) return;
       el.classList.add("peta-popup--diam");
+      // Bersihkan transformOrigin dan transform inline agar elemen fixed murni tanpa transform
+      el.style.transformOrigin = "";
+      el.style.transform = "";
       onSelesai?.();
     };
     el.addEventListener("animationend", saatSelesai);

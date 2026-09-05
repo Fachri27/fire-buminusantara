@@ -152,12 +152,13 @@ export function PopupPeta({
     <>
       {/* Backdrop semi-transparan yang menutup saat disentuh/diklik di luar popup */}
       <div
-        className="fixed inset-0 z-[44] bg-black/50 backdrop-blur-[2px] transition-opacity"
+        className="fixed inset-0 z-[44] bg-black/50 transition-opacity"
         onClick={onTutup}
         aria-hidden="true"
       />
 
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label="Berita karhutla wilayah terpilih"
+           onWheel={(e) => e.stopPropagation()}
            className="peta-popup fixed inset-x-2.5 sm:inset-x-[clamp(10px,4vw,190px)]
                       top-[calc(3.75rem+env(safe-area-inset-top,0px))] sm:top-[calc(4rem+clamp(10px,2.4vw,26px))]
                       bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-[clamp(10px,2.4vw,26px)]
@@ -268,7 +269,7 @@ export function PopupPeta({
             dalamnya. overscroll-contain menahan rantai gulir agar menyentuh
             dasar/tepinya tidak ikut menggulirkan halaman di belakang. */}
         <div data-lenis-prevent
-             className="tanpa-bilah-gulir min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y
+             className="tanpa-bilah-gulir min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y
                         p-3 sm:p-5 panggung:px-[28px]">
           {tampil.length > 0 ? (
             tampilan === "kartu" ? (
