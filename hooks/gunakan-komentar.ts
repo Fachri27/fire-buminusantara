@@ -26,26 +26,35 @@ export function gunakanKomentar(idLaporan: number) {
   const [daftar, setDaftar] = useState<Komentar[]>([]);
   const [memuat, setMemuat] = useState(false);
   const [mengirim, setMengirim] = useState(false);
-  const [nama, setNama] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return localStorage.getItem("komentar_nama") ?? "";
-    } catch {
-      return "";
-    }
-  });
-  const [email, setEmail] = useState(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return localStorage.getItem("komentar_email") ?? "";
-    } catch {
-      return "";
-    }
-  });
+  const [nama, setNama] = useState("");
+  const [email, setEmail] = useState("");
   const [anonim, setAnonim] = useState(false);
   const [isi, setIsi] = useState("");
   const [balasKe, setBalasKe] = useState<number | null>(null);
   const [balasNama, setBalasNama] = useState("");
+
+  /**
+   * Identitas pengisi komentar dipulihkan SESUDAH hidrasi, bukan di dalam
+   * inisialisasi useState.
+   *
+   * Inisialisasi lazy useState ikut berjalan pada render hidrasi di klien, jadi
+   * membaca localStorage di sana membuat klien merender nama tersimpan
+   * sementara server merender kosong — dan React membuang seluruh pohon itu
+   * dengan "Hydration failed because the server rendered text didn't match"
+   * (inisial "F" lawan "?" di kolom komentar). Menaruhnya di useEffect membuat
+   * render pertama identik dengan server, lalu nilainya terisi sepersekian
+   * detik kemudian.
+   */
+  useEffect(() => {
+    try {
+      const namaTersimpan = localStorage.getItem("komentar_nama");
+      const emailTersimpan = localStorage.getItem("komentar_email");
+      if (namaTersimpan) setNama(namaTersimpan);
+      if (emailTersimpan) setEmail(emailTersimpan);
+    } catch {
+      // localStorage bisa ditolak (mode privat, kuki diblokir) — biarkan kosong.
+    }
+  }, []);
   const [dibuka, setDibuka] = useState<number[]>([]);
   const [website, setWebsite] = useState("");
   const [galat, setGalat] = useState("");
