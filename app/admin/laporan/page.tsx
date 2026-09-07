@@ -197,6 +197,7 @@ function Lampiran({ daftar, judul }: { daftar: Lampiran[]; judul: string }) {
           <li key={m.url} title={m.keterangan}>
             <a href={m.url} target="_blank" rel="noreferrer"
                className="block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns */}
               <img src={m.url} alt={m.keterangan || `Lampiran ${i + 1} — ${judul}`} loading="lazy"
                    className="h-24 w-32 rounded-[3px] border border-[var(--garis)] object-cover" />
             </a>
@@ -206,6 +207,7 @@ function Lampiran({ daftar, judul }: { daftar: Lampiran[]; judul: string }) {
             <a href={m.url} target="_blank" rel="noreferrer"
                className="group relative block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
               {m.poster ? (
+                // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
                 <img src={m.poster} alt={m.keterangan || `Lampiran video ${i + 1} — ${judul}`} loading="lazy"
                      className="h-24 w-32 rounded-[3px] border border-[var(--garis)] object-cover" />
               ) : (

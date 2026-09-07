@@ -216,6 +216,7 @@ function LampiranPenuh({ id, daftar, judul }: { id: number; daftar: Lampiran[]; 
           {m.jenis === "gambar" ? (
             <a href={m.url} target="_blank" rel="noreferrer"
                className="block w-fit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--api)]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns */}
               <img src={m.url} alt={m.keterangan || `Lampiran ${i + 1} — ${judul}`} loading="lazy"
                    className="max-h-[70svh] w-auto max-w-full rounded-[3px] border border-[var(--garis)]" />
             </a>

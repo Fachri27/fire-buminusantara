@@ -31,6 +31,7 @@ export function Pratinjau({
 
   if (urlGambar) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
       <img
         src={urlGambar}
         alt=""

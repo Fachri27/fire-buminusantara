@@ -499,6 +499,7 @@ function Galeri({
                   {m.jenis === "video" ? (
                     m.poster ? (
                       <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns */}
                         <img src={m.poster} alt={`Media ${i + 1}`} className="h-[96px] w-full object-cover" />
                         <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
                           <span className="flex size-6 items-center justify-center rounded-full bg-black/60 shadow-xs">
@@ -517,6 +518,7 @@ function Galeri({
                       </div>
                     )
                   ) : (
+                    // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
                     <img src={m.url} alt={`Media ${i + 1}`} className="h-[96px] w-full object-cover" />
                   )}
 
@@ -597,6 +599,7 @@ function Galeri({
                 {b.video ? (
                   b.bingkai ? (
                     <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- pratinjau blob dari createObjectURL — next/image tak bisa memuatnya */}
                       <img src={b.bingkai} alt="" className="h-[96px] w-full object-cover" />
                       <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
                         <span className="flex size-6 items-center justify-center rounded-full bg-black/60 shadow-xs">
@@ -615,6 +618,7 @@ function Galeri({
                     </div>
                   )
                 ) : (
+                  // eslint-disable-next-line @next/next/no-img-element -- pratinjau blob dari createObjectURL — next/image tak bisa memuatnya
                   <img src={b.url} alt="" className="h-[96px] w-full object-cover" />
                 )}
                 <p className="truncate px-2 pt-1.5 text-[11px] text-[var(--redup)]" title={b.nama}>

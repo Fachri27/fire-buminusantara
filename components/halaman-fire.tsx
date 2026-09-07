@@ -14,6 +14,7 @@ import { Korsel } from "./korsel";
 import { Peta } from "./peta";
 import { PanelProvinsi } from "./panel-provinsi";
 import { PopupPeta } from "./popup-peta";
+import { TUTUP_OVERLAY } from "@/lib/peristiwa-popup";
 import { UlasanKomentar, FormulirKomentar } from "./kolom-komentar";
 import { SliderRincian } from "./slider-rincian";
 
@@ -104,6 +105,21 @@ export function HalamanFire({
     window.addEventListener("popstate", saatPopState);
     return () => window.removeEventListener("popstate", saatPopState);
   }, [daftarPeta]);
+
+  // Bilah navigasi menuju beranda/bagian halaman: tutup pop-up apa pun yang
+  // sedang terbuka. Tidak bisa disandarkan pada perubahan rute — lihat
+  // lib/peristiwa-popup.ts untuk sebabnya.
+  useEffect(() => {
+    const tutupSemua = () => {
+      setWilayah(null);
+      // tutupRincian, bukan setSorot(null): ia juga mengembalikan URL dari
+      // /xx/fire/<slug> ke beranda. Tanpa itu pop-up tertutup tapi bilah
+      // alamat tetap menunjuk kejadian yang sudah tidak tampak.
+      tutupRincian();
+    };
+    window.addEventListener(TUTUP_OVERLAY, tutupSemua);
+    return () => window.removeEventListener(TUTUP_OVERLAY, tutupSemua);
+  }, [tutupRincian]);
 
   return (
     <>

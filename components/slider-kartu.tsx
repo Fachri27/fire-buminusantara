@@ -115,6 +115,7 @@ function FotoKartu({
 
   return (
     <>
+      {/* eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns */}
       <img
         ref={pasangFoto}
         src={src}
