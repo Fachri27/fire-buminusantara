@@ -272,11 +272,20 @@ body:has(.rincian) iframe[src*="forecasting"] {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 6px;
+  /* Jarak dirapatkan di ponsel: bersama kotak sentuh 24px, dua belas media
+     jatuh di ~330px sehingga pilnya masih muat di layar 375px. Di layar lebar
+     kembali ke 6px seperti semula. */
+  gap: 2px;
   padding: 5px 10px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(8px);
+}
+
+@media (min-width: 640px) {
+  .rincian__dots {
+    gap: 6px;
+  }
 }
 
 /* Slide video: bilah kendali bawaan peramban menghuni dasar kotak media */
@@ -1055,14 +1064,26 @@ body:has(.rincian) iframe[src*="forecasting"] {
 }
 
 @media (max-width: 640px) {
+  /* Kredit DIANGKAT KE ATAS baris titik.
+     Di layar sempit keduanya berebut pita yang sama: kredit dulu duduk di
+     bottom 8px setinggi ~23px (8-31px), sedangkan baris titik di bottom 12px
+     setinggi 24px (12-36px) dan melebar sampai menutupi teksnya. Di layar lebar
+     persoalan ini tidak ada — titiknya terpusat jauh dari kredit di kiri — jadi
+     penataan ulang ini khusus ponsel. Angkanya: titik 12+24=36, kredit mulai 44. */
   .rincian__kredit {
-    bottom: 8px;
+    bottom: 44px;
     left: 8px;
     font-size: 11px;
     padding: 3px 8px;
   }
 
+  .rincian__dots {
+    bottom: 12px;
+  }
+
+  /* Slide video: bilah kendali menghuni dasar, jadi titik naik ke 60px
+     (lihat .rincian__dots--di-kendali) dan kredit menyusul di atasnya. */
   .rincian__kredit--di-kendali {
-    bottom: 60px;
+    bottom: 92px;
   }
 }

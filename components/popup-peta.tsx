@@ -2,20 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { gunakanTumbuh, type TitikAsal } from "@/hooks/gunakan-tumbuh";
-import { PULAU_TAB, tabDariPulau, waktuIso, waktuTeks } from "@/lib/tanggal";
-import { PROVINSI_KE_PULAU } from "@/lib/wilayah";
+import { waktuIso, waktuTeks } from "@/lib/tanggal";
+import { PROVINSI_KE_PULAU, PROVINSI_PETA_NAMA } from "@/lib/wilayah";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { Berita } from "@/lib/events";
 import type { ItemMedia } from "@/lib/media";
 
 type Props = {
+  /** Provinsi yang ditekan — daftar awal berisi laporan provinsi ini. */
   nama: string;
   pulau: string | null;
   jumlah: number | null;
   /** Titik layar tempat pop-up tumbuh — provinsi yang ditekan. */
   asal: TitikAsal;
   berita: Berita[];
-  jumlahLaporan?: Record<string, number>;
+  /** Hitungan per provinsi (34 nama kanonik, yang nol ikut ada) — mengisi
+   *  judul, angka kepala, dan daftar pilihan provinsi. */
+  jumlahLaporan: Record<string, number>;
   onBukaRincian: (i: number) => void;
   onTutup: () => void;
 };
@@ -31,9 +34,10 @@ const PER_HALAMAN = 10;
 /**
  * Pop-up berita wilayah, terbuka saat sebuah provinsi ditekan di peta.
  *
- * Wilayah yang ditekan hanya menentukan tab mana yang terbuka lebih dulu;
- * sesudah itu pop-up ini menjadi jalan masuk ke SELURUH berita, jadi tabnya
- * bebas dipindah.
+ * Isinya per provinsi yang dipilih — bukan se-pulau. Pengelompokan se-pulau
+ * pernah dipakai di sini dan membuat kepala ("4 laporan tercatat") berbohong
+ * terhadap daftarnya (17 se-Kalimantan). Pilihan provinsi bisa diganti lewat
+ * dropdown berkaca di bilah saringan tanpa menutup pop-up.
  */
 export function PopupPeta({
   nama,
@@ -48,22 +52,24 @@ export function PopupPeta({
   const panelRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line react-hooks/refs
   gunakanTumbuh(panelRef, asal);
-  const [tabAktif, setTabAktif] = useState(() => tabDariPulau(pulau) ?? PULAU_TAB[0].kunci);
-  const [prevPulau, setPrevPulau] = useState(pulau);
-  if (pulau !== prevPulau) {
-    setPrevPulau(pulau);
-    setTabAktif(tabDariPulau(pulau) ?? PULAU_TAB[0].kunci);
-  }
+  // Provinsi yang daftarnya tampil — diawali dari yang ditekan di peta,
+  // bisa diganti lewat dropdown berkaca.
+  const [provinsiAktif, setProvinsiAktif] = useState(nama);
+  // Dropdown pilih provinsi: ketikan penyaring + status terbuka.
+  const [cariProvinsi, setCariProvinsi] = useState("");
+  const [pilihTerbuka, setPilihTerbuka] = useState(false);
+  const pilihRef = useRef<HTMLDivElement | null>(null);
   // `dari` dan `sampai` disimpan terpisah karena penyaringnya memakai keduanya.
   const [dari, setDari] = useState("");
   const [sampai, setSampai] = useState("");
-  // Mode tampilan daftar berita — dipilih lewat saklar kartu/daftar di bilah saringan.
-  const [tampilan, setTampilan] = useState<ModeTampilan>("daftar");
-  // Halaman aktif pada kedua mode. Kembali ke halaman pertama saat tab pulau
+  // Mode tampilan daftar berita — bawaan kartu bergambar, dipilih lewat
+  // saklar kartu/daftar di bilah saringan.
+  const [tampilan, setTampilan] = useState<ModeTampilan>("kartu");
+  // Halaman aktif pada kedua mode. Kembali ke halaman pertama saat provinsi
   // atau saringan tanggal berganti — daftarnya baru, halamannya ikut baru.
   const [halaman, setHalaman] = useState(1);
-  const [kunciSaringanSebelumnya, setKunciSaringanSebelumnya] = useState(() => `${tabAktif}:${dari}:${sampai}`);
-  const kunciSaringanKini = `${tabAktif}:${dari}:${sampai}`;
+  const [kunciSaringanSebelumnya, setKunciSaringanSebelumnya] = useState(() => `${nama}:${dari}:${sampai}`);
+  const kunciSaringanKini = `${provinsiAktif}:${dari}:${sampai}`;
   if (kunciSaringanKini !== kunciSaringanSebelumnya) {
     setKunciSaringanSebelumnya(kunciSaringanKini);
     setHalaman(1);
@@ -82,62 +88,58 @@ export function PopupPeta({
     setSampai("");
   };
 
-  const tabAwal = useMemo(() => tabDariPulau(pulau) ?? PULAU_TAB[0].kunci, [pulau]);
-  const tab = PULAU_TAB.find((t) => t.kunci === tabAktif) ?? PULAU_TAB[0];
-
-  // Hitung total laporan per tab pulau dari seluruh provinsi
-  const totalLaporanTab = useMemo(() => {
-    if (!jumlahLaporan) return null;
-    const isi = tab.isi as readonly string[];
-    let total = 0;
-    for (const [prov, jml] of Object.entries(jumlahLaporan)) {
-      const p = PROVINSI_KE_PULAU[prov];
-      if (p && isi.includes(p)) {
-        total += jml;
-      }
-    }
-    return total;
-  }, [tab, jumlahLaporan]);
-
-  // Hitung total laporan untuk setiap tab pulau untuk ditampilkan di dropdown select
-  const jumlahLaporanSemuaTab = useMemo(() => {
-    const hasil: Record<string, number> = {};
-    if (!jumlahLaporan) return hasil;
-    for (const t of PULAU_TAB) {
-      const isi = t.isi as readonly string[];
-      let total = 0;
-      for (const [prov, jml] of Object.entries(jumlahLaporan)) {
-        const p = PROVINSI_KE_PULAU[prov];
-        if (p && isi.includes(p)) {
-          total += jml;
-        }
-      }
-      hasil[t.kunci] = total;
-    }
-    return hasil;
-  }, [jumlahLaporan]);
-
-  const adalahWilayahAwal = tabAktif === tabAwal;
-  const judulTampil = adalahWilayahAwal ? nama : tab.label;
-  const subTampil = adalahWilayahAwal ? (pulau ?? tab.label) : tab.label;
-  const jumlahTampil = adalahWilayahAwal ? jumlah : totalLaporanTab;
-
   const tampil = useMemo(() => {
-    const isi = tab.isi as readonly string[];
     const awal = waktuIso(dari);
     const akhir = waktuIso(sampai);
 
     return berita
       .map((b, i) => ({ b, i }))
       .filter(({ b }) => {
-        if (!b.pulau || !isi.includes(b.pulau)) return false;
+        // Hanya provinsi yang dipilih — tanpa gabungan se-pulau.
+        if (b.provinsi !== provinsiAktif) return false;
         const waktu = waktuTeks(b.tanggal);
         if (waktu === null) return true; // tanggal tak terbaca: jangan disembunyikan
         if (awal !== null && waktu < awal) return false;
         if (akhir !== null && waktu > akhir) return false;
         return true;
       });
-  }, [berita, tab, dari, sampai]);
+  }, [berita, provinsiAktif, dari, sampai]);
+
+  // Daftar 34 provinsi untuk dropdown — yang laporannya terbanyak dulu, seri
+  // diurut abjad; ketikan di kotak cari menyaringnya. Angka ikut supaya
+  // provinsi kosong (0 laporan) tetap terlihat dan bisa dipilih.
+  const daftarProvinsi = useMemo(() => {
+    const semua = PROVINSI_PETA_NAMA.map((p) => ({
+      nama: p,
+      jumlah: jumlahLaporan[p] ?? 0,
+    }));
+    semua.sort((a, b) => b.jumlah - a.jumlah || a.nama.localeCompare(b.nama, "id"));
+    const q = cariProvinsi.trim().toLowerCase();
+    return q ? semua.filter((p) => p.nama.toLowerCase().includes(q)) : semua;
+  }, [jumlahLaporan, cariProvinsi]);
+
+  // Angka kepala mengikuti pilihan — peta hitungannya sudah mencakup 34
+  // provinsi; cadangan `jumlah` untuk provinsi awal bila petanya belum ada.
+  const jumlahAktif = jumlahLaporan[provinsiAktif] ?? (provinsiAktif === nama ? jumlah : 0) ?? 0;
+
+  const pilihProvinsi = (p: string) => {
+    setProvinsiAktif(p);
+    setPilihTerbuka(false);
+    setCariProvinsi("");
+  };
+
+  // Sentuh/klik di luar dropdown menutupnya — kombobox buatan sendiri, jadi
+  // penutupnya dibuat sendiri (select bawaan tak bisa diketik untuk mencari).
+  useEffect(() => {
+    if (!pilihTerbuka) return;
+    const tutup = (e: MouseEvent) => {
+      if (pilihRef.current && !pilihRef.current.contains(e.target as Node)) {
+        setPilihTerbuka(false);
+      }
+    };
+    document.addEventListener("mousedown", tutup);
+    return () => document.removeEventListener("mousedown", tutup);
+  }, [pilihTerbuka]);
 
   // Potongan daftar untuk halaman aktif — berlaku untuk kedua mode. Indeks
   // `i` di tiap butir tetap menunjuk ke posisi global di `berita` supaya
@@ -178,24 +180,22 @@ export function PopupPeta({
                       bg-white text-tinta shadow-[0_26px_70px_rgb(0_0_0/0.45)]
                       panggung:inset-x-[7vw] panggung:top-[calc(4rem+3vh)] panggung:bottom-[5vh]">
 
-        {/* Kepala: wilayah yang ditekan / tab yang aktif */}
+        {/* Kepala: provinsi yang dipilih — angka dan daftarnya satu sumber */}
         <div className="flex shrink-0 items-start gap-2.5 sm:gap-[clamp(10px,2.6vw,14px)] border-b border-black/10
                         p-3 sm:p-5 pr-12 sm:pr-[54px] panggung:p-[22px_28px] panggung:pr-[76px]">
           <div className="grid min-w-0 flex-1 gap-[2px]">
             <p className="text-[length:var(--ukuran-rincian-nama)] leading-[1.1] font-bold tracking-[-0.01em]">
-              {judulTampil}
+              {provinsiAktif}
             </p>
-            {subTampil && (
+            {(PROVINSI_KE_PULAU[provinsiAktif] ?? pulau) && (
               <p className="text-[length:var(--ukuran-catatan)] font-medium tracking-[0.1em] uppercase text-bara">
-                {subTampil}
+                {PROVINSI_KE_PULAU[provinsiAktif] ?? pulau}
               </p>
             )}
-            {jumlahTampil !== null && (
-              <p className="mt-1 text-[length:var(--ukuran-catatan)] text-black/70">
-                <span className="font-bold text-tinta">{jumlahTampil.toLocaleString("id-ID")}</span>{" "}
-                <span>laporan tercatat</span>
-              </p>
-            )}
+            <p className="mt-1 text-[length:var(--ukuran-catatan)] text-black/70">
+              <span className="font-bold text-tinta">{jumlahAktif.toLocaleString("id-ID")}</span>{" "}
+              <span>laporan tercatat</span>
+            </p>
           </div>
 
           <button type="button" aria-label="Tutup berita wilayah" onClick={onTutup}
@@ -209,7 +209,7 @@ export function PopupPeta({
           </button>
         </div>
 
-        {/* Saringan tanggal + dropdown pilih pulau */}
+        {/* Saringan tanggal + saklar mode tampilan */}
         <div className="flex shrink-0 flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-black/10
                         p-3 sm:p-5 py-2.5 sm:py-[10px] panggung:px-[28px]">
           <DateRangePicker
@@ -221,37 +221,81 @@ export function PopupPeta({
             }}
           />
 
-          {/* Dropdown Select Wilayah Pulau Tercatat (Sesuai Arahan) + saklar
-              mode tampilan daftar/kartu */}
+          {/* Dropdown pilih provinsi + saklar mode tampilan */}
           <div className="flex w-full sm:w-auto items-stretch sm:items-center gap-2 sm:gap-2.5">
-            <div className="relative min-w-0 flex-1 sm:flex-none sm:min-w-[220px]">
-              <select
-                id="pilih-wilayah-pulau"
-                value={tabAktif}
-                onChange={(e) => setTabAktif(e.target.value)}
-                aria-label="Pilih wilayah pulau tercatat"
-                className="w-full appearance-none rounded-lg border border-black/15 bg-white py-1.5 pl-3 pr-8 text-xs sm:text-sm font-semibold text-tinta shadow-xs outline-none transition-colors hover:border-black/30 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 cursor-pointer"
+            <div ref={pilihRef} className="relative min-w-0 flex-1 sm:flex-none sm:min-w-[220px]">
+              <button
+                type="button"
+                onClick={() => setPilihTerbuka((buka) => !buka)}
+                aria-haspopup="listbox"
+                aria-expanded={pilihTerbuka}
+                aria-label="Pilih provinsi"
+                className="w-full appearance-none rounded-lg border border-black/15 bg-white py-1.5 pl-3 pr-8 text-xs sm:text-sm font-semibold text-tinta shadow-xs outline-none transition-colors hover:border-black/30 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 cursor-pointer text-left truncate"
               >
-                {PULAU_TAB.map((t) => {
-                  const jml = jumlahLaporanSemuaTab[t.kunci];
-                  return (
-                    <option key={t.kunci} value={t.kunci}>
-                      {t.label} {jml !== undefined ? `(${jml} laporan)` : ""}
-                    </option>
-                  );
-                })}
-              </select>
+                {provinsiAktif} ({jumlahAktif} laporan)
+              </button>
               <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-black/45">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </div>
+
+              {pilihTerbuka && (
+                <div className="absolute right-0 left-0 sm:left-auto sm:w-[260px] top-full z-[5] mt-1 overflow-hidden rounded-lg border border-black/15 bg-white shadow-[0_16px_40px_rgb(0_0_0/0.18)]">
+                  <div className="border-b border-black/10 p-1.5">
+                    <input
+                      type="search"
+                      autoFocus
+                      value={cariProvinsi}
+                      onChange={(e) => setCariProvinsi(e.target.value)}
+                      onKeyDown={(e) => {
+                        // Escape di kotak cari hanya menutup dropdown — tanpa
+                        // ini ia menggelembung ke penutup pop-up seutuhnya.
+                        if (e.key === "Escape") {
+                          e.stopPropagation();
+                          setPilihTerbuka(false);
+                        }
+                      }}
+                      placeholder="Cari provinsi…"
+                      aria-label="Cari provinsi"
+                      className="w-full rounded-md border border-black/10 bg-black/[0.03] px-2.5 py-1.5 text-xs sm:text-sm text-tinta outline-none placeholder:text-black/35 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <ul role="listbox" aria-label="Daftar provinsi"
+                      className="max-h-[240px] overflow-y-auto overscroll-contain p-1">
+                    {daftarProvinsi.length > 0 ? (
+                      daftarProvinsi.map((p) => {
+                        const aktif = p.nama === provinsiAktif;
+                        return (
+                          <li key={p.nama} role="option" aria-selected={aktif}>
+                            <button
+                              type="button"
+                              onClick={() => pilihProvinsi(p.nama)}
+                              className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-xs sm:text-sm transition-colors
+                                ${aktif ? "bg-black/[0.07] font-bold text-tinta" : "font-medium text-tinta hover:bg-black/[0.04]"}`}
+                            >
+                              <span className="min-w-0 truncate">{p.nama}</span>
+                              <span className="shrink-0 text-[11px] sm:text-xs font-normal text-black/45">
+                                {p.jumlah} laporan
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })
+                    ) : (
+                      <li className="px-2.5 py-3 text-xs sm:text-sm text-black/50">
+                        Tidak ada provinsi yang cocok.
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
             </div>
 
-            {/* Saklar mode tampilan: daftar (baris ringkas) atau kartu (kotak
-                bergambar). Segmen aktif mengikuti rupa bilah saringan lain. */}
-            <div role="group" aria-label="Mode tampilan berita"
-                 className="flex shrink-0 items-center gap-0.5 self-center rounded-lg border border-black/15 bg-white p-0.5 shadow-xs">
+          {/* Saklar mode tampilan: daftar (baris ringkas) atau kartu (kotak
+              bergambar). Segmen aktif mengikuti rupa bilah saringan lain. */}
+          <div role="group" aria-label="Mode tampilan berita"
+               className="flex shrink-0 items-center gap-0.5 self-start sm:self-center rounded-lg border border-black/15 bg-white p-0.5 shadow-xs">
               <TombolTampilan aktif={tampilan === "daftar"} label="Tampilan daftar"
                               onClick={() => setTampilan("daftar")}>
                 <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
@@ -392,7 +436,7 @@ export function PopupPeta({
             )
           ) : (
             <p className="py-6 sm:py-[clamp(24px,7vw,48px)] text-[length:var(--ukuran-catatan)] leading-[1.5] text-black/70">
-              Belum ada laporan untuk <span className="font-semibold">{tab.label}</span>
+              Belum ada laporan untuk <span className="font-semibold">{provinsiAktif}</span>
               {adaSaringan ? " pada rentang tanggal ini" : ""}.
               {adaSaringan && (
                 <button type="button" onClick={hapusTanggal}

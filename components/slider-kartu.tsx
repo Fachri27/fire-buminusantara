@@ -59,29 +59,14 @@ export function SliderKartu({
       )}
 
       {media.length > 1 && (
-        <div className="absolute bottom-1.5 left-1/2 z-20 flex -translate-x-1/2 items-center">
-          {media.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`Media ${i + 1}`}
-              aria-current={i === kini}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIndeks(i);
-                onGeser();
-              }}
-              className="flex min-h-[28px] min-w-[28px] items-center justify-center p-1"
-            >
-              <span
-                aria-hidden="true"
-                className={`block h-2 w-2 rounded-full transition-all ${
-                  i === kini ? "scale-110 bg-white" : "bg-white/50 hover:bg-white/75"
-                }`}
-              />
-            </button>
-          ))}
-        </div>
+        <TitikMedia
+          jumlah={media.length}
+          kini={kini}
+          onPilih={(i) => {
+            setIndeks(i);
+            onGeser();
+          }}
+        />
       )}
     </>
   );
@@ -134,5 +119,60 @@ function FotoKartu({
       />
       <div aria-hidden="true" className={`kartu-kerangka ${fotoSiap ? "tutup" : ""}`} />
     </>
+  );
+}
+
+/**
+ * Titik penunjuk posisi media pada kartu.
+ *
+ * Bentuknya sama di semua lebar; yang berbeda hanya ukurannya. Di ponsel kotak
+ * sentuh 20px dan titik 5px, di layar lebar 28px dan 8px.
+ *
+ * Dua puluh piksel ADA DI BAWAH batas 24px WCAG 2.5.8, dan itu disengaja untuk
+ * kartu pratinjau ini saja: ia bersandar pada pengecualian "Equivalent" —
+ * fungsi yang sama tersedia lewat pop-up rincian, yang titiknya tetap 24px dan
+ * masih ditemani panah kiri-kanan berukuran penuh. Menahan 24px di sini membuat
+ * dua belas titik memakan 288px pada kartu ~312px, yaitu tepi ke tepi.
+ *
+ * Konsekuensi yang tetap ada: barisnya tumbuh mengikuti jumlah media. Pada
+ * 20px per titik, kartu ponsel penuh di sekitar 15 media.
+ */
+function TitikMedia({
+  jumlah,
+  kini,
+  onPilih,
+}: {
+  jumlah: number;
+  kini: number;
+  onPilih: (i: number) => void;
+}) {
+  return (
+    <div
+      className="absolute bottom-1.5 left-1/2 z-20 flex -translate-x-1/2 items-center"
+      role="group"
+      aria-label={`Media ${kini + 1} dari ${jumlah}`}
+    >
+      {Array.from({ length: jumlah }, (_, i) => (
+        <button
+          key={i}
+          type="button"
+          aria-label={`Media ${i + 1} dari ${jumlah}`}
+          aria-current={i === kini}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPilih(i);
+          }}
+          className="flex min-h-[20px] min-w-[20px] items-center justify-center p-0.5
+                     sm:min-h-[28px] sm:min-w-[28px] sm:p-1"
+        >
+          <span
+            aria-hidden="true"
+            className={`block h-[5px] w-[5px] rounded-full transition-all sm:h-2 sm:w-2 ${
+              i === kini ? "scale-110 bg-white" : "bg-white/50 hover:bg-white/75"
+            }`}
+          />
+        </button>
+      ))}
+    </div>
   );
 }

@@ -7,6 +7,9 @@ export type Berita = {
   id: number;
   slug: string | null;
   pulau: string | null;
+  /** Provinsi kanonik (34 nama peta) dari kolom location — pop-up wilayah
+   *  menyaring daftar per provinsi yang ditekan, bukan se-pulau. */
+  provinsi: string | null;
   tanggal: string;
   judul: string;
   /** Thumbnail asli kejadian (sama dengan `poster`), null kalau tidak ada —
@@ -71,6 +74,7 @@ function keBerita(e: Baris): Berita {
     id: Number(e.id),
     slug: e.slug,
     pulau: inferPulau(e.location),
+    provinsi: inferProvinsi(e.location),
     tanggal: tanggalId.format(e.event_date),
     judul: e.title_id,
     // Payload ini menyeberang ke komponen klien; tanpa foto asli, `gambar`

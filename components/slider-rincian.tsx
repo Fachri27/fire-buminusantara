@@ -288,8 +288,12 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
             </svg>
           </button>
 
-          {/* Titik navigasi slide (Dots indicator) */}
+          {/* Titik penunjuk posisi media. Bentuknya sama di semua lebar;
+              di ponsel kotak sentuhnya 24px (batas bawah WCAG 2.5.8) dan
+              jaraknya dirapatkan lewat .rincian__dots supaya pilnya muat. */}
           <div
+            role="group"
+            aria-label={`Media ${kini + 1} dari ${media.length}`}
             className={`rincian__dots ${
               media[kini]?.jenis === "video" ? "rincian__dots--di-kendali" : ""
             }`}
@@ -298,17 +302,17 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
               <button
                 key={i}
                 type="button"
-                aria-label={`Lihat media ${i + 1}`}
+                aria-label={`Lihat media ${i + 1} dari ${media.length}`}
                 aria-current={i === kini}
                 onClick={() => setIndeks(i)}
-                className="inline-flex min-h-[28px] min-w-[28px] items-center justify-center p-1 bg-transparent border-0 cursor-pointer"
+                className="inline-flex min-h-[24px] min-w-[24px] items-center justify-center p-0.5 bg-transparent border-0 cursor-pointer sm:min-h-[28px] sm:min-w-[28px] sm:p-1"
               >
                 <span
                   aria-hidden="true"
                   className={`rincian__dot-item block transition-all duration-300 ${
                     i === kini
-                      ? "w-5 bg-white"
-                      : "w-2 bg-white/45 hover:bg-white/70"
+                      ? "w-4 bg-white sm:w-5"
+                      : "w-1.5 bg-white/45 hover:bg-white/70 sm:w-2"
                   }`}
                 />
               </button>
