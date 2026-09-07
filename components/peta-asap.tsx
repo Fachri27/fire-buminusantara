@@ -398,7 +398,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       if (mapRef.current) {
         mapRef.current.resize();
       }
-      // Jika proses sync masih berlangsung saat beralih kembali ke tab Sebaran Asap, pastikan overlay muncul
+      // Jika proses sync masih berlangsung saat beralih kembali ke tab Aerosol Karhutla, pastikan overlay muncul
       if (syncRunningRef.current) {
         setSedangSync(true);
       }
@@ -1491,10 +1491,10 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         className={`pointer-events-auto absolute bottom-24 right-3 z-[400] items-center gap-1.5 rounded-full bg-black/85 px-3 py-1.5 text-xs font-semibold text-white/90 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-95 hover:bg-black hover:text-white ${
           legendaTerbuka ? "hidden" : "flex xl:hidden"
         }`}
-        aria-label="Buka legenda sebaran asap"
+        aria-label="Buka legenda aerosol karhutla"
       >
         <span className={`text-sm leading-none ${gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}`}>🔥</span>
-        <span>Sebaran Asap</span>
+        <span>Aerosol Karhutla</span>
         <span className="text-white/40">·</span>
         <span className={`text-[11px] font-medium ${
           gayaVisual === "copernicus"
@@ -1524,31 +1524,26 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
       {/* Indikator Info Sumber Data & Legenda Warna (Kanan Bawah) */}
       <div
-        className={`pointer-events-auto absolute bottom-24 right-3 z-[400] w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-black/85 p-3.5 text-xs text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all xl:bottom-4 xl:right-5 ${
+        className={`pointer-events-auto absolute bottom-24 right-3 z-[400] w-80 max-w-[calc(100vw-2rem)] rounded-2xl bg-black/85 p-3.5 text-xs text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all xl:bottom-4 xl:right-5 ${
           legendaTerbuka ? "block" : "hidden xl:block"
         }`}
       >
-        <div className="flex items-center justify-between pb-2 border-b border-white/10">
-          <div className="flex items-center gap-1.5 font-semibold text-white">
-            <span className={gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}>🔥</span>
-            <span>Sebaran Asap</span>
+        <div className="flex items-start justify-between gap-2 pb-2 border-b border-white/10">
+          <div className="flex items-start gap-1.5 font-semibold text-white">
+            <span className={`text-sm leading-none shrink-0 mt-0.5 ${gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}`}>🔥</span>
+            <span className="text-xs leading-snug">Jumlah aerosol dari emisi kebakaran hutan dan lahan (wildfire)</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/70">
-              Copernicus CAMS
-            </span>
-            {/* Tombol Tutup Legenda pada Mobile */}
-            <button
-              type="button"
-              onClick={() => setLegendaTerbuka(false)}
-              className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors xl:hidden"
-              aria-label="Tutup legenda sebaran asap"
-            >
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+          {/* Tombol Tutup Legenda pada Mobile */}
+          <button
+            type="button"
+            onClick={() => setLegendaTerbuka(false)}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors xl:hidden"
+            aria-label="Tutup legenda"
+          >
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <p className="mt-2 text-[11px] leading-relaxed text-white/70">

@@ -183,17 +183,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
             }`}
           >
             <span className="text-xs sm:text-sm leading-none">🔥</span>
-            <span><span className="hidden sm:inline">Sebaran </span>Asap</span>
-            {sedangSyncAsap && mode === "asap" && (
-              <span
-                className="relative flex h-2 w-2 ml-0.5"
-                title="Menyinkronkan data sebaran asap"
-              >
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
-              </span>
-            )}
-            <span className="hidden opacity-90 md:inline font-normal text-[11px]">(Copernicus CAMS)</span>
+            <span><span className="hidden sm:inline">Aerosol </span>Karhutla</span>
           </button>
           <button
             type="button"
@@ -213,8 +203,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
             }`}
           >
             <span className="text-xs sm:text-sm leading-none">💨</span>
-            <span><span className="hidden sm:inline">Kualitas </span>Udara</span>
-            <span className="hidden opacity-90 md:inline font-normal text-[11px]">(Windy AQI)</span>
+            <span>Angin<span className="hidden sm:inline"> dan Kualitas Udara</span></span>
           </button>
         </div>
 
@@ -266,14 +255,11 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
 
             {/* List Indikator Data */}
             <div className="mt-3.5 grid min-h-0 flex-1 gap-3 overflow-y-auto overscroll-contain pr-1 sm:grid-cols-2 text-xs">
-              {/* Kolom 1: Sebaran Asap */}
+              {/* Kolom 1: Aerosol Karhutla */}
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="font-medium text-white text-xs">Sebaran Asap</span>
-                    <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-mono text-white/60">
-                      Copernicus CAMS
-                    </span>
+                    <span className="font-medium text-white text-xs">Aerosol Karhutla</span>
                   </div>
                   <div className="mt-2.5 space-y-2.5 text-white/75">
                     <div>
@@ -301,14 +287,11 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
                 </div>
               </div>
 
-              {/* Kolom 2: Kualitas Udara */}
+              {/* Kolom 2: Angin dan Kualitas Udara */}
               <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="font-medium text-white text-xs">Kualitas Udara & Angin</span>
-                    <span className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-mono text-white/60">
-                      Windy & ECMWF
-                    </span>
+                    <span className="font-medium text-white text-xs">Angin dan Kualitas Udara</span>
                   </div>
                   <div className="mt-2.5 space-y-2.5 text-white/75">
                     <div>
@@ -378,7 +361,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
           <iframe
             ref={iframeRef}
             src={windySrc}
-            title="Peta Sebaran Kualitas Udara dan Angin"
+            title="Peta Sebaran Angin dan Kualitas Udara"
             className="h-full w-full border-0"
             allow="geolocation"
             onContextMenu={(e) => e.preventDefault()}
@@ -414,7 +397,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 />
               </svg>
-              <span>Memuat peta kualitas udara Windy…</span>
+              <span>Memuat peta angin dan kualitas udara Windy…</span>
             </div>
           </div>
         )}
