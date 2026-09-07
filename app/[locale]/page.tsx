@@ -24,15 +24,15 @@ export const instant = false;
 // diterjemahkan penuh — bukan fallback bahasa Indonesia.
 const TEKS_BERANDA: Record<Bahasa, { judul: string; deskripsi: string; ogLocale: string }> = {
   id: {
-    judul: "Fire — Pantauan Karhutla Indonesia",
+    judul: "Lapor Karhutla!",
     deskripsi:
-      "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
+      "Menyaksikan kebakaran atau dampak asapnya? Laporkan di sini.Laporan dikurasi sebelum ditampilkan.",
     ogLocale: "id_ID",
   },
   en: {
-    judul: "Fire — Forest and Land Fire Monitoring in Indonesia",
+    judul: "Notify wildfire!",
     deskripsi:
-      "Forest and land fire monitoring in Indonesia — latest news, daily statistics, and maps of fire-prone areas.",
+      "Witnessing a fire or its haze? File it here. Reports are curated before being displayed.",
     ogLocale: "en_US",
   },
 };
