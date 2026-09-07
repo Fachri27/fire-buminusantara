@@ -12,6 +12,7 @@ ENV_FILE="$STACK_DIR/.env"
 ENV_ROLLBACK="$STACK_DIR/.env.rollback"
 BACKUP_DIR="$STACK_DIR/backups"
 BACKUP_KEEP=30
+IMAGE_KEEP_HOURS=168 # 7 hari — sisakan image versi baru untuk rollback cepat
 HEALTH_TIMEOUT=420  # 7 menit — boot pertama menarik image bisa lambat
 
 case "$ROLE" in
@@ -198,10 +199,18 @@ asap_rute() {
 if wait_healthy && asap_rute; then
   rm -f "$ENV_ROLLBACK"
   log "deploy $ROLE sukses, sehat, dan lolos asap rute"
+
+  # ── 6. Pembersihan image lama ──────────────────────────────────────────────
+  # Hapus image yang tidak terpakai lebih dari IMAGE_KEEP_HOURS agar disk host
+  # tidak penuh, tapi tetap sisakan image versi baru untuk rollback cepat.
+  log "membersihkan image Docker lama (usia > ${IMAGE_KEEP_HOURS}h)..."
+  docker image prune -f || true
+  docker image prune -a --filter "until=${IMAGE_KEEP_HOURS}h" -f || true
+
   exit 0
 fi
 
-# ── 6. Gagal → rollback ──────────────────────────────────────────────────────
+# ── 7. Gagal → rollback ──────────────────────────────────────────────────────
 log "health check / asap rute gagal — memulai rollback"
 diagnostics
 
