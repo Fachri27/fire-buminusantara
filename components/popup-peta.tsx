@@ -428,6 +428,10 @@ function PratinjauMedia({ awal, pulau, kelas }: {
     );
   }
   if (awal) {
+    /* Sengaja <img>, bukan next/image: URL galeri bisa remote warisan
+       (NEXT_PUBLIC_MEDIA_URL, host dinamis) yang tak masuk remotePatterns —
+       optimizer justru error runtime di situ. */
+    // eslint-disable-next-line @next/next/no-img-element
     return <img src={awal.url} alt="" aria-hidden="true" className={kelas} />;
   }
   return (

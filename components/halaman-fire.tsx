@@ -279,6 +279,11 @@ function Rincian({
                 thumbnail, huruf depan nama pulau saja — sama seperti keping
                 komentar. */}
             {berita.poster ? (
+              /* Sengaja <img>, bukan next/image: poster bisa berupa URL remote
+                 warisan (NEXT_PUBLIC_MEDIA_URL, host-nya dinamis per lingkungan)
+                 yang tak bisa didaftarkan ke remotePatterns statis — optimizer
+                 melempar error runtime untuk host tak dikenal. */
+              // eslint-disable-next-line @next/next/no-img-element
               <img className="rincian__keping" src={berita.poster} alt="" aria-hidden="true" />
             ) : (
               <span className="rincian__inisial" aria-hidden="true">{(berita.pulau ?? "I").charAt(0)}</span>
