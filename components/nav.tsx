@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { mintaTutupOverlay } from "@/lib/peristiwa-popup";
 import { usePathname } from "next/navigation";
 import { BAHASA, TEKS_NAV, type Bahasa } from "@/lib/bahasa";
 
@@ -86,6 +88,9 @@ export function Nav({ bahasa }: Props) {
   /** Gulir halus ke sebuah bagian (terintegrasi dengan Lenis jika tersedia) */
   const keBagian = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
     e.preventDefault();
+    // Menggulir ke bagian halaman tidak ada gunanya selama pop-up masih
+    // menutupi layar — tutup dulu, baru gulir.
+    mintaTutupOverlay();
 
     let y = 0;
     if (id !== BAGIAN[0]) {
@@ -96,14 +101,42 @@ export function Nav({ bahasa }: Props) {
       }
     }
 
-    const lenis = (window as unknown as { lenis?: { scrollTo(t: number): void } }).lenis;
+    // Penanda ANDAL bahwa sebuah pop-up masih mengunci guliran: gunakan-parallax.ts
+    // memasang overflow:hidden bersamaan dengan lenis?.stop(). stop() itu
+    // optional-chained — kalau pop-up dibuka sebelum impor dinamis Lenis
+    // selesai, Lenis tidak pernah berhenti dan isStopped tetap false padahal
+    // kuncinya sudah terpasang. Gaya inline inilah yang selalu benar.
+    const terkunci = document.body.style.overflow === "hidden";
+
+    const lenis = (
+      window as unknown as {
+        lenis?: {
+          scrollTo(t: number, o?: { immediate?: boolean; force?: boolean }): void;
+        };
+      }
+    ).lenis;
     if (lenis?.scrollTo) {
-      lenis.scrollTo(y);
+      // Pop-up yang terbuka membuat gunakan-parallax.ts memanggil lenis.stop()
+      // dan memasang overflow:hidden. Kunci itu baru dilepas di pembersih efek
+      // React — setelah paint, jadi belum terjadi di dalam handler ini.
+      //
+      // force  : tanpa ini Lenis membuang scrollTo selagi dirinya berhenti,
+      //          dan itulah sebabnya klik logo menutup pop-up tapi halaman
+      //          tetap tertinggal di bagian peta.
+      // immediate: hanya saat berhenti. Animasi Lenis digerakkan rAF yang ikut
+      //          mati bersama stop(), jadi gulir beranimasi tidak akan pernah
+      //          maju; penulisan langsung menembus, dan sudah terbukti bekerja
+      //          walau overflow:hidden masih terpasang. Saat tidak ada pop-up
+      //          Lenis berjalan normal dan guliran halus tetap seperti semula.
+      lenis.scrollTo(y, { force: true, immediate: terkunci });
       return;
     }
 
+    // Jalur cadangan (Lenis tak pernah dimuat, mis. mode kurangi gerak): kunci
+    // yang sama membuat guliran beranimasi tidak sampai tujuan, jadi saat
+    // terkunci lompat langsung.
     const kurangiGerak = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    window.scrollTo({ top: y, behavior: kurangiGerak ? "auto" : "smooth" });
+    window.scrollTo({ top: y, behavior: kurangiGerak || terkunci ? "auto" : "smooth" });
   };
 
   return (
@@ -121,9 +154,22 @@ export function Nav({ bahasa }: Props) {
             "Fire" jadi kesatuan merek yang mengisi ruang. Di ponsel "Lapor"
             pindah ke cluster kanan supaya logo ini punya tempat. */}
         <Link href={`/${bahasa}`} aria-label="Fire — beranda"
+           onClick={(e) => {
+             // SELALU ditangani di sini, tidak pernah lewat navigasi <Link>.
+             // Pop-up rincian mengubah URL jadi /xx/fire/<slug> lewat pushState
+             // mentah, jadi mencocokkan pathname dengan "/xx" akan meleset
+             // justru saat pop-up terbuka — kasus yang paling butuh ini.
+             // Lagi pula halaman rincian merender isi beranda yang sama persis
+             // di belakang pop-upnya, jadi menutup + naik ke puncak memang
+             // sudah "kembali ke beranda"; URL-nya dibereskan tutupRincian.
+             keBagian(e, BAGIAN[0]);
+           }}
            className="flex shrink-0 items-center gap-2">
-          <img src="/assets/img/logo-fire.png" alt="" aria-hidden="true"
-               width={95} height={160} className="h-9 w-auto sm:h-11" />
+          {/* Aset statis lokal berdimensi tetap — satu-satunya gambar di app ini
+              yang next/image bisa optimasi sepenuhnya. priority: logo ada di bilah
+              lengket yang selalu terlihat, jadi tidak boleh lazy-load. */}
+          <Image src="/assets/img/logo-fire.png" alt="" aria-hidden="true"
+                 width={99} height={160} priority className="h-9 w-auto sm:h-11" />
           <span className="text-[16px] font-bold leading-none tracking-tight text-tinta sm:text-[22px]">
             Fire
           </span>

@@ -494,6 +494,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
                     <video src={`${url}#t=0.5`} preload="metadata" muted playsInline
                            className="h-[86px] w-full object-cover" />
                   ) : url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- pratinjau blob dari createObjectURL — next/image tak bisa memuatnya
                     <img src={url} alt="" className="h-[86px] w-full object-cover" />
                   ) : (
                     <div className="flex h-[86px] w-full items-center justify-center bg-black/[0.06]">

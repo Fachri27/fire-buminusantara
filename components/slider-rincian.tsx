@@ -225,6 +225,7 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                     className="rincian__slide-media"
                   />
                 ) : (
+                  // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
                   <img
                     src={m.url}
                     alt={m.keterangan || `${label} - gambar ${idx + 1}`}

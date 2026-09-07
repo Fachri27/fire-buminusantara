@@ -146,6 +146,24 @@ export async function ambilBerita(limit = 10): Promise<Berita[]> {
   return urut.slice(0, limit).map((b) => keBerita(b as Baris));
 }
 
+/**
+ * SELURUH kejadian tayang untuk peta + pop-up wilayah — TANPA batas 10.
+ *
+ * `ambilBerita` di atas memang hanya 10 (kurasi korsel), dan pop-up peta
+ * tadinya memakai daftar yang sama — akibatnya laporan ke-11 dan seterusnya
+ * tak pernah tampil di daftar wilayah walau penghitung provinsinya menyebut
+ * angka yang benar. Urutannya murni terbaru dulu (tanpa campuran komentar):
+ * pop-up adalah arsip lengkap, bukan etalase.
+ */
+export async function ambilSemuaBerita(): Promise<Berita[]> {
+  const semua = await prisma.events.findMany({
+    where: TAYANG,
+    orderBy: [{ event_date: "desc" }, { id: "desc" }],
+    select: PILIH,
+  });
+  return semua.map((b) => keBerita(b as Baris));
+}
+
 /** Satu kejadian lewat permalink /fire/<slug>. */
 export async function ambilBeritaSlug(slug: string): Promise<Berita | null> {
   // findFirst, bukan findUnique: slug tetap unik, tapi saringan tayang harus
