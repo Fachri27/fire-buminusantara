@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import Image from "next/image";
 import { VideoKartu } from "./video-kartu";
-import type { ItemMedia } from "@/lib/media";
+import { mediaLokal, type ItemMedia } from "@/lib/media";
 
 type Props = {
   media: ItemMedia[];
@@ -100,23 +101,50 @@ function FotoKartu({
 
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns */}
-      <img
-        ref={pasangFoto}
-        src={src}
-        alt={alt}
-        loading="eager"
-        decoding="async"
-        onLoad={() => setFotoSiap(true)}
-        onError={() => setFotoSiap(true)}
-        onClick={(e) => {
-          if (aktif) {
-            e.stopPropagation();
-            onBuka();
-          }
-        }}
-        className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`}
-      />
+      {mediaLokal(src) ? (
+        /* Unggahan lokal lewat optimizer next/image: srcset mengikuti lebar
+           kartu (78vw ponsel, ~526px panggung) alih-alih mengirim JPEG orisinal
+           multi-MB, dan AVIF/WebP bila peramban mendukung. Kartu tengah diunggak
+           segera + fetchPriority tinggi (ia kandidat LCP); kartu salinan di luar
+           jendela korsel menunggu sampai terlihat — tanpa ini tiga puluh foto
+           orisinal turun serentak begitu hidrasi. */
+        <Image
+          ref={pasangFoto}
+          src={src}
+          alt={alt}
+          fill
+          sizes="(max-width: 1099px) 78vw, 526px"
+          loading={aktif ? "eager" : "lazy"}
+          fetchPriority={aktif ? "high" : undefined}
+          onLoad={() => setFotoSiap(true)}
+          onError={() => setFotoSiap(true)}
+          onClick={(e) => {
+            if (aktif) {
+              e.stopPropagation();
+              onBuka();
+            }
+          }}
+          className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`}
+        />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
+        <img
+          ref={pasangFoto}
+          src={src}
+          alt={alt}
+          loading={aktif ? "eager" : "lazy"}
+          decoding="async"
+          onLoad={() => setFotoSiap(true)}
+          onError={() => setFotoSiap(true)}
+          onClick={(e) => {
+            if (aktif) {
+              e.stopPropagation();
+              onBuka();
+            }
+          }}
+          className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`}
+        />
+      )}
       <div aria-hidden="true" className={`kartu-kerangka ${fotoSiap ? "tutup" : ""}`} />
     </>
   );
@@ -126,16 +154,14 @@ function FotoKartu({
  * Titik penunjuk posisi media pada kartu.
  *
  * Bentuknya sama di semua lebar; yang berbeda hanya ukurannya. Di ponsel kotak
- * sentuh 20px dan titik 5px, di layar lebar 28px dan 8px.
+ * sentuhnya 24px (batas bawah WCAG 2.5.8), di layar lebar 28px.
  *
- * Dua puluh piksel ADA DI BAWAH batas 24px WCAG 2.5.8, dan itu disengaja untuk
- * kartu pratinjau ini saja: ia bersandar pada pengecualian "Equivalent" —
- * fungsi yang sama tersedia lewat pop-up rincian, yang titiknya tetap 24px dan
- * masih ditemani panah kiri-kanan berukuran penuh. Menahan 24px di sini membuat
- * dua belas titik memakan 288px pada kartu ~312px, yaitu tepi ke tepi.
- *
- * Konsekuensi yang tetap ada: barisnya tumbuh mengikuti jumlah media. Pada
- * 20px per titik, kartu ponsel penuh di sekitar 15 media.
+ * Kartu dengan lebih dari 13 media kembali ke 20px: 24px × 13 = 312px sudah
+ * memenuhi kartu ponsel (~312px), jadi menahannya di atas itu membuat baris
+ * titik meluber keluar kartu. Untuk kartu sesepadat itu berlaku pengecualian
+ * "Equivalent" WCAG 2.5.8 — fungsi yang sama tersedia lewat pop-up rincian,
+ * yang titiknya tetap 24px dan masih ditemani panah kiri-kanan berukuran
+ * penuh.
  */
 function TitikMedia({
   jumlah,
@@ -146,6 +172,7 @@ function TitikMedia({
   kini: number;
   onPilih: (i: number) => void;
 }) {
+  const padat = jumlah > 13;
   return (
     <div
       className="absolute bottom-1.5 left-1/2 z-20 flex -translate-x-1/2 items-center"
@@ -162,8 +189,9 @@ function TitikMedia({
             e.stopPropagation();
             onPilih(i);
           }}
-          className="flex min-h-[20px] min-w-[20px] items-center justify-center p-0.5
-                     sm:min-h-[28px] sm:min-w-[28px] sm:p-1"
+          className={`flex items-center justify-center p-0.5 ${
+            padat ? "min-h-[20px] min-w-[20px]" : "min-h-[24px] min-w-[24px]"
+          } sm:min-h-[28px] sm:min-w-[28px] sm:p-1`}
         >
           <span
             aria-hidden="true"

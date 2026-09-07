@@ -1484,14 +1484,18 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </button>
       </div>
 
-      {/* Tombol Mini/Chip Legenda untuk Layar Mobile (< xl) */}
+      {/* Tombol Mini/Chip Legenda untuk Layar Mobile (< xl). Sengaja tanpa
+          aria-label: nama teraksesinya dihitung dari teks terlihatnya
+          ("Aerosol Karhutla · Fire Watch") — aria-label terpisah yang tidak
+          memuat seluruh teks terlihat (mis. potongan "Fire Watch"/"Bara"/
+          "Spektrum") justru dilaporkan label-content-name-mismatch oleh
+          Lighthouse/axe: nama teraksesi ≠ teks yang dilihat pengguna. */}
       <button
         type="button"
         onClick={() => setLegendaTerbuka(true)}
         className={`pointer-events-auto absolute bottom-24 right-3 z-[400] items-center gap-1.5 rounded-full bg-black/85 px-3 py-1.5 text-xs font-semibold text-white/90 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-95 hover:bg-black hover:text-white ${
           legendaTerbuka ? "hidden" : "flex xl:hidden"
         }`}
-        aria-label="Buka legenda aerosol karhutla"
       >
         <span className={`text-sm leading-none ${gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}`}>🔥</span>
         <span>Aerosol Karhutla</span>
@@ -1509,6 +1513,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             ? "Bara"
             : "Spektrum"}
         </span>
+        {/* Panah bawah pembuka legenda: dekoratif, teks di atasnya sudah
+            menyebut isi layer. */}
         <svg
           viewBox="0 0 24 24"
           width="14"
@@ -1516,6 +1522,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
+          aria-hidden="true"
           className="ml-0.5 text-white/60"
         >
           <path d="m6 9 6 6 6-6" />

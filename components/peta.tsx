@@ -29,6 +29,39 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
   const [windySrc, setWindySrc] = useState<string>("/api/forecasting?lat=0.200&lon=118.000&zoom=5");
   const [sedangSyncAsap, setSedangSyncAsap] = useState(true);
 
+  // Peta asap baru dipasang begitu layarnya mendekati pandangan. Begitu
+  // terpasang, PetaAsap mengunduh bundle MapLibre lalu seluruh 61 frame
+  // sebaran asap (~26 MB) — di atas (layar beranda masih terlihat) unduhan
+  // itu merebut jalur LCP: kartu tengah menunggu 90+ detik. Di balik
+  // IntersectionObserver, semuanya menunggu sampai pengunjung benar-benar
+  // menggulir ke layar peta.
+  //
+  // Ambang 5%, BUKAN rootMargin bawah positif: section peta mulai tepat di
+  // 100svh (tepat di bawah hero yang setinggi satu layar), jadi memperluas
+  // akar observasi sebesar apa pun di bawah membuatnya berpotongan seketika
+  // di scroll 0 — pertahanannya bolong. Ambang 5% berarti pemicunya saat
+  // pengunjung sudah menggulir sampai peta benar-benar mulai terlihat.
+  const [dekatPandangan, setDekatPandangan] = useState(false);
+  const akarRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = akarRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setDekatPandangan(true);
+      return;
+    }
+    const pengamat = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setDekatPandangan(true);
+          pengamat.disconnect();
+        }
+      },
+      { threshold: 0.05 },
+    );
+    pengamat.observe(el);
+    return () => pengamat.disconnect();
+  }, []);
+
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [memuatWindy, setMemuatWindy] = useState(true);
   const iframeReadyRef = useRef(false);
@@ -159,6 +192,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
 
   return (
     <div
+      ref={akarRef}
       onContextMenu={(e) => e.preventDefault()}
       className="relative h-full w-full overflow-hidden bg-[#0a0f18]"
     >
@@ -341,14 +375,20 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
             : "opacity-0 pointer-events-none -z-10"
         }`}
       >
-        <PetaAsap
-          jumlahLaporan={jumlahLaporan}
-          onPilihWilayah={onPilihWilayah}
-          berita={berita}
-          onBukaRincian={onBukaRincian}
-          aktif={mode === "asap"}
-          onSyncChange={setSedangSyncAsap}
-        />
+        {/* PetaAsap sengaja menunggu dekatPandangan — lihat komentar di atas.
+            Sebelum itu kotak ini hanya latar gelap: seluruh UI lapisan (tombol
+            mode, panduan) tetap ada, hanya canvas + unduhan framenya yang
+            ditunda. */}
+        {dekatPandangan && (
+          <PetaAsap
+            jumlahLaporan={jumlahLaporan}
+            onPilihWilayah={onPilihWilayah}
+            berita={berita}
+            onBukaRincian={onBukaRincian}
+            aktif={mode === "asap"}
+            onSyncChange={setSedangSyncAsap}
+          />
+        )}
       </div>
 
       {/* Tampilan Layer 2: Windy Air Quality & Wind Flow */}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ItemMedia } from "@/lib/media";
+import Image from "next/image";
+import { mediaLokal, type ItemMedia } from "@/lib/media";
 
 type Props = {
   media: ItemMedia[];
@@ -98,15 +99,17 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
     const pertama = media[0];
     if (!pertama) return;
 
-    if (pertama.jenis === "gambar") {
-      const img = new Image();
-      img.onload = () => { if (aktif) setAwalSiap(true); };
-      img.onerror = () => { if (aktif) setAwalSiap(true); };
-      img.src = pertama.url;
-    } else {
+    // Penunggu terpisah hanya untuk video: elemen <video> tidak menembak event
+    // onLoad untuk posternya, jadi kesiapan posternya diawasi lewat elemen img
+    // di sini (createElement, bukan new Image() — nama Image dipakai komponen
+    // next/image di berkas ini). Gambar tidak perlu preloader — onLoad elemen
+    // medianya sendiri (di bawah) yang menandakan siap, dan preloader terpisah
+    // justru mengunduh dua kali sekarang fotonya lewat next/image (URL
+    // teroptimasi ≠ URL mentah yang dimuat preloader).
+    if (pertama.jenis === "video") {
       const p = pertama.poster ?? poster;
       if (p) {
-        const img = new Image();
+        const img = document.createElement("img");
         img.onload = () => { if (aktif) setAwalSiap(true); };
         img.onerror = () => { if (aktif) setAwalSiap(true); };
         img.src = p;
@@ -224,6 +227,29 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                     }}
                     className="rincian__slide-media"
                   />
+                ) : mediaLokal(m.url) ? (
+                  /* Unggahan lokal lewat optimizer next/image — pop-up rincian
+                     ini justru pemboros terbesar: ia menampilkan foto orisinal
+                     multi-MB pada kotak maksimal 860px. Bingkainya (relative)
+                     sudah ada rasionya dari naturalWidth/Height di bawah, dan
+                     object-fit: contain datang dari kelas rincian__slide-media. */
+                  <Image
+                    src={m.url}
+                    alt={m.keterangan || `${label} - gambar ${idx + 1}`}
+                    fill
+                    sizes="(max-width: 767px) 92vw, 55vw"
+                    className="rincian__slide-media"
+                    decoding="async"
+                    loading={idx === 0 ? "eager" : "lazy"}
+                    onLoad={(e) => {
+                      const el = e.currentTarget;
+                      simpanRasio(el.naturalWidth, el.naturalHeight, idx);
+                      if (idx === 0) setAwalSiap(true);
+                    }}
+                    onError={() => {
+                      if (idx === 0) setAwalSiap(true);
+                    }}
+                  />
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
                   <img
@@ -234,6 +260,9 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                     onLoad={(e) => {
                       const el = e.currentTarget;
                       simpanRasio(el.naturalWidth, el.naturalHeight, idx);
+                      if (idx === 0) setAwalSiap(true);
+                    }}
+                    onError={() => {
                       if (idx === 0) setAwalSiap(true);
                     }}
                     className="rincian__slide-media"

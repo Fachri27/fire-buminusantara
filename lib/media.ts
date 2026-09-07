@@ -24,6 +24,18 @@ export function urlMedia(path: string | null): string | null {
   return MEDIA_BASE_URL ? `${MEDIA_BASE_URL}/${path}` : null;
 }
 
+/**
+ * Apakah URL media ini dilayani oleh route /media (unggahan CMS lokal)?
+ *
+ * Hanya URL seperti itu yang aman dioptimasi lewat next/image: media warisan
+ * (MEDIA_BASE_URL) memakai host dinamis per lingkungan yang tak bisa
+ * didaftarkan ke remotePatterns statis — optimizer melempar galat runtime
+ * untuk host tak dikenal, jadi media warisan tetap <img> polos.
+ */
+export function mediaLokal(url: string): boolean {
+  return url.startsWith("/media/");
+}
+
 /** Orientasi yang dipilih peninjau saat memverifikasi — dipakai penampil media
  *  untuk mengatur rasio (mis. potret tampil tinggi, lanskap tampil lebar). */
 export type Orientasi = "potret" | "lanskap";
