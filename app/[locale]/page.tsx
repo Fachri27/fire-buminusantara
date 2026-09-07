@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { ambilBerita, hitungLaporanProvinsi } from "@/lib/events";
+import { ambilBerita, ambilSemuaBerita, hitungLaporanProvinsi } from "@/lib/events";
 import { ambilTigaTeratas } from "@/lib/wms";
 import { ambilStatistik } from "@/lib/statistik";
 import { HalamanFire } from "@/components/halaman-fire";
@@ -88,8 +88,9 @@ async function IsiHalaman({ params }: Pick<PageProps<'/[locale]'>, 'params'>) {
   const { locale } = await params;
   const bahasa: Bahasa = adaBahasa(locale) ? locale : "id";
   await connection();
-  const [berita, jumlahLaporan, tigaTeratas, statistik] = await Promise.all([
+  const [berita, semuaBerita, jumlahLaporan, tigaTeratas, statistik] = await Promise.all([
     ambilBerita(),
+    ambilSemuaBerita(),
     hitungLaporanProvinsi(),
     ambilTigaTeratas(),
     ambilStatistik(bahasa),
@@ -98,6 +99,7 @@ async function IsiHalaman({ params }: Pick<PageProps<'/[locale]'>, 'params'>) {
   return (
     <HalamanFire
       berita={berita}
+      semuaBerita={semuaBerita}
       jumlahLaporan={jumlahLaporan}
       tigaTeratas={tigaTeratas}
       statistik={statistik}

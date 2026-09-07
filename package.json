@@ -13,6 +13,7 @@
     "seed:media": "node prisma/seed-media.mjs",
     "seed:media:kejadian": "node prisma/seed-media-kejadian.mjs",
     "seed:media:laporan": "node prisma/seed-media-laporan.mjs",
+    "seed:uji-paginasi": "node prisma/seed-uji-paginasi.mjs",
     "test": "node --test 'lib/**/*.test.ts'"
   },
   "dependencies": {

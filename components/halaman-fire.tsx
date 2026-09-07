@@ -22,7 +22,11 @@ import type { Statistik as DataStatistik } from "@/lib/statistik";
 import type { ProvinsiTeratas } from "@/lib/wms";
 
 type Props = {
+  /** Sepuluh kurasi untuk korsel — urutan campuran terbaru + komentar. */
   berita: Berita[];
+  /** Arsip lengkap untuk peta + pop-up wilayah. Tanpa ini keduanya hanya
+   *  melihat 10 kurasi korsel (laporan ke-11 tak berpin dan tak terdaftar). */
+  semuaBerita?: Berita[];
   jumlahLaporan: Record<string, number>;
   tigaTeratas: ProvinsiTeratas[];
   statistik: DataStatistik[];
@@ -32,6 +36,7 @@ type Props = {
 
 export function HalamanFire({
   berita,
+  semuaBerita,
   jumlahLaporan,
   tigaTeratas,
   statistik,
@@ -51,6 +56,10 @@ export function HalamanFire({
   gunakanSegarOtomatis();
   // Pop-up mana pun yang terbuka menghentikan guliran halaman di belakangnya.
   gunakanParallax(sorot !== null || wilayah !== null);
+
+  // Daftar untuk peta + pop-up: arsip lengkap bila disediakan halaman,
+  // kalau tidak ya 10 kurasi (pop-up permalink lama tetap jalan).
+  const daftarPeta = semuaBerita ?? berita;
 
   const bukaRincian = useCallback(
     (b: Berita) => {
@@ -83,7 +92,7 @@ export function HalamanFire({
       const cocokan = path.match(pola);
       if (cocokan && cocokan[1]) {
         const slug = decodeURIComponent(cocokan[1]);
-        const ketemu = berita.find((b) => b.slug === slug);
+        const ketemu = daftarPeta.find((b) => b.slug === slug);
         if (ketemu) {
           setSorot(ketemu);
           return;
@@ -94,7 +103,7 @@ export function HalamanFire({
 
     window.addEventListener("popstate", saatPopState);
     return () => window.removeEventListener("popstate", saatPopState);
-  }, [berita]);
+  }, [daftarPeta]);
 
   return (
     <>
@@ -112,7 +121,7 @@ export function HalamanFire({
         <div className="absolute inset-0 h-full w-full">
           <Peta
             jumlahLaporan={jumlahLaporan}
-            berita={berita}
+            berita={daftarPeta}
             onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
             onBukaRincian={bukaRincian}
           />
@@ -139,10 +148,11 @@ export function HalamanFire({
           pulau={wilayah.pulau}
           jumlah={jumlahLaporan[wilayah.nama] ?? null}
           asal={wilayah.asal}
-          berita={berita}
+          berita={daftarPeta}
           jumlahLaporan={jumlahLaporan}
           onBukaRincian={(i) => {
-            if (berita[i]) bukaRincian(berita[i]);
+            const ketemu = daftarPeta[i];
+            if (ketemu) bukaRincian(ketemu);
           }}
           onTutup={() => setWilayah(null)}
         />

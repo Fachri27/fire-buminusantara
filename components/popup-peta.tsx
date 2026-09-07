@@ -23,10 +23,10 @@ type Props = {
 /** Mode tampilan daftar berita: baris ringkas atau kartu bergambar. */
 type ModeTampilan = "daftar" | "kartu";
 
-/** Banyak kartu yang tampak pertama pada mode kartu — dua baris lima kolom. */
-const KARTU_AWAL = 10;
-/** Tiap tombol muat lebih banyak menambah satu baris (lima kartu). */
-const KARTU_PER_BARIS = 5;
+/** Banyak laporan per halaman — sepuluh baris pada mode daftar, atau dua
+ *  baris lima kartu pada mode kartu. Satu angka untuk keduanya supaya ganti
+ *  mode tak mengubah total halaman di kepala pengunjung. */
+const PER_HALAMAN = 10;
 
 /**
  * Pop-up berita wilayah, terbuka saat sebuah provinsi ditekan di peta.
@@ -59,16 +59,22 @@ export function PopupPeta({
   const [sampai, setSampai] = useState("");
   // Mode tampilan daftar berita — dipilih lewat saklar kartu/daftar di bilah saringan.
   const [tampilan, setTampilan] = useState<ModeTampilan>("daftar");
-  // Banyak kartu yang sudah tampak pada mode kartu. Kembali ke jumlah awal
-  // saat tab pulau atau saringan tanggal berganti — daftar barunya, hitungannya
-  // baru.
-  const [jumlahKartu, setJumlahKartu] = useState(KARTU_AWAL);
+  // Halaman aktif pada kedua mode. Kembali ke halaman pertama saat tab pulau
+  // atau saringan tanggal berganti — daftarnya baru, halamannya ikut baru.
+  const [halaman, setHalaman] = useState(1);
   const [kunciSaringanSebelumnya, setKunciSaringanSebelumnya] = useState(() => `${tabAktif}:${dari}:${sampai}`);
   const kunciSaringanKini = `${tabAktif}:${dari}:${sampai}`;
   if (kunciSaringanKini !== kunciSaringanSebelumnya) {
     setKunciSaringanSebelumnya(kunciSaringanKini);
-    setJumlahKartu(KARTU_AWAL);
+    setHalaman(1);
   }
+  // Rel gulir daftar — pindah halaman mengembalikannya ke atas supaya
+  // pengunjung selalu mulai dari laporan pertama halaman itu.
+  const daftarRef = useRef<HTMLDivElement | null>(null);
+  const keHalaman = (h: number) => {
+    setHalaman(h);
+    daftarRef.current?.scrollTo({ top: 0 });
+  };
 
   const adaSaringan = Boolean(dari || sampai);
   const hapusTanggal = () => {
@@ -133,10 +139,16 @@ export function PopupPeta({
       });
   }, [berita, tab, dari, sampai]);
 
-  // Kartu yang benar-benar dirender pada mode kartu — sepuluh pertama (dua
-  // baris), tiap klik muat lebih banyak menambah satu baris.
-  const kartuTampak = tampil.slice(0, jumlahKartu);
-  const masihAdaKartu = tampil.length > kartuTampak.length;
+  // Potongan daftar untuk halaman aktif — berlaku untuk kedua mode. Indeks
+  // `i` di tiap butir tetap menunjuk ke posisi global di `berita` supaya
+  // rincian yang dibuka tak salah sasaran. totalHalaman dihitung turun (bukan
+  // state) agar penyegaran data yang menyusutkan daftar tak meninggalkan
+  // halaman hantu.
+  const totalHalaman = Math.max(1, Math.ceil(tampil.length / PER_HALAMAN));
+  const halamanAktif = Math.min(Math.max(1, halaman), totalHalaman);
+  const tampilHalaman = tampil.slice((halamanAktif - 1) * PER_HALAMAN, halamanAktif * PER_HALAMAN);
+  const awalNomor = tampil.length === 0 ? 0 : (halamanAktif - 1) * PER_HALAMAN + 1;
+  const akhirNomor = Math.min(halamanAktif * PER_HALAMAN, tampil.length);
 
   useEffect(() => {
     const saatTombol = (e: KeyboardEvent) => { if (e.key === "Escape") onTutup(); };
@@ -269,6 +281,7 @@ export function PopupPeta({
             dalamnya. overscroll-contain menahan rantai gulir agar menyentuh
             dasar/tepinya tidak ikut menggulirkan halaman di belakang. */}
         <div data-lenis-prevent
+             ref={daftarRef}
              className="tanpa-bilah-gulir min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y
                         p-3 sm:p-5 panggung:px-[28px]">
           {tampil.length > 0 ? (
@@ -279,7 +292,7 @@ export function PopupPeta({
               <>
               <ul className="grid grid-cols-1 min-[430px]:grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3
                              panggung:grid-cols-5 panggung:gap-[20px] xl:grid-cols-5">
-                {kartuTampak.map(({ b, i }) => {
+                {tampilHalaman.map(({ b, i }) => {
                   const awal = b.media[0];
                   return (
                     <li key={b.id} className="flex">
@@ -324,35 +337,14 @@ export function PopupPeta({
                   );
                 })}
               </ul>
-              {masihAdaKartu && (
-                /* Muat lebih banyak: satu baris (lima kartu) berikutnya per
-                   klik, tanpa gulir ulang dari atas — daftar yang sudah tampak
-                   tak bergeser. */
-                <div className="mt-4 flex flex-col items-center gap-2 sm:mt-5 panggung:mt-[22px]">
-                  <p className="text-[length:var(--ukuran-catatan)] text-black/55">
-                    Menampilkan {kartuTampak.length} dari {tampil.length} laporan
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setJumlahKartu((n) => n + KARTU_PER_BARIS)}
-                    className="flex min-h-[38px] cursor-pointer items-center gap-1.5 rounded-lg border border-black/15
-                               bg-white px-4 py-1.5 text-xs sm:text-sm font-semibold text-tinta shadow-xs
-                               transition-colors hover:border-black/30 hover:bg-black/[0.03]
-                               focus-visible:border-amber-500 focus-visible:ring-1 focus-visible:ring-amber-500
-                               focus-visible:outline-none"
-                  >
-                    Muat lebih banyak
-                    <svg viewBox="0 0 24 24" aria-hidden="true" width="15" height="15" fill="none"
-                         stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+              <NavigasiHalaman halaman={halamanAktif} totalHalaman={totalHalaman}
+                               awal={awalNomor} akhir={akhirNomor} total={tampil.length}
+                               onPilih={keHalaman} />
               </>
             ) : (
+            <>
             <ul>
-              {tampil.map(({ b, i }) => {
+              {tampilHalaman.map(({ b, i }) => {
                 /* Pratinjau diambil dari media asli kejadian (galeri `media`),
                    bukan dari `gambar` yang tadinya selalu diberi foto bawaan —
                    kartu kejadian bervideo-galeri tampil dengan foto dummy yang
@@ -393,6 +385,10 @@ export function PopupPeta({
                 );
               })}
             </ul>
+            <NavigasiHalaman halaman={halamanAktif} totalHalaman={totalHalaman}
+                             awal={awalNomor} akhir={akhirNomor} total={tampil.length}
+                             onPilih={keHalaman} />
+            </>
             )
           ) : (
             <p className="py-6 sm:py-[clamp(24px,7vw,48px)] text-[length:var(--ukuran-catatan)] leading-[1.5] text-black/70">
@@ -445,8 +441,80 @@ function PratinjauMedia({ awal, pulau, kelas }: {
   );
 }
 
-/** Satu segmen saklar mode tampilan (daftar/kartu). */
-function TombolTampilan({ aktif, label, onClick, children }: {
+/**
+ * Navigasi halaman daftar berita — dipakai kedua mode tampilan. Klien murni
+ * (tanpa query URL): datanya sudah ada semua di `berita`, jadi pindah halaman
+ * hanya mengiris tampilan tanpa memuat ulang. Disembunyikan bila semuanya
+ * muat dalam satu halaman.
+ */
+function NavigasiHalaman({ halaman, totalHalaman, awal, akhir, total, onPilih }: {
+  halaman: number;
+  totalHalaman: number;
+  awal: number;
+  akhir: number;
+  total: number;
+  onPilih: (h: number) => void;
+}) {
+  if (totalHalaman <= 1) return null;
+
+  // Nomor dengan elipsis cerdas (1 … 4 5 6 … 12) — pola yang sama dengan
+  // paginasi CMS supaya pengunjung hanya belajar sekali.
+  const nomor: (number | "...")[] = [];
+  for (let i = 1; i <= totalHalaman; i++) {
+    if (i === 1 || i === totalHalaman || (i >= halaman - 1 && i <= halaman + 1)) {
+      nomor.push(i);
+    } else if (nomor[nomor.length - 1] !== "...") {
+      nomor.push("...");
+    }
+  }
+
+  const kelasTombol = "flex min-h-[34px] cursor-pointer items-center justify-center gap-1 rounded-lg border border-black/15 \
+bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold text-tinta shadow-xs \
+transition-colors hover:border-black/30 hover:bg-black/[0.03] \
+disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-black/15 disabled:hover:bg-white \
+focus-visible:border-amber-500 focus-visible:ring-1 focus-visible:ring-amber-500 \
+focus-visible:outline-none";
+
+  return (
+    <nav aria-label="Paginasi laporan"
+         className="mt-4 flex flex-col items-center gap-2.5 border-t border-black/10 pt-3.5 sm:mt-5">
+      <p className="text-[length:var(--ukuran-catatan)] text-black/55">
+        Menampilkan {awal}–{akhir} dari {total} laporan
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <button type="button" onClick={() => onPilih(halaman - 1)} disabled={halaman <= 1}
+                aria-label="Halaman sebelumnya" className={kelasTombol}>
+          ← Sebelumnya
+        </button>
+        <div className="hidden items-center gap-1 px-1 min-[430px]:flex" aria-hidden={false}>
+          {nomor.map((item, idx) =>
+            item === "..." ? (
+              <span key={`ellipsis-${idx}`} className="select-none px-1.5 text-[13px] text-black/40">
+                …
+              </span>
+            ) : item === halaman ? (
+              <span key={item} aria-current="page"
+                    className="grid min-h-[34px] min-w-[34px] place-items-center rounded-lg bg-black/80 px-2 py-1.5 text-xs sm:text-sm font-bold text-white shadow-xs">
+                {item}
+              </span>
+            ) : (
+              <button key={item} type="button" onClick={() => onPilih(item)}
+                      aria-label={`Halaman ${item}`} className={kelasTombol}>
+                {item}
+              </button>
+            ),
+          )}
+        </div>
+        <button type="button" onClick={() => onPilih(halaman + 1)} disabled={halaman >= totalHalaman}
+                aria-label="Halaman selanjutnya" className={kelasTombol}>
+          Selanjutnya →
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+/** Satu segmen saklar mode tampilan (daftar/kartu). */function TombolTampilan({ aktif, label, onClick, children }: {
   aktif: boolean;
   label: string;
   onClick: () => void;

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { cacheLife, cacheTag } from "next/cache";
-import { ambilBerita, ambilBeritaSlug, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
+import { ambilBerita, ambilBeritaSlug, ambilSemuaBerita, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { JsonLd } from "@/components/json-ld";
 import { ambilTigaTeratas } from "@/lib/wms";
@@ -142,8 +142,9 @@ async function IsiHalaman({
   kejadianAwal: NonNullable<Awaited<ReturnType<typeof ambilBeritaSlug>>>;
 }) {
   await connection();
-  const [berita, jumlahLaporan, tigaTeratas, statistik, seo] = await Promise.all([
+  const [berita, semuaBerita, jumlahLaporan, tigaTeratas, statistik, seo] = await Promise.all([
     ambilBerita(),
+    ambilSemuaBerita(),
     hitungLaporanProvinsi(),
     ambilTigaTeratas(),
     ambilStatistik(bahasa),
@@ -156,6 +157,11 @@ async function IsiHalaman({
   const daftarBerita = berita.some((b) => b.id === kejadian.id)
     ? berita
     : [kejadian, ...berita];
+  // Arsip pop-up sudah lengkap dari sononya — tinggal pastikan kejadian
+  // permalink ikut di dalamnya.
+  const arsipPopup = semuaBerita.some((b) => b.id === kejadian.id)
+    ? semuaBerita
+    : [kejadian, ...semuaBerita];
 
   // Data terstruktur untuk crawler — URL/gambar absolut karena JSON-LD tidak
   // ikut di-resolve metadataBase; nama organisasi mengikuti siteName layout.
@@ -210,6 +216,7 @@ async function IsiHalaman({
       <JsonLd data={remahLd} />
       <HalamanFire
         berita={daftarBerita}
+        semuaBerita={arsipPopup}
         jumlahLaporan={jumlahLaporan}
         tigaTeratas={tigaTeratas}
         statistik={statistik}
