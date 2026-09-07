@@ -1528,10 +1528,10 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           legendaTerbuka ? "block" : "hidden xl:block"
         }`}
       >
-        <div className="flex items-start justify-between gap-2 pb-2 border-b border-white/10">
-          <div className="flex items-start gap-1.5 font-semibold text-white">
-            <span className={`text-sm leading-none shrink-0 mt-0.5 ${gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}`}>🔥</span>
-            <span className="text-xs leading-snug">Jumlah aerosol dari emisi kebakaran hutan dan lahan (wildfire)</span>
+        <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/10">
+          <div className="flex items-center gap-1.5 font-semibold text-white">
+            <span className={`text-sm leading-none shrink-0 ${gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}`}>🔥</span>
+            <span className="text-xs">Aerosol Karhutla</span>
           </div>
           {/* Tombol Tutup Legenda pada Mobile */}
           <button
@@ -1547,7 +1547,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </div>
 
         <p className="mt-2 text-[11px] leading-relaxed text-white/70">
-          Pantauan partikel aerosol asap akibat kebakaran hutan dan lahan (OMAOD 550nm &bull; Organic Matter AOD).
+          Aerosol asap kebakaran hutan dan lahan <span className="italic font-normal">(wildfire)</span> OMAOD 550nm . Organic Matter AOD
         </p>
 
         {/* Pita Gradien Warna */}
