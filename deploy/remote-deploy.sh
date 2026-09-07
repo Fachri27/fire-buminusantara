@@ -12,7 +12,7 @@ ENV_FILE="$STACK_DIR/.env"
 ENV_ROLLBACK="$STACK_DIR/.env.rollback"
 BACKUP_DIR="$STACK_DIR/backups"
 BACKUP_KEEP=30
-IMAGE_KEEP_HOURS=168 # 7 hari — sisakan image versi baru untuk rollback cepat
+IMAGE_KEEP_HOURS=24  # 1 hari — sisakan image versi 24 jam terakhir untuk rollback cepat
 HEALTH_TIMEOUT=420  # 7 menit — boot pertama menarik image bisa lambat
 
 case "$ROLE" in
