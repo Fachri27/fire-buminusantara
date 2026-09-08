@@ -39,6 +39,9 @@ export const metadata: Metadata = {
       "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
     images: ["/assets/img/og-fire.jpg"],
   },
+  verification: {
+    google: "NzkMjQ1QkQYyfTyYyBcGWMy22JqcQcGd0WZ-42W9FbU",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
