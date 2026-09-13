@@ -60,7 +60,10 @@ const nextConfig: NextConfig = {
 
   // Dipakai Docker (Dockerfile di root): `next build` menyalin server minimal
   // ke .next/standalone sehingga image produksi tidak perlu node_modules penuh.
-  output: "standalone",
+  // Di Vercel output ini TIDAK dipakai (ia memakai .nft.json hasil tracing) —
+  // jadi dinonaktifkan saat VERCEL=1, kalau tidak build gagal dengan
+  // "ENOENT next-server.js.nft.json".
+  ...(process.env.VERCEL ? {} : { output: "standalone" }),
 
   // @prisma/client dan @aws-sdk/client-s3 sudah eksternal secara bawaan, tapi
   // adapter MariaDB belum: tanpa ini webpack membundelnya ke chunk server, ia
