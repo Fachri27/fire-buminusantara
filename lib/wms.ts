@@ -134,6 +134,11 @@ async function tigaTeratasTercache(): Promise<ProvinsiTeratas[]> {
 }
 
 export async function ambilTigaTeratas(): Promise<ProvinsiTeratas[]> {
+  // Mode contoh (PETA_DUMMY=1): jangan panggil GeoServer, langsung statis.
+  if (process.env.PETA_DUMMY === "1") {
+    const { TERATAS_CONTOH } = await import("./contoh-peta");
+    return TERATAS_CONTOH;
+  }
   try {
     return await tigaTeratasTercache();
   } catch {

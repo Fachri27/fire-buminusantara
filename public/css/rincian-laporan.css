@@ -1064,14 +1064,8 @@ body:has(.rincian) iframe[src*="forecasting"] {
 }
 
 @media (max-width: 640px) {
-  /* Kredit DIANGKAT KE ATAS baris titik.
-     Di layar sempit keduanya berebut pita yang sama: kredit dulu duduk di
-     bottom 8px setinggi ~23px (8-31px), sedangkan baris titik di bottom 12px
-     setinggi 24px (12-36px) dan melebar sampai menutupi teksnya. Di layar lebar
-     persoalan ini tidak ada — titiknya terpusat jauh dari kredit di kiri — jadi
-     penataan ulang ini khusus ponsel. Angkanya: titik 12+24=36, kredit mulai 44. */
   .rincian__kredit {
-    bottom: 44px;
+    bottom: 8px;
     left: 8px;
     font-size: 11px;
     padding: 3px 8px;
@@ -1081,9 +1075,28 @@ body:has(.rincian) iframe[src*="forecasting"] {
     bottom: 12px;
   }
 
-  /* Slide video: bilah kendali menghuni dasar, jadi titik naik ke 60px
-     (lihat .rincian__dots--di-kendali) dan kredit menyusul di atasnya. */
+  /* Kredit menyingkir ke atas baris titik — HANYA bila barisnya ada.
+     Di layar sempit keduanya berebut pita yang sama: kredit di bottom 8px
+     setinggi ~23px (8-31px) lawan baris titik di bottom 12px setinggi 24px
+     (12-36px), dan barisnya cukup lebar untuk menjulur ke bawah teksnya.
+     Media tunggal tidak merender titik sama sekali, jadi kreditnya harus tetap
+     di dasar; mengangkatnya tanpa syarat membuatnya mengambang di tengah
+     gambar. Di layar lebar persoalan ini tidak ada — titik terpusat jauh dari
+     kredit di kiri — maka aturan ini hanya hidup di ponsel. */
+  .rincian__kredit--di-atas-titik {
+    bottom: 44px;
+  }
+
+  /* Slide video: bilah kendali bawaan menghuni dasar media, jadi kredit naik
+     melewatinya. Bila slide itu JUGA punya baris titik (yang ikut naik ke 60px,
+     lihat .rincian__dots--di-kendali), kredit harus naik sekali lagi — aturan
+     dua-kelas di bawahnya menang atas yang ini karena spesifisitasnya lebih
+     tinggi, bukan karena urutan. */
   .rincian__kredit--di-kendali {
+    bottom: 60px;
+  }
+
+  .rincian__kredit--di-kendali.rincian__kredit--di-atas-titik {
     bottom: 92px;
   }
 }

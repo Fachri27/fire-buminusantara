@@ -16,6 +16,7 @@ export const TEKS_NAV = {
   id: {
     navigasi: "Navigasi utama",
     awal: "Ke awal halaman",
+    merek: "Kebakaran Hutan dan Lahan",
     bagian: {
       beranda: "Beranda",
       peta: "Peta Sebaran",
@@ -28,6 +29,7 @@ export const TEKS_NAV = {
   en: {
     navigasi: "Main navigation",
     awal: "Back to top",
+    merek: "Forest and Land Fires",
     bagian: {
       beranda: "Home",
       peta: "Spread Map",
@@ -113,5 +115,50 @@ export const TEKS_LAPOR = {
     terlaluBesar: "Total file size exceeds 100 MB. Remove or shrink some files first.",
     terlaluBanyak: "At most {n} files per report.",
     berkasWajib: "Attach at least one photo or video as evidence.",
+  },
+} as const satisfies Record<Bahasa, unknown>;
+
+/** Teks halaman peta. Halaman ini berada di bawah [locale] seperti yang lain,
+ *  jadi seluruh tulisannya — judul tab, deskripsi hasil pencarian, dan H1 —
+ *  ikut bahasa yang sedang dibuka; versi Inggris diterjemahkan penuh, bukan
+ *  fallback bahasa Indonesia. */
+export const TEKS_PETA = {
+  id: {
+    judulTab: "Peta Sebaran | Karhutla",
+    judulHalaman: "Peta Sebaran Asap Karhutla",
+    deskripsi:
+      "Peta sebaran asap kebakaran hutan dan lahan Indonesia — sebaran aerosol Copernicus dengan laporan terkurasi di atasnya.",
+    cari: "Cari provinsi atau laporan…",
+    provinsi: "Provinsi",
+    terbaru: "Laporan terbaru",
+    populer: "Terpopuler",
+    terluas: "Kebakaran terluas",
+    langsung: "Langsung",
+    terpantau: "laporan terpantau",
+    terpantauSatu: "laporan terpantau",
+    satuanLuas: "ha",
+    bukaRincian: "Buka rincian laporan",
+    tidakCocok: "Tidak ada yang cocok.",
+    cobaLain: "Coba kata kunci lain.",
+    relKosong: "Belum ada laporan terpantau.",
+  },
+  en: {
+    judulTab: "Spread Map | Wildfire",
+    judulHalaman: "Wildfire Smoke Spread Map",
+    deskripsi:
+      "Smoke spread map of forest and land fires in Indonesia — Copernicus aerosol fields with curated reports on top.",
+    cari: "Search provinces or reports…",
+    provinsi: "Provinces",
+    terbaru: "Latest reports",
+    populer: "Most popular",
+    terluas: "Largest fires",
+    langsung: "Live",
+    terpantau: "reports tracked",
+    terpantauSatu: "report tracked",
+    satuanLuas: "ha",
+    bukaRincian: "Open report details",
+    tidakCocok: "No matches.",
+    cobaLain: "Try another keyword.",
+    relKosong: "No reports tracked yet.",
   },
 } as const satisfies Record<Bahasa, unknown>;

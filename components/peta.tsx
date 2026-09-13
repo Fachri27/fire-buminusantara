@@ -21,9 +21,18 @@ type Props = {
   onPilihWilayah: (nama: string, pulau: string | null, asal: { x: number; y: number }) => void;
   berita?: Berita[];
   onBukaRincian?: (b: Berita) => void;
+  /** Diteruskan ke PetaAsap — konsol /peta mengaktifkannya karena bingkai
+   *  tengahnya lebih sempit dari viewport. */
+  legendaRingkas?: boolean;
+  /** Diteruskan ke PetaAsap — kamera awal memuat seluruh Nusantara. */
+  muatNusantara?: boolean;
+  /** true = pil alih mode rapat ke tepi atas bingkai. Di peta fullscreen
+   *  (beranda) pil butuh jarak top-20 agar lolos dari nav yang fixed; di
+   *  dalam bingkai dasbor jarak itu membuatnya melayang di tengah peta. */
+  tombolRapat?: boolean;
 };
 
-export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: Props) {
+export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false }: Props) {
   const [mode, setMode] = useState<"asap" | "windy">("asap");
   const [hasOpenedWindy, setHasOpenedWindy] = useState(false);
   const [windySrc, setWindySrc] = useState<string>("/api/forecasting?lat=0.200&lon=118.000&zoom=5");
@@ -157,13 +166,22 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
 
   const [bukaInfoPerbedaan, setBukaInfoPerbedaan] = useState(false);
 
+  /* Pil alih mode versi rapat untuk bingkai dasbor — sedikit lebih kecil
+     dari versi fullscreen beranda. */
+  const kelasPil = `flex items-center gap-1 sm:gap-2 rounded-full font-semibold transition-all ${
+    tombolRapat ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs"
+  }`;
+  const kelasInfo = `flex items-center justify-center rounded-full bg-black/85 text-white/80 shadow-2xl ring-1 ring-white/20 backdrop-blur-md transition-all hover:bg-black hover:text-white hover:ring-white/40 active:scale-95 ${
+    tombolRapat ? "h-7 w-7" : "h-8 w-8 sm:h-9 sm:w-9"
+  }`;
+
   return (
     <div
       onContextMenu={(e) => e.preventDefault()}
       className="relative h-full w-full overflow-hidden bg-[#0a0f18]"
     >
       {/* Tombol Alih Mode Layer Peta & Info Perbedaan */}
-      <div className="pointer-events-auto absolute left-4 top-20 z-[450] flex items-center gap-1.5 sm:gap-2 sm:left-6">
+      <div className={`pointer-events-auto absolute left-4 z-[450] flex items-center gap-1.5 sm:gap-2 sm:left-6 ${tombolRapat ? "top-4" : "top-20"}`}>
         <div className="flex items-center gap-1 rounded-full bg-black/85 p-1 shadow-2xl ring-1 ring-white/20 backdrop-blur-md">
           <button
             type="button"
@@ -176,7 +194,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
                   }
                 : undefined
             }
-            className={`flex items-center gap-1 sm:gap-2 rounded-full px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs font-semibold transition-all ${
+            className={`${kelasPil} ${
               mode === "asap"
                 ? "text-white shadow-md shadow-purple-950/50 ring-1 ring-fuchsia-400/40 [text-shadow:_0_1px_2px_rgb(0_0_0_/_70%)]"
                 : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -196,7 +214,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
                   }
                 : undefined
             }
-            className={`flex items-center gap-1 sm:gap-2 rounded-full px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs font-semibold transition-all ${
+            className={`${kelasPil} ${
               mode === "windy"
                 ? "text-white shadow-md shadow-emerald-950/50 ring-1 ring-emerald-400/40 [text-shadow:_0_1px_2px_rgb(0_0_0_/_70%)]"
                 : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -211,7 +229,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
         <button
           type="button"
           onClick={() => setBukaInfoPerbedaan(true)}
-          className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-black/85 text-white/80 shadow-2xl ring-1 ring-white/20 backdrop-blur-md transition-all hover:bg-black hover:text-white hover:ring-white/40 active:scale-95"
+          className={kelasInfo}
           aria-label="Panduan Peta"
           title="Panduan Peta"
         >
@@ -348,6 +366,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian }: P
           onBukaRincian={onBukaRincian}
           aktif={mode === "asap"}
           onSyncChange={setSedangSyncAsap}
+          legendaRingkas={legendaRingkas}
+          muatNusantara={muatNusantara}
         />
       </div>
 

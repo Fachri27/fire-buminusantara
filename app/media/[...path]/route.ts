@@ -41,7 +41,17 @@ async function lewatMinio(kunci: string, rentang: string | null): Promise<Respon
   let kepala;
   try {
     kepala = await klien.send(new HeadObjectCommand({ Bucket: cfg.bucket, Key: kunci }));
-  } catch {
+  } catch (galat) {
+    // 404 = objeknya memang tak ada, lanjut ke cadangan lokal tanpa berisik.
+    // Selain itu (ECONNREFUSED, 403, dsb.) = MinIO-nya yang bermasalah — catat
+    // supaya "semua media hilang" tidak didiagnosis sebagai berkas terhapus.
+    const status = (galat as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+    if (status !== 404) {
+      console.warn("[Media] MinIO tak terjangkau, jatuh ke lokal:", {
+        kunci,
+        sebab: galat instanceof Error ? galat.message : String(galat),
+      });
+    }
     return null;
   }
 

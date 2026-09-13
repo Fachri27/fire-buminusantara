@@ -10,7 +10,7 @@ import { BAHASA, TEKS_NAV, type Bahasa } from "@/lib/bahasa";
 /** Bagian halaman yang bisa dituju dari bilah ini — dua layar utama. */
 const BAGIAN = ["beranda", "peta"] as const;
 
-type Props = { bahasa: Bahasa };
+type Props = { bahasa: Bahasa; gelap?: boolean };
 
 /**
  * Bilah Navigasi Minimalis.
@@ -18,8 +18,12 @@ type Props = { bahasa: Bahasa };
  * Tingginya TETAP 4rem (h-16): seluruh halaman menghitung jarak amannya dari angka itu
  * (`pt-[calc(4rem+…)]` di kedua section, posisi atas pop-up peta), jadi
  * ukuran luarnya tetap dipertahankan.
+ *
+ * Varian `gelap` dipakai halaman dasbor /peta yang gelap: bilah near-black,
+ * merek tertulis penuh, tanpa tautan bagian (jangkar #beranda/#peta milik
+ * beranda). Ukuran luarnya identik — hanya warnanya yang berganti.
  */
-export function Nav({ bahasa }: Props) {
+export function Nav({ bahasa, gelap = false }: Props) {
   const teks = TEKS_NAV[bahasa];
   const [aktif, setAktif] = useState<string>(BAGIAN[0]);
   const [tergulir, setTergulir] = useState(false);
@@ -142,13 +146,17 @@ export function Nav({ bahasa }: Props) {
   return (
     <header
       aria-label={teks.navigasi}
-      className={`fixed top-0 left-0 z-50 h-16 w-full bg-white/80 backdrop-blur-md transition-all duration-200 ${
-        tergulir
-          ? "border-b border-black/[0.08] shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]"
-          : "border-b border-black/[0.03]"
+      className={`fixed top-0 left-0 z-50 h-16 w-full backdrop-blur-md transition-all duration-200 ${
+        gelap
+          ? "border-b border-white/10 bg-[#141414]/95"
+          : tergulir
+            ? "bg-white/80 border-b border-black/[0.08] shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]"
+            : "bg-white/80 border-b border-black/[0.03]"
       }`}
     >
-      <div className="mx-auto flex h-full max-w-7xl items-center justify-between gap-4 px-[var(--pias)]">
+      <div className={`mx-auto flex h-full items-center justify-between gap-4 ${
+        gelap ? "max-w-7xl px-4 sm:px-6" : "max-w-7xl px-[var(--pias)]"
+      }`}>
         {/* Logo + wordmark — tautan ke beranda dalam bahasa aktif, di pojok
             kiri bilah. Ikon sendirian terlihat kecil & sepi; dipasangkan teks
             "Fire" jadi kesatuan merek yang mengisi ruang. Di ponsel "Lapor"
@@ -170,13 +178,28 @@ export function Nav({ bahasa }: Props) {
               lengket yang selalu terlihat, jadi tidak boleh lazy-load. */}
           <Image src="/assets/img/logo-fire.png" alt="" aria-hidden="true"
                  width={99} height={160} priority className="h-9 w-auto sm:h-11" />
-          <span className="text-[16px] font-bold leading-none tracking-tight text-tinta sm:text-[22px]">
+          {gelap ? (
+            <>
+              {/* Merek penuh tak muat di 360px berdampingan Lapor + ID/EN —
+                  di ponsel cukup nama pendeknya yang dikenal publik. */}
+              <span className="font-bold leading-none tracking-tight text-white text-xl sm:hidden">
+                {bahasa === "en" ? "Wildfire" : "Karhutla"}
+              </span>
+              <span className="hidden font-bold leading-none tracking-tight text-white sm:inline sm:text-2xl">
+                {teks.merek}
+              </span>
+            </>
+          ) : (
+          <span className="font-bold leading-none tracking-tight text-tinta text-[16px] sm:text-[22px]">
             Fire
           </span>
+          )}
         </Link>
 
         {/* Menu Navigasi & Penukar Bahasa */}
-        <div className="flex items-center gap-4 sm:gap-7">
+        <div className="flex items-center gap-2 sm:gap-5">
+          {/* Tautan bagian hanya milik beranda — dasbor gelap tidak pakai. */}
+          {!gelap && (
           <nav aria-label={teks.navigasi} className="hidden sm:flex items-center gap-1 sm:gap-2">
             {BAGIAN.map((id) => {
               const sedang = aktif === id;
@@ -203,25 +226,32 @@ export function Nav({ bahasa }: Props) {
               );
             })}
           </nav>
+          )}
 
           {/* Jalan masuk ke form laporan warga — di cluster kanan untuk semua
               ukuran layar (logo memakai pojok kiri). Tautan sungguhan, bukan
               jangkar gulir seperti dua tombol di sebelahnya. */}
           <Link
             href={`/${bahasa}/lapor`}
-            className="rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+            className={gelap
+              ? "rounded-md bg-white/[0.05] px-3 py-1.5 text-xs font-bold tracking-wide uppercase text-pantau-bara ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api sm:px-4 sm:py-2 sm:text-sm"
+              : "rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"}
           >
             {teks.lapor}
           </Link>
 
-          {/* Garis Pemisah Tipis */}
-          <div className="hidden h-4 w-[1px] bg-black/10 sm:block" aria-hidden="true" />
+          {/* Garis Pemisah Tipis — hanya varian terang. */}
+          {!gelap && (
+            <div className="hidden h-4 w-[1px] bg-black/10 sm:block" aria-hidden="true" />
+          )}
 
           {/* Penukar Bahasa Minimalis */}
           <div
             role="group"
             aria-label={teks.ganti}
-            className="flex items-center rounded-full bg-black/[0.04] p-0.5 border border-black/[0.06] text-xs font-bold"
+            className={gelap
+              ? "flex items-center gap-1 text-xs font-bold sm:text-sm"
+              : "flex items-center rounded-full bg-black/[0.04] p-0.5 border border-black/[0.06] text-xs font-bold"}
           >
             {BAHASA.map((kode) => {
               const terpilih = kode === bahasa;
@@ -229,7 +259,9 @@ export function Nav({ bahasa }: Props) {
                 <span
                   key={kode}
                   aria-current="true"
-                  className="rounded-full bg-tinta px-2.5 py-0.5 uppercase text-white shadow-xs"
+                  className={gelap
+                    ? "rounded-md bg-white/[0.08] px-2 py-1 uppercase text-white ring-1 ring-white/10 sm:px-3 sm:py-1.5"
+                    : "rounded-full bg-tinta px-2.5 py-0.5 uppercase text-white shadow-xs"}
                 >
                   {kode}
                 </span>
@@ -239,7 +271,9 @@ export function Nav({ bahasa }: Props) {
                   href={tautanBahasa(kode)}
                   prefetch={false}
                   aria-label={`${teks.ganti} (${kode.toUpperCase()})`}
-                  className="rounded-full px-2.5 py-0.5 uppercase text-tinta/50 transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"
+                  className={gelap
+                    ? "rounded-md bg-white/[0.04] px-2 py-1 uppercase text-white/60 ring-1 ring-white/[0.07] transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api sm:px-3 sm:py-1.5"
+                    : "rounded-full px-2.5 py-0.5 uppercase text-tinta/50 transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"}
                 >
                   {kode}
                 </Link>
@@ -247,9 +281,9 @@ export function Nav({ bahasa }: Props) {
             })}
           </div>
 
-          {/* Hamburger di pojok kanan — hanya layar kecil, karena nav inline
-              disembunyikan di bawah `sm`: dua tautan bagian pindah ke panel
-              dropdown. */}
+          {/* Hamburger — hanya varian terang (varian gelap tak punya tautan
+              bagian untuk disembunyikan). */}
+          {!gelap && (
           <button
             type="button"
             onClick={() => setMenuTerbuka((b) => !b)}
@@ -265,6 +299,7 @@ export function Nav({ bahasa }: Props) {
               <span className={`absolute bottom-0 left-0 h-[2px] w-full rounded-full bg-current transition-transform duration-200 ${menuTerbuka ? "-translate-y-[6px] -rotate-45" : ""}`} />
             </span>
           </button>
+          )}
         </div>
       </div>
 

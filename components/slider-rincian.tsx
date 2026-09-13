@@ -182,6 +182,13 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                       m.jenis === "video" && idx === kini && kendaliTampak
                         ? "rincian__kredit--di-kendali"
                         : ""
+                    } ${
+                      // Kredit hanya perlu menyingkir bila baris titik memang
+                      // dirender — dan itu hanya terjadi pada media jamak
+                      // (lihat penjaga media.length > 1 di bawah). Media
+                      // tunggal tidak punya titik, jadi kreditnya tetap di
+                      // dasar; tanpa syarat ini ia mengambang di tengah gambar.
+                      media.length > 1 ? "rincian__kredit--di-atas-titik" : ""
                     }`}
                     aria-hidden="true"
                   >

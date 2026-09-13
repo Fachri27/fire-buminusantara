@@ -3,6 +3,7 @@
 @import "../public/css/kartu-kursor.css";
 @import "../public/css/kartu-video.css";
 @import "../public/css/pantauan-kosong.css";
+@import "../public/css/pantau.css";
 @import "../public/css/peta-angka.css";
 @import "../public/css/peta-popup.css";
 
@@ -52,6 +53,17 @@
   --color-peta-4: #b51523;
   --color-peta-5: #90101a;
   --color-peta-tanpa-data: #d5d2cb;
+
+  /* Palet dasbor pantau (/peta) — "ruang pantau gambut larut malam". Arang
+     kebiruan (bukan hitam pekat), teks tulang hangat (bukan putih), bara
+     untuk yang hidup, gambut untuk peringkat luas terbakar. */
+  --color-pantau-malam: #0e1219;
+  --color-pantau-konsol: #151b26;
+  --color-pantau-sumur: #0a0e14;
+  --color-pantau-tulang: #ece7d9;
+  --color-pantau-abu: #9aa4b4;
+  --color-pantau-bara: #ff5a26;
+  --color-pantau-gambut: #9db35c;
 }
 
 /* ── Token tata letak ─────────────────────────────────────────────────────

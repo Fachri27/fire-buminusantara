@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -21,6 +22,16 @@ type Props = {
   onBukaRincian?: (b: Berita) => void;
   aktif?: boolean;
   onSyncChange?: (syncing: boolean) => void;
+  /** true = mode konsol berdampingan: legenda selalu terbuka dan bilah waktu
+   *  mengalir rata kiri menyisakan ruang legenda — tidak ada cip, tidak ada
+   *  tumpang tindih. Dipakai pembungkus yang bingkainya lebih sempit dari
+   *  viewport (konsol /peta). Di layar kecil (< sm) tetap pola ponsel: cip
+   *  yang membuka panel. */
+  legendaRingkas?: boolean;
+  /** true = kamera awal (dan tombol rumah) memuat seluruh Nusantara
+   *  Sabang–Merauke, bukan tampilan dekat bawaan. Dipakai konsol /peta yang
+   *  bingkainya sempit: zoom bawaan memotong Papua. */
+  muatNusantara?: boolean;
 };
 
 // GLSL Vertex Shader: Quad koordinat Mercator dunia [0, 1] dikalikan matriks proyeksi MapLibre GL
@@ -238,6 +249,18 @@ function getInitialMapPos(): { center: [number, number]; zoom: number } {
   };
 }
 
+/** Batas Nusantara Sabang–Merauke dengan sedikit napas di tiap sisi —
+ *  dipakai mode muatNusantara lewat fitBounds supaya pas di bingkai selebar
+ *  apa pun (desktop maupun ponsel). */
+const BATAS_NUSANTARA: [[number, number], [number, number]] = [
+  [94.5, -11.5],
+  [141.5, 6.5],
+];
+
+/** Ruang aman di dalam bingkai saat memuat Nusantara: pil mode di atas,
+ *  bilah waktu di bawah. */
+const SELA_NUSANTARA = { top: 70, bottom: 120, left: 24, right: 24 };
+
 const SINKRON_SELESAI_KEY = "cams_sebaran_asap_selesai";
 const METADATA_CACHE_KEY = "cams_sebaran_asap_metadata";
 
@@ -265,7 +288,7 @@ let globalZarrMetadata: ZarrMetadataResponse | null = null;
 const globalFrameCache: Record<string, Uint8Array> = {};
 let globalSyncSelesai = false;
 
-export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange }: Props) {
+export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false }: Props) {
   const wadahPetaRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const onPilihRef = useRef(onPilihWilayah);
@@ -273,6 +296,18 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const beritaRef = useRef(berita);
   const jumlahLaporanRef = useRef(jumlahLaporan);
   const tooltipElRef = useRef<HTMLDivElement | null>(null);
+
+  /* Tooltip tooltip provinsi memakai `position: fixed` + koordinat viewport
+     (clientX/clientY). Tapi `#beranda, #peta { will-change: transform }` di
+     globals.css menjadikan section peta sebagai containing block bagi semua
+     keturunan fixed-nya — akibatnya tooltip tersalin relatif ke section, bukan
+     ke viewport, dan melayang jauh dari kursor di konsol /peta. Solusinya:
+     portal ke document.body, di luar section mana pun, agar fixed selalu
+     berarti viewport. */
+  const [wadahTooltip, setWadahTooltip] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setWadahTooltip(document.body);
+  }, []);
 
   useEffect(() => {
     onBukaRincianRef.current = onBukaRincian;
@@ -285,6 +320,15 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   useEffect(() => {
     jumlahLaporanRef.current = jumlahLaporan;
   }, [jumlahLaporan]);
+
+  const muatNusantaraRef = useRef(muatNusantara);
+  useEffect(() => {
+    muatNusantaraRef.current = muatNusantara;
+  }, [muatNusantara]);
+
+  // Ukuran ikon tombol navigasi kanan — rapat di bingkai dasbor.
+  const ikonNav = legendaRingkas ? 13 : 16;
+  const ikonSegar = legendaRingkas ? 13 : 15;
 
   // Status linimasa
   const [linimasa, setLinimasa] = useState<ZarrTimestepMeta[]>(() => {
@@ -805,6 +849,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     mapRef.current = map;
     (window as unknown as { _maplibreMap?: maplibregl.Map })._maplibreMap = map;
 
+    // Mode Nusantara: bingkai sempit langsung memuat Sabang–Merauke, dihitung
+    // dari ukuran wadah yang sebenarnya (bukan zoom tebakan).
+    if (muatNusantaraRef.current) {
+      map.fitBounds(BATAS_NUSANTARA, { padding: SELA_NUSANTARA, duration: 0 });
+    }
+
     // Custom WebGL Layer untuk Asap Karhutla CAMS Global
     const smokeCustomLayer: maplibregl.CustomLayerInterface = {
       id: "smoke-layer",
@@ -1065,8 +1115,16 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 : `<span style="color:rgba(255,255,255,0.65);">Tidak ada laporan karhutla</span>`;
             tooltipElRef.current.innerHTML = `<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">${nama}</div><div style="font-size:11px;">${teksJml}</div>`;
             tooltipElRef.current.style.display = "block";
-            tooltipElRef.current.style.left = `${e.originalEvent.clientX + 14}px`;
-            tooltipElRef.current.style.top = `${e.originalEvent.clientY + 14}px`;
+            /* Ikut kursor + 14px, tapi dijepit agar tidak keluar viewport —
+               bingkai peta konsol sempit, tooltip di tepi kanan-bawahnya
+               mudah meluber. */
+            const kotak = tooltipElRef.current;
+            const lb = kotak.offsetWidth;
+            const tg = kotak.offsetHeight;
+            const x = Math.min(e.originalEvent.clientX + 14, window.innerWidth - lb - 8);
+            const y = Math.min(e.originalEvent.clientY + 14, window.innerHeight - tg - 8);
+            tooltipElRef.current.style.left = `${Math.max(8, x)}px`;
+            tooltipElRef.current.style.top = `${Math.max(8, y)}px`;
           }
         }
       });
@@ -1388,37 +1446,42 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       {/* Wadah Peta MapLibre GL */}
       <div ref={wadahPetaRef} className="absolute inset-0 h-full w-full" />
 
-      {/* Tooltip Mengambang Provinsi (Persis Kualitas Udara) */}
-      <div
-        ref={tooltipElRef}
-        id="asap-provinsi-tooltip"
-        style={{
-          position: "fixed",
-          display: "none",
-          pointerEvents: "none",
-          zIndex: 9999,
-          background: "rgba(20, 16, 15, 0.94)",
-          border: "1px solid rgba(255, 255, 255, 0.25)",
-          color: "#fff",
-          borderRadius: "8px",
-          padding: "6px 12px",
-          fontSize: "12px",
-          fontWeight: 600,
-          boxShadow: "0 4px 16px rgba(0, 0, 0, 0.6)",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-        }}
-      />
+      {/* Tooltip Mengambang Provinsi (Persis Kualitas Udara) — di-portal ke
+          document.body; lihat komentar di wadahTooltip di atas. */}
+      {wadahTooltip &&
+        createPortal(
+          <div
+            ref={tooltipElRef}
+            id="asap-provinsi-tooltip"
+            style={{
+              position: "fixed",
+              display: "none",
+              pointerEvents: "none",
+              zIndex: 9999,
+              background: "rgba(20, 16, 15, 0.94)",
+              border: "1px solid rgba(255, 255, 255, 0.25)",
+              color: "#fff",
+              borderRadius: "8px",
+              padding: "6px 12px",
+              fontSize: "12px",
+              fontWeight: 600,
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.6)",
+              fontFamily: "system-ui, -apple-system, sans-serif",
+            }}
+          />,
+          wadahTooltip
+        )}
 
-      {/* Kontrol Navigasi Peta (Kanan Atas) */}
-      <div className="absolute right-3 top-20 z-[400] flex flex-col gap-2 sm:right-4">
+      {/* Kontrol Navigasi Peta (Kanan Atas) — rapat ke atas di bingkai dasbor. */}
+      <div className={`absolute right-3 z-[400] flex flex-col gap-2 sm:right-4 ${legendaRingkas ? "top-4" : "top-20"}`}>
         {/* Tombol Zoom In */}
         <button
           type="button"
           onClick={() => mapRef.current?.zoomIn()}
           aria-label="Perbesar peta"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white"
+          className={`flex items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg viewBox="0 0 24 24" width={ikonNav} height={ikonNav} fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
@@ -1429,9 +1492,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           type="button"
           onClick={() => mapRef.current?.zoomOut()}
           aria-label="Perkecil peta"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white"
+          className={`flex items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg viewBox="0 0 24 24" width={ikonNav} height={ikonNav} fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
@@ -1440,6 +1503,10 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         <button
           type="button"
           onClick={() => {
+            if (muatNusantaraRef.current) {
+              mapRef.current?.fitBounds(BATAS_NUSANTARA, { padding: SELA_NUSANTARA, duration: 800 });
+              return;
+            }
             const pos = getInitialMapPos();
             mapRef.current?.flyTo({
               center: pos.center,
@@ -1451,9 +1518,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           }}
           aria-label="Fokus seluruh Nusantara"
           title="Fokus seluruh Nusantara"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white"
+          className={`flex items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg viewBox="0 0 24 24" width={ikonNav} height={ikonNav} fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             <polyline points="9 22 9 12 15 12 15 22" />
           </svg>
@@ -1466,12 +1533,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           disabled={sedangSync}
           aria-label="Sinkronkan sebaran asap terbaru"
           title="Sinkronkan sebaran asap terbaru"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-90 hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+          className={`flex items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-90 hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
         >
           <svg
             viewBox="0 0 24 24"
-            width="15"
-            height="15"
+            width={ikonSegar}
+            height={ikonSegar}
             fill="none"
             stroke="currentColor"
             strokeWidth="2.3"
@@ -1484,12 +1551,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </button>
       </div>
 
-      {/* Tombol Mini/Chip Legenda untuk Layar Mobile (< xl) */}
+      {/* Cip legenda — hanya pola ponsel: di konsol dasbor (legendaRingkas)
+          cip cuma ada di layar kecil, selebihnya panel selalu terbuka. */}
       <button
         type="button"
         onClick={() => setLegendaTerbuka(true)}
         className={`pointer-events-auto absolute bottom-24 right-3 z-[400] items-center gap-1.5 rounded-full bg-black/85 px-3 py-1.5 text-xs font-semibold text-white/90 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-95 hover:bg-black hover:text-white ${
-          legendaTerbuka ? "hidden" : "flex xl:hidden"
+          legendaTerbuka ? "hidden" : legendaRingkas ? "flex sm:hidden" : "flex xl:hidden"
         }`}
         aria-label="Buka legenda aerosol karhutla"
       >
@@ -1522,10 +1590,20 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </svg>
       </button>
 
-      {/* Indikator Info Sumber Data & Legenda Warna (Kanan Bawah) */}
+      {/* Panel legenda — di konsol dasbor selalu terbuka berdampingan dengan
+          bilah waktu (kanan bawah), kecuali di layar kecil yang tetap memakai
+          pola buka-tutup. */}
       <div
-        className={`pointer-events-auto absolute bottom-24 right-3 z-[400] w-80 max-w-[calc(100vw-2rem)] rounded-2xl bg-black/85 p-3.5 text-xs text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all xl:bottom-4 xl:right-5 ${
-          legendaTerbuka ? "block" : "hidden xl:block"
+        className={`pantau-legenda pointer-events-auto absolute right-3 z-[400] rounded-2xl bg-black/85 text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all ${
+          legendaRingkas
+            ? "pantau-legenda--ringkas bottom-24 w-72 max-w-[calc(100vw-2rem)] p-3 text-[11px] sm:bottom-4"
+            : "bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs xl:bottom-4 xl:right-5"
+        } ${
+          legendaTerbuka
+            ? "block"
+            : legendaRingkas
+              ? "hidden sm:block"
+              : "hidden xl:block"
         }`}
       >
         <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/10">
@@ -1533,11 +1611,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             <span className={`text-sm leading-none shrink-0 ${gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}`}>🔥</span>
             <span className="text-xs">Aerosol Karhutla</span>
           </div>
-          {/* Tombol Tutup Legenda pada Mobile */}
+          {/* Tombol tutup — di konsol dasbor panel tak bisa ditutup (selalu
+              terbuka), jadi tombolnya hanya ada di pola ponsel. */}
           <button
             type="button"
             onClick={() => setLegendaTerbuka(false)}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors xl:hidden"
+            className={`shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors flex h-5 w-5 ${legendaRingkas ? "sm:hidden" : "xl:hidden"}`}
             aria-label="Tutup legenda"
           >
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1635,8 +1714,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </div>
       </div>
 
-      {/* Logo Copernicus CAMS (Pojok Kiri Bawah - Konsisten dengan Kualitas Udara) */}
-      <div className="pointer-events-auto absolute bottom-24 left-3 z-[400] xl:bottom-4 xl:left-5 flex items-center">
+      {/* Logo Copernicus — di sudut kiri bawah sejajar bilah waktu (bilah
+          dasbor tidak lagi melebar sampai tepi, jadi sudutnya lowong). */}
+      <div className={`pointer-events-auto absolute left-3 z-[400] flex items-center ${legendaRingkas ? "bottom-4" : "bottom-24 xl:bottom-4 xl:left-5"}`}>
         <a
           href="https://atmosphere.copernicus.eu/"
           target="_blank"
@@ -1655,9 +1735,18 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </a>
       </div>
 
-      {/* Kontrol Linimasa Animasi (Tengah Bawah) */}
-      <div className="pointer-events-auto absolute bottom-4 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-[450] w-auto sm:w-[560px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-[#0c121e]/90 p-2.5 sm:px-4 sm:py-3 shadow-2xl backdrop-blur-xl">
-        <div className="flex flex-col gap-2.5">
+      {/* Kontrol Linimasa Animasi — di konsol dasbor rata kiri dan menyisakan
+          ruang panel legenda di kanan (berdampingan, bukan bertindih); di
+          layar kecil tetap selebar bingkai seperti pola ponsel. */}
+      <div className={`pointer-events-auto absolute bottom-4 z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-[#0c121e]/90 p-2 shadow-2xl backdrop-blur-xl sm:px-4 sm:py-3 ${
+        legendaRingkas
+          ? /* Dasbor: lebar dibatasi, dan dipusatkan di ruang antara tepi
+               bingkai dan panel legenda (257px = lebar panel pasca-zoom +
+               tepi + napas). */
+          "inset-x-3 sm:left-3 sm:right-[257px] sm:max-w-[520px] sm:mx-auto"
+          : "inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 w-auto sm:w-[560px]"
+      }`}>
+        <div className="flex flex-col gap-2 sm:gap-2.5">
           {/* Baris Atas: Tombol Putar, Navigasi, Info Waktu & Status */}
           <div className="flex items-center justify-between gap-1.5 sm:gap-3">
             <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
@@ -1665,7 +1754,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
               <button
                 type="button"
                 onClick={() => setMemutar(!memutar)}
-                className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-full bg-gradient-to-r from-[#86198f] to-[#b90d84] text-white shadow-md shadow-purple-950/60 ring-1 ring-fuchsia-400/40 hover:brightness-110 active:scale-95 transition-all"
+                className="flex h-7 w-7 min-w-[28px] items-center justify-center rounded-full bg-gradient-to-r from-[#86198f] to-[#b90d84] text-white shadow-md shadow-purple-950/60 ring-1 ring-fuchsia-400/40 hover:brightness-110 active:scale-95 transition-all sm:h-8 sm:w-8 sm:min-w-[32px]"
                 aria-label={memutar ? "Jeda animasi sebaran asap" : "Putar animasi sebaran asap"}
               >
                 {memutar ? (
@@ -1702,7 +1791,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 }}
                 aria-label="Titik waktu sebelumnya"
                 title="Waktu sebelumnya"
-                className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all"
+                className="flex h-7 w-7 min-w-[28px] items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all sm:h-8 sm:w-8 sm:min-w-[32px]"
               >
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m15 18-6-6 6-6" />
@@ -1731,7 +1820,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 }}
                 aria-label="Titik waktu berikutnya"
                 title="Waktu berikutnya"
-                className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all"
+                className="flex h-7 w-7 min-w-[28px] items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all sm:h-8 sm:w-8 sm:min-w-[32px]"
               >
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m9 18 6-6-6-6" />
@@ -1743,7 +1832,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 type="button"
                 onClick={() => setKecepatan(kecepatan === 1 ? 2 : 1)}
                 title="Kecepatan putar"
-                className="flex h-8 min-w-[32px] items-center justify-center rounded-md px-2 text-[11px] font-mono font-medium text-zinc-400 hover:text-zinc-200 bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] transition-all"
+                className="flex h-7 min-w-[28px] items-center justify-center rounded-md px-1.5 text-[11px] font-mono font-medium text-zinc-400 hover:text-zinc-200 bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] transition-all sm:h-8 sm:min-w-[32px] sm:px-2"
               >
                 {kecepatan}×
               </button>
@@ -1783,8 +1872,11 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 </span>
               </div>
 
-              {/* Sub-keterangan: Siklus Basis Model saat Prediksi / Analisis Teramati */}
-              <div className="text-[9.5px] leading-tight text-zinc-400/90 font-mono tracking-tight mt-0.5 truncate max-w-[210px] sm:max-w-[320px]">
+              {/* Sub-keterangan: Siklus Basis Model saat Prediksi / Analisis Teramati.
+                  Di ponsel disembunyikan — badge Analisis/Prediksi + panel legenda
+                  sudah menyampaikan statusnya, dan baris ini yang bikin bilah
+                  terlihat besar. */}
+              <div className="hidden text-[9.5px] leading-tight text-zinc-400/90 font-mono tracking-tight mt-0.5 truncate max-w-[210px] sm:block sm:max-w-[320px]">
                 {langkahSekarang?.adalahPrediksi ? (
                   <span
                     title={modelRunWib ? `Hasil prakiraan numerik dari siklus model CAMS ${modelRunWib}` : undefined}
