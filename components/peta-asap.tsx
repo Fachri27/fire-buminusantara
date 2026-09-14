@@ -1714,9 +1714,11 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </div>
       </div>
 
-      {/* Logo Copernicus — di sudut kiri bawah sejajar bilah waktu (bilah
-          dasbor tidak lagi melebar sampai tepi, jadi sudutnya lowong). */}
-      <div className={`pointer-events-auto absolute left-3 z-[400] flex items-center ${legendaRingkas ? "bottom-4" : "bottom-24 xl:bottom-4 xl:left-5"}`}>
+      {/* Logo Copernicus — di sm+ sudut kiri bawah lowong karena bilah waktu
+          menyempit ke tengah (max-w), jadi logo sejajar bilah. Di ponsel
+          (< sm) bilah melebar penuh (inset-x-2) sehingga sudut kiri bawah
+          tertutup bilah — logo dipindah ke kiri atas di bawah pil mode. */}
+      <div className={`pointer-events-auto absolute left-3 z-[500] flex items-center ${legendaRingkas ? "top-[68px] sm:top-auto sm:bottom-4" : "bottom-24 xl:bottom-4 xl:left-5"}`}>
         <a
           href="https://atmosphere.copernicus.eu/"
           target="_blank"
