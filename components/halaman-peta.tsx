@@ -377,9 +377,10 @@ export function HalamanPeta({
               tombolRapat
               muatNusantara
             />
-            {/* Tab lipat rel kiri/kanan di tepi bingkai — selalu terlihat,
-                di mode aliran pun (relnya di bawah peta). Tengah vertikal
-                bebas dari pil mode (atas), legenda & linimasa (bawah). */}
+            {/* Tab lipat rel kiri/kanan di tepi bingkai — hanya mode panggung.
+                Di aliran relnya di bawah peta (bukan di samping), jadi tabnya
+                disembunyikan di sana (lihat TabRel). Tengah vertikal bebas
+                dari pil mode (atas), legenda & linimasa (bawah). */}
             <TabRel
               sisi="kiri"
               terbuka={kiriBuka}
@@ -509,8 +510,8 @@ function TabRel({ sisi, terbuka, kontrol, labelTutup, labelBuka, onUbah }: {
       aria-controls={kontrol}
       aria-label={label}
       title={label}
-      className={`absolute top-1/2 z-[600] -translate-y-1/2 bg-black/70 py-3 text-white/70 ring-1 ring-white/20 backdrop-blur-md transition-colors
-                  hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none ${
+      className={`absolute top-1/2 z-[600] hidden -translate-y-1/2 bg-black/70 py-3 text-white/70 ring-1 ring-white/20 backdrop-blur-md transition-colors
+                  hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none panggung:block ${
                     sisi === "kiri" ? "left-0 rounded-r-lg pr-1 pl-0.5" : "right-0 rounded-l-lg pr-0.5 pl-1"
                   }`}
     >

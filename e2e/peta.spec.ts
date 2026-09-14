@@ -39,11 +39,17 @@ test("pop-up wilayah terbuka dari daftar provinsi", async ({ page }) => {
   await expect(dialog).toBeHidden();
 });
 
-test("tab tepi melipat dan membuka rel kiri", async ({ page }) => {
+test("tab tepi melipat dan membuka rel kiri (panggung)", async ({ page }) => {
+  // Tab lipat hanya tampil di mode panggung (≥1100px & ≥640px tinggi);
+  // di aliran (mobile) ia hidden dan rel selalu terbuka — lewati.
+  test.skip((page.viewportSize()?.width ?? 0) < 1100, "hanya panggung yang punya tab lipat");
+
+  const tutup = page.getByRole("button", { name: /tutup panel provinsi/i });
+  await expect(tutup).toBeVisible();
   const cari = page.getByRole("searchbox", { name: /cari provinsi/i });
   await expect(cari).toBeVisible();
 
-  await page.getByRole("button", { name: /tutup panel provinsi/i }).click();
+  await tutup.click();
   await expect(cari).toBeHidden();
 
   await page.getByRole("button", { name: /buka panel provinsi/i }).click();
