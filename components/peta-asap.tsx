@@ -358,11 +358,19 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
      tetap terbaca; bingkai < 640px memakai pola ponsel tanpa skala. */
   const akarRef = useRef<HTMLDivElement>(null);
   const [skalaHamparan, setSkalaHamparan] = useState(1);
+  /* Bingkai sempit: legenda (320px) + bilah waktu (560px) tak muat
+     berdampingan di dasar bingkai — dengan skala 0,6 pun butuh ~570px,
+     tanpa skala ~880px. Di bawah ambang ini legenda menciut jadi cip
+     pola ponsel (panel dibuka manual, melayang di atas bilah waktu) dan
+     logo pindah ke kiri atas supaya tak tertimpa bilah waktu. */
+  const AMBANG_SEMPIT = 800;
+  const [bingkaiSempit, setBingkaiSempit] = useState(false);
   useEffect(() => {
     const el = akarRef.current;
     if (!legendaRingkas || !el) return;
     const amati = new ResizeObserver(([masuk]) => {
       const lebar = masuk.contentRect.width;
+      setBingkaiSempit(lebar < AMBANG_SEMPIT);
       // Dibulatkan ke 0,05: saat rel dilipat bingkai melebar tiap frame, dan
       // skala yang ikut berubah tiap frame membuat hamparan bergetar.
       const skala = lebar < 640 ? 1 : Math.min(1, Math.max(0.6, lebar / 1760));
@@ -1633,13 +1641,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </button>
       </div>
 
-      {/* Cip legenda — hanya pola ponsel: di konsol dasbor (legendaRingkas)
-          cip cuma ada di layar kecil, selebihnya panel selalu terbuka. */}
+      {/* Cip legenda — pola ponsel, plus bingkai sempit konsol: panel selalu
+          terbuka hanya kalau bingkainya lega, selebihnya cip yang membuka. */}
       <button
         type="button"
         onClick={() => setLegendaTerbuka(true)}
         className={`pointer-events-auto absolute bottom-24 right-3 z-[400] items-center gap-1.5 rounded-full bg-black/85 px-3 py-1.5 text-xs font-semibold text-white/90 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-95 hover:bg-black hover:text-white ${
-          legendaTerbuka ? "hidden" : legendaRingkas ? "flex sm:hidden" : "flex xl:hidden"
+          legendaTerbuka ? "hidden" : legendaRingkas ? (bingkaiSempit ? "flex sm:bottom-28" : "flex sm:hidden") : "flex xl:hidden"
         }`}
         aria-label="Buka legenda aerosol karhutla"
       >
@@ -1672,20 +1680,21 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </svg>
       </button>
 
-      {/* Panel legenda — di konsol dasbor selalu terbuka di kanan bawah
-          dengan ukuran beranda yang diperkecil (gayaHamparan), kecuali di
-          layar kecil yang tetap memakai pola buka-tutup. */}
+      {/* Panel legenda — di konsol dasbor ia selalu terbuka hanya kalau
+          bingkainya lega; di bingkai sempit ia jadi hamparan pola ponsel
+          (dibuka lewat cip, melayang di atas bilah waktu, menggulir sendiri
+          kalau lebih tinggi dari bingkai). */}
       <div
         style={gayaHamparan}
         className={`pantau-legenda pointer-events-auto absolute right-3 z-[400] rounded-2xl bg-black/85 text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all ${
           legendaRingkas
-            ? "bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs sm:bottom-4 sm:right-5"
+            ? `bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs sm:right-5${bingkaiSempit ? " max-h-[calc(100%-8rem)] overflow-y-auto sm:bottom-28" : " sm:bottom-4"}`
             : "bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs xl:bottom-4 xl:right-5"
         } ${
           legendaTerbuka
             ? "block"
             : legendaRingkas
-              ? "hidden sm:block"
+              ? bingkaiSempit ? "hidden" : "hidden sm:block"
               : "hidden xl:block"
         }`}
       >
@@ -1695,11 +1704,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             <span className="text-xs">Aerosol Karhutla</span>
           </div>
           {/* Tombol tutup — di konsol dasbor panel tak bisa ditutup (selalu
-              terbuka), jadi tombolnya hanya ada di pola ponsel. */}
+              terbuka) kecuali di bingkai sempit yang memakai pola cip;
+              selebihnya tombolnya hanya ada di pola ponsel. */}
           <button
             type="button"
             onClick={() => setLegendaTerbuka(false)}
-            className={`shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors flex h-5 w-5 ${legendaRingkas ? "sm:hidden" : "xl:hidden"}`}
+            className={`shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors flex h-5 w-5 ${legendaRingkas ? (bingkaiSempit ? "" : "sm:hidden") : "xl:hidden"}`}
             aria-label="Tutup legenda"
           >
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1800,8 +1810,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       {/* Logo Copernicus — di sm+ sudut kiri bawah lowong karena bilah waktu
           menyempit ke tengah (max-w), jadi logo sejajar bilah. Di ponsel
           (< sm) bilah melebar penuh (inset-x-2) sehingga sudut kiri bawah
-          tertutup bilah — logo dipindah ke kiri atas di bawah pil mode. */}
-      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex items-center ${legendaRingkas ? "top-[68px] sm:top-auto sm:bottom-4 sm:left-5" : "bottom-24 xl:bottom-4 xl:left-5"}`}>
+          tertutup bilah — logo dipindah ke kiri atas di bawah pil mode.
+          Bingkai sempit konsol ikut pola ponsel: bilahnya selebar bingkai. */}
+      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex items-center ${legendaRingkas ? (bingkaiSempit ? "top-[68px] sm:left-5" : "top-[68px] sm:top-auto sm:bottom-4 sm:left-5") : "bottom-24 xl:bottom-4 xl:left-5"}`}>
         <a
           href="https://atmosphere.copernicus.eu/"
           target="_blank"
@@ -1822,12 +1833,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
       {/* Kontrol Linimasa Animasi — di tengah bawah bingkai. Di konsol dasbor
           ukurannya ukuran beranda yang diperkecil (gayaHamparan); di layar
-          kecil tetap selebar bingkai seperti pola ponsel. */}
+          kecil tetap selebar bingkai seperti pola ponsel. Lebarnya dikunci
+          selebar bingkai supaya tak terpotong bingkai sempit. */}
       <div style={gayaHamparan} className={`pointer-events-auto absolute bottom-4 z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-pantau-konsol/90 p-2 shadow-2xl backdrop-blur-xl sm:px-4 sm:py-3 ${
         legendaRingkas
           ? /* Dasbor: dipusatkan lewat margin otomatis (bukan translate)
                supaya tetap tepat di tengah setelah zoom. */
-          "inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[560px]"
+          "inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[560px] sm:max-w-[calc(100%-1.5rem)]"
           : "inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 w-auto sm:w-[560px]"
       }`}>
         <div className="flex flex-col gap-2 sm:gap-2.5">

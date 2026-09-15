@@ -379,8 +379,13 @@ export function HalamanPeta({
         </div>
 
         {/* ── Tengah: judul di atas, peta berbingkai di bawahnya ───────
-            Di aliran kolom ini naik paling atas: peta adalah pekerjaannya. */}
-        <section id="peta" aria-label={teks.judulHalaman} className="relative flex min-h-0 flex-col px-1 aliran:order-first panggung:px-2.5 panggung:py-6">
+            Di aliran kolom ini naik paling atas: peta adalah pekerjaannya.
+            panggung:z-10 — TabRel mengangkangi garis tepi bingkai 18px ke
+            arah rel, tapi relnya `[contain:layout_paint]` (stacking context
+            sendiri yang terlukis sesudah section) sehingga separuh tab yang
+            menumpang rel tertutup. Section diangkat agar tab tampil utuh;
+            grid tak pernah tumpang tindih jadi tak ada yang ikut berubah. */}
+        <section id="peta" aria-label={teks.judulHalaman} className="relative flex min-h-0 flex-col px-1 aliran:order-first panggung:z-10 panggung:px-2.5 panggung:py-6">
           {/* Pola titik bara di dua pojok berseberangan — tekstur, bukan
               isi, jadi hanya di layar panggung yang lega. */}
           <div aria-hidden="true" className="pantau-titik pantau-titik--kanan hidden panggung:block" />
