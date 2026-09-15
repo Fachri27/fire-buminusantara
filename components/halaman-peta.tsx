@@ -34,7 +34,7 @@ const BATAS_CARI = 10;
  *
  * Satu klik pada laporan membuka pop-up rincian yang sama dengan beranda
  * (geser media, komentar, bagikan) — URL ikut berpindah ke /fire/<slug> dan
- * kembali ke /peta saat ditutup.
+ * kembali ke index (konsol peta) saat ditutup.
  */
 export function HalamanPeta({
   berita,
@@ -162,13 +162,14 @@ export function HalamanPeta({
     });
   };
 
-  // Pop-up rincian seperti beranda: URL ikut ke /fire/<slug>, kembali ke /peta
-  // saat ditutup. Pop-up wilayah (kalau ada) tetap di bawahnya (z-46 > z-45).
+  // Pop-up rincian seperti beranda: URL ikut ke /fire/<slug>, kembali ke
+  // index (konsol peta) saat ditutup. Pop-up wilayah (kalau ada) tetap di
+  // bawahnya (z-46 > z-45).
   const bukaRincian = useCallback(
     (b: Berita) => {
       setSorot(b);
       if (typeof window !== "undefined") {
-        const pathTujuan = b.slug ? `/${bahasa}/fire/${b.slug}` : `/${bahasa}/peta`;
+        const pathTujuan = b.slug ? `/${bahasa}/fire/${b.slug}` : `/${bahasa}`;
         if (window.location.pathname !== pathTujuan) {
           window.history.pushState({ slug: b.slug }, "", pathTujuan);
         }
@@ -180,7 +181,7 @@ export function HalamanPeta({
   const tutupRincian = useCallback(() => {
     setSorot(null);
     if (typeof window !== "undefined") {
-      const pathPeta = `/${bahasa}/peta`;
+      const pathPeta = `/${bahasa}`;
       if (window.location.pathname !== pathPeta) {
         window.history.pushState(null, "", pathPeta);
       }
@@ -211,6 +212,34 @@ export function HalamanPeta({
     return () => window.removeEventListener("popstate", saatPopState);
   }, [berita]);
 
+  /* Panduan data lapisan aktif — kaki kolom tengah di panggung, penutup tab
+     Wilayah di laci ponsel. */
+  const tentangData = (
+    <>
+      <strong className="font-bold text-white">{teks.hakCipta}</strong> — {asapAktif ? teks.kakiAerosol : teks.kakiWindy}
+    </>
+  );
+
+  /* Daftar provinsi + kabupaten, dipakai rel kiri (panggung) dan tab Wilayah
+     laci (aliran). `idAwalan` membedakan id daftar keduanya; `lega` untuk
+     laci: tanpa rel gulir bersarang dan baris lebih tinggi agar mudah disentuh. */
+  const kelompokWilayah = (idAwalan: string, lega = false) => (
+    <KelompokWilayah
+      teks={teks}
+      kunci={kunci}
+      daftarProvinsi={daftarProvinsi}
+      daftarKabupaten={daftarKabupaten}
+      adaKabupaten={kabupaten.length > 0}
+      provinsiBuka={provinsiBuka}
+      onAlihProvinsi={() => setProvinsiBuka((b) => !b)}
+      kabupatenBuka={kabupatenBuka}
+      onAlihKabupaten={() => setKabupatenBuka((b) => !b)}
+      onPilih={pilihProvinsi}
+      idAwalan={idAwalan}
+      lega={lega}
+    />
+  );
+
   // Bilah navigasi: tutup pop-up apa pun yang sedang terbuka.
   useEffect(() => {
     const tutupSemua = () => {
@@ -222,7 +251,9 @@ export function HalamanPeta({
   }, [tutupRincian]);
 
   return (
-    <div className="bg-pantau-malam pt-16 text-pantau-tulang panggung:flex panggung:h-[100svh] panggung:flex-col panggung:overflow-hidden">
+    // Satu layar terkunci di semua ukuran: di panggung tiga kolom, di aliran
+    // (ponsel/tablet) peta penuh dengan laci di atasnya — halaman tak menggulir.
+    <div className="flex h-[100svh] flex-col overflow-hidden bg-pantau-malam pt-16 text-pantau-tulang">
       {/* Grid selalu tiga lajur; rel yang dilipat lajurnya menyusut ke 0.
           Lebarnya lewat variabel supaya grid-template-columns bisa
           dianimasikan (jumlah lajur tetap sama, px ke px). Lajur rel yang
@@ -234,7 +265,7 @@ export function HalamanPeta({
           "--kolom-kiri": kiriBuka ? "calc(var(--rel-kiri) + 0.5rem)" : "0px",
           "--kolom-kanan": kananBuka ? "calc(var(--rel-kanan) + 0.5rem)" : "0px",
         } as React.CSSProperties}
-        className="flex w-full flex-1 flex-col aliran:gap-3 aliran:px-3 aliran:pb-4 panggung:p-2
+        className="relative flex min-h-0 w-full flex-1 flex-col panggung:p-2
                    [--rel-kiri:300px] [--rel-kanan:340px] xl:[--rel-kiri:320px] xl:[--rel-kanan:360px]
                    panggung:grid panggung:min-h-0 panggung:grid-cols-[var(--kolom-kiri)_minmax(0,1fr)_var(--kolom-kanan)]
                    panggung:transition-[grid-template-columns] panggung:duration-500 panggung:ease-[cubic-bezier(0.22,1,0.36,1)]
@@ -244,7 +275,8 @@ export function HalamanPeta({
         {/* Pembungkus memotong rel selebar lajurnya; rel di dalamnya tetap
             selebar penuh dan menempel ke tepi peta, jadi saat dilipat ia
             tampak bergeser masuk ke bawah bingkai, bukan teksnya terlipat. */}
-        <div className={`min-h-0 panggung:flex panggung:justify-end panggung:overflow-hidden ${kiriBuka ? "" : "aliran:hidden"}`}>
+        {/* Di aliran kedua rel tersembunyi — isinya pindah ke LaciPeta. */}
+        <div className="min-h-0 aliran:hidden panggung:flex panggung:justify-end panggung:overflow-hidden">
         <aside
           id="rel-kiri-pantau"
           data-lenis-prevent
@@ -296,99 +328,7 @@ export function HalamanPeta({
               {teks.terbaru}
             </button>
 
-            <div className="relative pt-2 before:absolute before:top-0 before:right-0 before:left-3 before:border-t before:border-white/15">
-              {/* Judul kelompok tebal & putih penuh; nama di bawahnya lebih kecil
-                  dan redup — dua tingkat yang terbaca sekilas. */}
-              <h2>
-                <button
-                  type="button"
-                  onClick={() => setProvinsiBuka((b) => !b)}
-                  aria-expanded={provinsiBuka || Boolean(kunci)}
-                  aria-controls="daftar-provinsi-pantau"
-                  className="flex w-full items-center justify-between gap-2 rounded-md px-3 pb-1 text-left text-base leading-snug font-semibold text-white
-                             transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
-                >
-                  {teks.provinsi}
-                  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
-                       strokeLinecap="round" strokeLinejoin="round"
-                       className={`size-3.5 shrink-0 text-white/50 transition-transform ${provinsiBuka || kunci ? "" : "-rotate-90"}`}>
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </button>
-              </h2>
-              {(provinsiBuka || kunci) && (daftarProvinsi.length > 0 ? (
-                <ul id="daftar-provinsi-pantau" className="pantau-rel max-h-[300px] overflow-y-auto overscroll-contain pb-3">
-                  {daftarProvinsi.map((nama) => (
-                    <li key={nama}>
-                      <button
-                        type="button" onClick={(e) => pilihProvinsi(nama, e)}
-                        className="block w-full truncate rounded-md py-[3px] pr-2 pl-[18px] text-left text-[13.5px] leading-snug text-white/70
-                                   transition-colors hover:bg-white/[0.06] hover:text-white
-                                   focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
-                      >
-                        {nama}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="px-[18px] pb-3 text-[13px] leading-relaxed text-pantau-abu">
-                  {teks.tidakCocok} {teks.cobaLain}
-                </p>
-              ))}
-            </div>
-
-            {/* Kabupaten dari layer GeoServer (luas kebakaran), terluas dulu.
-                Terbuka sejak awal dan bisa dilipat lewat judulnya; selalu
-                terbuka saat mencari.
-                Kabupaten tak punya pop-up sendiri — menekannya membuka pop-up
-                laporan provinsinya. */}
-            {kabupaten.length > 0 && (
-              <div className="relative pt-2 before:absolute before:top-0 before:right-0 before:left-3 before:border-t before:border-white/15">
-                <button
-                  type="button"
-                  onClick={() => setKabupatenBuka((b) => !b)}
-                  aria-expanded={kabupatenBuka || Boolean(kunci)}
-                  aria-controls="daftar-kabupaten-pantau"
-                  className="flex w-full items-center justify-between gap-2 rounded-md px-3 pb-1 text-left text-base leading-snug font-semibold text-white
-                             transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
-                >
-                  {teks.kabupaten}
-                  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
-                       strokeLinecap="round" strokeLinejoin="round"
-                       className={`size-3.5 shrink-0 text-white/50 transition-transform ${kabupatenBuka || kunci ? "" : "-rotate-90"}`}>
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </button>
-
-                {(kabupatenBuka || kunci) &&
-                  (daftarKabupaten.length > 0 ? (
-                    <ul id="daftar-kabupaten-pantau" className="pantau-rel max-h-[300px] overflow-y-auto overscroll-contain pb-3">
-                      {daftarKabupaten.map((k) => {
-                        const provinsi = namaProvinsiLokal(k.provinsi);
-                        return (
-                          <li key={`${k.provinsi}-${k.nama}`}>
-                            <button
-                              type="button" onClick={(e) => pilihProvinsi(provinsi, e)}
-                              aria-label={`${k.nama}, ${provinsi}`}
-                              title={provinsi}
-                              className="block w-full truncate rounded-md py-[3px] pr-2 pl-[18px] text-left text-[13.5px] leading-snug text-white/70
-                                         transition-colors hover:bg-white/[0.06] hover:text-white
-                                         focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
-                            >
-                              {k.nama}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="px-[18px] pb-3 text-[13px] leading-relaxed text-pantau-abu">
-                      {teks.tidakCocok} {teks.cobaLain}
-                    </p>
-                  ))}
-              </div>
-            )}
+            {kelompokWilayah("pantau")}
           </div>
         </aside>
         </div>
@@ -400,7 +340,10 @@ export function HalamanPeta({
             sendiri yang terlukis sesudah section) sehingga separuh tab yang
             menumpang rel tertutup. Section diangkat agar tab tampil utuh;
             grid tak pernah tumpang tindih jadi tak ada yang ikut berubah. */}
-        <section id="peta" aria-label={teks.judulHalaman} className="relative flex min-h-0 flex-col px-1 aliran:order-first panggung:z-10 panggung:px-0 panggung:py-6">
+        {/* Aliran: section mengisi layar di bawah nav. --sela-bawah = tinggi
+            laci saat mengintip (TINGGI_INTIP) — PetaAsap/Peta memakainya untuk
+            menaikkan bilah waktu, legenda, logo, dan kamera awal di atas laci. */}
+        <section id="peta" aria-label={teks.judulHalaman} className="relative flex min-h-0 flex-col aliran:flex-1 aliran:[--sela-bawah:272px] panggung:z-10 panggung:py-6">
           {/* Pola titik bara di dua pojok berseberangan — tekstur, bukan
               isi, jadi hanya di layar panggung yang lega. */}
           <div aria-hidden="true" className="pantau-titik pantau-titik--kanan hidden panggung:block" />
@@ -415,9 +358,12 @@ export function HalamanPeta({
               ukuran, sehingga lebar bingkai = min(lebar ruang, tinggi ruang ×
               rasio) — rasio desain 1080×544 terjaga dan bingkai tak pernah
               meluap di layar pendek. */}
-          <div className="relative min-h-0 panggung:flex panggung:flex-1 panggung:items-center panggung:justify-center panggung:[container-type:size]">
-          <div className="relative w-full panggung:w-[min(100cqw,calc(100cqh*1080/544))]">
-          <div className="relative h-[54svh] overflow-hidden rounded-2xl panggung:aspect-[1080/544] panggung:h-auto">
+          <div className="relative min-h-0 aliran:h-full panggung:flex panggung:flex-1 panggung:items-center panggung:justify-center panggung:[container-type:size]">
+          <div className="relative w-full aliran:h-full panggung:w-[min(100cqw,calc(100cqh*1080/544))]">
+          {/* isolate: hamparan peta (pil lapisan, zoom, bilah waktu — z-400..500)
+              tertahan di dalam bingkai, sehingga LaciPeta (z-30, saudara
+              bingkai ini) selalu menutupinya saat ditarik ke atas. */}
+          <div className="relative isolate h-full overflow-hidden panggung:aspect-[1080/544] panggung:h-auto panggung:rounded-2xl">
             <Peta
               jumlahLaporan={jumlahLaporan}
               onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
@@ -461,15 +407,27 @@ export function HalamanPeta({
           </div>
           </div>
 
-          <p className="relative mx-auto mt-4 max-w-[68ch] px-3 text-center text-[12.5px] leading-snug text-pantau-tulang/85 panggung:max-w-[78%]">
+          <p className="relative mx-auto mt-4 max-w-[68ch] px-3 text-center text-[12.5px] leading-snug text-pantau-tulang/85 aliran:hidden panggung:max-w-[78%]">
             {/* Isinya panduan data lapisan yang sedang tampil — sama dengan
                 pop-up Panduan Data di sebelah pil lapisan. */}
-            <strong className="font-bold text-white">{teks.hakCipta}</strong> — {asapAktif ? teks.kakiAerosol : teks.kakiWindy}
+            {tentangData}
           </p>
+
+          <LaciPeta
+            teks={teks}
+            cari={cari}
+            onCari={setCari}
+            laporan={laporanTampil ?? [...terbaru, ...populer]}
+            onBuka={bukaRincian}
+            asapAktif={asapAktif}
+            wilayah={kelompokWilayah("laci", true)}
+            tentangData={tentangData}
+            aktif={sorot === null && wilayah === null}
+          />
         </section>
 
         {/* ── Rel kanan: laporan terbaru, tanggal–judul–gambar ─────── */}
-        <div className={`min-h-0 panggung:flex panggung:justify-start panggung:overflow-hidden ${kananBuka ? "" : "aliran:hidden"}`}>
+        <div className="min-h-0 aliran:hidden panggung:flex panggung:justify-start panggung:overflow-hidden">
         <aside
           id="rel-kanan-pantau"
           data-lenis-prevent
@@ -651,6 +609,398 @@ export function HalamanPeta({
           onTutup={() => setWilayah(null)}
           gelap
         />
+      )}
+    </div>
+  );
+}
+
+/** Daftar provinsi dan kabupaten dengan judul kelompok yang bisa dilipat.
+ *  Judul tebal & putih penuh; nama di bawahnya lebih kecil dan redup — dua
+ *  tingkat yang terbaca sekilas. Kabupaten tak punya pop-up sendiri —
+ *  menekannya membuka pop-up laporan provinsinya. */
+function KelompokWilayah({
+  teks, kunci, daftarProvinsi, daftarKabupaten, adaKabupaten,
+  provinsiBuka, onAlihProvinsi, kabupatenBuka, onAlihKabupaten, onPilih, idAwalan, lega,
+}: {
+  teks: (typeof TEKS_PETA)[Bahasa];
+  kunci: string;
+  daftarProvinsi: string[];
+  daftarKabupaten: KabupatenTerluas[];
+  adaKabupaten: boolean;
+  provinsiBuka: boolean;
+  onAlihProvinsi: () => void;
+  kabupatenBuka: boolean;
+  onAlihKabupaten: () => void;
+  onPilih: (nama: string, e: React.MouseEvent<HTMLElement>) => void;
+  idAwalan: string;
+  lega: boolean;
+}) {
+  // Rel kiri: daftar bergulir sendiri setinggi 300px. Laci: laci sudah
+  // bergulir, jadi daftar dibiarkan memanjang (tanpa gulir bersarang).
+  const kelasDaftar = lega ? "pb-3" : "pantau-rel max-h-[300px] overflow-y-auto overscroll-contain pb-3";
+  const kelasItem = `block w-full truncate rounded-md pr-2 pl-[18px] text-left leading-snug text-white/70
+                     transition-colors hover:bg-white/[0.06] hover:text-white
+                     focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none
+                     ${lega ? "py-2 text-[15px]" : "py-[3px] text-[13.5px]"}`;
+  const kelasJudul = "flex w-full items-center justify-between gap-2 rounded-md px-3 pb-1 text-left text-base leading-snug font-semibold text-white transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none";
+  const panah = (buka: boolean) => (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
+         strokeLinecap="round" strokeLinejoin="round"
+         className={`size-3.5 shrink-0 text-white/50 transition-transform ${buka ? "" : "-rotate-90"}`}>
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+  const kosong = (
+    <p className="px-[18px] pb-3 text-[13px] leading-relaxed text-pantau-abu">
+      {teks.tidakCocok} {teks.cobaLain}
+    </p>
+  );
+  const provinsiTampil = provinsiBuka || Boolean(kunci);
+  const kabupatenTampil = kabupatenBuka || Boolean(kunci);
+
+  return (
+    <>
+      <div className="relative pt-2 before:absolute before:top-0 before:right-0 before:left-3 before:border-t before:border-white/15">
+        <h2>
+          <button type="button" onClick={onAlihProvinsi} aria-expanded={provinsiTampil}
+                  aria-controls={`daftar-provinsi-${idAwalan}`} className={kelasJudul}>
+            {teks.provinsi}
+            {panah(provinsiTampil)}
+          </button>
+        </h2>
+        {provinsiTampil && (daftarProvinsi.length > 0 ? (
+          <ul id={`daftar-provinsi-${idAwalan}`} className={kelasDaftar}>
+            {daftarProvinsi.map((nama) => (
+              <li key={nama}>
+                <button type="button" onClick={(e) => onPilih(nama, e)} className={kelasItem}>
+                  {nama}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : kosong)}
+      </div>
+
+      {/* Kabupaten dari layer GeoServer (luas kebakaran), terluas dulu. */}
+      {adaKabupaten && (
+        <div className="relative pt-2 before:absolute before:top-0 before:right-0 before:left-3 before:border-t before:border-white/15">
+          <h2>
+            <button type="button" onClick={onAlihKabupaten} aria-expanded={kabupatenTampil}
+                    aria-controls={`daftar-kabupaten-${idAwalan}`} className={kelasJudul}>
+              {teks.kabupaten}
+              {panah(kabupatenTampil)}
+            </button>
+          </h2>
+          {kabupatenTampil && (daftarKabupaten.length > 0 ? (
+            <ul id={`daftar-kabupaten-${idAwalan}`} className={kelasDaftar}>
+              {daftarKabupaten.map((k) => {
+                const provinsi = namaProvinsiLokal(k.provinsi);
+                return (
+                  <li key={`${k.provinsi}-${k.nama}`}>
+                    <button type="button" onClick={(e) => onPilih(provinsi, e)}
+                            aria-label={`${k.nama}, ${provinsi}`} title={provinsi} className={kelasItem}>
+                      {k.nama}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : kosong)}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Posisi laci konsol di layar sempit. */
+type PosisiLaci = "intip" | "setengah" | "penuh";
+
+/** Tinggi laci saat mengintip (px): pegangan, kotak cari, dan deret kartu.
+ *  Harus sama dengan `aliran:[--sela-bawah:272px]` di section peta — angka
+ *  itu yang menaikkan bilah waktu, legenda, dan kamera awal di atas laci. */
+const TINGGI_INTIP = 272;
+
+/** Letak laci per posisi. Persen translate mengacu tinggi laci sendiri. */
+function geserLaci(p: PosisiLaci) {
+  if (p === "penuh") return "translateY(0px)";
+  if (p === "setengah") return "translateY(45%)";
+  return `translateY(calc(100% - ${TINGGI_INTIP}px))`;
+}
+
+/**
+ * Laci konsol di ponsel/tablet (aliran): menumpang di atas peta layar penuh.
+ *
+ * Mengintip — pegangan, kotak cari, dan deret kartu laporan yang digeser ke
+ * samping. Ditarik ke atas (atau pegangannya ditekan) ia berhenti di setengah
+ * atau penuh, berisi tab Laporan dan Wilayah yang bergulir. Tarikan mengikuti
+ * jari lalu mendarat di posisi terdekat dengan memperhitungkan laju lepas;
+ * Escape dan menekan pegangan menurunkannya kembali.
+ */
+function LaciPeta({ teks, cari, onCari, laporan, onBuka, asapAktif, wilayah, tentangData, aktif }: {
+  teks: (typeof TEKS_PETA)[Bahasa];
+  cari: string;
+  onCari: (nilai: string) => void;
+  laporan: Berita[];
+  onBuka: (b: Berita) => void;
+  asapAktif: boolean;
+  wilayah: React.ReactNode;
+  tentangData: React.ReactNode;
+  /** false saat pop-up lain terbuka — Escape milik pop-up itu. */
+  aktif: boolean;
+}) {
+  const [posisi, setPosisi] = useState<PosisiLaci>("intip");
+  const [tab, setTab] = useState<"laporan" | "wilayah">("laporan");
+  const laciRef = useRef<HTMLDivElement | null>(null);
+  // Tarikan yang baru selesai tak boleh ikut dihitung sebagai ketukan pegangan.
+  const baruDiseret = useRef(false);
+
+  const pindah = useCallback((p: PosisiLaci) => {
+    const el = laciRef.current;
+    // Tarikan menulis transform langsung ke DOM; kembalikan ke nilai posisi
+    // secara eksplisit karena React tak menulis ulang style yang tak berubah.
+    if (el) {
+      el.style.transition = "";
+      el.style.transform = geserLaci(p);
+    }
+    setPosisi(p);
+  }, []);
+
+  useEffect(() => {
+    if (!aktif || posisi === "intip") return;
+    const saatTombol = (e: KeyboardEvent) => {
+      if (e.key === "Escape") pindah("intip");
+    };
+    window.addEventListener("keydown", saatTombol);
+    return () => window.removeEventListener("keydown", saatTombol);
+  }, [aktif, posisi, pindah]);
+
+  const batasGeser = (nilai: number, tinggi: number) => Math.min(Math.max(nilai, 0), tinggi - TINGGI_INTIP);
+
+  /* Tarikan dimulai di kepala laci, tapi jari segera keluar dari kepala —
+     gerak dan lepas didengar di window sampai jari diangkat. */
+  const mulaiSeret = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("input")) return;
+    const el = laciRef.current;
+    if (!el) return;
+    const s = {
+      y0: e.clientY,
+      geser0: new DOMMatrixReadOnly(getComputedStyle(el).transform).m42,
+      t0: performance.now(),
+      tinggi: el.offsetHeight,
+      bergerak: false,
+    };
+
+    const saatGerak = (ev: PointerEvent) => {
+      const dy = ev.clientY - s.y0;
+      if (!s.bergerak) {
+        // Ambang 6px: ketukan pada pegangan tetap jadi klik, bukan tarikan.
+        if (Math.abs(dy) < 6) return;
+        s.bergerak = true;
+        el.style.transition = "none";
+      }
+      ev.preventDefault();
+      el.style.transform = `translateY(${batasGeser(s.geser0 + dy, s.tinggi)}px)`;
+    };
+
+    const saatLepas = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", saatGerak);
+      window.removeEventListener("pointerup", saatLepas);
+      window.removeEventListener("pointercancel", saatLepas);
+      if (!s.bergerak) return;
+      // Klik yang mungkin menyusul lepas ini diabaikan, lalu penanda direset
+      // setelah klik itu sempat lewat.
+      baruDiseret.current = true;
+      setTimeout(() => {
+        baruDiseret.current = false;
+      }, 0);
+      const dy = ev.clientY - s.y0;
+      const geser = batasGeser(s.geser0 + dy, s.tinggi);
+      // Laju lepas (px/ms) diproyeksikan 200ms ke depan: kibasan cepat
+      // melompati posisi terdekat, tarikan pelan mendarat di yang terdekat.
+      const laju = dy / Math.max(1, performance.now() - s.t0);
+      const ramalan = geser + laju * 200;
+      const titik: [PosisiLaci, number][] = [
+        ["penuh", 0],
+        ["setengah", s.tinggi * 0.45],
+        ["intip", s.tinggi - TINGGI_INTIP],
+      ];
+      const tujuan = titik.reduce((a, b) => (Math.abs(b[1] - ramalan) < Math.abs(a[1] - ramalan) ? b : a))[0];
+      pindah(tujuan);
+    };
+
+    window.addEventListener("pointermove", saatGerak, { passive: false });
+    window.addEventListener("pointerup", saatLepas);
+    window.addEventListener("pointercancel", saatLepas);
+  };
+
+  const terbuka = posisi !== "intip";
+  const garisAksen = asapAktif ? "bg-[#86198f]" : "bg-emerald-500";
+  const pesanKosong = (
+    <p className="px-4 pb-4 text-[13px] leading-relaxed text-pantau-abu">
+      {cari.trim() ? `${teks.tidakCocok} ${teks.cobaLain}` : teks.relKosong}
+    </p>
+  );
+
+  return (
+    <div
+      ref={laciRef}
+      role="region"
+      aria-label={teks.laciLabel}
+      data-lenis-prevent
+      style={{ transform: geserLaci(posisi) }}
+      className="absolute inset-x-0 top-2 bottom-0 z-[30] flex flex-col rounded-t-2xl bg-pantau-konsol
+                 shadow-[0_-12px_32px_rgb(0_0_0/0.55)] ring-1 ring-white/10
+                 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none
+                 sm:mx-auto sm:max-w-xl panggung:hidden"
+    >
+      {/* Kepala laci — area tarik (pegangan + kotak cari + tab). */}
+      <div
+        onPointerDown={mulaiSeret}
+        className="shrink-0 touch-none px-4 pt-1.5 pb-3"
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (baruDiseret.current) {
+              baruDiseret.current = false;
+              return;
+            }
+            pindah(terbuka ? "intip" : "setengah");
+          }}
+          aria-expanded={terbuka}
+          aria-label={terbuka ? teks.laciTutup : teks.laciBuka}
+          className="mx-auto flex h-5 w-20 items-center justify-center rounded-full
+                     focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+        >
+          <span aria-hidden="true" className="block h-1 w-10 rounded-full bg-white/30" />
+        </button>
+
+        <form role="search" onSubmit={(e) => e.preventDefault()} className="relative mt-1.5">
+          <label htmlFor="cari-laci" className="sr-only">
+            {teks.cari}
+          </label>
+          <svg
+            viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round"
+            className="pointer-events-none absolute top-1/2 left-3 size-[18px] -translate-y-1/2 text-white"
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.6-3.6" />
+          </svg>
+          {/* text-base (16px): di bawah itu Safari iOS memperbesar layar
+              saat kotak disentuh. */}
+          <input
+            id="cari-laci" type="search" value={cari} enterKeyHint="search"
+            onChange={(e) => onCari(e.target.value)}
+            onFocus={() => pindah("penuh")}
+            placeholder={teks.cari} autoComplete="off"
+            className="w-full rounded-lg bg-[#141414] py-2.5 pr-3 pl-10 text-base text-pantau-tulang outline-none
+                       placeholder:text-white/30 focus-visible:ring-2 focus-visible:ring-white/40
+                       [&::-webkit-search-cancel-button]:hidden"
+          />
+        </form>
+
+        {terbuka && (
+          <div role="tablist" aria-label={teks.laciLabel} className="mt-3 grid grid-cols-2">
+            {(["laporan", "wilayah"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                onClick={() => setTab(t)}
+                className={`relative rounded-md pb-2.5 text-[15px] font-semibold transition-colors
+                            focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none
+                            ${tab === t ? "text-white" : "text-white/45"}`}
+              >
+                {t === "laporan" ? teks.laciLaporan : teks.laciWilayah}
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-x-6 bottom-0 h-0.5 rounded-full ${tab === t ? garisAksen : "bg-white/10"}`}
+                />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {!terbuka ? (
+        laporan.length > 0 ? (
+          <ul
+            aria-label={teks.terbaru}
+            className="flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto overscroll-x-contain px-4 pb-4
+                       [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            {laporan.map((b) => (
+              // Dua kartu pas selebar laci. Sela antarkartu (16px) sama dengan
+              // jarak tepi, sehingga kartu ketiga mulai tepat di tepi layar —
+              // tak ada irisan tipis yang membuat sisi kanan tampak rapat.
+              <li key={b.id} className="w-[calc((100%-1rem)/2)] shrink-0 snap-start">
+                <button
+                  type="button"
+                  onClick={() => onBuka(b)}
+                  aria-label={`${b.judul} — ${teks.bukaRincian}`}
+                  className="group block w-full rounded-lg text-left focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+                >
+                  {/* Tinggi gambar tetap (bukan rasio) dan judul selalu memesan
+                      dua baris — tinggi deret kartu sama di semua lebar layar,
+                      jadi TINGGI_INTIP bisa satu angka tanpa memotong judul. */}
+                  <span className="relative block h-[104px] overflow-hidden rounded-lg">
+                    {/* Sama dengan kartu rel kanan: video diputar otomatis (bisu,
+                        berulang) selama kartunya terlihat, dijeda saat digeser
+                        keluar; foto memakai media pertamanya. */}
+                    {b.media[0]?.jenis === "video" ? (
+                      <VideoKeping
+                        key={b.media[0].url}
+                        url={b.media[0].url}
+                        poster={b.media[0].poster ?? b.poster}
+                        label={b.judul}
+                      />
+                    ) : (
+                      <Keping berita={b} src={b.media[0]?.url} />
+                    )}
+                  </span>
+                  <span className="mt-1.5 block text-[11px] text-white/55">{b.tanggal}</span>
+                  <span className="mt-0.5 line-clamp-2 min-h-[2.75em] text-[13px] leading-snug font-semibold text-white">{b.judul}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          pesanKosong
+        )
+      ) : (
+        <div
+          className="pantau-rel min-h-0 flex-1 overflow-y-auto overscroll-contain px-2"
+          // Di posisi setengah 45% laci berada di bawah layar — ganjal bawah
+          // sebesar itu supaya baris terakhir tetap bisa digulir ke pandangan.
+          style={{
+            paddingBottom: posisi === "setengah"
+              ? "calc(0.45 * (100svh - 4.5rem) + 1rem)"
+              : "calc(1rem + env(safe-area-inset-bottom, 0px))",
+          }}
+        >
+          {tab === "laporan" ? (
+            laporan.length > 0 ? (
+              <ul className="divide-y divide-white/10 px-2">
+                {laporan.map((b) => (
+                  <li key={b.id} className="py-1.5">
+                    <ItemListLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => onBuka(b)} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              pesanKosong
+            )
+          ) : (
+            <div className="pr-4">
+              {wilayah}
+              <p className="mt-4 border-t border-white/10 px-3 pt-4 text-[12.5px] leading-relaxed text-white/55">
+                {tentangData}
+              </p>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -943,6 +1293,10 @@ function VideoKeping({ url, poster, label }: { url: string; poster: string | nul
         loop
         preload="metadata"
         onCanPlay={(e) => cobaPutar(e.currentTarget)}
+        // canplay bisa lewat sebelum pendengarnya terpasang (video dari cache)
+        // — video lalu berputar tapi tetap opacity-0 di belakang poster.
+        // `playing` datang tiap kali pemutaran benar-benar mulai.
+        onPlaying={() => setSiap(true)}
         className={`absolute inset-0 h-full w-full object-cover transition duration-500
                     group-hover:scale-[1.03] ${siap ? "opacity-100" : "opacity-0"}`}
       />

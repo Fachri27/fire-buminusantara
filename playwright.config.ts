@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-/** E2E untuk konsol /peta. Memakai dev server yang sudah jalan
+/** E2E untuk konsol peta (index /id). Memakai dev server yang sudah jalan
  *  (reuseExistingServer) supaya data dev ikut terpakai. */
 export default defineConfig({
   testDir: "./e2e",
@@ -13,7 +13,7 @@ export default defineConfig({
   use: { baseURL: "http://localhost:3000", trace: "retain-on-failure", video: "off", screenshot: "only-on-failure" },
   webServer: {
     command: "npm run dev -- --port 3000",
-    url: "http://localhost:3000/id/peta",
+    url: "http://localhost:3000/id",
     reuseExistingServer: true,
     timeout: 120_000,
   },

@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 
-/** Asap perilaku konsol /peta — struktur, bukan isi: toleran terhadap data
- *  (cukup 1 laporan tayang), tegas pada interaksi. */
+/** Asap perilaku konsol peta (index /id) — struktur, bukan isi: toleran
+ *  terhadap data (cukup 1 laporan tayang), tegas pada interaksi. */
 test.beforeEach(async ({ page }) => {
-  await page.goto("/id/peta");
+  await page.goto("/id");
   await expect(page.getByRole("heading", { name: /peta sebaran/i }).first()).toBeVisible();
 });
 
@@ -73,7 +73,7 @@ test("kartu membuka rincian lalu kembali ke peta", async ({ page }) => {
 
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
-  await expect(page).toHaveURL(/\/peta/);
+  await expect(page).toHaveURL(/\/id\/?$/);
 
   // Lepas peta WebGL sebelum context ditutup — kalau tidak, teardown
   // menggantung menunggu request tile/Zarr yang masih terbuka.

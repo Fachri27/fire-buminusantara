@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 
 const PetaAsap = dynamic(
@@ -393,8 +394,10 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         </button>
       </div>
 
-      {/* Modal Dialog: Panduan Peta */}
-      {bukaInfoPerbedaan && (
+      {/* Modal Dialog: Panduan Peta — di-portal ke body: bingkai peta konsol
+          memakai `isolate`, dan fixed di dalamnya akan tertahan di bawah laci
+          ponsel serta bilah navigasi. */}
+      {bukaInfoPerbedaan && createPortal(
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
           onClick={() => setBukaInfoPerbedaan(false)}
@@ -498,7 +501,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Tampilan Layer 1: Native Leaflet CAMS Wildfire Smoke */}
@@ -527,7 +531,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       {/* Tampilan Layer 2: Windy Air Quality & Wind Flow */}
       <div
         ref={lapisWindyRef}
-        className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
+        // Berhenti di atas laci konsol ponsel (--sela-bawah; 0 di panggung)
+        // supaya bilah skala & logo Windy tak tertutup laci.
+        className={`absolute inset-x-0 top-0 bottom-[var(--sela-bawah,0px)] w-full transition-opacity duration-300 ${
           mode === "windy" ? "opacity-100 pointer-events-auto z-[2]" : "opacity-0 pointer-events-none -z-10"
         }`}
       >

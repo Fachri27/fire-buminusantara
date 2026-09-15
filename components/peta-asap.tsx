@@ -1649,8 +1649,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       <button
         type="button"
         onClick={() => setLegendaTerbuka(true)}
-        className={`pointer-events-auto absolute bottom-24 right-3 z-[400] items-center gap-1.5 rounded-full bg-black/85 px-3 py-1.5 text-xs font-semibold text-white/90 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-95 hover:bg-black hover:text-white ${
-          legendaTerbuka ? "hidden" : legendaRingkas ? (bingkaiSempit ? "flex sm:bottom-28" : "flex sm:hidden") : "flex xl:hidden"
+        className={`pointer-events-auto absolute bottom-[calc(var(--sela-bawah,0px)+6rem)] right-3 z-[400] items-center gap-1.5 rounded-full bg-black/85 px-3 py-1.5 text-xs font-semibold text-white/90 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-95 hover:bg-black hover:text-white ${
+          legendaTerbuka ? "hidden" : legendaRingkas ? (bingkaiSempit ? "flex sm:bottom-[calc(var(--sela-bawah,0px)+7rem)]" : "flex sm:hidden") : "flex xl:hidden"
         }`}
         aria-label="Buka legenda aerosol karhutla"
       >
@@ -1696,7 +1696,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         style={gayaHamparan}
         className={`pantau-legenda pointer-events-auto absolute right-3 z-[400] rounded-2xl bg-black/85 text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-[bottom,top,max-height] ${
           legendaRingkas
-            ? `bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs sm:right-5${bingkaiSempit ? " max-h-[calc(100%-8rem)] overflow-y-auto sm:bottom-28" : " sm:bottom-4"}`
+            ? /* --sela-bawah: tinggi laci konsol ponsel yang menutup dasar
+                 bingkai (0 di panggung) — hamparan bawah naik di atasnya. */
+              `bottom-[calc(var(--sela-bawah,0px)+6rem)] w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs sm:right-5${bingkaiSempit ? " max-h-[calc(100%-8rem-var(--sela-bawah,0px))] overflow-y-auto sm:bottom-[calc(var(--sela-bawah,0px)+7rem)]" : " sm:bottom-[calc(var(--sela-bawah,0px)+1rem)]"}`
             : "bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs xl:bottom-4 xl:right-5"
         } ${
           legendaTerbuka
@@ -1820,7 +1822,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           (< sm) bilah melebar penuh (inset-x-2) sehingga sudut kiri bawah
           tertutup bilah — logo dipindah ke kiri atas di bawah pil mode.
           Bingkai sempit konsol ikut pola ponsel: bilahnya selebar bingkai. */}
-      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex items-center ${legendaRingkas ? (bingkaiSempit ? "top-[68px] sm:left-5" : "top-[68px] sm:top-auto sm:bottom-4 sm:left-5") : "bottom-24 xl:bottom-4 xl:left-5"}`}>
+      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex items-center ${legendaRingkas ? (bingkaiSempit ? "top-[68px] sm:left-5" : "top-[68px] sm:top-auto sm:bottom-[calc(var(--sela-bawah,0px)+1rem)] sm:left-5") : "bottom-24 xl:bottom-4 xl:left-5"}`}>
         <a
           href="https://atmosphere.copernicus.eu/"
           target="_blank"
@@ -1843,7 +1845,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           ukurannya ukuran beranda yang diperkecil (gayaHamparan); di layar
           kecil tetap selebar bingkai seperti pola ponsel. Lebarnya dikunci
           selebar bingkai supaya tak terpotong bingkai sempit. */}
-      <div style={gayaHamparan} className={`pointer-events-auto absolute bottom-4 z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-pantau-konsol/90 p-2 shadow-2xl backdrop-blur-xl sm:px-4 sm:py-3 ${
+      <div style={gayaHamparan} className={`pointer-events-auto absolute bottom-[calc(var(--sela-bawah,0px)+1rem)] z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-pantau-konsol/90 p-2 shadow-2xl backdrop-blur-xl sm:px-4 sm:py-3 ${
         legendaRingkas
           ? /* Dasbor: dipusatkan lewat margin otomatis (bukan translate)
                supaya tetap tepat di tengah setelah zoom. */

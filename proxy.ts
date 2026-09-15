@@ -10,21 +10,38 @@ import { BAHASA } from "@/lib/bahasa";
  * lewat apa adanya — karena itu matcher mengecualikannya.
  *
  * Mode etalase (PETA_SAJA=1, mis. deploy Vercel coba-coba): semua halaman
- * publik selain /<locale>/peta dialihkan ke /id/peta, dan /admin
+ * publik selain /<locale> dialihkan ke /id, dan /admin
  * dikembalikan 404 — CMS tidak ikut dipamerkan.
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Rute lama konsol peta (/id/peta) — sejak konsol menjadi index, tautan
+  // lama (bagikan, bookmark) dialihkan permanen ke /<locale>. Berlaku di
+  // kedua mode (biasa maupun etalase) dan diletakkan paling atas supaya tak
+  // tersangkut aturan lain di bawah.
+  const bahasaLawas = BAHASA.find((b) => pathname === `/${b}/peta` || pathname.startsWith(`/${b}/peta/`));
+  if (bahasaLawas) {
+    request.nextUrl.pathname = `/${bahasaLawas}`;
+    return NextResponse.redirect(request.nextUrl, 308);
+  }
+
+  // Beranda lama (/<locale>/beranda) tidak dibuka untuk umum — konsol peta di
+  // /<locale> adalah halaman utama. Ditolak 404 di kedua mode; berkas halamannya
+  // dibiarkan ada supaya mudah dibuka lagi bila diperlukan.
+  if (BAHASA.some((b) => pathname === `/${b}/beranda` || pathname.startsWith(`/${b}/beranda/`))) {
+    return new NextResponse(null, { status: 404 });
+  }
+
   if (process.env.PETA_SAJA === "1") {
     if (pathname === "/admin" || pathname.startsWith("/admin/")) {
       return new NextResponse(null, { status: 404 });
     }
-    const kePeta = BAHASA.some((b) => pathname === `/${b}/peta` || pathname.startsWith(`/${b}/peta/`));
+    const kePeta = BAHASA.some((b) => pathname === `/${b}` || pathname === `/${b}/`);
     const aset = pathname.startsWith("/_next/") || pathname.startsWith("/assets/") || pathname.startsWith("/css/") ||
       pathname.startsWith("/api/") || pathname.startsWith("/media/") || pathname.includes(".");
     if (!kePeta && !aset) {
-      request.nextUrl.pathname = "/id/peta";
+      request.nextUrl.pathname = "/id";
       return NextResponse.redirect(request.nextUrl, 308);
     }
   }

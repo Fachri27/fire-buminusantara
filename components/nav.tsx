@@ -157,11 +157,12 @@ export function Nav({ bahasa, gelap = false }: Props) {
       <div className={`mx-auto flex h-full items-center justify-between gap-4 ${
         gelap ? "max-w-7xl px-4 sm:px-6" : "max-w-7xl px-[var(--pias)]"
       }`}>
-        {/* Logo + wordmark — tautan ke beranda dalam bahasa aktif, di pojok
-            kiri bilah. Ikon sendirian terlihat kecil & sepi; dipasangkan teks
-            "Fire" jadi kesatuan merek yang mengisi ruang. Di ponsel "Lapor"
-            pindah ke cluster kanan supaya logo ini punya tempat. */}
-        <Link href={`/${bahasa}`} aria-label="Fire — beranda"
+        {/* Logo + wordmark — tautan ke halaman utama (konsol peta) dalam
+            bahasa aktif, di pojok kiri bilah. Ikon sendirian terlihat kecil
+            & sepi; dipasangkan teks "Fire" jadi kesatuan merek yang mengisi
+            ruang. Di ponsel "Lapor" pindah ke cluster kanan supaya logo ini
+            punya tempat. */}
+        <Link href={`/${bahasa}`} aria-label={`Fire — ${teks.bagian.peta}`}
            onClick={(e) => {
              // SELALU ditangani di sini, tidak pernah lewat navigasi <Link>.
              // Pop-up rincian mengubah URL jadi /xx/fire/<slug> lewat pushState
