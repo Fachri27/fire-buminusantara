@@ -15,6 +15,46 @@ const PetaAsap = dynamic(
 );
 
 import type { Berita } from "@/lib/events";
+import { BATAS_NUSANTARA, selaNusantara } from "@/lib/kamera-nusantara";
+
+/** Bagian peta MapLibre lapisan Aerosol yang dibaca untuk menyamakan kamera
+ *  Windy — diakses lewat window supaya peta.tsx tak mengimpor maplibre-gl. */
+type PetaAerosol = {
+  getContainer: () => HTMLElement;
+  cameraForBounds: (
+    batas: [[number, number], [number, number]],
+    opsi: { padding: { top: number; bottom: number; left: number; right: number } },
+  ) => { center: { lng: number; lat: number } | [number, number]; zoom?: number } | undefined;
+};
+
+/** Kamera Windy yang sama dengan kamera Nusantara lapisan Aerosol, atau null
+ *  bila peta Aerosol belum siap. Zoom Windy (skala Leaflet) = zoom MapLibre + 1
+ *  — lihat catatan tombol rumah di app/api/forecasting/route.ts. */
+function kameraWindyNusantara(): { lat: number; lon: number; zoom: number } | null {
+  const peta = (window as unknown as { _maplibreMap?: PetaAerosol })._maplibreMap;
+  if (!peta) return null;
+  const kamera = peta.cameraForBounds(BATAS_NUSANTARA, { padding: selaNusantara(peta.getContainer()) });
+  if (!kamera || kamera.zoom === undefined) return null;
+  const [lon, lat] = Array.isArray(kamera.center) ? kamera.center : [kamera.center.lng, kamera.center.lat];
+  return { lat, lon, zoom: kamera.zoom + 1 };
+}
+
+/** Bagian peta Leaflet milik Windy di dalam iframe (satu origin dengan
+ *  halaman) yang dipakai untuk membaca kameranya. */
+type PetaWindy = {
+  getCenter: () => { lat: number; lng: number };
+  getZoom: () => number;
+};
+
+/** Kamera lapisan Aerosol saat ini dalam skala zoom Windy (+1), atau null. */
+function kameraAerosolKini(): { lat: number; lon: number; zoom: number } | null {
+  const peta = (window as unknown as {
+    _maplibreMap?: { getCenter: () => { lat: number; lng: number }; getZoom: () => number };
+  })._maplibreMap;
+  if (!peta) return null;
+  const c = peta.getCenter();
+  return { lat: c.lat, lon: c.lng, zoom: peta.getZoom() + 1 };
+}
 
 /** Mode lapisan peta — diangkat ke luar supaya konsol /peta bisa
  *  menyelaraskan aksen rel kiri (titik + badge) dengan tema lapisan aktif:
@@ -57,6 +97,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [memuatWindy, setMemuatWindy] = useState(true);
   const iframeReadyRef = useRef(false);
+  // Kamera Aerosol yang harus diterapkan ke Windy begitu iframe siap.
+  const kameraTertundaRef = useRef<{ lat: number; lon: number; zoom: number } | null>(null);
   const pendingJumlahRef = useRef(jumlahLaporan);
   const onPilihRef = useRef(onPilihWilayah);
 
@@ -69,13 +111,42 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   const handlePilihMode = (m: ModePeta) => {
     if (terkendali) onModeChange?.(m);
     else setModeDalam(m);
+    // Konsol /peta: kamera ikut berpindah lapisan — zoom dan geseran terakhir
+    // pengunjung terbawa, bukan kembali ke tampilan awal lapisan tujuan.
+    if (muatNusantara && m === mode) {
+      // Pil yang sama ditekan lagi — tak ada yang perlu disamakan.
+    } else if (muatNusantara && m === "windy") {
+      const kamera = kameraAerosolKini();
+      if (kamera) {
+        kameraTertundaRef.current = kamera;
+        if (iframeReadyRef.current) kirimData({ type: "SET_KAMERA", ...kamera });
+      }
+    } else if (muatNusantara && m === "asap" && hasOpenedWindy) {
+      try {
+        const windy = (iframeRef.current?.contentWindow as unknown as { W?: { map?: { map?: PetaWindy } } } | null)?.W?.map?.map;
+        const aerosol = (window as unknown as {
+          _maplibreMap?: { jumpTo: (o: { center: [number, number]; zoom: number }) => void };
+        })._maplibreMap;
+        if (windy && aerosol) {
+          const c = windy.getCenter();
+          aerosol.jumpTo({ center: [c.lng, c.lat], zoom: windy.getZoom() - 1 });
+        }
+      } catch {
+        // Iframe belum siap atau tak terjangkau — biarkan kamera Aerosol apa adanya.
+      }
+    }
     if (m === "windy") {
       if (!hasOpenedWindy && typeof window !== "undefined") {
         const isMobile = window.innerWidth < 640;
+        // Konsol /peta: kamera dan zoom roda disamakan dengan lapisan Aerosol.
+        const kamera = muatNusantara ? kameraWindyNusantara() : null;
+        const konsol = zoomRoda ? "&konsol=1" : "";
         setWindySrc(
-          isMobile
-            ? "/api/forecasting?lat=-1.000&lon=118.000&zoom=3.8"
-            : "/api/forecasting?lat=0.200&lon=118.000&zoom=5"
+          kamera
+            ? `/api/forecasting?lat=${kamera.lat.toFixed(3)}&lon=${kamera.lon.toFixed(3)}&zoom=${kamera.zoom.toFixed(2)}${konsol}`
+            : isMobile
+              ? `/api/forecasting?lat=-1.000&lon=118.000&zoom=3.8${konsol}`
+              : `/api/forecasting?lat=0.200&lon=118.000&zoom=5${konsol}`
         );
       }
       setHasOpenedWindy(true);
@@ -126,6 +197,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       if (data.type === "FORECASTING_READY") {
         iframeReadyRef.current = true;
         setMemuatWindy(false);
+        if (kameraTertundaRef.current) {
+          kirimData({ type: "SET_KAMERA", ...kameraTertundaRef.current });
+        }
         // Kuras data jumlah laporan dan kejadian yang tertunda saat inisialisasi awal
         if (pendingJumlahRef.current) {
           kirimData({
@@ -180,6 +254,67 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     window.addEventListener("message", saatPesan);
     return () => window.removeEventListener("message", saatPesan);
   }, [kirimData, berita, onBukaRincian]);
+
+  /* Konsol /peta: saat rel dilipat bingkai berubah ukuran tiap frame. Kalau
+     iframe Windy ikut di-resize tiap frame, petanya patah-patah dan zoomnya
+     tetap — wilayah yang tampil melebar. Maka selama bingkai berubah, iframe
+     dikunci di ukuran lama dan hanya diskalakan (transform, ringan; rasio
+     bingkai tetap jadi tak gepeng). Begitu ukuran diam, iframe dilepas ke
+     ukuran baru sekali, dan zoom Windy digeser log2(lebar baru/lama) supaya
+     wilayahnya tetap sama persis. */
+  const lapisWindyRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const lapis = lapisWindyRef.current;
+    if (!zoomRoda || !hasOpenedWindy || !lapis) return;
+    let ukuran = { w: lapis.clientWidth, h: lapis.clientHeight };
+    let penunda: ReturnType<typeof setTimeout> | undefined;
+    const amati = new ResizeObserver(() => {
+      const ifr = iframeRef.current;
+      const w = lapis.clientWidth;
+      const h = lapis.clientHeight;
+      if (!ifr || !w || !h || !ukuran.w) return;
+      ifr.style.width = `${ukuran.w}px`;
+      ifr.style.height = `${ukuran.h}px`;
+      ifr.style.transformOrigin = "0 0";
+      ifr.style.transform = `scale(${w / ukuran.w})`;
+      clearTimeout(penunda);
+      penunda = setTimeout(() => {
+        const wBaru = lapis.clientWidth;
+        const hBaru = lapis.clientHeight;
+        const seragam = Math.abs(wBaru / hBaru - ukuran.w / ukuran.h) < 0.02;
+        const delta = Math.log2(wBaru / ukuran.w);
+        const deltaKirim = seragam && Math.abs(delta) > 0.001 ? delta : 0;
+        requestAnimationFrame(() => {
+          // Lepas ukuran iframe lalu — dalam tugas yang sama, sebelum frame
+          // dilukis — minta Windy me-resize kanvas, menggeser zoom, dan
+          // menggambar ulang lewat panggilan langsung (iframe satu origin).
+          // Event resize iframe baru jalan SETELAH parent melukis satu frame,
+          // jadi mengandalkannya menampilkan kanvas basi sekejap (berkedip).
+          ifr.style.width = "";
+          ifr.style.height = "";
+          ifr.style.transform = "";
+          ifr.style.transformOrigin = "";
+          let sinkron = false;
+          try {
+            const skala = (ifr.contentWindow as unknown as { __skalaKonsol?: (d: number) => void } | null)?.__skalaKonsol;
+            if (typeof skala === "function") {
+              skala(deltaKirim);
+              sinkron = true;
+            }
+          } catch {
+            // Tak terjangkau (beda origin) — pakai jalur pesan di bawah.
+          }
+          if (!sinkron && deltaKirim) kirimData({ type: "SKALA_ZOOM", delta: deltaKirim });
+        });
+        ukuran = { w: wBaru, h: hBaru };
+      }, 160);
+    });
+    amati.observe(lapis);
+    return () => {
+      amati.disconnect();
+      clearTimeout(penunda);
+    };
+  }, [zoomRoda, hasOpenedWindy, kirimData]);
 
   const [bukaInfoPerbedaan, setBukaInfoPerbedaan] = useState(false);
 
@@ -391,6 +526,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
       {/* Tampilan Layer 2: Windy Air Quality & Wind Flow */}
       <div
+        ref={lapisWindyRef}
         className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${
           mode === "windy" ? "opacity-100 pointer-events-auto z-[2]" : "opacity-0 pointer-events-none -z-10"
         }`}

@@ -125,10 +125,13 @@ export const TEKS_LAPOR = {
 export const TEKS_PETA = {
   id: {
     judulTab: "Peta Sebaran | Karhutla",
-    judulHalaman: "Peta Sebaran Asap Karhutla",
+    judulHalaman: "Peta Sebaran Karhutla",
+    hakCipta: "©2026 Lapor Karhutla",
+    kaki:
+      "Sebaran aerosol dari Copernicus Atmosphere Monitoring Service (CAMS). Laporan lapangan dikirim warga dan diperiksa sebelum tayang.",
     deskripsi:
       "Peta sebaran asap kebakaran hutan dan lahan Indonesia — sebaran aerosol Copernicus dengan laporan terkurasi di atasnya.",
-    cari: "Cari provinsi, kabupaten, atau laporan…",
+    cari: "Cari wilayah atau laporan",
     provinsi: "Provinsi",
     terbaru: "Laporan terbaru",
     populer: "Terpopuler",
@@ -145,10 +148,13 @@ export const TEKS_PETA = {
   },
   en: {
     judulTab: "Spread Map | Wildfire",
-    judulHalaman: "Wildfire Smoke Spread Map",
+    judulHalaman: "Wildfire Spread Map",
+    hakCipta: "©2026 Lapor Karhutla",
+    kaki:
+      "Aerosol spread from the Copernicus Atmosphere Monitoring Service (CAMS). Field reports come from residents and are reviewed before publishing.",
     deskripsi:
       "Smoke spread map of forest and land fires in Indonesia — Copernicus aerosol fields with curated reports on top.",
-    cari: "Search provinces, regencies, or reports…",
+    cari: "Search areas or reports",
     provinsi: "Provinces",
     terbaru: "Latest reports",
     populer: "Most popular",

@@ -258,7 +258,6 @@ html.lenis body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
 }
-
 /* ── Kerangka beranda, mode panggung ──────────────────────────────────────
    Isi asli menempatakan koordinat desain 1920×1080 lalu memperkecilnya
    lewat transform scale yang dipasang gunakanPanggung() — JS yang baru

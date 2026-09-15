@@ -24,19 +24,28 @@ export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
                    xl:grid-cols-[320px_minmax(0,1fr)_360px]"
       >
         {/* Rel kiri */}
-        <div className="bg-pantau-konsol p-4 aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10 panggung:border-r panggung:border-white/10 panggung:py-5">
-          <div className="h-11 rounded-xl bg-white/[0.07]" />
-          <div className="mt-5 h-3 w-24 rounded bg-white/[0.07]" />
-          <div className="mt-2 grid gap-1.5">
-            {Array.from({ length: 8 }, (_, i) => (
-              <div key={i} className="h-10 rounded-xl bg-white/[0.05]" />
-            ))}
+        <div className="bg-pantau-konsol px-3 py-3.5 aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10 panggung:border-r panggung:border-white/10">
+          <div className="h-9 rounded-lg bg-[#141414]" />
+          <div className="mt-4 mr-6 grid gap-2.5 px-3">
+            <div className="h-4 w-32 rounded bg-white/[0.07]" />
+            <div className="h-4 w-20 rounded bg-white/[0.07]" />
+            <div className="grid gap-2 pl-1.5">
+              {Array.from({ length: 7 }, (_, i) => (
+                <div key={i} className="h-3.5 w-36 rounded bg-white/[0.05]" />
+              ))}
+            </div>
+            <div className="h-4 w-24 rounded bg-white/[0.07]" />
           </div>
         </div>
 
-        {/* Tengah: bingkai peta berasio desain, di tengah kolom */}
-        <div className="flex min-h-0 flex-col px-1 aliran:order-first panggung:justify-center panggung:px-2 panggung:py-5">
-          <div className="h-[54svh] rounded-2xl bg-pantau-sumur ring-1 ring-white/10 panggung:aspect-[1080/544] panggung:h-auto panggung:max-h-full" />
+        {/* Tengah: judul, bingkai peta berasio desain, kaki — geometri sama
+            dengan HalamanPeta supaya tak ada geseran saat isi tiba. */}
+        <div className="flex min-h-0 flex-col px-1 aliran:order-first panggung:px-2.5 panggung:py-6">
+          <div className="mx-2 mt-4 mb-3 h-[29px] w-2/3 max-w-[380px] rounded-lg bg-white/[0.08] panggung:mx-3.5 panggung:mt-0 panggung:h-[clamp(25px,1.9vw,38px)]" />
+          <div className="min-h-0 panggung:flex panggung:flex-1 panggung:items-center panggung:justify-center panggung:[container-type:size]">
+            <div className="h-[54svh] w-full rounded-2xl bg-pantau-sumur ring-1 ring-white/10 panggung:aspect-[1080/544] panggung:h-auto panggung:w-[min(100cqw,calc(100cqh*1080/544))]" />
+          </div>
+          <div className="mx-auto mt-4 h-4 w-3/4 max-w-[560px] rounded bg-white/[0.05]" />
         </div>
 
         {/* Rel kanan */}

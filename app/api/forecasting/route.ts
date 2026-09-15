@@ -65,13 +65,23 @@ export async function GET(req: NextRequest) {
     : Math.min(Math.max(rawLon, 90.0), 145.0);
   const safeZoom = Number.isNaN(rawZoom) || !Number.isFinite(rawZoom)
     ? 5.0
-    : Math.min(Math.max(rawZoom, 3.0), 18.0);
+    : Math.min(Math.max(rawZoom, 2.0), 18.0);
 
   const lat = safeLat.toFixed(3);
   const lon = safeLon.toFixed(3);
-  const zoom = safeZoom.toFixed(1);
+  // Dua desimal: konsol /peta mengirim zoom pecahan hasil cameraForBounds
+  // lapisan Aerosol, dan pembulatan ke satu desimal sudah menggeser Papua.
+  const zoom = safeZoom.toFixed(2);
+  // Konsol /peta: halamannya tak menggulir, jadi roda tetikus memperbesar
+  // peta seperti lapisan Aerosol, bukan diteruskan ke guliran halaman.
+  const konsol = searchParams.get("konsol") === "1";
 
-  const targetUrl = `https://www.windy.com/-Air-quality-index-aqi?cams,aqi,${lat},${lon},${zoom}`;
+  // Router Windy hanya mengenali zoom bulat di URL — zoom pecahan membuatnya
+  // membuang seluruh posisi dan jatuh ke lokasi GeoIP. Pecahannya diterapkan
+  // belakangan lewat setView (ZOOM_AWAL di skrip).
+  const zoomUrl = Math.round(safeZoom);
+
+  const targetUrl = `https://www.windy.com/-Air-quality-index-aqi?cams,aqi,${lat},${lon},${zoomUrl}`;
 
   try {
     const resWindy = await fetch(targetUrl, {
@@ -209,7 +219,7 @@ export async function GET(req: NextRequest) {
 
           // B. Pre-seed URL path & search before router parses window.location
           var targetPath = '/-Air-quality-index-aqi';
-          var targetSearch = '?cams,aqi,${lat},${lon},${zoom}';
+          var targetSearch = '?cams,aqi,${lat},${lon},${zoomUrl}';
           try {
             if (!window.location.pathname.includes('Air-quality-index') || !window.location.search.includes('aqi')) {
               window.history.replaceState(null, '', _docOrigin + targetPath + targetSearch);
@@ -892,19 +902,100 @@ export async function GET(req: NextRequest) {
           let hasSyncedTime = false;
           let mapInitialized = false;
           // Tampilan awal peta: disinkronkan dengan zoom/center asli Windy sampai pengguna berinteraksi
-          let tampilanAwal = { pusat: [parseFloat('${lat}'), parseFloat('${lon}')], zoom: parseInt('${zoom}', 10) };
+          // Konsol /peta: roda memperbesar peta, dan zoom awalnya pecahan (hasil
+          // cameraForBounds lapisan Aerosol) — jangan dibulatkan ke bawah.
+          const KONSOL = ${konsol};
+          const ZOOM_AWAL = KONSOL ? parseFloat('${zoom}') : parseInt('${zoom}', 10);
+          let tampilanAwal = { pusat: [parseFloat('${lat}'), parseFloat('${lon}')], zoom: ZOOM_AWAL };
+          // Kamera terakhir lapisan Aerosol yang dikirim parent (SET_KAMERA) —
+          // bila ada, dipakai menggantikan tampilanAwal saat memosisikan ulang.
+          let kameraTarget = null;
+
+          // Selisih zoom dari parent (SKALA_ZOOM) yang menunggu iframe
+          // di-resize. Diterapkan di handler resize — sebelum Windy sempat
+          // menggambar — atau lewat cadangan waktu bila resize tak datang.
+          let deltaTertunda = 0;
+          let penundaDelta = null;
+          function terapkanDeltaTertunda() {
+            clearTimeout(penundaDelta);
+            const delta = deltaTertunda;
+            deltaTertunda = 0;
+            if (!delta || !window.W || !window.W.map || !window.W.map.map) return;
+            const m = window.W.map.map;
+            try {
+              const mml = m._maplibreMap;
+              if (mml && typeof mml.resize === 'function') mml.resize();
+            } catch (e) {}
+            try {
+              if (typeof m.invalidateSize === 'function') m.invalidateSize({ animate: false, pan: false });
+            } catch (e) {}
+            try {
+              m.setView(m.getCenter(), m.getZoom() + delta, { animate: false });
+            } catch (e) {}
+            try {
+              const mml = m._maplibreMap;
+              if (mml && typeof mml.redraw === 'function') mml.redraw();
+            } catch (e) {}
+            // Tombol rumah ikut menyesuaikan, tetap memuat Nusantara penuh.
+            tampilanAwal = { pusat: tampilanAwal.pusat, zoom: tampilanAwal.zoom + delta };
+            if (kameraTarget) kameraTarget = { pusat: kameraTarget.pusat, zoom: kameraTarget.zoom + delta };
+          }
+          // MapLibre milik Windy me-resize kanvasnya lewat ResizeObserver lalu
+          // baru menggambar di frame berikutnya — satu frame basi (zoom lama,
+          // kanvas kosong di tepi) sempat tampil saat bingkai konsol berubah.
+          // Di konsol pelacakan itu dimatikan dan resize ditangani sinkron di
+          // event resize: ubah ukuran, terapkan selisih zoom, gambar ulang —
+          // semuanya sebelum browser melukis frame.
+          function petaMapLibreWindy() {
+            try {
+              const m = window.W && window.W.map && window.W.map.map;
+              return m && m._maplibreMap ? m._maplibreMap : null;
+            } catch (e) { return null; }
+          }
+          function matikanLacakResize() {
+            const mml = petaMapLibreWindy();
+            if (mml && mml._trackResize) mml._trackResize = false;
+          }
+          if (KONSOL) {
+            // Dipanggil parent secara SINKRON (iframe ini satu origin) tepat
+            // setelah parent melepas ukuran iframe — resize kanvas, geser zoom,
+            // dan gambar ulang terjadi di tugas yang sama, sebelum frame dilukis.
+            // Event resize di bawah tetap ada untuk resize jendela biasa.
+            window.__skalaKonsol = function(delta) {
+              matikanLacakResize();
+              const mml = petaMapLibreWindy();
+              if (typeof delta === 'number' && isFinite(delta) && delta !== 0) {
+                deltaTertunda += delta;
+                terapkanDeltaTertunda();
+              } else {
+                try { if (mml) { mml.resize(); mml.redraw(); } } catch (e) {}
+              }
+            };
+            window.addEventListener('resize', function() {
+              matikanLacakResize();
+              const mml = petaMapLibreWindy();
+              try { if (mml) mml.resize(); } catch (e) {}
+              if (deltaTertunda) {
+                terapkanDeltaTertunda();
+              } else {
+                try { if (mml) mml.redraw(); } catch (e) {}
+              }
+            });
+          }
           let interaksiPengguna = false;
 
           function disableMapScrollZoom(map) {
             if (!map) return;
+            // Di konsol /peta zoom roda justru dinyalakan — sama seperti lapisan Aerosol.
+            const aksi = KONSOL ? 'enable' : 'disable';
             try {
-              if (map.scrollWheelZoom && typeof map.scrollWheelZoom.disable === 'function') {
-                map.scrollWheelZoom.disable();
+              if (map.scrollWheelZoom && typeof map.scrollWheelZoom[aksi] === 'function') {
+                map.scrollWheelZoom[aksi]();
               }
             } catch (e) {}
             try {
-              if (map._maplibreMap && map._maplibreMap.scrollZoom && typeof map._maplibreMap.scrollZoom.disable === 'function') {
-                map._maplibreMap.scrollZoom.disable();
+              if (map._maplibreMap && map._maplibreMap.scrollZoom && typeof map._maplibreMap.scrollZoom[aksi] === 'function') {
+                map._maplibreMap.scrollZoom[aksi]();
               }
             } catch (e) {}
             // Pastikan sentuhan geser (panning) dan cubit (pinch-to-zoom) selalu aktif dan mulus di mobile
@@ -1046,6 +1137,7 @@ export async function GET(req: NextRequest) {
 
             const map = window.W.map.map;
             disableMapScrollZoom(map);
+            if (KONSOL) matikanLacakResize();
             if (window.W && window.W.store && typeof window.W.store.set === 'function') {
               try {
                 window.W.store.set('product', 'cams');
@@ -1053,8 +1145,25 @@ export async function GET(req: NextRequest) {
               } catch (e) {}
             }
             try {
-              map.setView([parseFloat('${lat}'), parseFloat('${lon}')], parseInt('${zoom}', 10));
+              map.setView([parseFloat('${lat}'), parseFloat('${lon}')], ZOOM_AWAL);
             } catch (e) {}
+
+            // Konsol /peta: Windy masih memosisikan ulang peta beberapa saat
+            // setelah siap (router + pemulihan posisi), menimpa kamera di atas.
+            // Terapkan ulang kamera yang sama dengan lapisan Aerosol sampai
+            // pengunjung sendiri menyentuh peta.
+            if (KONSOL) {
+              ['pointerdown', 'wheel', 'touchstart', 'keydown'].forEach(function(jenis) {
+                window.addEventListener(jenis, function() { interaksiPengguna = true; }, { capture: true, passive: true });
+              });
+              [400, 1200, 2500, 4500].forEach(function(jeda) {
+                setTimeout(function() {
+                  if (interaksiPengguna) return;
+                  const k = kameraTarget || tampilanAwal;
+                  try { map.setView(k.pusat, k.zoom, { animate: false }); } catch (e) {}
+                }, jeda);
+              });
+            }
 
             // Buat tombol kontrol zoom kustom (+ / − / home)
             if (!document.getElementById('custom-zoom-controls')) {
@@ -1310,6 +1419,27 @@ export async function GET(req: NextRequest) {
                 const map = window.W.map.map;
                 map.flyTo([info.titik[1], info.titik[0]], 6, { duration: 1.2 });
               }
+            } else if (data.type === 'SKALA_ZOOM') {
+              // Konsol /peta: bingkai membesar/mengecil (rel dilipat). Parent
+              // mengirim selisih zoom = log2(lebar baru / lebar lama) supaya
+              // wilayah yang tampil tetap sama — Nusantara ikut membesar.
+              // Selisihnya disimpan dulu dan diterapkan pada event resize iframe
+              // (parent melepas ukuran iframe sesudah pesan ini) — zoom baru dan
+              // ukuran baru tergambar di frame yang sama, tanpa kedipan.
+              if (KONSOL && typeof data.delta === 'number' && isFinite(data.delta)) {
+                deltaTertunda += data.delta;
+                clearTimeout(penundaDelta);
+                penundaDelta = setTimeout(terapkanDeltaTertunda, 300);
+              }
+            } else if (data.type === 'SET_KAMERA') {
+              // Konsol /peta: samakan kamera dengan lapisan Aerosol saat pengunjung
+              // berpindah lapisan. Zoom sudah dalam skala Windy (Aerosol + 1).
+              if (KONSOL && isFinite(data.lat) && isFinite(data.lon) && isFinite(data.zoom)) {
+                kameraTarget = { pusat: [data.lat, data.lon], zoom: data.zoom };
+                if (window.W && window.W.map && window.W.map.map) {
+                  try { window.W.map.map.setView(kameraTarget.pusat, kameraTarget.zoom, { animate: false }); } catch (e) {}
+                }
+              }
             } else if (data.type === 'WINDY_ACTIVE') {
               if (window.W && window.W.store && typeof window.W.store.set === 'function') {
                 try {
@@ -1352,6 +1482,8 @@ export async function GET(req: NextRequest) {
 
           // Tangkap event wheel: cegah zoom peta dan teruskan ke parent window agar halaman dapat di-scroll naik/turun
           window.addEventListener('wheel', function(e) {
+            // Konsol /peta: biarkan peta Windy menangani roda sendiri (zoom biasa).
+            if (KONSOL) return;
             // Jika pengguna menekan Ctrl atau Meta (Cmd), izinkan perbesaran peta
             if (e.ctrlKey || e.metaKey) {
               e.preventDefault();

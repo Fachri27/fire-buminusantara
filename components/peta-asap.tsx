@@ -12,6 +12,7 @@ if (typeof window !== "undefined") {
 
 import { inferPulau, PROVINSI_KE_PULAU } from "@/lib/wilayah";
 import { PUSAT_WILAYAH } from "@/lib/pusat-wilayah";
+import { BATAS_NUSANTARA, selaNusantara } from "@/lib/kamera-nusantara";
 import type { ZarrTimestepMeta, ZarrMetadataResponse } from "@/lib/zarr-reader";
 import type { Berita } from "@/lib/events";
 
@@ -253,31 +254,6 @@ function getInitialMapPos(): { center: [number, number]; zoom: number } {
   };
 }
 
-/** Batas Nusantara Sabang–Merauke dengan sedikit napas di tiap sisi —
- *  dipakai mode muatNusantara lewat fitBounds supaya pas di bingkai selebar
- *  apa pun (desktop maupun ponsel). */
-const BATAS_NUSANTARA: [[number, number], [number, number]] = [
-  [94.5, -11.5],
-  [141.5, 6.5],
-];
-
-/** Ruang di sekeliling Nusantara saat memuatnya. Di bingkai lebar ia
- *  proporsional terhadap ukuran bingkai supaya komposisinya sama di layar
- *  mana pun: Nusantara ~54% lebar, bergeser ke kiri-atas, menyisakan daratan
- *  Asia Tenggara di atas dan Australia di bawah sebagai konteks gerak asap
- *  (kanan & bawah lebih lega karena legenda dan bilah waktu ada di sana).
- *  Di bingkai sempit (ponsel) ruang tetap: pil mode di atas, bilah waktu di
- *  bawah — sela proporsional di sana membuat Nusantara terlalu kecil. */
-function selaNusantara(map: maplibregl.Map) {
-  const { clientWidth: w, clientHeight: h } = map.getContainer();
-  if (w < 640) return { top: 70, bottom: 120, left: 24, right: 24 };
-  return {
-    top: Math.round(h * 0.3),
-    bottom: Math.round(h * 0.34),
-    left: Math.round(w * 0.17),
-    right: Math.round(w * 0.29),
-  };
-}
 
 const SINKRON_SELESAI_KEY = "cams_sebaran_asap_selesai";
 const METADATA_CACHE_KEY = "cams_sebaran_asap_metadata";
@@ -374,6 +350,82 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const [jumlahFrameTerunduh, setJumlahFrameTerunduh] = useState(() => Object.keys(globalFrameCache).length);
   const [gayaVisual, setGayaVisual] = useState<"copernicus" | "sh_Oranges_aod" | "sh_all_aod">("copernicus");
   const [legendaTerbuka, setLegendaTerbuka] = useState(false);
+
+  /* Skala hamparan bawah (bilah waktu, legenda, logo) di konsol /peta.
+     Desainnya adalah peta layar penuh beranda yang diperkecil ke dalam
+     bingkai, jadi ketiganya ikut mengecil sebanding lebar bingkai: 1760px
+     = lebar bingkai tempat ukuran aslinya pas. Lantai 0,6 menjaga teks
+     tetap terbaca; bingkai < 640px memakai pola ponsel tanpa skala. */
+  const akarRef = useRef<HTMLDivElement>(null);
+  const [skalaHamparan, setSkalaHamparan] = useState(1);
+  useEffect(() => {
+    const el = akarRef.current;
+    if (!legendaRingkas || !el) return;
+    const amati = new ResizeObserver(([masuk]) => {
+      const lebar = masuk.contentRect.width;
+      // Dibulatkan ke 0,05: saat rel dilipat bingkai melebar tiap frame, dan
+      // skala yang ikut berubah tiap frame membuat hamparan bergetar.
+      const skala = lebar < 640 ? 1 : Math.min(1, Math.max(0.6, lebar / 1760));
+      setSkalaHamparan(Math.round(skala * 20) / 20);
+    });
+    amati.observe(el);
+    return () => amati.disconnect();
+  }, [legendaRingkas]);
+  const gayaHamparan = legendaRingkas ? { zoom: skalaHamparan } : undefined;
+
+  /* Konsol /peta: bingkai berubah ukuran tiap frame saat rel dilipat. Me-resize
+     kanvas WebGL tiap frame membuat peta patah-patah, dan zoom yang tetap
+     membuat Nusantara mengecil di bingkai yang melebar. Maka selama bingkai
+     berubah, isi peta (kanvas + penanda angka) hanya diskalakan lewat
+     transform — ringan, dan rasio bingkai tetap jadi tak gepeng. Begitu
+     ukurannya diam, kanvas di-resize sekali dan zoom digeser log2(lebar
+     baru/lama): wilayah yang tampil tetap sama persis, tanpa lompatan. */
+  useEffect(() => {
+    const akar = akarRef.current;
+    if (!muatNusantara || !akar) return;
+    let ukuran = { w: akar.clientWidth, h: akar.clientHeight };
+    let penunda: ReturnType<typeof setTimeout> | undefined;
+    const amati = new ResizeObserver(() => {
+      const map = mapRef.current;
+      const w = akar.clientWidth;
+      const h = akar.clientHeight;
+      if (!map || !w || !h) return;
+      if (!ukuran.w || !ukuran.h) {
+        ukuran = { w, h };
+        map.resize();
+        return;
+      }
+      const wadahKanvas = map.getCanvasContainer();
+      wadahKanvas.style.transformOrigin = "0 0";
+      wadahKanvas.style.transform = `scale(${w / ukuran.w})`;
+      clearTimeout(penunda);
+      penunda = setTimeout(() => {
+        // Pergantian dari gambar terskala ke kanvas baru dilakukan di satu
+        // frame: resize mengosongkan buffer WebGL, jadi redraw() menggambar
+        // ulang saat itu juga — tanpa itu satu frame kosong tampil (berkedip).
+        requestAnimationFrame(() => {
+          const wBaru = akar.clientWidth;
+          const hBaru = akar.clientHeight;
+          const seragam = Math.abs(wBaru / hBaru - ukuran.w / ukuran.h) < 0.02;
+          const pusat = map.getCenter();
+          const zoom = map.getZoom();
+          map.resize();
+          if (seragam && wBaru !== ukuran.w) {
+            map.jumpTo({ center: pusat, zoom: zoom + Math.log2(wBaru / ukuran.w) });
+          }
+          map.redraw();
+          wadahKanvas.style.transform = "";
+          wadahKanvas.style.transformOrigin = "";
+          ukuran = { w: wBaru, h: hBaru };
+        });
+      }, 160);
+    });
+    amati.observe(akar);
+    return () => {
+      amati.disconnect();
+      clearTimeout(penunda);
+    };
+  }, [muatNusantara]);
 
   // Status sinkronisasi data sebaran asap (Fullscreen Blocking Overlay)
   // Bila data sudah lengkap di memori atau sesi sebelumnya, jangan tampilkan overlay blocking
@@ -864,6 +916,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       touchPitch: false,
       attributionControl: false,
       scrollZoom: false, // Diteruskan manual untuk kelembutan sinkronisasi Lenis
+      // Konsol /peta mengatur resize sendiri (lihat efek skala bingkai) supaya
+      // kanvas tak di-resize tiap frame saat rel dilipat.
+      trackResize: !muatNusantaraRef.current,
     });
 
     mapRef.current = map;
@@ -875,7 +930,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     // Mode Nusantara: bingkai sempit langsung memuat Sabang–Merauke, dihitung
     // dari ukuran wadah yang sebenarnya (bukan zoom tebakan).
     if (muatNusantaraRef.current) {
-      map.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(map), duration: 0 });
+      map.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(map.getContainer()), duration: 0 });
     }
 
     // Custom WebGL Layer untuk Asap Karhutla CAMS Global
@@ -1467,7 +1522,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const persentaseCache = Math.round((jumlahFrameTerunduh / Math.max(1, linimasa.length)) * 100);
 
   return (
-    <div className="relative h-full w-full select-none overflow-hidden bg-black">
+    <div ref={akarRef} className="relative h-full w-full select-none overflow-hidden bg-black">
       {/* Wadah Peta MapLibre GL */}
       <div ref={wadahPetaRef} className="absolute inset-0 h-full w-full" />
 
@@ -1530,7 +1585,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           onClick={() => {
             if (muatNusantaraRef.current) {
               if (mapRef.current) {
-                mapRef.current.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(mapRef.current), duration: 800 });
+                mapRef.current.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(mapRef.current.getContainer()), duration: 800 });
               }
               return;
             }
@@ -1617,13 +1672,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </svg>
       </button>
 
-      {/* Panel legenda — di konsol dasbor selalu terbuka berdampingan dengan
-          bilah waktu (kanan bawah), kecuali di layar kecil yang tetap memakai
-          pola buka-tutup. */}
+      {/* Panel legenda — di konsol dasbor selalu terbuka di kanan bawah
+          dengan ukuran beranda yang diperkecil (gayaHamparan), kecuali di
+          layar kecil yang tetap memakai pola buka-tutup. */}
       <div
+        style={gayaHamparan}
         className={`pantau-legenda pointer-events-auto absolute right-3 z-[400] rounded-2xl bg-black/85 text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all ${
           legendaRingkas
-            ? "pantau-legenda--ringkas bottom-24 w-72 max-w-[calc(100vw-2rem)] p-3 text-[11px] sm:bottom-4"
+            ? "bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs sm:bottom-4 sm:right-5"
             : "bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs xl:bottom-4 xl:right-5"
         } ${
           legendaTerbuka
@@ -1745,7 +1801,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           menyempit ke tengah (max-w), jadi logo sejajar bilah. Di ponsel
           (< sm) bilah melebar penuh (inset-x-2) sehingga sudut kiri bawah
           tertutup bilah — logo dipindah ke kiri atas di bawah pil mode. */}
-      <div className={`pointer-events-auto absolute left-3 z-[500] flex items-center ${legendaRingkas ? "top-[68px] sm:top-auto sm:bottom-4" : "bottom-24 xl:bottom-4 xl:left-5"}`}>
+      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex items-center ${legendaRingkas ? "top-[68px] sm:top-auto sm:bottom-4 sm:left-5" : "bottom-24 xl:bottom-4 xl:left-5"}`}>
         <a
           href="https://atmosphere.copernicus.eu/"
           target="_blank"
@@ -1764,15 +1820,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </a>
       </div>
 
-      {/* Kontrol Linimasa Animasi — di konsol dasbor rata kiri dan menyisakan
-          ruang panel legenda di kanan (berdampingan, bukan bertindih); di
-          layar kecil tetap selebar bingkai seperti pola ponsel. */}
-      <div className={`pointer-events-auto absolute bottom-4 z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-pantau-konsol/90 p-2 shadow-2xl backdrop-blur-xl sm:px-4 sm:py-3 ${
+      {/* Kontrol Linimasa Animasi — di tengah bawah bingkai. Di konsol dasbor
+          ukurannya ukuran beranda yang diperkecil (gayaHamparan); di layar
+          kecil tetap selebar bingkai seperti pola ponsel. */}
+      <div style={gayaHamparan} className={`pointer-events-auto absolute bottom-4 z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-pantau-konsol/90 p-2 shadow-2xl backdrop-blur-xl sm:px-4 sm:py-3 ${
         legendaRingkas
-          ? /* Dasbor: lebar dibatasi, dan dipusatkan di ruang antara tepi
-               bingkai dan panel legenda (257px = lebar panel pasca-zoom +
-               tepi + napas). */
-          "inset-x-3 sm:left-3 sm:right-[257px] sm:max-w-[520px] sm:mx-auto"
+          ? /* Dasbor: dipusatkan lewat margin otomatis (bukan translate)
+               supaya tetap tepat di tengah setelah zoom. */
+          "inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[560px]"
           : "inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 w-auto sm:w-[560px]"
       }`}>
         <div className="flex flex-col gap-2 sm:gap-2.5">
