@@ -365,16 +365,19 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
      logo pindah ke kiri atas supaya tak tertimpa bilah waktu. */
   const AMBANG_SEMPIT = 800;
   const [bingkaiSempit, setBingkaiSempit] = useState(false);
+  /* Skala hamparan mengikuti lebar bingkai apa adanya setiap frame —
+     tanpa pembulatan dan tanpa tunda. Pembulatan (mis. ke 0,05) membuat
+     legenda melompat-lompat saat rel dilipat, penundaan membuatnya
+     tertinggal lalu menyentak; nilai eksak bergerak mulus bersama bingkai
+     karena lebarnya sendiri monoton selama animasi. */
   useEffect(() => {
     const el = akarRef.current;
     if (!legendaRingkas || !el) return;
     const amati = new ResizeObserver(([masuk]) => {
       const lebar = masuk.contentRect.width;
       setBingkaiSempit(lebar < AMBANG_SEMPIT);
-      // Dibulatkan ke 0,05: saat rel dilipat bingkai melebar tiap frame, dan
-      // skala yang ikut berubah tiap frame membuat hamparan bergetar.
       const skala = lebar < 640 ? 1 : Math.min(1, Math.max(0.6, lebar / 1760));
-      setSkalaHamparan(Math.round(skala * 20) / 20);
+      setSkalaHamparan(skala);
     });
     amati.observe(el);
     return () => amati.disconnect();
@@ -1683,10 +1686,15 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       {/* Panel legenda — di konsol dasbor ia selalu terbuka hanya kalau
           bingkainya lega; di bingkai sempit ia jadi hamparan pola ponsel
           (dibuka lewat cip, melayang di atas bilah waktu, menggulir sendiri
-          kalau lebih tinggi dari bingkai). */}
+          kalau lebih tinggi dari bingkai). Transisinya SENGAJA dibatasi ke
+          properti posisi: `zoom` (skalaHamparan) berubah tiap frame saat rel
+          dilipat, dan `transition-all` membuat tiap nilai baru mengejar
+          transisi 150ms yang belum selesai — hasilnya panel bergetar.
+          Dengan daftar eksplisit zoom selalu langsung, posisi (bottom/max-h
+          saat ganti mode) tetap meluncur mulus. */}
       <div
         style={gayaHamparan}
-        className={`pantau-legenda pointer-events-auto absolute right-3 z-[400] rounded-2xl bg-black/85 text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all ${
+        className={`pantau-legenda pointer-events-auto absolute right-3 z-[400] rounded-2xl bg-black/85 text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-[bottom,top,max-height] ${
           legendaRingkas
             ? `bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs sm:right-5${bingkaiSempit ? " max-h-[calc(100%-8rem)] overflow-y-auto sm:bottom-28" : " sm:bottom-4"}`
             : "bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs xl:bottom-4 xl:right-5"
