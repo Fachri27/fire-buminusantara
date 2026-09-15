@@ -18,13 +18,13 @@ export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
 
       <div
         aria-hidden="true"
-        className="mx-auto flex w-full max-w-[1720px] animate-pulse flex-col gap-3 p-3
-                   panggung:grid panggung:h-[calc(100svh-4rem)] panggung:gap-0 panggung:p-0
+        className="flex w-full animate-pulse flex-col gap-3 p-3
+                   panggung:grid panggung:h-[calc(100svh-4rem)] panggung:gap-2 panggung:p-2
                    panggung:grid-cols-[300px_minmax(0,1fr)_340px]
                    xl:grid-cols-[320px_minmax(0,1fr)_360px]"
       >
         {/* Rel kiri */}
-        <div className="bg-pantau-konsol px-3 py-3.5 aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10 panggung:border-r panggung:border-white/10">
+        <div className="bg-pantau-konsol px-3 py-3.5 aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10 panggung:rounded-xl">
           <div className="h-9 rounded-lg bg-[#141414]" />
           <div className="mt-4 mr-6 grid gap-2.5 px-3">
             <div className="h-4 w-32 rounded bg-white/[0.07]" />
@@ -40,7 +40,7 @@ export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
 
         {/* Tengah: judul, bingkai peta berasio desain, kaki — geometri sama
             dengan HalamanPeta supaya tak ada geseran saat isi tiba. */}
-        <div className="flex min-h-0 flex-col px-1 aliran:order-first panggung:px-2.5 panggung:py-6">
+        <div className="flex min-h-0 flex-col px-1 aliran:order-first panggung:px-0 panggung:py-6">
           <div className="mx-2 mt-4 mb-3 h-[29px] w-2/3 max-w-[380px] rounded-lg bg-white/[0.08] panggung:mx-3.5 panggung:mt-0 panggung:h-[clamp(25px,1.9vw,38px)]" />
           <div className="min-h-0 panggung:flex panggung:flex-1 panggung:items-center panggung:justify-center panggung:[container-type:size]">
             <div className="h-[54svh] w-full rounded-2xl bg-pantau-sumur ring-1 ring-white/10 panggung:aspect-[1080/544] panggung:h-auto panggung:w-[min(100cqw,calc(100cqh*1080/544))]" />
@@ -49,7 +49,7 @@ export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
         </div>
 
         {/* Rel kanan */}
-        <div className="bg-pantau-konsol p-4 aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10 panggung:border-l panggung:border-white/10 panggung:py-5">
+        <div className="bg-pantau-konsol p-4 aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10 panggung:rounded-xl panggung:py-5">
           <div className="h-3 w-32 rounded bg-white/[0.07]" />
           <div className="mt-3 grid gap-4">
             {Array.from({ length: 3 }, (_, i) => (

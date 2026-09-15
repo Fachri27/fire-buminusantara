@@ -29,6 +29,12 @@ export function proxy(request: NextRequest) {
     }
   }
 
+  // CMS tidak berprefiks bahasa. Matcher memasukkan /admin hanya supaya mode
+  // etalase di atas bisa menutupnya; di mode biasa ia lewat apa adanya.
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return NextResponse.next();
+  }
+
   const adaPrefiks = BAHASA.some((b) => pathname === `/${b}` || pathname.startsWith(`/${b}/`));
   if (!adaPrefiks) {
     request.nextUrl.pathname = `/${BAHASA[0]}${pathname === "/" ? "" : pathname}`;
@@ -49,5 +55,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   // Lewati internal Next.js, rute tanpa-bahasa (admin/api/media), berkas
   // statis, dan semua yang berekstensi (favicon.ico, robots.txt, llms.txt dsb.).
-  matcher: ["/((?!_next|admin|api|media|assets|llms|robots|sitemap|.*\\..*).*)"],
+  // /admin ikut dicocokkan terpisah: tanpa itu PETA_SAJA=1 tak pernah bisa
+  // mengembalikan 404 untuk CMS (proxy tak dijalankan sama sekali di sana).
+  matcher: ["/((?!_next|admin|api|media|assets|llms|robots|sitemap|.*\\..*).*)", "/admin", "/admin/:path*"],
 };

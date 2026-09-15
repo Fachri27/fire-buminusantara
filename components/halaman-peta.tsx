@@ -237,13 +237,16 @@ export function HalamanPeta({
     <div className="bg-pantau-malam pt-16 text-pantau-tulang panggung:flex panggung:h-[100svh] panggung:flex-col panggung:overflow-hidden">
       {/* Grid selalu tiga lajur; rel yang dilipat lajurnya menyusut ke 0.
           Lebarnya lewat variabel supaya grid-template-columns bisa
-          dianimasikan (jumlah lajur tetap sama, px ke px). */}
+          dianimasikan (jumlah lajur tetap sama, px ke px). Lajur rel yang
+          terbuka ikut memuat sela 8px ke kolom tengah, jadi sela di tepi
+          layar, di bawah nav, dan di antara kolom sama di semua lebar layar —
+          tanpa batas lebar maksimum yang menyisakan pita hitam. */}
       <div
         style={{
-          "--kolom-kiri": kiriBuka ? "var(--rel-kiri)" : "0px",
-          "--kolom-kanan": kananBuka ? "var(--rel-kanan)" : "0px",
+          "--kolom-kiri": kiriBuka ? "calc(var(--rel-kiri) + 0.5rem)" : "0px",
+          "--kolom-kanan": kananBuka ? "calc(var(--rel-kanan) + 0.5rem)" : "0px",
         } as React.CSSProperties}
-        className="mx-auto flex w-full max-w-[1720px] flex-1 flex-col aliran:gap-3 aliran:px-3 aliran:pb-4
+        className="flex w-full flex-1 flex-col aliran:gap-3 aliran:px-3 aliran:pb-4 panggung:p-2
                    [--rel-kiri:300px] [--rel-kanan:340px] xl:[--rel-kiri:320px] xl:[--rel-kanan:360px]
                    panggung:grid panggung:min-h-0 panggung:grid-cols-[var(--kolom-kiri)_minmax(0,1fr)_var(--kolom-kanan)]
                    panggung:transition-[grid-template-columns] panggung:duration-500 panggung:ease-[cubic-bezier(0.22,1,0.36,1)]
@@ -261,8 +264,8 @@ export function HalamanPeta({
           inert={!kiriBuka}
           className={`pantau-rel min-h-0 border-white/10 bg-pantau-konsol px-3 py-3.5
                      aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10
-                     panggung:h-full panggung:w-[var(--rel-kiri)] panggung:shrink-0
-                     panggung:overflow-y-auto panggung:overscroll-contain panggung:border-r
+                     panggung:mr-2 panggung:h-full panggung:w-[var(--rel-kiri)] panggung:shrink-0 panggung:rounded-xl
+                     panggung:overflow-y-auto panggung:overscroll-contain
                      transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none [contain:layout_paint] ${kiriBuka ? "opacity-100" : "opacity-0"}`}
         >
           <form role="search" onSubmit={(e) => e.preventDefault()} className="relative">
@@ -385,7 +388,7 @@ export function HalamanPeta({
             sendiri yang terlukis sesudah section) sehingga separuh tab yang
             menumpang rel tertutup. Section diangkat agar tab tampil utuh;
             grid tak pernah tumpang tindih jadi tak ada yang ikut berubah. */}
-        <section id="peta" aria-label={teks.judulHalaman} className="relative flex min-h-0 flex-col px-1 aliran:order-first panggung:z-10 panggung:px-2.5 panggung:py-6">
+        <section id="peta" aria-label={teks.judulHalaman} className="relative flex min-h-0 flex-col px-1 aliran:order-first panggung:z-10 panggung:px-0 panggung:py-6">
           {/* Pola titik bara di dua pojok berseberangan — tekstur, bukan
               isi, jadi hanya di layar panggung yang lega. */}
           <div aria-hidden="true" className="pantau-titik pantau-titik--kanan hidden panggung:block" />
@@ -447,7 +450,9 @@ export function HalamanPeta({
           </div>
 
           <p className="relative mx-auto mt-4 max-w-[68ch] px-3 text-center text-[12.5px] leading-snug text-pantau-tulang/85 panggung:max-w-[78%]">
-            <strong className="font-bold text-white">{teks.hakCipta}</strong> — {teks.kaki}
+            {/* Isinya panduan data lapisan yang sedang tampil — sama dengan
+                pop-up Panduan Data di sebelah pil lapisan. */}
+            <strong className="font-bold text-white">{teks.hakCipta}</strong> — {asapAktif ? teks.kakiAerosol : teks.kakiWindy}
           </p>
         </section>
 
@@ -460,8 +465,8 @@ export function HalamanPeta({
           inert={!kananBuka}
           className={`pantau-rel min-h-0 border-white/10 bg-pantau-konsol p-4 sm:p-5
                      aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10
-                     panggung:h-full panggung:w-[var(--rel-kanan)] panggung:shrink-0
-                     panggung:overflow-y-auto panggung:overscroll-contain panggung:border-l panggung:py-5
+                     panggung:ml-2 panggung:h-full panggung:w-[var(--rel-kanan)] panggung:shrink-0 panggung:rounded-xl
+                     panggung:overflow-y-auto panggung:overscroll-contain panggung:py-5
                      transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none [contain:layout_paint] ${kananBuka ? "opacity-100" : "opacity-0"}`}
         >
           {/* Toolbar: filter terbaru/terpopuler + toggle tampilan */}

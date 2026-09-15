@@ -868,11 +868,33 @@ export async function GET(req: NextRequest) {
         #custom-zoom-controls button:active {
           transform: scale(0.95);
         }
-        ${konsol ? `/* Konsol /peta: samakan ukuran tombol dengan tombol navigasi
-           lapisan Aerosol (28px + ikon 13px, sela 8px). */
-        #custom-zoom-controls { gap: 8px; }
-        #custom-zoom-controls button { width: 28px; height: 28px; }
-        #custom-zoom-controls button svg { width: 13px; height: 13px; }` : ""}
+        ${konsol ? `/* Konsol /peta: samakan tombol dengan tombol navigasi lapisan
+           Aerosol — ukuran 28px + ikon 13px, sela 8px, rapat 16px ke sudut
+           kanan atas bingkai, sudut 12px, kaca hitam 75% bercincin tipis.
+           !important karena blok ponsel di atas memakai media query. */
+        #custom-zoom-controls {
+          gap: 8px !important;
+          top: 16px !important;
+          right: 16px !important;
+        }
+        #custom-zoom-controls button {
+          width: 28px !important;
+          height: 28px !important;
+          border-radius: 12px !important;
+          background: rgba(0, 0, 0, 0.75) !important;
+          border: 0 !important;
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          color: rgba(255, 255, 255, 0.9) !important;
+        }
+        #custom-zoom-controls button:hover {
+          background: #000000 !important;
+          color: #ffffff !important;
+          transform: none !important;
+        }
+        #custom-zoom-controls button:active { transform: scale(0.9) !important; }
+        #custom-zoom-controls button svg { width: 13px !important; height: 13px !important; }` : ""}
 
         /* MOBILE: Pastikan sentuhan pan dan pinch-to-zoom di perangkat sentuh mulus dan responsif */
         @media (pointer: coarse), (max-width: 640px) {

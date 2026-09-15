@@ -127,8 +127,12 @@ export const TEKS_PETA = {
     judulTab: "Peta Sebaran | Karhutla",
     judulHalaman: "Peta Sebaran Karhutla",
     hakCipta: "©2026 Lapor Karhutla",
-    kaki:
-      "Sebaran aerosol dari Copernicus Atmosphere Monitoring Service (CAMS). Laporan lapangan dikirim warga dan diperiksa sebelum tayang.",
+    // Kaki kolom tengah mengikuti lapisan aktif — isinya panduan data yang
+    // sama dengan pop-up Panduan Data di peta.
+    kakiAerosol:
+      "OMAOD 550nm (Organic Matter AOD) dari CAMS global mengukur kepekatan partikel asap biomassa. Riwayat 7 hari ke belakang hingga proyeksi gerak asap 3 hari ke depan, tiap 3 jam.",
+    kakiWindy:
+      "Indeks Kualitas Udara (AQI) berbasis model atmosfer Copernicus CAMS, dipadukan hembusan angin model ECMWF IFS. Near real-time, disajikan melalui Windy.com.",
     deskripsi:
       "Peta sebaran asap kebakaran hutan dan lahan Indonesia — sebaran aerosol Copernicus dengan laporan terkurasi di atasnya.",
     cari: "Cari wilayah atau laporan",
@@ -150,8 +154,10 @@ export const TEKS_PETA = {
     judulTab: "Spread Map | Wildfire",
     judulHalaman: "Wildfire Spread Map",
     hakCipta: "©2026 Lapor Karhutla",
-    kaki:
-      "Aerosol spread from the Copernicus Atmosphere Monitoring Service (CAMS). Field reports come from residents and are reviewed before publishing.",
+    kakiAerosol:
+      "OMAOD 550nm (Organic Matter AOD) from global CAMS measures the density of biomass smoke particles. Covers the past 7 days through a 3-day smoke forecast, every 3 hours.",
+    kakiWindy:
+      "Air Quality Index (AQI) from the Copernicus CAMS atmospheric model, combined with ECMWF IFS wind flow. Near real-time, served via Windy.com.",
     deskripsi:
       "Smoke spread map of forest and land fires in Indonesia — Copernicus aerosol fields with curated reports on top.",
     cari: "Search areas or reports",
