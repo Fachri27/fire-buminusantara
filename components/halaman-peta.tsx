@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Berita } from "@/lib/events";
-import type { ProvinsiTeratas } from "@/lib/wms";
+import type { KabupatenTerluas } from "@/lib/wms";
 import { BAHASA, TEKS_PETA, type Bahasa } from "@/lib/bahasa";
 import { gunakanParallax } from "@/hooks/gunakan-parallax";
 import { TUTUP_OVERLAY } from "@/lib/peristiwa-popup";
@@ -12,7 +12,7 @@ import {
   ringkasNamaProvinsi,
   PROVINSI_PETA_NAMA,
 } from "@/lib/wilayah";
-import { Peta } from "@/components/peta";
+import { Peta, type ModePeta } from "@/components/peta";
 import { PopupPeta } from "@/components/popup-peta";
 import { RincianLaporan } from "@/components/rincian-laporan";
 
@@ -41,7 +41,7 @@ export function HalamanPeta({
   terbaru,
   populer,
   jumlahLaporan,
-  teratas,
+  kabupaten,
   bahasa,
 }: {
   /** Arsip lengkap — pop-up wilayah dan pencarian. */
@@ -52,7 +52,8 @@ export function HalamanPeta({
    *  kedua rel kanan saat tidak mencari. */
   populer: Berita[];
   jumlahLaporan: Record<string, number>;
-  teratas: ProvinsiTeratas[];
+  /** Kabupaten berluas kebakaran dari layer GeoServer, terluas dulu. */
+  kabupaten: KabupatenTerluas[];
   bahasa: Bahasa;
 }) {
   const teks = TEKS_PETA[bahasa];
@@ -62,11 +63,27 @@ export function HalamanPeta({
   const [cari, setCari] = useState("");
   // Daftar provinsi bisa dilipat supaya rel kiri tidak terlalu panjang ke bawah.
   const [provinsiBuka, setProvinsiBuka] = useState(true);
+  const [kabupatenBuka, setKabupatenBuka] = useState(true);
   // Kedua rel bisa dilipat seluruhnya supaya peta lebih lega — dibuka lagi
   // lewat tab di tepi bingkai peta. Peta mengikuti sendiri (ResizeObserver
   // bawaan MapLibre), tak perlu resize manual.
   const [kiriBuka, setKiriBuka] = useState(true);
   const [kananBuka, setKananBuka] = useState(true);
+  // Mode lapisan aktif — diangkat dari <Peta> supaya aksen rel kiri (titik +
+  // badge jumlah) bisa selaras dengan tema lapisan: asap = ungu berbahaya
+  // #49006A (pusat asap terpekat), windy = oren bara seperti semula.
+  const [modePeta, setModePeta] = useState<ModePeta>("asap");
+  const asapAktif = modePeta === "asap";
+  // Aksen tombol filter rel kanan — senada dengan pil lapisan dan TabRel:
+  // ungu #49006a untuk aerosol, hijau emerald untuk windy.
+  const aksenFilter = asapAktif
+    ? "bg-[#49006a] text-white ring-1 ring-[#86198f]/60"
+    : "bg-emerald-700 text-white ring-1 ring-emerald-500/60";
+  // Filter jenis laporan: terbaru / populer / semua.
+  type FilterMedia = "semua" | "terbaru" | "populer";
+  const [filterMedia, setFilterMedia] = useState<FilterMedia>("semua");
+  // Mode tampilan rel kanan — kartu atau daftar.
+  const [modeRel, setModeRel] = useState<"kartu" | "daftar">("kartu");
   // Jam konsol (WIB), disegarkan tiap setengah menit — teksnya berubah,
   // bukan animasi, jadi aman bagi pengurang gerak.
   const [kini, setKini] = useState("");
@@ -87,6 +104,18 @@ export function HalamanPeta({
 
   const kunci = ringkasNamaProvinsi(cari.trim());
 
+  /* Provinsi yang punya kabupaten cocok dengan kata kunci — mengetik "Berau"
+     ikut memunculkan Kalimantan Timur di daftar provinsi dan laporan-laporannya
+     di rel kanan, bukan "tidak ada yang cocok". */
+  const provinsiKabupatenCocok = useMemo(() => {
+    if (!kunci) return new Set<string>();
+    return new Set(
+      kabupaten
+        .filter((k) => ringkasNamaProvinsi(k.nama).includes(kunci))
+        .map((k) => namaProvinsiLokal(k.provinsi)),
+    );
+  }, [kabupaten, kunci]);
+
   /* Provinsi terbanyak laporannya dulu, abjad sebagai penyeimbang —
      urutan yang sama dengan daftar pilihan di pop-up wilayah, supaya
      pengunjung tidak mempelajari dua urutan berbeda. */
@@ -97,22 +126,47 @@ export function HalamanPeta({
         a.localeCompare(b, "id"),
     );
     if (!kunci) return semua;
-    return semua.filter((n) => ringkasNamaProvinsi(n).includes(kunci));
-  }, [jumlahLaporan, kunci]);
+    return semua.filter(
+      (n) => ringkasNamaProvinsi(n).includes(kunci) || provinsiKabupatenCocok.has(n),
+    );
+  }, [jumlahLaporan, kunci, provinsiKabupatenCocok]);
 
-  /* Rel kanan: tanpa kata kunci ia menampilkan dua kelompok (5 terbaru + 5
-     terpopuler); saat mencari ia menyaring arsip lengkap. null = mode
-     kelompok, array = hasil pencarian. */
+  /* Kabupaten ikut kotak cari yang sama — cocok lewat nama kabupaten atau
+     provinsinya, jadi mengetik "kalimantan" menampilkan kabupaten di sana. */
+  const daftarKabupaten = useMemo(() => {
+    if (!kunci) return kabupaten;
+    return kabupaten.filter((k) =>
+      [k.nama, k.provinsi].some((t) => ringkasNamaProvinsi(t).includes(kunci)),
+    );
+  }, [kabupaten, kunci]);
+
+  /* Pembantu filter — tidak ada filter media (video/foto), hanya filter kelompok. */
+
+  /* Rel kanan: tanpa kata kunci ia menampilkan dua kelompok (terbaru + populer);
+     saat mencari ia menyaring arsip lengkap. null = mode kelompok. */
   const laporanTampil = useMemo(() => {
     if (!kunci) return null;
     return berita
-      .filter((b) =>
-        [b.judul, b.lokasi, b.provinsi].some(
-          (t) => t && ringkasNamaProvinsi(t).includes(kunci),
-        ),
+      .filter(
+        (b) =>
+          [b.judul, b.lokasi, b.provinsi].some(
+            (t) => t && ringkasNamaProvinsi(t).includes(kunci),
+          ) || (b.provinsi !== null && provinsiKabupatenCocok.has(b.provinsi)),
       )
       .slice(0, BATAS_CARI);
-  }, [berita, kunci]);
+  }, [berita, kunci, provinsiKabupatenCocok]);
+
+  /* Laporan terbaru — ditampilkan saat filterMedia "semua" atau "terbaru". */
+  const laporanTerbaru = useMemo(() => {
+    if (filterMedia === "populer") return [];
+    return terbaru;
+  }, [terbaru, filterMedia]);
+
+  /* Laporan populer — ditampilkan saat filterMedia "semua" atau "populer". */
+  const laporanPopuler = useMemo(() => {
+    if (filterMedia === "terbaru") return [];
+    return populer;
+  }, [populer, filterMedia]);
 
   const total = berita.length;
   const satuan = (
@@ -191,26 +245,35 @@ export function HalamanPeta({
 
   return (
     <div className="bg-pantau-malam pt-16 text-pantau-tulang panggung:flex panggung:h-[100svh] panggung:flex-col panggung:overflow-hidden">
+      {/* Grid selalu tiga lajur; rel yang dilipat lajurnya menyusut ke 0.
+          Lebarnya lewat variabel supaya grid-template-columns bisa
+          dianimasikan (jumlah lajur tetap sama, px ke px). */}
       <div
-        className={`mx-auto flex w-full max-w-[1720px] flex-1 flex-col aliran:gap-3 aliran:px-3 aliran:pb-4 panggung:grid panggung:min-h-0 ${
-          kiriBuka && kananBuka
-            ? "panggung:grid-cols-[300px_minmax(0,1fr)_340px] xl:grid-cols-[320px_minmax(0,1fr)_360px]"
-            : kiriBuka
-              ? "panggung:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]"
-              : kananBuka
-                ? "panggung:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]"
-                : "panggung:grid-cols-[minmax(0,1fr)]"
-        }`}
+        style={{
+          "--kolom-kiri": kiriBuka ? "var(--rel-kiri)" : "0px",
+          "--kolom-kanan": kananBuka ? "var(--rel-kanan)" : "0px",
+        } as React.CSSProperties}
+        className="mx-auto flex w-full max-w-[1720px] flex-1 flex-col aliran:gap-3 aliran:px-3 aliran:pb-4
+                   [--rel-kiri:300px] [--rel-kanan:340px] xl:[--rel-kiri:320px] xl:[--rel-kanan:360px]
+                   panggung:grid panggung:min-h-0 panggung:grid-cols-[var(--kolom-kiri)_minmax(0,1fr)_var(--kolom-kanan)]
+                   panggung:transition-[grid-template-columns] panggung:duration-500 panggung:ease-[cubic-bezier(0.22,1,0.36,1)]
+                   motion-reduce:transition-none"
       >
         {/* ── Rel kiri: cari + provinsi + peringkat ─────────────────── */}
-        {kiriBuka && (
+        {/* Pembungkus memotong rel selebar lajurnya; rel di dalamnya tetap
+            selebar penuh dan menempel ke tepi peta, jadi saat dilipat ia
+            tampak bergeser masuk ke bawah bingkai, bukan teksnya terlipat. */}
+        <div className={`min-h-0 panggung:flex panggung:justify-end panggung:overflow-hidden ${kiriBuka ? "" : "aliran:hidden"}`}>
         <aside
           id="rel-kiri-pantau"
           data-lenis-prevent
           aria-label={teks.provinsi}
-          className="pantau-rel min-h-0 border-white/10 bg-pantau-konsol p-4
+          inert={!kiriBuka}
+          className={`pantau-rel min-h-0 border-white/10 bg-pantau-konsol p-4
                      aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10
-                     panggung:overflow-y-auto panggung:overscroll-contain panggung:border-r panggung:py-5"
+                     panggung:h-full panggung:w-[var(--rel-kiri)] panggung:shrink-0
+                     panggung:overflow-y-auto panggung:overscroll-contain panggung:border-r panggung:py-5
+                     transition-opacity duration-300 motion-reduce:transition-none ${kiriBuka ? "opacity-100" : "opacity-0"}`}
         >
           <form role="search" onSubmit={(e) => e.preventDefault()} className="relative">
             <label htmlFor="cari-pantau" className="sr-only">
@@ -273,11 +336,14 @@ export function HalamanPeta({
                                  transition-colors hover:bg-white/[0.06]
                                  focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
                     >
-                      {/* Titik bara menyala hanya yang laporannya ada — rel ini
-                          dibaca sekilas seperti papan status. */}
+                      {/* Titik menyala hanya yang laporannya ada — dibaca sekilas
+                          seperti papan status. Warnanya ikut lapisan aktif:
+                          ungu berbahaya #49006A saat asap, oren bara saat
+                          windy. Ungu pekat butuh cincin terang supaya tak
+                          tenggelam di latar gelap. */}
                       <span
                         aria-hidden="true"
-                        className={`size-1.5 shrink-0 rounded-full ${n > 0 ? "bg-pantau-bara" : "bg-white/15"}`}
+                        className={`size-1.5 shrink-0 rounded-full ${n > 0 ? (asapAktif ? "bg-[#49006a] ring-1 ring-white/40" : "bg-pantau-bara") : "bg-white/15"}`}
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-pantau-tulang">
@@ -292,7 +358,9 @@ export function HalamanPeta({
                       <span
                         className={`shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold ${
                           n > 0
-                            ? "bg-pantau-bara/15 text-pantau-bara"
+                            ? asapAktif
+                              ? "bg-[#49006a] text-white"
+                              : "bg-pantau-bara/15 text-pantau-bara"
                             : "bg-white/[0.06] text-pantau-abu/70"
                         }`}
                       >
@@ -309,49 +377,75 @@ export function HalamanPeta({
             </p>
             ))}
 
-          {/* Peringkat luas terbakar dari model WMS — angkanya berurutan,
-              jadi nomor peringkat di sini membawa informasi, bukan hiasan. */}
-          {teratas.length > 0 && (
-            <div className="mt-6 pb-2">
-              <h2 className="font-mono text-[11px] font-semibold tracking-[0.18em] text-pantau-abu uppercase">
-                {teks.terluas}
-              </h2>
-              <ol className="mt-2 overflow-hidden rounded-xl ring-1 ring-white/10">
-                {teratas.map((p) => {
-                  const nama = namaProvinsiLokal(p.nama);
-                  return (
-                    <li key={p.nama} className="border-b border-white/[0.07] bg-pantau-sumur last:border-0">
-                      <button
-                        type="button" onClick={(e) => pilihProvinsi(nama, e)}
-                        className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors
-                                   hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-pantau-bara
-                                   focus-visible:ring-inset focus-visible:outline-none"
-                      >
-                        <span className="font-mono text-xs font-bold text-pantau-gambut">
-                          {p.peringkat}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] font-semibold text-pantau-tulang">
-                            {nama}
-                          </span>
-                          <span className="block truncate font-mono text-[10.5px] tracking-wider text-pantau-abu/80 uppercase">
-                            {p.pulau}
-                          </span>
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
+          {/* Kabupaten dari layer GeoServer (luas kebakaran), terluas dulu.
+              Kabupaten tak punya pop-up sendiri — menekannya membuka pop-up
+              laporan provinsinya. */}
+          {kabupaten.length > 0 && (
+            <div className="mt-5 border-t border-white/10 pt-4 pb-2">
+              <button
+                type="button"
+                onClick={() => setKabupatenBuka((b) => !b)}
+                aria-expanded={kabupatenBuka}
+                aria-controls="daftar-kabupaten-pantau"
+                className="flex w-full items-center justify-between gap-2 rounded-lg px-1 py-1 text-left
+                           focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
+              >
+                <span className="font-mono text-[11px] font-semibold tracking-[0.18em] text-pantau-abu uppercase">
+                  {teks.kabupaten}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-mono text-[11px] text-pantau-abu/70">
+                    {kunci ? `${daftarKabupaten.length}/${kabupaten.length}` : kabupaten.length}
+                  </span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
+                       strokeLinecap="round" strokeLinejoin="round"
+                       className={`size-3.5 text-pantau-abu/70 transition-transform ${kabupatenBuka ? "" : "-rotate-90"}`}>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </span>
+              </button>
+
+              {kabupatenBuka &&
+                (daftarKabupaten.length > 0 ? (
+                  <ul id="daftar-kabupaten-pantau" className="pantau-rel mt-1 max-h-[300px] overflow-y-auto overscroll-contain">
+                    {daftarKabupaten.map((k) => {
+                      const provinsi = namaProvinsiLokal(k.provinsi);
+                      return (
+                        <li key={`${k.provinsi}-${k.nama}`}>
+                          <button
+                            type="button" onClick={(e) => pilihProvinsi(provinsi, e)}
+                            aria-label={`${k.nama}, ${provinsi}`}
+                            className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left
+                                       transition-colors hover:bg-white/[0.06]
+                                       focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-pantau-tulang">
+                                {k.nama}
+                              </span>
+                              <span className="block truncate font-mono text-[10.5px] tracking-wider text-pantau-abu/80 uppercase">
+                                {provinsi}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="mt-2 rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
+                    {teks.tidakCocok} {teks.cobaLain}
+                  </p>
+                ))}
             </div>
           )}
         </aside>
-        )}
+        </div>
 
         {/* ── Tengah: judul di atas, peta berbingkai di bawahnya ───────
             Di aliran kolom ini naik paling atas: peta adalah pekerjaannya. */}
-        <section id="peta" aria-label={teks.judulHalaman} className="flex min-h-0 flex-col px-1 aliran:order-first panggung:px-5 panggung:py-5">
-          <div className="relative px-1 pt-1 pb-4">
+        <section id="peta" aria-label={teks.judulHalaman} className="relative flex min-h-0 flex-col px-1 aliran:order-first panggung:justify-center panggung:px-2 panggung:py-5">
+          {/*<div className="relative px-1 pt-1 pb-4">
             <div aria-hidden="true" className="pantau-titik pantau-titik--kanan hidden sm:block" />
             <h2 className="relative text-[clamp(19px,1.8vw,26px)] leading-[1.1] font-bold tracking-tight text-white">
               {teks.judulHalaman}
@@ -362,12 +456,17 @@ export function HalamanPeta({
                 {teks.langsung} · {kini ? `${kini} WIB` : "—"} · {total} {satuan}
               </span>
             </p>
-          </div>
+          </div>*/}
 
-          <div className="relative h-[54svh] min-h-0 overflow-hidden rounded-2xl ring-1 ring-white/10 panggung:h-auto panggung:flex-1">
+          {/* Bingkai mengikuti rasio desain (1080×544, ±2:1) dan duduk di
+              tengah kolom — tingginya ikut lebar kolom, bukan sisa ruang.
+              max-h-full menjaga layar pendek agar bingkai tak meluap. */}
+          <div className="relative h-[54svh] min-h-0 overflow-hidden rounded-2xl panggung:aspect-[1080/544] panggung:h-auto panggung:max-h-full">
             <Peta
               jumlahLaporan={jumlahLaporan}
               onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
+              mode={modePeta}
+              onModeChange={setModePeta}
               /* Bingkai tengah lebih sempit dari viewport — legenda yang selalu
                  terbuka menindih bilah waktu, jadi ia jadi cip yang dibuka
                  sendiri seperti di ponsel; pil alih mode pun rapat ke atas
@@ -376,18 +475,23 @@ export function HalamanPeta({
               legendaRingkas
               tombolRapat
               muatNusantara
+              /* Halaman konsol tidak menggulir, jadi roda tetikus bebas
+                 dipakai untuk zoom peta seperti peta biasa. */
+              zoomRoda
             />
-            {/* Tab lipat rel kiri/kanan di tepi bingkai — hanya mode panggung.
-                Di aliran relnya di bawah peta (bukan di samping), jadi tabnya
-                disembunyikan di sana (lihat TabRel). Tengah vertikal bebas
-                dari pil mode (atas), legenda & linimasa (bawah). */}
-            <TabRel
+          </div>
+          {/* Tab lipat rel kiri/kanan mengapung di garis tepi bingkai —
+              separuh di atas peta, separuh di atas rel — jadi ia berada di
+              luar bingkai yang overflow-hidden. Hanya mode panggung: di
+              aliran relnya di bawah peta, bukan di samping (lihat TabRel). */}
+          <TabRel
               sisi="kiri"
               terbuka={kiriBuka}
               kontrol="rel-kiri-pantau"
               labelTutup={bahasa === "en" ? "Collapse province panel" : "Tutup panel provinsi"}
               labelBuka={bahasa === "en" ? "Open province panel" : "Buka panel provinsi"}
               onUbah={() => setKiriBuka((b) => !b)}
+              modePeta={modePeta}
             />
             <TabRel
               sisi="kanan"
@@ -396,60 +500,159 @@ export function HalamanPeta({
               labelTutup={bahasa === "en" ? "Collapse report panel" : "Tutup panel laporan"}
               labelBuka={bahasa === "en" ? "Open report panel" : "Buka panel laporan"}
               onUbah={() => setKananBuka((b) => !b)}
+              modePeta={modePeta}
             />
-          </div>
         </section>
 
         {/* ── Rel kanan: laporan terbaru, tanggal–judul–gambar ─────── */}
-        {kananBuka && (
+        <div className={`min-h-0 panggung:flex panggung:justify-start panggung:overflow-hidden ${kananBuka ? "" : "aliran:hidden"}`}>
         <aside
           id="rel-kanan-pantau"
           data-lenis-prevent
           aria-label={teks.terbaru}
-          className="pantau-rel min-h-0 border-white/10 bg-pantau-konsol p-4 sm:p-5
+          inert={!kananBuka}
+          className={`pantau-rel min-h-0 border-white/10 bg-pantau-konsol p-4 sm:p-5
                      aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10
-                     panggung:overflow-y-auto panggung:overscroll-contain panggung:border-l panggung:py-5"
+                     panggung:h-full panggung:w-[var(--rel-kanan)] panggung:shrink-0
+                     panggung:overflow-y-auto panggung:overscroll-contain panggung:border-l panggung:py-5
+                     transition-opacity duration-300 motion-reduce:transition-none ${kananBuka ? "opacity-100" : "opacity-0"}`}
         >
+          {/* Toolbar: filter terbaru/terpopuler + toggle tampilan */}
+          <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-white/10">
+            {/* Filter Terbaru / Terpopuler — icon buttons */}
+            <div className="flex items-center gap-1 rounded-lg bg-pantau-sumur p-1 ring-1 ring-white/10">
+              {/* Terbaru */}
+              <button
+                type="button"
+                onClick={() => setFilterMedia(filterMedia === "terbaru" ? "semua" : "terbaru")}
+                title={bahasa === "en" ? "Filter: Latest reports" : "Filter: Laporan terbaru"}
+                aria-label={bahasa === "en" ? "Filter: Latest reports" : "Filter: Laporan terbaru"}
+                aria-pressed={filterMedia === "terbaru" || filterMedia === "semua"}
+                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                  filterMedia === "terbaru" || filterMedia === "semua"
+                    ? aksenFilter
+                    : "text-pantau-abu hover:text-pantau-tulang hover:bg-white/10"
+                }`}
+              >
+                {/* Ikon jam */}
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6.5" />
+                  <path d="M8 4.5V8l2.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {/* Terpopuler */}
+              <button
+                type="button"
+                onClick={() => setFilterMedia(filterMedia === "populer" ? "semua" : "populer")}
+                title={bahasa === "en" ? "Filter: Popular reports" : "Filter: Laporan terpopuler"}
+                aria-label={bahasa === "en" ? "Filter: Popular reports" : "Filter: Laporan terpopuler"}
+                aria-pressed={filterMedia === "populer"}
+                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                  filterMedia === "populer"
+                    ? aksenFilter
+                    : "text-pantau-abu hover:text-pantau-tulang hover:bg-white/10"
+                }`}
+              >
+                {/* Ikon api/populer */}
+                <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" aria-hidden="true">
+                  <path d="M8 1.5c-.3 0-.6.2-.7.5l-.9 2.8-2.9-.3c-.3 0-.6.1-.7.4-.1.3 0 .6.2.8l2.2 1.9-1.4 2.5c-.2.3-.1.6.1.8.2.2.5.2.8.1L8 9.2l3.3 1.8c.3.2.6.1.8-.1.2-.2.3-.5.1-.8l-1.4-2.5 2.2-1.9c.2-.2.3-.5.2-.8-.1-.3-.4-.5-.7-.4l-2.9.3-.9-2.8c-.1-.3-.4-.5-.7-.5z" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Toggle kartu / daftar */}
+            <div className="flex items-center gap-1 rounded-lg bg-pantau-sumur p-1 ring-1 ring-white/10">
+              {/* Mode kartu */}
+              <button
+                type="button"
+                onClick={() => setModeRel("kartu")}
+                title={bahasa === "en" ? "Card view" : "Tampilan kartu"}
+                aria-label={bahasa === "en" ? "Card view" : "Tampilan kartu"}
+                aria-pressed={modeRel === "kartu"}
+                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                  modeRel === "kartu"
+                    ? "bg-white/15 text-pantau-tulang"
+                    : "text-pantau-abu hover:text-pantau-tulang hover:bg-white/10"
+                }`}
+              >
+                {/* Ikon kartu besar */}
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14" aria-hidden="true">
+                  <rect x="1" y="1" width="14" height="6" rx="1.2" />
+                  <rect x="1" y="9" width="14" height="6" rx="1.2" />
+                </svg>
+              </button>
+              {/* Mode daftar */}
+              <button
+                type="button"
+                onClick={() => setModeRel("daftar")}
+                title={bahasa === "en" ? "List view" : "Tampilan daftar"}
+                aria-label={bahasa === "en" ? "List view" : "Tampilan daftar"}
+                aria-pressed={modeRel === "daftar"}
+                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                  modeRel === "daftar"
+                    ? "bg-white/15 text-pantau-tulang"
+                    : "text-pantau-abu hover:text-pantau-tulang hover:bg-white/10"
+                }`}
+              >
+                {/* Ikon daftar */}
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="14" height="14" aria-hidden="true">
+                  <line x1="1" y1="3" x2="15" y2="3" strokeLinecap="round" />
+                  <line x1="1" y1="8" x2="15" y2="8" strokeLinecap="round" />
+                  <line x1="1" y1="13" x2="15" y2="13" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
           <h2 className="sr-only">{teks.terbaru}</h2>
           {laporanTampil !== null ? (
             laporanTampil.length > 0 ? (
-              <ul className="divide-y divide-white/10">
+              <ul className={modeRel === "daftar" ? "mt-2 divide-y divide-white/10" : "divide-y divide-white/10"}>
                 {laporanTampil.map((b) => (
                   <li key={b.id} className="py-5 first:pt-0 last:pb-0">
-                    <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                    {modeRel === "kartu"
+                      ? <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                      : <ItemListLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                    }
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
+              <p className="mt-3 rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
                 {teks.tidakCocok} {teks.cobaLain}
               </p>
             )
-          ) : terbaru.length + populer.length > 0 ? (
+          ) : laporanTerbaru.length + laporanPopuler.length > 0 ? (
             <>
-              {terbaru.length > 0 && (
+              {laporanTerbaru.length > 0 && (
                 <section aria-label={teks.terbaru}>
-                  <h3 className="font-mono text-[11px] font-semibold tracking-[0.18em] text-pantau-abu uppercase">
+                  {/*<h3 className="mt-4 font-mono text-[11px] font-semibold tracking-[0.18em] text-pantau-abu uppercase">
                     {teks.terbaru}
-                  </h3>
-                  <ul className="mt-2 divide-y divide-white/10">
-                    {terbaru.map((b) => (
+                  </h3>*/}
+                  <ul className={modeRel === "daftar" ? "mt-2 divide-y divide-white/10" : "mt-2 divide-y divide-white/10"}>
+                    {laporanTerbaru.map((b) => (
                       <li key={b.id} className="py-5 first:pt-0 last:pb-0">
-                        <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                        {modeRel === "kartu"
+                          ? <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                          : <ItemListLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                        }
                       </li>
                     ))}
                   </ul>
                 </section>
               )}
-              {populer.length > 0 && (
-                <section aria-label={teks.populer} className="mt-8 border-t border-white/10 pt-6">
-                  <h3 className="font-mono text-[11px] font-semibold tracking-[0.18em] text-pantau-abu uppercase">
+              {laporanPopuler.length > 0 && (
+                <section aria-label={teks.populer} className="">
+                  {/*<h3 className="font-mono text-[11px] font-semibold tracking-[0.18em] text-pantau-abu uppercase">
                     {teks.populer}
-                  </h3>
-                  <ul className="mt-2 divide-y divide-white/10">
-                    {populer.map((b) => (
+                  </h3>*/}
+                  <ul className={modeRel === "daftar" ? "mt-2 divide-y divide-white/10" : "mt-2 divide-y divide-white/10"}>
+                    {laporanPopuler.map((b) => (
                       <li key={b.id} className="py-5 first:pt-0 last:pb-0">
-                        <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                        {modeRel === "kartu"
+                          ? <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                          : <ItemListLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+                        }
                       </li>
                     ))}
                   </ul>
@@ -457,16 +660,16 @@ export function HalamanPeta({
               )}
             </>
           ) : (
-            <p className="rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
+            <p className="mt-3 rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
               {teks.relKosong}
             </p>
           )}
         </aside>
-        )}
+        </div>
       </div>
 
       {sorot !== null && (
-        <RincianLaporan berita={sorot} bahasa={bahasa} onTutup={tutupRincian} />
+        <RincianLaporan berita={sorot} bahasa={bahasa} onTutup={tutupRincian} gelap />
       )}
 
       {wilayah && (
@@ -482,6 +685,7 @@ export function HalamanPeta({
             if (ketemu) bukaRincian(ketemu);
           }}
           onTutup={() => setWilayah(null)}
+          gelap
         />
       )}
     </div>
@@ -490,36 +694,67 @@ export function HalamanPeta({
 
 /** Tab gagang di tepi bingkai peta untuk melipat/membuka satu rel. Panah
  *  menunjuk arah gerak relnya: ke tepi saat terbuka (klik = lipat), ke tengah
- *  saat terlipat (klik = buka). */
-function TabRel({ sisi, terbuka, kontrol, labelTutup, labelBuka, onUbah }: {
+ *  saat terlipat (klik = buka). Warna mengikuti tema peta: ungu untuk asap,
+ *  hijau untuk windy. */
+function TabRel({ sisi, terbuka, kontrol, labelTutup, labelBuka, onUbah, modePeta }: {
   sisi: "kiri" | "kanan";
   terbuka: boolean;
   kontrol: string;
   labelTutup: string;
   labelBuka: string;
   onUbah: () => void;
+  modePeta: ModePeta;
 }) {
   const label = terbuka ? labelTutup : labelBuka;
   // kiri terbuka → ‹ (lipat ke kiri); kiri tertutup → › (buka ke tengah).
   const keKiri = sisi === "kiri" ? terbuka : !terbuka;
+
+  // Warna tema: ungu #49006a untuk asap, hijau emerald untuk windy — cahaya
+  // bayangannya ikut warna supaya tombol terasa melayang, bukan menempel.
+  const warnaAktif = modePeta === "asap"
+    ? "bg-[#49006a] ring-[#86198f]/60 shadow-[0_6px_20px_rgb(73_0_106/0.65)] hover:ring-[#d946ef]/70 hover:shadow-[0_10px_28px_rgb(134_25_143/0.8)]"
+    : "bg-emerald-700 ring-emerald-400/50 shadow-[0_6px_20px_rgb(4_120_87/0.6)] hover:ring-emerald-300/70 hover:shadow-[0_10px_28px_rgb(16_185_129/0.7)]";
+
   return (
-    <button
-      type="button"
-      onClick={onUbah}
-      aria-expanded={terbuka}
-      aria-controls={kontrol}
-      aria-label={label}
-      title={label}
-      className={`absolute top-1/2 z-[600] hidden -translate-y-1/2 bg-black/70 py-3 text-white/70 ring-1 ring-white/20 backdrop-blur-md transition-colors
-                  hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none panggung:block ${
-                    sisi === "kiri" ? "left-0 rounded-r-lg pr-1 pl-0.5" : "right-0 rounded-l-lg pr-0.5 pl-1"
-                  }`}
+    /* Pembungkus memegang posisi (tepat di garis bingkai); tombol di dalamnya
+       bebas beranimasi apung lewat transform tanpa menimpa translate posisi. */
+    /* Terbuka: berpusat di garis antara rel dan peta. Terlipat: garis itu
+       menempel tepi layar, jadi tombol bergeser masuk utuh ke dalam bingkai
+       supaya tak terpotong. */
+    <span
+      className={`absolute top-1/2 z-[41] hidden -translate-y-1/2 transition-[translate] duration-500
+                  ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none panggung:block ${
+        sisi === "kiri"
+          ? terbuka ? "left-2 -translate-x-1/2" : "left-2 translate-x-2"
+          : terbuka ? "right-2 translate-x-1/2" : "right-2 -translate-x-2"
+      }`}
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4"
-           strokeLinecap="round" strokeLinejoin="round" className="size-3.5">
-        <path d={keKiri ? "m14 6-6 6 6 6" : "m10 6 6 6-6 6"} />
-      </svg>
-    </button>
+      <button
+        type="button"
+        onClick={onUbah}
+        aria-expanded={terbuka}
+        aria-controls={kontrol}
+        aria-label={label}
+        title={label}
+        className={`group flex size-9 items-center justify-center rounded-full text-white ring-1 ring-inset
+                    transition-[scale,box-shadow,background-color] duration-300 ease-out
+                    hover:scale-110 active:scale-90
+                    focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+                    motion-safe:animate-[tab-rel-apung_3.2s_ease-in-out_infinite] hover:[animation-play-state:paused]
+                    ${warnaAktif}`}
+      >
+        {/* Satu panah yang berputar 180° — arah berganti dengan gerak,
+            bukan lompatan bentuk. Saat hover ia menyenggol ke arah rel akan
+            bergerak. */}
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5"
+             strokeLinecap="round" strokeLinejoin="round"
+             className={`size-4 transition-[rotate,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+               keKiri ? "rotate-0 group-hover:-translate-x-0.5" : "rotate-180 group-hover:translate-x-0.5"
+             }`}>
+          <path d="m14 6-6 6 6 6" />
+        </svg>
+      </button>
+    </span>
   );
 }
 
@@ -748,5 +983,79 @@ function VideoKeping({ url, poster, label }: { url: string; poster: string | nul
                     group-hover:scale-[1.03] ${siap ? "opacity-100" : "opacity-0"}`}
       />
     </span>
+  );
+}
+
+/** Satu baris daftar rel kanan (mode list): thumbnail kecil kiri + tanggal–judul
+ *  kanan. Thumbnail menampilkan badge video kalau ada. Tanpa galeri titik —
+ *  ruangnya terlalu sempit untuk itu. */
+function ItemListLaporan({ b, bukaLabel, onBuka }: { b: Berita; bukaLabel: string; onBuka: () => void }) {
+  const item = b.media[0];
+  const adalahVideo = item?.jenis === "video" || !!b.video;
+  const gambar = item?.jenis === "video" ? (item.poster ?? b.poster ?? b.gambar) : (item?.url ?? b.gambar ?? b.poster);
+  const [imgKeadaan, setImgKeadaan] = useState<"memuat" | "ok" | "gagal">("memuat");
+
+  const pasangImg = useCallback((el: HTMLImageElement | null) => {
+    if (el && el.complete) {
+      setImgKeadaan(el.naturalWidth > 0 ? "ok" : "gagal");
+    }
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={onBuka}
+      title={bukaLabel}
+      aria-label={`${b.judul} — ${bukaLabel}`}
+      className="group flex w-full items-center gap-3 rounded-xl px-1 py-1.5 text-left transition-colors
+                 hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2
+                 focus-visible:ring-pantau-bara focus-visible:ring-offset-2 focus-visible:ring-offset-pantau-konsol"
+    >
+      {/* Thumbnail kotak 44×44 */}
+      <span className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-pantau-sumur">
+        {gambar && imgKeadaan !== "gagal" && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            ref={pasangImg}
+            src={gambar}
+            alt=""
+            loading="lazy"
+            onLoad={() => setImgKeadaan("ok")}
+            onError={() => setImgKeadaan("gagal")}
+            className={`absolute inset-0 h-full w-full object-cover transition duration-300 ${
+              imgKeadaan === "ok" ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        )}
+        {adalahVideo && (
+          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
+            <span className="flex size-5 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm ring-1 ring-white/25">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="size-2.5 text-white">
+                <polygon points="6 4 20 12 6 20" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </span>
+        )}
+      </span>
+
+      {/* Teks */}
+      <span className="min-w-0 flex-1">
+        <span className="block font-mono text-[10px] tracking-[0.08em] text-pantau-abu uppercase">
+          {b.tanggal}
+          {b.provinsi && (
+            <> · <span className="text-pantau-abu/70">{b.provinsi}</span></>
+          )}
+        </span>
+        <span className="mt-0.5 block truncate text-[13px] font-semibold leading-snug text-pantau-tulang">
+          {b.judul}
+        </span>
+      </span>
+
+      {/* Panah buka */}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+           strokeLinejoin="round" className="size-3.5 shrink-0 text-pantau-abu/50 transition-colors group-hover:text-pantau-abu" aria-hidden="true">
+        <path d="m9 6 6 6-6 6" />
+      </svg>
+    </button>
   );
 }

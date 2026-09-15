@@ -1,5 +1,5 @@
 import type { Berita } from "./events";
-import type { ProvinsiTeratas } from "./wms";
+import type { KabupatenTerluas, ProvinsiTeratas } from "./wms";
 
 /**
  * Data contoh untuk pratinjau /peta tanpa basis data (mis. deploy Vercel
@@ -76,6 +76,14 @@ export const TERATAS_CONTOH: ProvinsiTeratas[] = [
   { peringkat: 1, nama: "Kalimantan Tengah", pulau: "Kalimantan", luas: "12.400" },
   { peringkat: 2, nama: "Riau", pulau: "Sumatra", luas: "8.150" },
   { peringkat: 3, nama: "Kalimantan Barat", pulau: "Kalimantan", luas: "5.320" },
+];
+
+export const KABUPATEN_CONTOH: KabupatenTerluas[] = [
+  { nama: "Kapuas", provinsi: "Kalimantan Tengah", luas: "11.850" },
+  { nama: "Pelalawan", provinsi: "Riau", luas: "8.150" },
+  { nama: "Ogan Komering Ilir", provinsi: "Sumatera Selatan", luas: "6.900" },
+  { nama: "Ketapang", provinsi: "Kalimantan Barat", luas: "5.320" },
+  { nama: "Merauke", provinsi: "Papua Selatan", luas: "4.100" },
 ];
 
 /** true kalau deploy ini memakai data contoh (tanpa basis data). */

@@ -13,10 +13,14 @@ export function RincianLaporan({
   berita,
   bahasa = "id",
   onTutup,
+  gelap = false,
 }: {
   berita: Berita;
   bahasa?: Bahasa;
   onTutup: () => void;
+  /** true = rel kanan abu gelap (#1e1e1e) senada konsol /peta. Bawaan false
+   *  supaya beranda dan /fire tetap putih. */
+  gelap?: boolean;
 }) {
   const kurangiGerak = useKurangiGerak();
   const [toastTersalin, setToastTersalin] = useState(false);
@@ -89,7 +93,7 @@ export function RincianLaporan({
        menelan roda dengan preventDefault; satu atribut di akar ini
        mengecualikan seluruh panel — rel kanan dan badan komentarnya — dari
        penangkapan itu, jadi keduanya bisa menggulir secara native. */
-    <div className="rincian" data-lenis-prevent
+    <div className={gelap ? "rincian rincian--gelap" : "rincian"} data-lenis-prevent
          onClick={(e) => { if (e.target === e.currentTarget) onTutup(); }}>
       <div role="dialog" aria-modal="true" aria-label="Rincian laporan karhutla" className="rincian__panel">
         {toastTersalin && (
@@ -109,8 +113,8 @@ export function RincianLaporan({
           ) : (
             // Tanpa media apa pun: tidak menampilkan foto dummy — kotak
             // medianya memuat petunjuk lokasi saja.
-            <div className="flex h-full min-h-[140px] items-center justify-center bg-[linear-gradient(150deg,#eef1f4,#d7dee4)]">
-              <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-black/45">
+            <div className={`flex h-full min-h-[140px] items-center justify-center ${gelap ? "bg-[linear-gradient(150deg,#18181b,#27272a)]" : "bg-[linear-gradient(150deg,#eef1f4,#d7dee4)]"}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${gelap ? "bg-white/10 text-white/60" : "bg-white/70 text-black/45"}`}>
                 {berita.lokasi || "Belum ada foto"}
               </span>
             </div>

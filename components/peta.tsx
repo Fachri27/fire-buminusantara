@@ -16,6 +16,11 @@ const PetaAsap = dynamic(
 
 import type { Berita } from "@/lib/events";
 
+/** Mode lapisan peta — diangkat ke luar supaya konsol /peta bisa
+ *  menyelaraskan aksen rel kiri (titik + badge) dengan tema lapisan aktif:
+ *  asap = ungu berbahaya #49006A, windy = oren bara. */
+export type ModePeta = "asap" | "windy";
+
 type Props = {
   jumlahLaporan: Record<string, number>;
   onPilihWilayah: (nama: string, pulau: string | null, asal: { x: number; y: number }) => void;
@@ -30,10 +35,21 @@ type Props = {
    *  (beranda) pil butuh jarak top-20 agar lolos dari nav yang fixed; di
    *  dalam bingkai dasbor jarak itu membuatnya melayang di tengah peta. */
   tombolRapat?: boolean;
+  /** Mode lapisan terkontrol — kalau diisi, pil hanya memanggil
+   *  onModeChange dan tampilan ikut prop ini. Kalau kosong (beranda),
+   *  komponen memakai state dalamnya sendiri seperti dulu. */
+  mode?: ModePeta;
+  onModeChange?: (m: ModePeta) => void;
+  /** Diteruskan ke PetaAsap — roda tetikus memperbesar peta. */
+  zoomRoda?: boolean;
 };
 
-export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false }: Props) {
-  const [mode, setMode] = useState<"asap" | "windy">("asap");
+export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false }: Props) {
+  const [modeDalam, setModeDalam] = useState<ModePeta>("asap");
+  // Terkendali kalau induk mengisi prop mode (+ onModeChange) — kalau tidak,
+  // fallback ke state dalam supaya pemakaian lama (beranda) tak berubah.
+  const terkendali = modeLuar !== undefined && onModeChange !== undefined;
+  const mode = terkendali ? modeLuar : modeDalam;
   const [hasOpenedWindy, setHasOpenedWindy] = useState(false);
   const [windySrc, setWindySrc] = useState<string>("/api/forecasting?lat=0.200&lon=118.000&zoom=5");
   const [sedangSyncAsap, setSedangSyncAsap] = useState(true);
@@ -50,8 +66,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
 
   // Aktifkan pemuatan iframe saat pertama kali beralih ke mode Windy
-  const handlePilihMode = (m: "asap" | "windy") => {
-    setMode(m);
+  const handlePilihMode = (m: ModePeta) => {
+    if (terkendali) onModeChange?.(m);
+    else setModeDalam(m);
     if (m === "windy") {
       if (!hasOpenedWindy && typeof window !== "undefined") {
         const isMobile = window.innerWidth < 640;
@@ -178,7 +195,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   return (
     <div
       onContextMenu={(e) => e.preventDefault()}
-      className="relative h-full w-full overflow-hidden bg-[#0a0f18]"
+      className="relative h-full w-full overflow-hidden bg-black"
     >
       {/* Tombol Alih Mode Layer Peta & Info Perbedaan */}
       <div className={`pointer-events-auto absolute left-4 z-[450] flex items-center gap-1.5 sm:gap-2 sm:left-6 ${tombolRapat ? "top-4" : "top-20"}`}>
@@ -248,7 +265,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           onClick={() => setBukaInfoPerbedaan(false)}
         >
           <div
-            className="relative w-full max-w-lg max-h-[calc(100svh-2rem)] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0d1117]/95 p-4 sm:p-5 shadow-2xl text-white backdrop-blur-md"
+            className="relative w-full max-w-lg max-h-[calc(100svh-2rem)] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-pantau-konsol p-4 sm:p-5 shadow-2xl text-white"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -368,6 +385,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           onSyncChange={setSedangSyncAsap}
           legendaRingkas={legendaRingkas}
           muatNusantara={muatNusantara}
+          zoomRoda={zoomRoda}
         />
       </div>
 
@@ -395,7 +413,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           />
         )}
         {mode === "windy" && memuatWindy && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#0a0f18]/85 transition-opacity duration-500">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/85 transition-opacity duration-500">
             <div className="flex items-center gap-3 rounded-full bg-black/75 px-5 py-2.5 text-sm text-white/90 shadow-xl ring-1 ring-white/15">
               <svg
                 className="h-4 w-4 animate-spin text-api"

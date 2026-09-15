@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ambilRelKanan, ambilSemuaBerita, hitungLaporanProvinsi } from "@/lib/events";
-import { ambilTigaTeratas } from "@/lib/wms";
+import { ambilKabupaten } from "@/lib/wms";
 import { HalamanPeta } from "@/components/halaman-peta";
 import { KerangkaPeta } from "@/components/kerangka-peta";
 import { Nav } from "@/components/nav";
@@ -69,11 +69,11 @@ async function IsiHalaman({ params }: Props) {
   const { locale } = await params;
   const bahasa: Bahasa = adaBahasa(locale) ? locale : "id";
   await connection();
-  const [rel, semuaBerita, jumlahLaporan, teratas] = await Promise.all([
+  const [rel, semuaBerita, jumlahLaporan, kabupaten] = await Promise.all([
     ambilRelKanan(),
     ambilSemuaBerita(),
     hitungLaporanProvinsi(),
-    ambilTigaTeratas(),
+    ambilKabupaten(),
   ]);
 
   return (
@@ -82,7 +82,7 @@ async function IsiHalaman({ params }: Props) {
       terbaru={rel.terbaru}
       populer={rel.populer}
       jumlahLaporan={jumlahLaporan}
-      teratas={teratas}
+      kabupaten={kabupaten}
       bahasa={bahasa}
     />
   );

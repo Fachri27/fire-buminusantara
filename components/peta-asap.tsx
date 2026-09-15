@@ -32,6 +32,10 @@ type Props = {
    *  Sabang–Merauke, bukan tampilan dekat bawaan. Dipakai konsol /peta yang
    *  bingkainya sempit: zoom bawaan memotong Papua. */
   muatNusantara?: boolean;
+  /** true = roda tetikus memperbesar/memperkecil peta seperti peta biasa.
+   *  Dipakai konsol /peta yang halamannya tidak menggulir. Bawaan false:
+   *  beranda meneruskan roda ke guliran halaman (Lenis). */
+  zoomRoda?: boolean;
 };
 
 // GLSL Vertex Shader: Quad koordinat Mercator dunia [0, 1] dikalikan matriks proyeksi MapLibre GL
@@ -257,9 +261,23 @@ const BATAS_NUSANTARA: [[number, number], [number, number]] = [
   [141.5, 6.5],
 ];
 
-/** Ruang aman di dalam bingkai saat memuat Nusantara: pil mode di atas,
- *  bilah waktu di bawah. */
-const SELA_NUSANTARA = { top: 70, bottom: 120, left: 24, right: 24 };
+/** Ruang di sekeliling Nusantara saat memuatnya. Di bingkai lebar ia
+ *  proporsional terhadap ukuran bingkai supaya komposisinya sama di layar
+ *  mana pun: Nusantara ~54% lebar, bergeser ke kiri-atas, menyisakan daratan
+ *  Asia Tenggara di atas dan Australia di bawah sebagai konteks gerak asap
+ *  (kanan & bawah lebih lega karena legenda dan bilah waktu ada di sana).
+ *  Di bingkai sempit (ponsel) ruang tetap: pil mode di atas, bilah waktu di
+ *  bawah — sela proporsional di sana membuat Nusantara terlalu kecil. */
+function selaNusantara(map: maplibregl.Map) {
+  const { clientWidth: w, clientHeight: h } = map.getContainer();
+  if (w < 640) return { top: 70, bottom: 120, left: 24, right: 24 };
+  return {
+    top: Math.round(h * 0.3),
+    bottom: Math.round(h * 0.34),
+    left: Math.round(w * 0.17),
+    right: Math.round(w * 0.29),
+  };
+}
 
 const SINKRON_SELESAI_KEY = "cams_sebaran_asap_selesai";
 const METADATA_CACHE_KEY = "cams_sebaran_asap_metadata";
@@ -288,7 +306,7 @@ let globalZarrMetadata: ZarrMetadataResponse | null = null;
 const globalFrameCache: Record<string, Uint8Array> = {};
 let globalSyncSelesai = false;
 
-export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false }: Props) {
+export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false }: Props) {
   const wadahPetaRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const onPilihRef = useRef(onPilihWilayah);
@@ -322,6 +340,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   }, [jumlahLaporan]);
 
   const muatNusantaraRef = useRef(muatNusantara);
+  // Dibaca sekali saat peta dibuat — pemakainya tak pernah mengganti mode ini.
+  const zoomRodaRef = useRef(zoomRoda);
   useEffect(() => {
     muatNusantaraRef.current = muatNusantara;
   }, [muatNusantara]);
@@ -810,7 +830,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           id: "background",
           type: "background",
           paint: {
-            "background-color": "#070c14",
+            "background-color": "#000000",
           },
         },
         {
@@ -849,10 +869,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     mapRef.current = map;
     (window as unknown as { _maplibreMap?: maplibregl.Map })._maplibreMap = map;
 
+    // Zoom roda bawaan MapLibre (halus, berpusat di kursor) untuk konsol /peta.
+    if (zoomRodaRef.current) map.scrollZoom.enable();
+
     // Mode Nusantara: bingkai sempit langsung memuat Sabang–Merauke, dihitung
     // dari ukuran wadah yang sebenarnya (bukan zoom tebakan).
     if (muatNusantaraRef.current) {
-      map.fitBounds(BATAS_NUSANTARA, { padding: SELA_NUSANTARA, duration: 0 });
+      map.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(map), duration: 0 });
     }
 
     // Custom WebGL Layer untuk Asap Karhutla CAMS Global
@@ -1244,6 +1267,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
     // Handler event wheel untuk meneruskan scroll halaman (Lenis)
     const handleWheel = (e: WheelEvent) => {
+      // Zoom roda aktif: biarkan MapLibre yang menangani, jangan diteruskan.
+      if (zoomRodaRef.current) return;
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         if (e.deltaY < 0) map.zoomIn();
@@ -1442,7 +1467,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const persentaseCache = Math.round((jumlahFrameTerunduh / Math.max(1, linimasa.length)) * 100);
 
   return (
-    <div className="relative h-full w-full select-none overflow-hidden bg-[#070c14]">
+    <div className="relative h-full w-full select-none overflow-hidden bg-black">
       {/* Wadah Peta MapLibre GL */}
       <div ref={wadahPetaRef} className="absolute inset-0 h-full w-full" />
 
@@ -1504,7 +1529,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           type="button"
           onClick={() => {
             if (muatNusantaraRef.current) {
-              mapRef.current?.fitBounds(BATAS_NUSANTARA, { padding: SELA_NUSANTARA, duration: 800 });
+              if (mapRef.current) {
+                mapRef.current.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(mapRef.current), duration: 800 });
+              }
               return;
             }
             const pos = getInitialMapPos();
@@ -1740,7 +1767,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       {/* Kontrol Linimasa Animasi — di konsol dasbor rata kiri dan menyisakan
           ruang panel legenda di kanan (berdampingan, bukan bertindih); di
           layar kecil tetap selebar bingkai seperti pola ponsel. */}
-      <div className={`pointer-events-auto absolute bottom-4 z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-[#0c121e]/90 p-2 shadow-2xl backdrop-blur-xl sm:px-4 sm:py-3 ${
+      <div className={`pointer-events-auto absolute bottom-4 z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-pantau-konsol/90 p-2 shadow-2xl backdrop-blur-xl sm:px-4 sm:py-3 ${
         legendaRingkas
           ? /* Dasbor: lebar dibatasi, dan dipusatkan di ruang antara tepi
                bingkai dan panel legenda (257px = lebar panel pasca-zoom +

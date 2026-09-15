@@ -699,7 +699,7 @@ export async function GET(req: NextRequest) {
           margin: 0 !important;
           padding: 0 !important;
           overflow: hidden !important;
-          background-color: #0a0f18 !important;
+          background-color: #000000 !important;
         }
 
         /* I. Administrative Polygon Styling */

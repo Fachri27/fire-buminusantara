@@ -34,13 +34,9 @@ export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
           </div>
         </div>
 
-        {/* Tengah: judul + bingkai peta */}
-        <div className="flex min-h-0 flex-col px-1 aliran:order-first panggung:px-5 panggung:py-5">
-          <div className="px-1 pt-1 pb-4">
-            <div className="h-9 w-3/4 rounded-lg bg-white/[0.08]" />
-            <div className="mt-2.5 h-3.5 w-56 rounded bg-white/[0.06]" />
-          </div>
-          <div className="h-[62svh] rounded-2xl bg-pantau-sumur ring-1 ring-white/10 panggung:h-auto panggung:flex-1" />
+        {/* Tengah: bingkai peta berasio desain, di tengah kolom */}
+        <div className="flex min-h-0 flex-col px-1 aliran:order-first panggung:justify-center panggung:px-2 panggung:py-5">
+          <div className="h-[54svh] rounded-2xl bg-pantau-sumur ring-1 ring-white/10 panggung:aspect-[1080/544] panggung:h-auto panggung:max-h-full" />
         </div>
 
         {/* Rel kanan */}

@@ -146,12 +146,12 @@ export function Nav({ bahasa, gelap = false }: Props) {
   return (
     <header
       aria-label={teks.navigasi}
-      className={`fixed top-0 left-0 z-50 h-16 w-full backdrop-blur-md transition-all duration-200 ${
+      className={`fixed top-0 left-0 z-50 h-16 w-full transition-all duration-200 ${
         gelap
-          ? "border-b border-white/10 bg-[#141414]/95"
+          ? "border-b border-white/10 bg-pantau-konsol"
           : tergulir
-            ? "bg-white/80 border-b border-black/[0.08] shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]"
-            : "bg-white/80 border-b border-black/[0.03]"
+            ? "bg-white/80 border-b border-black/[0.08] shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] backdrop-blur-md"
+            : "bg-white/80 border-b border-black/[0.03] backdrop-blur-md"
       }`}
     >
       <div className={`mx-auto flex h-full items-center justify-between gap-4 ${

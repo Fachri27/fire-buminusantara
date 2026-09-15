@@ -102,7 +102,7 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
                             w-full flex-col justify-center overflow-hidden"
         >
           <div className="kabur-tepi pointer-events-none" aria-hidden="true" />
-          <div className="absolute inset-0 h-full w-full animate-pulse bg-[#0a0f18]/85" />
+          <div className="absolute inset-0 h-full w-full animate-pulse bg-black/85" />
 
           {/* Kolom pencarian mengambang (khusus mobile, desktop tersembunyi) */}
           <div className="pointer-events-none absolute inset-x-0 top-[clamp(64px,11vh,92px)] z-[20] flex justify-center px-4 md:hidden panggung:hidden">

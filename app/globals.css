@@ -54,16 +54,18 @@
   --color-peta-5: #90101a;
   --color-peta-tanpa-data: #d5d2cb;
 
-  /* Palet dasbor pantau (/peta) — "ruang pantau gambut larut malam". Arang
-     kebiruan (bukan hitam pekat), teks tulang hangat (bukan putih), bara
-     untuk yang hidup, gambut untuk peringkat luas terbakar. */
-  --color-pantau-malam: #0e1219;
-  --color-pantau-konsol: #151b26;
-  --color-pantau-sumur: #0a0e14;
-  --color-pantau-tulang: #ece7d9;
-  --color-pantau-abu: #9aa4b4;
+  /* Palet dasbor pantau (/peta) — mengikuti referensi: hanya dua nada.
+     malam/sumur = hitam murni (#000) untuk tengah + search/sumur/placeholder,
+     konsol = abu netral (#1e1e1e) untuk rel kiri/kanan + header. List dibuat
+     flat di atas rel (tanpa pil hitam) seperti referensi. Teks netral
+     (bukan kebiruan / kekuningan) supaya putih-abu sesuai referensi. */
+  --color-pantau-malam: #000000;
+  --color-pantau-konsol: #1e1e1e;
+  --color-pantau-sumur: #000000;
   --color-pantau-bara: #ff5a26;
   --color-pantau-gambut: #9db35c;
+  --color-pantau-abu: #a0a0a0;
+  --color-pantau-tulang: #f5f5f5;
 }
 
 /* ── Token tata letak ─────────────────────────────────────────────────────
@@ -248,6 +250,13 @@ html.lenis body {
   .animate-pulse {
     animation: none;
   }
+}
+
+/* Tab lipat rel /peta (TabRel) — apung pelan naik-turun. Dipasang lewat
+   motion-safe:, jadi pengurang gerak tak pernah menjalankannya. */
+@keyframes tab-rel-apung {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 /* ── Kerangka beranda, mode panggung ──────────────────────────────────────
