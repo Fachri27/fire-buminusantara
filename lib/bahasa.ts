@@ -16,7 +16,7 @@ export const TEKS_NAV = {
   id: {
     navigasi: "Navigasi utama",
     awal: "Ke awal halaman",
-    merek: "Kebakaran Hutan dan Lahan",
+    merek: "Lapor Karhutla",
     bagian: {
       beranda: "Beranda",
       peta: "Peta Sebaran",
@@ -29,7 +29,7 @@ export const TEKS_NAV = {
   en: {
     navigasi: "Main navigation",
     awal: "Back to top",
-    merek: "Forest and Land Fires",
+    merek: "Report Wildfire",
     bagian: {
       beranda: "Home",
       peta: "Spread Map",

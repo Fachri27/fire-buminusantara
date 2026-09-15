@@ -23,19 +23,6 @@ type WilayahDipilih = { nama: string; pulau: string | null; asal: { x: number; y
 /** Hasil pencarian di rel kanan — dibatasi supaya tetap terpindai. */
 const BATAS_CARI = 10;
 
-/** Provinsi yang tampil di rel kiri saat tidak mencari — wilayah langganan
- *  karhutla (gambut Sumatra–Kalimantan, sabana Papua Selatan), urut barat ke
- *  timur. Kotak cari tetap menjangkau seluruh provinsi. */
-const WILAYAH_RAWAN = [
-  "Riau",
-  "Sumatera Selatan",
-  "Kalimantan Barat",
-  "Kalimantan Tengah",
-  "Kalimantan Timur",
-  "Kalimantan Utara",
-  "Papua Selatan",
-];
-
 /**
  * Konsol pantau karhutla — tiga kolom terkunci satu viewport.
  *
@@ -74,9 +61,11 @@ export function HalamanPeta({
   // Laporan yang pop-up rinciannya terbuka, atau null — sama seperti beranda.
   const [sorot, setSorot] = useState<Berita | null>(null);
   const [cari, setCari] = useState("");
-  // Daftar kabupaten terlipat di bawah judulnya sampai ditekan (atau sampai
-  // pengunjung mencari) — 383 baris terlalu panjang untuk tampil begitu saja.
-  const [kabupatenBuka, setKabupatenBuka] = useState(false);
+  // Daftar kabupaten tampil sejak awal (rel gulirnya sendiri, 300px) dan bisa
+  // dilipat lewat judulnya; saat mencari ia selalu terbuka.
+  const [kabupatenBuka, setKabupatenBuka] = useState(true);
+  // Sama untuk daftar provinsi: tampil sejak awal, bisa dilipat lewat judulnya.
+  const [provinsiBuka, setProvinsiBuka] = useState(true);
   // Kedua rel bisa dilipat seluruhnya supaya peta lebih lega — dibuka lagi
   // lewat tab di tepi bingkai peta. Peta mengikuti sendiri (ResizeObserver
   // bawaan MapLibre), tak perlu resize manual.
@@ -112,18 +101,17 @@ export function HalamanPeta({
     );
   }, [kabupaten, kunci]);
 
-  /* Tanpa kata kunci: wilayah rawan saja. Saat mencari: seluruh provinsi,
-     terbanyak laporannya dulu dengan abjad sebagai penyeimbang — urutan yang
-     sama dengan daftar pilihan di pop-up wilayah. */
+  /* Seluruh provinsi, terbanyak laporannya dulu dengan abjad sebagai
+     penyeimbang — urutan yang sama dengan daftar pilihan di pop-up wilayah.
+     Saat mencari, disaring lewat nama provinsi atau kabupatennya. */
   const daftarProvinsi = useMemo(() => {
-    if (!kunci) return WILAYAH_RAWAN;
-    return [...PROVINSI_PETA_NAMA]
-      .sort(
-        (a, b) =>
-          (jumlahLaporan[b] ?? 0) - (jumlahLaporan[a] ?? 0) ||
-          a.localeCompare(b, "id"),
-      )
-      .filter((n) => ringkasNamaProvinsi(n).includes(kunci) || provinsiKabupatenCocok.has(n));
+    const semua = [...PROVINSI_PETA_NAMA].sort(
+      (a, b) =>
+        (jumlahLaporan[b] ?? 0) - (jumlahLaporan[a] ?? 0) ||
+        a.localeCompare(b, "id"),
+    );
+    if (!kunci) return semua;
+    return semua.filter((n) => ringkasNamaProvinsi(n).includes(kunci) || provinsiKabupatenCocok.has(n));
   }, [jumlahLaporan, kunci, provinsiKabupatenCocok]);
 
   /* Kabupaten ikut kotak cari yang sama — cocok lewat nama kabupaten atau
@@ -302,21 +290,39 @@ export function HalamanPeta({
                 document.getElementById("rel-kanan-pantau")?.scrollTo({ top: 0 });
               }}
               aria-pressed={filterMedia === "terbaru"}
-              className="block w-full rounded-md px-3 pb-1.5 text-left text-base leading-snug text-pantau-tulang
-                         transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+              className="block w-full rounded-md px-3 pb-1.5 text-left text-base leading-snug font-semibold text-white
+                         transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
             >
               {teks.terbaru}
             </button>
 
             <div className="relative pt-2 before:absolute before:top-0 before:right-0 before:left-3 before:border-t before:border-white/15">
-              <h2 className="px-3 pb-1 text-base leading-snug text-pantau-tulang">{teks.provinsi}</h2>
-              {daftarProvinsi.length > 0 ? (
-                <ul id="daftar-provinsi-pantau" className="pb-3">
+              {/* Judul kelompok tebal & putih penuh; nama di bawahnya lebih kecil
+                  dan redup — dua tingkat yang terbaca sekilas. */}
+              <h2>
+                <button
+                  type="button"
+                  onClick={() => setProvinsiBuka((b) => !b)}
+                  aria-expanded={provinsiBuka || Boolean(kunci)}
+                  aria-controls="daftar-provinsi-pantau"
+                  className="flex w-full items-center justify-between gap-2 rounded-md px-3 pb-1 text-left text-base leading-snug font-semibold text-white
+                             transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+                >
+                  {teks.provinsi}
+                  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
+                       strokeLinecap="round" strokeLinejoin="round"
+                       className={`size-3.5 shrink-0 text-white/50 transition-transform ${provinsiBuka || kunci ? "" : "-rotate-90"}`}>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </button>
+              </h2>
+              {(provinsiBuka || kunci) && (daftarProvinsi.length > 0 ? (
+                <ul id="daftar-provinsi-pantau" className="pantau-rel max-h-[300px] overflow-y-auto overscroll-contain pb-3">
                   {daftarProvinsi.map((nama) => (
                     <li key={nama}>
                       <button
                         type="button" onClick={(e) => pilihProvinsi(nama, e)}
-                        className="block w-full truncate rounded-md py-[3px] pr-2 pl-[18px] text-left text-[14.5px] leading-snug text-pantau-tulang
+                        className="block w-full truncate rounded-md py-[3px] pr-2 pl-[18px] text-left text-[13.5px] leading-snug text-white/70
                                    transition-colors hover:bg-white/[0.06] hover:text-white
                                    focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
                       >
@@ -329,11 +335,12 @@ export function HalamanPeta({
                 <p className="px-[18px] pb-3 text-[13px] leading-relaxed text-pantau-abu">
                   {teks.tidakCocok} {teks.cobaLain}
                 </p>
-              )}
+              ))}
             </div>
 
             {/* Kabupaten dari layer GeoServer (luas kebakaran), terluas dulu.
-                Terlipat di bawah judulnya; terbuka sendiri saat mencari.
+                Terbuka sejak awal dan bisa dilipat lewat judulnya; selalu
+                terbuka saat mencari.
                 Kabupaten tak punya pop-up sendiri — menekannya membuka pop-up
                 laporan provinsinya. */}
             {kabupaten.length > 0 && (
@@ -343,10 +350,15 @@ export function HalamanPeta({
                   onClick={() => setKabupatenBuka((b) => !b)}
                   aria-expanded={kabupatenBuka || Boolean(kunci)}
                   aria-controls="daftar-kabupaten-pantau"
-                  className="block w-full rounded-md px-3 pb-1 text-left text-base leading-snug text-pantau-tulang
-                             transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+                  className="flex w-full items-center justify-between gap-2 rounded-md px-3 pb-1 text-left text-base leading-snug font-semibold text-white
+                             transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
                 >
                   {teks.kabupaten}
+                  <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
+                       strokeLinecap="round" strokeLinejoin="round"
+                       className={`size-3.5 shrink-0 text-white/50 transition-transform ${kabupatenBuka || kunci ? "" : "-rotate-90"}`}>
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
                 </button>
 
                 {(kabupatenBuka || kunci) &&
@@ -360,7 +372,7 @@ export function HalamanPeta({
                               type="button" onClick={(e) => pilihProvinsi(provinsi, e)}
                               aria-label={`${k.nama}, ${provinsi}`}
                               title={provinsi}
-                              className="block w-full truncate rounded-md py-[3px] pr-2 pl-[18px] text-left text-[14.5px] leading-snug text-pantau-tulang
+                              className="block w-full truncate rounded-md py-[3px] pr-2 pl-[18px] text-left text-[13.5px] leading-snug text-white/70
                                          transition-colors hover:bg-white/[0.06] hover:text-white
                                          focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
                             >
