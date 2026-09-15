@@ -868,6 +868,11 @@ export async function GET(req: NextRequest) {
         #custom-zoom-controls button:active {
           transform: scale(0.95);
         }
+        ${konsol ? `/* Konsol /peta: samakan ukuran tombol dengan tombol navigasi
+           lapisan Aerosol (28px + ikon 13px, sela 8px). */
+        #custom-zoom-controls { gap: 8px; }
+        #custom-zoom-controls button { width: 28px; height: 28px; }
+        #custom-zoom-controls button svg { width: 13px; height: 13px; }` : ""}
 
         /* MOBILE: Pastikan sentuhan pan dan pinch-to-zoom di perangkat sentuh mulus dan responsif */
         @media (pointer: coarse), (max-width: 640px) {
