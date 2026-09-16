@@ -158,12 +158,14 @@ export async function ambilBerita(limit = 10): Promise<Berita[]> {
 export async function ambilRelKanan(
   baru = 5,
   ramai = 5,
-): Promise<{ terbaru: Berita[]; populer: Berita[] }> {
+): Promise<{ terbaru: Berita[]; populer: Berita[]; komentar: Record<string, number> }> {
   // Mode contoh (PETA_DUMMY=1, mis. pratinjau Vercel tanpa basis data):
   // kembalikan data statis supaya halaman tetap tampil penuh.
   if (process.env.PETA_DUMMY === "1") {
     const { TERBARU_CONTOH, POPULER_CONTOH } = await import("./contoh-peta");
-    return { terbaru: TERBARU_CONTOH.slice(0, baru), populer: POPULER_CONTOH.slice(0, ramai) };
+    // Tanpa basis data tak ada komentar: peringkat kosong berarti filter
+    // "populer" jatuh ke urutan bawaan (terbaru dulu), bukan daftar kosong.
+    return { terbaru: TERBARU_CONTOH.slice(0, baru), populer: POPULER_CONTOH.slice(0, ramai), komentar: {} };
   }
 
   const [semua, hitung] = await Promise.all([
@@ -193,6 +195,11 @@ export async function ambilRelKanan(
   return {
     terbaru: terbaru.map((b) => keBerita(b as Baris)),
     populer: populer.map((b) => keBerita(b as Baris)),
+    /* Peringkatnya, bukan laporannya: rel kanan mode arsip penuh mengurutkan
+       `berita` yang sudah ada di klien dengan angka ini. Mengirim daftar
+       laporan populer yang panjang berarti objek yang sama dikirim dua kali
+       dalam satu muatan halaman. Hanya laporan berkomentar yang terdaftar. */
+    komentar: Object.fromEntries(jumlahKomentar),
   };
 }
 

@@ -81,6 +81,7 @@ async function IsiHalaman({ params }: Props) {
       berita={semuaBerita}
       terbaru={rel.terbaru}
       populer={rel.populer}
+      komentar={rel.komentar}
       jumlahLaporan={jumlahLaporan}
       kabupaten={kabupaten}
       bahasa={bahasa}

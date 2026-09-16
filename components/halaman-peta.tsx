@@ -5,6 +5,7 @@ import type { Berita } from "@/lib/events";
 import type { KabupatenTerluas } from "@/lib/wms";
 import { BAHASA, TEKS_PETA, type Bahasa } from "@/lib/bahasa";
 import { gunakanParallax } from "@/hooks/gunakan-parallax";
+import { gunakanKolomMasonry } from "@/hooks/gunakan-kolom-masonry";
 import { TUTUP_OVERLAY } from "@/lib/peristiwa-popup";
 import {
   inferPulau,
@@ -40,6 +41,7 @@ export function HalamanPeta({
   berita,
   terbaru,
   populer,
+  komentar,
   jumlahLaporan,
   kabupaten,
   bahasa,
@@ -51,6 +53,10 @@ export function HalamanPeta({
   /** Lima laporan berkomentar terbanyak (di luar lima terbaru) — kelompok
    *  kedua rel kanan saat tidak mencari. */
   populer: Berita[];
+  /** Jumlah komentar per id laporan — dipakai mengurutkan filter "populer"
+   *  saat peta dilipat (arsip penuh). Hanya laporan yang punya komentar yang
+   *  terdaftar; sisanya dihitung 0. */
+  komentar: Record<string, number>;
   jumlahLaporan: Record<string, number>;
   /** Kabupaten berluas kebakaran dari layer GeoServer, terluas dulu. */
   kabupaten: KabupatenTerluas[];
@@ -74,69 +80,27 @@ export function HalamanPeta({
   // Kolom tengah (peta) bisa dilipat — saat dilipat rel kanan melebar penuh
   // sampai batas rel kiri. Dibuka lagi lewat rel bukaan di bekas kolomnya.
   const [tengahBuka, setTengahBuka] = useState(true);
-  /* Arsip penuh (puluhan kartu masonry) baru dipasang SETELAH lajur grid
-     selesai menyusut. Merendernya bersamaan dengan animasi 500ms membuat
-     transisi tersendat: tiap kartu mengukur potongan deskripsinya sendiri,
-     dan tugas-tugas panjang itu jatuh tepat di tengah animasi. */
-  const [tengahSelesai, setTengahSelesai] = useState(false);
+  /* Arsipnya kini dipasang langsung penuh (lihat daftarGrid), jadi tak ada
+     lagi gerbang yang menahan daftar pendek — itu yang dulu membuat rel
+     tampak "lima dulu, baru semua".
+
+     Yang tersisa hanya memanaskan gambar. Kartunya memakai loading="lazy",
+     jadi tanpa ini gambar baru mulai diunduh pada saat elemennya dipasang;
+     memulainya sejak tombol ditekan membuat gambar tiba lebih cepat tanpa
+     menunda apa pun. Tinggi kartu sudah dipesan lewat rasio, jadi gambar yang
+     telat tidak lagi menggeser tata letak. */
   useEffect(() => {
-    // Hanya memasang timer; penyetelan ulang saat peta dibuka dilakukan di
-    // tombolnya, supaya effect ini tak memanggil setState secara sinkron.
     if (tengahBuka) return;
-    let batal = false;
-    const jam: ReturnType<typeof setTimeout>[] = [];
-    const tunggu = (ms: number) =>
-      new Promise<void>((lanjut) => {
-        jam.push(setTimeout(lanjut, ms));
-      });
-
-    /* Unduh gambar SELURUH kartu arsip sejak tombol ditekan — bukan sebagian.
-       Kartunya memakai loading="lazy", jadi tanpa ini gambar baru mulai
-       diunduh pada saat elemennya dipasang, dan karena masonry mengisi kolom
-       kiri lebih dulu, dua pertiga layar sebelah kanan tinggal kotak gelap
-       selama hampir satu detik — itulah kedipnya. */
-    const sumber = berita
-      .map((laporan) => {
-        const media = laporan.media[0];
-        return media?.jenis === "video"
-          ? (media.poster ?? laporan.poster)
-          : (media?.url ?? laporan.gambar ?? laporan.poster);
-      })
-      .filter((src): src is string => Boolean(src));
-
-    /* Menunggu semuanya terlalu kaku: satu gambar raksasa menahan seluruh
-       arsip. Tiga perempat sudah cukup mengisi ketiga kolom, dan sisanya
-       menyusul tanpa terlihat. Unduhannya paralel, jadi menunggu 24 nyaris
-       seharga menunggu 12. */
-    const cukup = Math.ceil(sumber.length * 0.75);
-    const terisi = new Promise<void>((lanjut) => {
-      if (sumber.length === 0) return lanjut();
-      let siap = 0;
-      for (const src of sumber) {
+    for (const laporan of berita) {
+      const media = laporan.media[0];
+      const src = media?.jenis === "video"
+        ? (media.poster ?? laporan.poster)
+        : (media?.url ?? laporan.gambar ?? laporan.poster);
+      if (src) {
         const muat = new Image();
         muat.src = src;
-        // Gambar yang gagal tetap dihitung: kartunya memang punya pil lokasi
-        // sebagai pengganti, dan tak boleh menahan arsip.
-        void muat.decode().catch(() => undefined).then(() => {
-          if (++siap >= cukup) lanjut();
-        });
       }
-    });
-
-    /* Dua syarat sekaligus: animasi lajur selesai DAN gambarnya siap digambar.
-       Batas 1,8 detik menjaga arsip tetap muncul kalau jaringannya lambat —
-       lebih baik terlambat sedikit daripada berkedip. */
-    void Promise.race([
-      Promise.all([tunggu(550), terisi]),
-      tunggu(1800),
-    ]).then(() => {
-      if (!batal) setTengahSelesai(true);
-    });
-
-    return () => {
-      batal = true;
-      for (const t of jam) clearTimeout(t);
-    };
+    }
   }, [tengahBuka, berita]);
   // Mode lapisan aktif — diangkat dari <Peta> supaya aksen rel kiri (titik +
   // badge jumlah) bisa selaras dengan tema lapisan: asap = ungu berbahaya
@@ -222,6 +186,16 @@ export function HalamanPeta({
     if (filterMedia === "terbaru") return [];
     return populer;
   }, [populer, filterMedia]);
+
+  /* Versi arsip penuh dari "populer": SELURUH laporan diurut komentar
+     terbanyak, bukan lima pilihan rel sempit. Prop `populer` sengaja tidak
+     dipakai di sini — ia dibatasi lima DAN mengecualikan lima terbaru, jadi
+     memakainya berarti filter ini selamanya menampilkan lima kartu saja. */
+  const arsipPopuler = useMemo(() => {
+    const nilai = (b: Berita) => komentar[b.id] ?? 0;
+    // Salinan: sort() mengubah larik di tempat, dan `berita` milik prop.
+    return [...berita].sort((a, b) => nilai(b) - nilai(a));
+  }, [berita, komentar]);
 
   /* Pop-up tumbuh dari baris yang ditekan, sama seperti ia tumbuh dari
      provinsi yang ditekan di peta. */
@@ -322,17 +296,23 @@ export function HalamanPeta({
     return () => window.removeEventListener(TUTUP_OVERLAY, tutupSemua);
   }, [tutupRincian]);
 
-  /* Rel kanan saat peta dilipat melebar penuh — daftar kartu satu kolom akan
+  /* Rel kanan saat peta dilipat melebar penuh — daftar satu kolom akan
      meregang (media potret jadi kolom raksasa di tengah layar), jadi ia jadi
-     masonry (CSS columns): kartu mengisi kolom terpendek, tinggi tiap kartu
-     mengikuti medianya; mode daftar tetap satu kolom. */
+     masonry; mode daftar tetap satu kolom.
+
+     Kolomnya dibagi di JS, BUKAN lewat CSS `columns`. Dengan CSS columns
+     peramban menyeimbangkan sendiri isi tiap kolom memakai tinggi yang ada
+     saat itu; karena tinggi kartu mengikuti gambar, begitu gambar berdatangan
+     seluruh isi ditata ulang dan kartu meloncat antar kolom — itulah "kedip"
+     saat pertama membuka (terukur: daftar melonjak 3998px -> 6335px). Dengan
+     pembagian tetap, kartu tak punya jalan untuk pindah kolom: yang tersisa
+     hanya geser turun di dalam kolomnya sendiri. */
   const kartuGrid = !tengahBuka && modeRel === "kartu";
-  const kelasUlRel = kartuGrid
-    ? "mt-2 columns-1 gap-x-6 sm:columns-2 2xl:columns-3"
-    : "mt-2 divide-y divide-white/10";
+  const jumlahKolom = gunakanKolomMasonry();
+  const kelasUlRel = kartuGrid ? "mt-2" : "mt-2 divide-y divide-white/10";
   const kelasLiRel = kartuGrid
     // Jarak antar kartu sama ke bawah dan ke samping (24px).
-    ? "mb-6 break-inside-avoid"
+    ? "mb-6"
     : "py-5 first:pt-0 last:pb-0";
 
   /* Satu baris rel kanan — dipakai ketiga daftar supaya markupnya sama. */
@@ -348,11 +328,10 @@ export function HalamanPeta({
   /* Mode full (peta dilipat): tampilkan SEMUA foto arsip (terbaru dulu —
      `berita` sudah urut event_date desc), bukan dibatasi 5 seperti rel
      sempit. Filter eksplisit "populer" tetap dihormati. */
-  const daftarGrid = filterMedia === "populer"
-    ? laporanPopuler
-    // Selama lajur masih bergerak, tetap daftar pendek — arsip penuh menyusul
-    // begitu animasi selesai (tengahSelesai).
-    : tengahSelesai ? berita : laporanTerbaru;
+  /* Tanpa penundaan: begitu peta dilipat, arsipnya langsung penuh. Dulu di
+     sini ada gerbang yang menahan daftar pendek sampai animasi + gambar siap,
+     dan itu yang membuat rel tampak "lima dulu, baru semua". */
+  const daftarGrid = filterMedia === "populer" ? arsipPopuler : berita;
 
   return (
     // Satu layar terkunci di semua ukuran: di panggung tiga kolom, di aliran
@@ -629,19 +608,16 @@ export function HalamanPeta({
             <button
               type="button"
               onClick={() => {
-                /* Dua fase — kebalikan dari arah menutup. Klik ini melepas
-                   puluhan kartu masonry sekaligus (tiap kartu mengukur
-                   deskripsinya + melepas observer video + image lazy): kalau
-                   unmount massal itu satu commit dengan awal transisi grid
-                   500ms, main thread macet ~60–90ms tepat saat animasi mulai
-                   — bingkai-bingkai pertamanya hilang dan pembukaan terlihat
-                   patah / glitch. Maka daftar dikembalikan pendek DULU
-                   selagi lajur masih statis (satu reflow tanpa animasi
-                   berjalan), lajur baru melebar dua frame sesudahnya. */
-                setTengahSelesai(false);
-                requestAnimationFrame(() => {
-                  requestAnimationFrame(() => setTengahBuka(true));
-                });
+                /* Satu fase saja. Sebelumnya daftar dikembalikan pendek dulu,
+                   lalu lajur melebar dua frame sesudahnya, supaya unmount
+                   puluhan kartu tidak jatuh satu commit dengan awal transisi
+                   grid. Premis itu sudah tidak ada: daftarnya TIDAK pernah
+                   dipendekkan lagi (arsip selalu penuh), jadi tak ada unmount
+                   massal yang perlu dipisahkan — menunda animasi dua frame
+                   cuma menambah jeda. Terukur juga: memecahnya jadi dua commit
+                   membuat masonry dihitung ulang dua kali, dan halaman beku
+                   490ms alih-alih 130ms. */
+                setTengahBuka(true);
               }}
               aria-expanded={tengahBuka}
               aria-controls="peta"
@@ -761,9 +737,13 @@ export function HalamanPeta({
           <h2 className="sr-only">{teks.terbaru}</h2>
           {laporanTampil !== null ? (
             laporanTampil.length > 0 ? (
-              <ul className={kelasUlRel}>
-                {laporanTampil.map(itemRel)}
-              </ul>
+              kartuGrid ? (
+                <MasonryKolom daftar={laporanTampil} kolom={jumlahKolom} item={itemRel} />
+              ) : (
+                <ul className={kelasUlRel}>
+                  {laporanTampil.map(itemRel)}
+                </ul>
+              )
             ) : (
               <p className="mt-3 rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
                 {teks.tidakCocok} {teks.cobaLain}
@@ -774,9 +754,12 @@ export function HalamanPeta({
               /* Model galeri: satu aliran masonry terbaru saja (bukan campur
                  terpopuler) supaya tidak "muncul semua". */
               daftarGrid.length > 0 ? (
-                <ul aria-label={filterMedia === "populer" ? teks.populer : teks.terbaru} className={kelasUlRel}>
-                  {daftarGrid.map(itemRel)}
-                </ul>
+                <MasonryKolom
+                  daftar={daftarGrid}
+                  kolom={jumlahKolom}
+                  item={itemRel}
+                  label={filterMedia === "populer" ? teks.populer : teks.terbaru}
+                />
               ) : (
                 <p className="mt-3 rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
                   {teks.relKosong}
@@ -1297,6 +1280,45 @@ function TabRel({ sisi, terbuka, kontrol, labelTutup, labelBuka, onUbah, modePet
   );
 }
 
+/**
+ * Masonry berkolom tetap: kartu dibagi bergiliran (0,1,2,0,1,2…) ke sejumlah
+ * daftar terpisah, lalu daftar-daftar itu dijajar.
+ *
+ * Sengaja TIDAK memakai CSS `columns`. Di sana peramban yang memutuskan isi
+ * tiap kolom, dan keputusannya dihitung ulang tiap kali tinggi isi berubah —
+ * sehingga gambar yang baru termuat melempar kartu ke kolom lain. Di sini
+ * penempatan ditentukan indeks, jadi kekal: gambar yang telat hanya mendorong
+ * kartu di bawahnya dalam kolom yang sama.
+ *
+ * Konsekuensi yang diterima: kolomnya tidak diseimbangkan menurut tinggi
+ * (mustahil tanpa tahu tinggi gambar sebelum termuat), jadi satu kolom bisa
+ * berakhir lebih panjang dari yang lain.
+ */
+function MasonryKolom({ daftar, kolom, item, label }: {
+  daftar: Berita[];
+  kolom: number;
+  item: (b: Berita) => React.ReactNode;
+  label?: string;
+}) {
+  const keranjang = useMemo(() => {
+    const isi: Berita[][] = Array.from({ length: Math.max(1, kolom) }, () => []);
+    daftar.forEach((b, i) => {
+      isi[i % isi.length].push(b);
+    });
+    return isi;
+  }, [daftar, kolom]);
+
+  return (
+    <div role="group" aria-label={label} className="mt-2 flex items-start gap-6">
+      {keranjang.map((isiKolom, i) => (
+        <ul key={i} className="flex min-w-0 flex-1 flex-col">
+          {isiKolom.map(item)}
+        </ul>
+      ))}
+    </div>
+  );
+}
+
 /** Satu kartu rel kanan: tanggal–judul–media–deskripsi, plus titik galeri bila
  *  laporannya bermedia lebih dari satu (seperti TitikMedia beranda). Kartunya
  *  tumpukan grid satu sel: tombol dan titik menumpang di dalam gambar tanpa
@@ -1367,16 +1389,36 @@ function KartuLaporan({ b, bukaLabel, selengkapnya, lebihSedikit, masonry, onBuk
         ukur.remove();
       }
     };
-    cek();
-    window.addEventListener("resize", cek);
-    // Font Poppins bisa datang belakangan dan mengubah lebar baris.
+    /* Yang menentukan potongan adalah lebar ELEMENNYA, bukan lebar jendela.
+       Dulu di sini hanya ada listener resize jendela, dan itu meleset: kartu
+       arsip dipasang tepat saat tombol tutup diklik, ketika rel masih selebar
+       rel sempit (±368px dibagi 3 kolom ≈ 110px). Potongan dihitung di lebar
+       itu — tiga baris cuma memuat ~17 karakter — lalu lajurnya melebar ke
+       ±496px tanpa jendela pernah berubah ukuran, jadi hasil sempit tadi
+       membeku. ResizeObserver menangkap pelebaran itu dan mengukur ulang. */
+    let lebarTerukur = -1;
+    const cekBilaLebarBerubah = () => {
+      const lebar = el.clientWidth;
+      // Teks yang dipotong mengubah tinggi, bukan lebar — penjaga ini
+      // memastikan pengamat tidak memicu dirinya sendiri berulang kali.
+      if (lebar === lebarTerukur) return;
+      lebarTerukur = lebar;
+      cek();
+    };
+    // Memanggil observe() sudah memicu callback sekali, jadi tak perlu cek()
+    // manual di sini: pengukuran pertama datang dari situ.
+    const amati = new ResizeObserver(cekBilaLebarBerubah);
+    amati.observe(el);
+
+    // Font Poppins bisa datang belakangan dan mengubah lebar baris tanpa
+    // mengubah lebar elemen — pengamat di atas tak akan menyala untuk itu.
     let batal = false;
     document.fonts?.ready.then(() => {
       if (!batal) cek();
     }).catch(() => {});
     return () => {
       batal = true;
-      window.removeEventListener("resize", cek);
+      amati.disconnect();
     };
   }, [b.deskripsi, selengkapnya, bentang, masonry]);
 
@@ -1434,7 +1476,10 @@ function KartuLaporan({ b, bukaLabel, selengkapnya, lebihSedikit, masonry, onBuk
           </span>
         )}
         {/* Masonry: rasio alami tanpa crop maupun kunci potret — tinggi kartu
-            mengikuti medianya seperti galeri foto. */}
+            mengikuti medianya seperti galeri foto. Yang menjaga tata letaknya
+            tetap tenang bukan rasio yang dipesan, melainkan kolom yang dibagi
+            tetap di JS (lihat MasonryKolom): kartu boleh bertambah tinggi saat
+            gambarnya tiba, tapi tak bisa pindah kolom. */}
         {/* Tanpa media sama sekali, blok ini tidak dirender: di masonry ia jadi
             kotak hitam tinggi berisi pil lokasi saja, dan kolomnya jadi timpang.
             Kartunya cukup teks. */}

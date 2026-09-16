@@ -11,7 +11,15 @@ import type { KabupatenTerluas, ProvinsiTeratas } from "./wms";
  * picsum.photos supaya kartu/galeri ikut terlihat tanpa MinIO.
  */
 
-const FOTO = (id: number) => `https://picsum.photos/seed/karhutla-${id}/800/500`;
+/* Dua rasio, bukan satu. Rel kanan mode arsip memakai rasio ASLI gambar
+   (tinggi kartu mengikuti medianya), jadi kalau semua contoh 800x500 seluruh
+   kartu jadi sama tinggi dan masonry-nya terbaca sebagai grid berbaris —
+   persis yang terjadi di pratinjau Vercel. Potret 600x900 memberi variasi
+   tinggi seperti data asli, yang campur foto ponsel tegak dan mendatar. */
+const FOTO = (id: number, potret = false) =>
+  potret
+    ? `https://picsum.photos/seed/karhutla-${id}/600/900`
+    : `https://picsum.photos/seed/karhutla-${id}/800/500`;
 
 function laporan(
   id: number,
@@ -23,8 +31,9 @@ function laporan(
   lng: number,
   tanggal: string,
   seedFoto: number,
+  potret = false,
 ): Berita {
-  const gambar = FOTO(seedFoto);
+  const gambar = FOTO(seedFoto, potret);
   return {
     id,
     slug: `contoh-${id}`,
@@ -41,20 +50,22 @@ function laporan(
     lng,
     deskripsi: `${judul} — data contoh untuk pratinjau tampilan.`,
     media: [{ jenis: "gambar", url: gambar, keterangan: judul }],
-    vertikal: false,
+    // Dipakai mode daftar/kartu sempit untuk memilih bingkai 3/4 vs 16/10;
+    // mode arsip masonry tidak memakainya (rasio datang dari gambar sendiri).
+    vertikal: potret,
   };
 }
 
 export const BERITA_CONTOH: Berita[] = [
   laporan(1, "Asap tebal di tepi jalan Trans-Kalimantan", "Kalimantan Barat", "Kalimantan", "Pontianak, Kalimantan Barat", -0.0263, 109.3425, "12 September 2026", 11),
-  laporan(2, "Kebakaran lahan gambut di pinggir kota", "Kalimantan Tengah", "Kalimantan", "Palangka Raya, Kalimantan Tengah", -2.2161, 113.9139, "11 September 2026", 12),
+  laporan(2, "Kebakaran lahan gambut di pinggir kota", "Kalimantan Tengah", "Kalimantan", "Palangka Raya, Kalimantan Tengah", -2.2161, 113.9139, "11 September 2026", 12, true),
   laporan(3, "Titik api terlihat dari permukiman warga", "Riau", "Sumatra", "Pekanbaru, Riau", 0.5071, 101.4478, "10 September 2026", 13),
-  laporan(4, "Asap menyelimuti kebun sawit", "Jawa Barat", "Jawa", "Bogor, Jawa Barat", -6.5971, 106.806, "9 September 2026", 14),
+  laporan(4, "Asap menyelimuti kebun sawit", "Jawa Barat", "Jawa", "Bogor, Jawa Barat", -6.5971, 106.806, "9 September 2026", 14, true),
   laporan(5, "Lahan kering terbakar dekat perumahan", "Jawa Barat", "Jawa", "Depok, Jawa Barat", -6.4025, 106.7942, "8 September 2026", 15),
   laporan(6, "Kepulan asap dari arah hutan lindung", "Jawa Barat", "Jawa", "Bandung, Jawa Barat", -6.9175, 107.6191, "7 September 2026", 16),
-  laporan(7, "Rumput ilalang terbakar di bukit", "Jawa Timur", "Jawa", "Malang, Jawa Timur", -7.9666, 112.6326, "6 September 2026", 17),
+  laporan(7, "Rumput ilalang terbakar di bukit", "Jawa Timur", "Jawa", "Malang, Jawa Timur", -7.9666, 112.6326, "6 September 2026", 17, true),
   laporan(8, "Asap tipis di kawasan pesisir", "Banten", "Jawa", "Serang, Banten", -6.1167, 106.15, "5 September 2026", 18),
-  laporan(9, "Lahan kosong terbakar di pinggir tol", "Jawa Barat", "Jawa", "Bekasi, Jawa Barat", -6.2383, 106.9756, "4 September 2026", 19),
+  laporan(9, "Lahan kosong terbakar di pinggir tol", "Jawa Barat", "Jawa", "Bekasi, Jawa Barat", -6.2383, 106.9756, "4 September 2026", 19, true),
   laporan(10, "Titik panas terpantau warga", "Sumatera Selatan", "Sumatra", "Palembang, Sumatera Selatan", -2.9909, 104.7565, "3 September 2026", 20),
 ];
 
