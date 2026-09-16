@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import * as maplibregl from "maplibre-gl";
@@ -220,6 +220,24 @@ function buatLinimasaDefault(): ZarrTimestepMeta[] {
   return hasil;
 }
 
+/** Titik waktu terdekat dengan sekarang. Rentang linimasa membentang dari
+ *  riwayat 7 hari ke belakang sampai prakiraan 3 hari ke depan — pengunjung
+ *  baru harus melihat kondisi hari ini, bukan awal rentang. */
+function indeksWaktuKini(langkah: ZarrTimestepMeta[]): number {
+  if (langkah.length === 0) return 0;
+  const kini = Date.now();
+  let terbaik = 0;
+  let selisihTerbaik = Infinity;
+  for (let i = 0; i < langkah.length; i++) {
+    const selisih = Math.abs((langkah[i]?.waktu ?? 0) - kini);
+    if (selisih < selisihTerbaik) {
+      selisihTerbaik = selisih;
+      terbaik = i;
+    }
+  }
+  return terbaik;
+}
+
 function formatIsoKeWib(iso: string): string {
   try {
     const d = new Date(iso);
@@ -235,6 +253,12 @@ function formatIsoKeWib(iso: string): string {
     return "";
   }
 }
+
+/** Ambang lebar/tinggi minimum bingkai peta (px). Di bawah ambang ini (misal saat
+ *  kolom peta dilipat hingga tersisa ~177px atau nol), buffer WebGL tidak
+ *  dialokasikan ulang agar saat dibuka kembali tidak memicu frame drop / alokasi mahal. */
+const AMBANG_LIPAT = 200;
+const langgananKosong = () => () => {};
 
 // Posisi & zoom peta adaptif untuk perangkat mobile potret vs desktop/tablet
 function getInitialMapPos(): { center: [number, number]; zoom: number } {
@@ -298,10 +322,11 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
      ke viewport, dan melayang jauh dari kursor di konsol /peta. Solusinya:
      portal ke document.body, di luar section mana pun, agar fixed selalu
      berarti viewport. */
-  const [wadahTooltip, setWadahTooltip] = useState<HTMLElement | null>(null);
-  useEffect(() => {
-    setWadahTooltip(document.body);
-  }, []);
+  const wadahTooltip = useSyncExternalStore(
+    langgananKosong,
+    () => document.body,
+    () => null
+  );
 
   useEffect(() => {
     onBukaRincianRef.current = onBukaRincian;
@@ -410,6 +435,15 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       wadahKanvas.style.transformOrigin = "0 0";
       wadahKanvas.style.transform = `scale(${w / ukuran.w})`;
       clearTimeout(penunda);
+      /* Bingkai sedang dilipat habis (kolom peta ditutup): berhenti di sini.
+         Transform tetap diperbarui — murah, dan animasi menyusutnya sama
+         seperti sebelumnya — tapi buffer WebGL JANGAN disentuh. Dulu settle
+         di bawah ini tetap jalan di lebar sisa ~177px, jadi buffer dikecilkan
+         ke 177px DAN 177px jadi ukuran acuan yang baru; saat peta dibuka lagi
+         gambarnya harus direntangkan 6,7× lalu buffernya dibangun ulang —
+         satu tugas 134ms yang menjatuhkan 5 frame. Dengan acuan lama ditahan,
+         membuka kembali tidak perlu mengalokasi ulang apa pun. */
+      if (w < AMBANG_LIPAT || h < AMBANG_LIPAT) return;
       penunda = setTimeout(() => {
         // Pergantian dari gambar terskala ke kanvas baru dilakukan di satu
         // frame: resize mengosongkan buffer WebGL, jadi redraw() menggambar
@@ -491,6 +525,25 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const lastTimeRef = useRef<number>(0);
   const rafIdRef = useRef<number | null>(null);
   const sliderInputRef = useRef<HTMLInputElement | null>(null);
+
+  /* Setiap kali daftar waktu terisi (cache sesi, pemuatan awal, atau siklus
+     model baru), bilah waktu mulai dari titik terdekat dengan sekarang.
+     progressRef ikut ditulis supaya loop animasi melanjutkan dari titik itu,
+     dan nilai slider disetel langsung karena slider tak dikendalikan React. */
+  const mulaiDariSekarang = useCallback((langkah: ZarrTimestepMeta[]) => {
+    const idx = indeksWaktuKini(langkah);
+    progressRef.current = idx;
+    setIndeksAktif(idx);
+    const el = sliderInputRef.current;
+    if (el) {
+      el.value = String(idx);
+      el.style.setProperty(
+        "--progress-percent",
+        `${((idx / Math.max(1, langkah.length - 1)) * 100).toFixed(1)}%`,
+      );
+    }
+    return idx;
+  }, []);
   const isScrubbingRef = useRef<boolean>(false);
 
   // State refs for 60 FPS animation loop
@@ -665,8 +718,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           setSedangSync(false);
           setProgresSync(100);
 
-          // Muat frame aktif jika belum ada di memori WebGL
-          const activeIndex = Math.min(Math.floor(progressRef.current), cachedMeta.timesteps.length - 1);
+          // Muat frame aktif jika belum ada di memori WebGL — titik waktu
+          // sekarang, bukan posisi terakhir sesi sebelumnya.
+          const activeIndex = mulaiDariSekarang(cachedMeta.timesteps);
           const activeStep = cachedMeta.timesteps[activeIndex] || cachedMeta.timesteps[0];
           if (activeStep) {
             await muatFrame(activeStep);
@@ -718,11 +772,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 if (runWibBaru) setModelRunWib(runWibBaru);
                 setLinimasa(metaBaru.timesteps);
 
-                // Muat frame aktif untuk siklus model baru
-                const curActiveIndex = Math.min(
-                  Math.floor(progressRef.current),
-                  metaBaru.timesteps.length - 1
-                );
+                // Muat frame aktif untuk siklus model baru, dari titik sekarang
+                const curActiveIndex = mulaiDariSekarang(metaBaru.timesteps);
                 const curStep = metaBaru.timesteps[curActiveIndex] || metaBaru.timesteps[0];
                 if (curStep) {
                   await muatFrame(curStep);
@@ -783,7 +834,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         setLinimasa(data.timesteps);
 
         // Muat frame aktif awal agar shader WebGL langsung terisi tanpa jeda
-        const activeIndex = Math.min(Math.floor(progressRef.current), totalFrames - 1);
+        const activeIndex = mulaiDariSekarang(data.timesteps);
         const activeStep = data.timesteps[activeIndex] || data.timesteps[0];
         if (activeStep) {
           await muatFrame(activeStep);
@@ -841,7 +892,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         syncRunningRef.current = false;
       }
     },
-    [muatFrame]
+    [muatFrame, mulaiDariSekarang]
   );
 
   // Jalankan sinkronisasi saat komponen terpasang, saat window kembali aktif (focus), dan berkala tiap 10 menit

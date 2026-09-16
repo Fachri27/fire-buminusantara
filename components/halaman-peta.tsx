@@ -71,6 +71,73 @@ export function HalamanPeta({
   // bawaan MapLibre), tak perlu resize manual.
   const [kiriBuka, setKiriBuka] = useState(true);
   const [kananBuka, setKananBuka] = useState(true);
+  // Kolom tengah (peta) bisa dilipat — saat dilipat rel kanan melebar penuh
+  // sampai batas rel kiri. Dibuka lagi lewat rel bukaan di bekas kolomnya.
+  const [tengahBuka, setTengahBuka] = useState(true);
+  /* Arsip penuh (puluhan kartu masonry) baru dipasang SETELAH lajur grid
+     selesai menyusut. Merendernya bersamaan dengan animasi 500ms membuat
+     transisi tersendat: tiap kartu mengukur potongan deskripsinya sendiri,
+     dan tugas-tugas panjang itu jatuh tepat di tengah animasi. */
+  const [tengahSelesai, setTengahSelesai] = useState(false);
+  useEffect(() => {
+    // Hanya memasang timer; penyetelan ulang saat peta dibuka dilakukan di
+    // tombolnya, supaya effect ini tak memanggil setState secara sinkron.
+    if (tengahBuka) return;
+    let batal = false;
+    const jam: ReturnType<typeof setTimeout>[] = [];
+    const tunggu = (ms: number) =>
+      new Promise<void>((lanjut) => {
+        jam.push(setTimeout(lanjut, ms));
+      });
+
+    /* Unduh gambar SELURUH kartu arsip sejak tombol ditekan — bukan sebagian.
+       Kartunya memakai loading="lazy", jadi tanpa ini gambar baru mulai
+       diunduh pada saat elemennya dipasang, dan karena masonry mengisi kolom
+       kiri lebih dulu, dua pertiga layar sebelah kanan tinggal kotak gelap
+       selama hampir satu detik — itulah kedipnya. */
+    const sumber = berita
+      .map((laporan) => {
+        const media = laporan.media[0];
+        return media?.jenis === "video"
+          ? (media.poster ?? laporan.poster)
+          : (media?.url ?? laporan.gambar ?? laporan.poster);
+      })
+      .filter((src): src is string => Boolean(src));
+
+    /* Menunggu semuanya terlalu kaku: satu gambar raksasa menahan seluruh
+       arsip. Tiga perempat sudah cukup mengisi ketiga kolom, dan sisanya
+       menyusul tanpa terlihat. Unduhannya paralel, jadi menunggu 24 nyaris
+       seharga menunggu 12. */
+    const cukup = Math.ceil(sumber.length * 0.75);
+    const terisi = new Promise<void>((lanjut) => {
+      if (sumber.length === 0) return lanjut();
+      let siap = 0;
+      for (const src of sumber) {
+        const muat = new Image();
+        muat.src = src;
+        // Gambar yang gagal tetap dihitung: kartunya memang punya pil lokasi
+        // sebagai pengganti, dan tak boleh menahan arsip.
+        void muat.decode().catch(() => undefined).then(() => {
+          if (++siap >= cukup) lanjut();
+        });
+      }
+    });
+
+    /* Dua syarat sekaligus: animasi lajur selesai DAN gambarnya siap digambar.
+       Batas 1,8 detik menjaga arsip tetap muncul kalau jaringannya lambat —
+       lebih baik terlambat sedikit daripada berkedip. */
+    void Promise.race([
+      Promise.all([tunggu(550), terisi]),
+      tunggu(1800),
+    ]).then(() => {
+      if (!batal) setTengahSelesai(true);
+    });
+
+    return () => {
+      batal = true;
+      for (const t of jam) clearTimeout(t);
+    };
+  }, [tengahBuka, berita]);
   // Mode lapisan aktif — diangkat dari <Peta> supaya aksen rel kiri (titik +
   // badge jumlah) bisa selaras dengan tema lapisan: asap = ungu berbahaya
   // #49006A (pusat asap terpekat), windy = oren bara seperti semula.
@@ -81,6 +148,11 @@ export function HalamanPeta({
   const aksenFilter = asapAktif
     ? "bg-[#49006a] text-white ring-1 ring-[#86198f]/60"
     : "bg-emerald-700 text-white ring-1 ring-emerald-500/60";
+  // Aksen tombol tutup/buka kolom peta — ikut tema lapisan seperti pil filter,
+  // supaya tombolnya terbaca sebagai bagian dari peta yang sedang aktif.
+  const aksenTombolPeta = asapAktif
+    ? "bg-[#49006a]/90 ring-[#d946ef]/40 shadow-[0_8px_24px_rgb(73_0_106/0.5)] hover:bg-[#5c0086] hover:ring-[#d946ef]/70"
+    : "bg-emerald-700/90 ring-emerald-300/40 shadow-[0_8px_24px_rgb(4_120_87/0.45)] hover:bg-emerald-600 hover:ring-emerald-200/70";
   // Filter jenis laporan: terbaru / populer / semua.
   type FilterMedia = "semua" | "terbaru" | "populer";
   const [filterMedia, setFilterMedia] = useState<FilterMedia>("semua");
@@ -250,6 +322,38 @@ export function HalamanPeta({
     return () => window.removeEventListener(TUTUP_OVERLAY, tutupSemua);
   }, [tutupRincian]);
 
+  /* Rel kanan saat peta dilipat melebar penuh — daftar kartu satu kolom akan
+     meregang (media potret jadi kolom raksasa di tengah layar), jadi ia jadi
+     masonry (CSS columns): kartu mengisi kolom terpendek, tinggi tiap kartu
+     mengikuti medianya; mode daftar tetap satu kolom. */
+  const kartuGrid = !tengahBuka && modeRel === "kartu";
+  const kelasUlRel = kartuGrid
+    ? "mt-2 columns-1 gap-x-6 sm:columns-2 2xl:columns-3"
+    : "mt-2 divide-y divide-white/10";
+  const kelasLiRel = kartuGrid
+    // Jarak antar kartu sama ke bawah dan ke samping (24px).
+    ? "mb-6 break-inside-avoid"
+    : "py-5 first:pt-0 last:pb-0";
+
+  /* Satu baris rel kanan — dipakai ketiga daftar supaya markupnya sama. */
+  const itemRel = (b: Berita) => (
+    <li key={b.id} className={kelasLiRel}>
+      {modeRel === "kartu"
+        ? <KartuLaporan b={b} bukaLabel={teks.bukaRincian} selengkapnya={teks.selengkapnya} lebihSedikit={teks.lebihSedikit} masonry={kartuGrid} onBuka={() => bukaRincian(b)} />
+        : <ItemListLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
+      }
+    </li>
+  );
+
+  /* Mode full (peta dilipat): tampilkan SEMUA foto arsip (terbaru dulu —
+     `berita` sudah urut event_date desc), bukan dibatasi 5 seperti rel
+     sempit. Filter eksplisit "populer" tetap dihormati. */
+  const daftarGrid = filterMedia === "populer"
+    ? laporanPopuler
+    // Selama lajur masih bergerak, tetap daftar pendek — arsip penuh menyusul
+    // begitu animasi selesai (tengahSelesai).
+    : tengahSelesai ? berita : laporanTerbaru;
+
   return (
     // Satu layar terkunci di semua ukuran: di panggung tiga kolom, di aliran
     // (ponsel/tablet) peta penuh dengan laci di atasnya — halaman tak menggulir.
@@ -262,12 +366,41 @@ export function HalamanPeta({
           tanpa batas lebar maksimum yang menyisakan pita hitam. */}
       <div
         style={{
-          "--kolom-kiri": kiriBuka ? "calc(var(--rel-kiri) + 0.5rem)" : "0px",
-          "--kolom-kanan": kananBuka ? "calc(var(--rel-kanan) + 0.5rem)" : "0px",
+          /* KETIGANYA WAJIB bertipe sama — minmax(0, <panjang>) — di setiap
+             keadaan. grid-template-columns hanya bisa dianimasikan kalau
+             daftar treknya cocok tipe, dan begitu SATU trek tak cocok seluruh
+             daftar berhenti diinterpolasi. Versi sebelumnya mencampur
+             minmax(0,1fr) dengan 0px, jadi lajurnya melompat seketika: ada
+             transisi 500ms yang terdaftar, tapi tak pernah menggigit.
+             Karena itu tidak ada satu pun fr di sini; lajur yang dulu 1fr
+             dinyatakan sebagai sisa ruang yang eksplisit supaya tetap 100%. */
+          "--kolom-kiri": kiriBuka
+            ? "minmax(0,calc(var(--rel-kiri) + 0.5rem))"
+            : "minmax(0,0px)",
+          // Saat tengah dilipat rel kanan melebar penuh sampai batas rel kiri;
+          // saat tengah terbuka ia kembali selebar rel tetap. Kolom tengahnya
+          // sendiri menyusut ke 0 — tombol buka kembali menempel di tepi kiri
+          // rel kanan (lihat bawah).
+          "--kolom-kanan": !kananBuka
+            ? "minmax(0,0px)"
+            : tengahBuka
+              ? "minmax(0,calc(var(--rel-kanan) + 0.5rem))"
+              : "minmax(0,calc(100% - var(--kolom-lebar-kiri)))",
+          // Lebar kiri sebagai panjang telanjang: dipakai aritmetika di atas,
+          // yang tak bisa membaca var berisi minmax().
+          "--kolom-lebar-kiri": kiriBuka ? "calc(var(--rel-kiri) + 0.5rem)" : "0px",
+          "--kolom-lebar-kanan": !kananBuka
+            ? "0px"
+            : tengahBuka
+              ? "calc(var(--rel-kanan) + 0.5rem)"
+              : "calc(100% - var(--kolom-lebar-kiri))",
+          "--kolom-tengah": tengahBuka
+            ? "minmax(0,calc(100% - var(--kolom-lebar-kiri) - var(--kolom-lebar-kanan)))"
+            : "minmax(0,0px)",
         } as React.CSSProperties}
         className="relative flex min-h-0 w-full flex-1 flex-col panggung:p-2
                    [--rel-kiri:300px] [--rel-kanan:340px] xl:[--rel-kiri:320px] xl:[--rel-kanan:360px]
-                   panggung:grid panggung:min-h-0 panggung:grid-cols-[var(--kolom-kiri)_minmax(0,1fr)_var(--kolom-kanan)]
+                   panggung:grid panggung:min-h-0 panggung:grid-cols-[var(--kolom-kiri)_var(--kolom-tengah)_var(--kolom-kanan)]
                    panggung:transition-[grid-template-columns] panggung:duration-500 panggung:ease-[cubic-bezier(0.22,1,0.36,1)]
                    motion-reduce:transition-none"
       >
@@ -276,7 +409,10 @@ export function HalamanPeta({
             selebar penuh dan menempel ke tepi peta, jadi saat dilipat ia
             tampak bergeser masuk ke bawah bingkai, bukan teksnya terlipat. */}
         {/* Di aliran kedua rel tersembunyi — isinya pindah ke LaciPeta. */}
-        <div className="min-h-0 aliran:hidden panggung:flex panggung:justify-end panggung:overflow-hidden">
+        {/* col-start eksplisit: saat kolom tengah display:none (dilipat),
+            penempatan otomatis akan menggeser rel kanan ke lajur tengah yang
+            0px — dengan ini ia tetap di lajur kanan yang melebar. */}
+        <div className="min-h-0 aliran:hidden panggung:col-start-1 panggung:row-start-1 panggung:flex panggung:justify-end panggung:overflow-hidden">
         <aside
           id="rel-kiri-pantau"
           data-lenis-prevent
@@ -339,11 +475,34 @@ export function HalamanPeta({
             arah rel, tapi relnya `[contain:layout_paint]` (stacking context
             sendiri yang terlukis sesudah section) sehingga separuh tab yang
             menumpang rel tertutup. Section diangkat agar tab tampil utuh;
-            grid tak pernah tumpang tindih jadi tak ada yang ikut berubah. */}
+            grid tak pernah tumpang tindih jadi tak ada yang ikut berubah.
+            Karena itu section TIDAK boleh overflow-hidden saat terbuka —
+            itu memotong tab tepat di garis bingkai.
+            Saat dilipat section display:none di panggung (bukan kolom 0px):
+            grid hanya berisi rel kiri + rel kanan penuh, sehingga membuka =
+            section muncul kembali + rel kanan menyempit (keduanya px ke px —
+            mulus, tanpa snap kolom 0px ↔ penuh dan tanpa kanvas MapLibre
+            yang resize ke 0 lalu balik — sumber glitch buka). Di aliran
+            section selalu tampil (peta = pekerjaannya). */}
         {/* Aliran: section mengisi layar di bawah nav. --sela-bawah = tinggi
             laci saat mengintip (TINGGI_INTIP) — PetaAsap/Peta memakainya untuk
-            menaikkan bilah waktu, legenda, logo, dan kamera awal di atas laci. */}
-        <section id="peta" aria-label={teks.judulHalaman} className="relative flex min-h-0 flex-col aliran:flex-1 aliran:[--sela-bawah:272px] panggung:z-10 panggung:py-6">
+            menaikkan bilah waktu, legenda, logo, dan kamera awal di atas laci.
+
+            Panggung, saat dilipat: section TIDAK di-hidden dan kolomnya TETAP
+            selebar penuh — rel kanan yang overlap di atasnya (col-start-2,
+            z-20) sambil petanya memudar ke opacity 0. Membuka = rel kanan
+            menyempit kembali (px ke px — mulus) sambil peta memudar masuk:
+            tanpa snap kolom 0px ↔ penuh dan tanpa kanvas MapLibre yang
+            resize ke 0 lalu balik (sumber glitch buka). pointer-events +
+            overflow-hidden HANYA saat dilipat supaya isi tak terlihat tak
+            bisa diklik / meluber. */}
+        <section id="peta" aria-label={teks.judulHalaman} inert={!tengahBuka}
+          className={`relative flex min-h-0 flex-col aliran:flex-1 aliran:[--sela-bawah:272px]
+                      panggung:z-10 panggung:col-start-2 panggung:row-start-1 panggung:py-6
+                      transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none
+                      ${tengahBuka
+                        ? "panggung:opacity-100"
+                        : "panggung:pointer-events-none panggung:overflow-hidden panggung:opacity-0"}`}>
           {/* Pola titik bara di dua pojok berseberangan — tekstur, bukan
               isi, jadi hanya di layar panggung yang lega. */}
           <div aria-hidden="true" className="pantau-titik pantau-titik--kanan hidden panggung:block" />
@@ -404,14 +563,49 @@ export function HalamanPeta({
               onUbah={() => setKananBuka((b) => !b)}
               modePeta={modePeta}
             />
+            {/* Tombol tutup kolom peta — pil berlabel di sudut kanan atas
+                bingkai. Panahnya menunjuk ke bawah: petanya yang turun, bukan
+                panelnya yang naik. Warnanya ikut lapisan aktif, sepasang
+                dengan tombol buka di bekas kolomnya. Hanya panggung.
+                Ditahan right-14, bukan right-3: tumpukan zoom peta berdiri di
+                sudut yang sama, dan pil yang menempel tepi kanan menimbun
+                tombol Perbesar peta sampai tak bisa diklik. */}
+            {tengahBuka && (
+              <button
+                type="button"
+                onClick={() => setTengahBuka(false)}
+                aria-expanded={tengahBuka}
+                aria-controls="peta"
+                title={teks.tutupPeta}
+                aria-label={teks.tutupPeta}
+                className={`group absolute top-3 right-14 z-[42] hidden items-center gap-1.5 rounded-full
+                           py-2 pr-4 pl-3 text-[13px] leading-none font-semibold tracking-tight
+                           text-white ring-1 backdrop-blur-sm ${aksenTombolPeta}
+                           transition hover:scale-[1.03] active:scale-95
+                           focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none
+                           panggung:inline-flex`}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.6"
+                     strokeLinecap="round" strokeLinejoin="round"
+                     className="size-4 transition-transform group-hover:translate-y-0.5">
+                  <path d="m6 10 6 6 6-6" />
+                </svg>
+                {teks.tutupPeta}
+              </button>
+            )}
           </div>
           </div>
 
-          <p className="relative mx-auto mt-4 max-w-[68ch] px-3 text-center text-[12.5px] leading-snug text-pantau-tulang/85 aliran:hidden panggung:max-w-[78%]">
-            {/* Isinya panduan data lapisan yang sedang tampil — sama dengan
-                pop-up Panduan Data di sebelah pil lapisan. */}
-            {tentangData}
-          </p>
+          {/* Kaki kolom tengah — caption panduan data. Tombol lipat kolom
+              pindah ke sudut kanan atas section (tombol X kotak ala mockup).
+              Hanya panggung; di aliran peta selalu tampil dan footer ini hidden. */}
+          <div className="relative mx-auto mt-4 hidden max-w-[78%] items-center justify-center px-3 aliran:hidden panggung:flex">
+            <p className="min-w-0 flex-1 text-center text-[12.5px] leading-snug text-pantau-tulang/85">
+              {/* Isinya panduan data lapisan yang sedang tampil — sama dengan
+                  pop-up Panduan Data di sebelah pil lapisan. */}
+              {tentangData}
+            </p>
+          </div>
 
           <LaciPeta
             teks={teks}
@@ -427,7 +621,44 @@ export function HalamanPeta({
         </section>
 
         {/* ── Rel kanan: laporan terbaru, tanggal–judul–gambar ─────── */}
-        <div className="min-h-0 aliran:hidden panggung:flex panggung:justify-start panggung:overflow-hidden">
+        {/* Pembuka kembali kolom tengah menempel di tepi kiri rel ini saat
+            peta dilipat — rel kanan tetap penuh sampai batas rel kiri. */}
+        <div className="relative min-h-0 aliran:hidden panggung:col-start-3 panggung:row-start-1 panggung:flex panggung:justify-start panggung:overflow-visible">
+        {!tengahBuka && (
+          <span className="absolute top-1/2 left-0 z-[41] hidden -translate-x-1/2 -translate-y-1/2 panggung:block">
+            <button
+              type="button"
+              onClick={() => {
+                /* Dua fase — kebalikan dari arah menutup. Klik ini melepas
+                   puluhan kartu masonry sekaligus (tiap kartu mengukur
+                   deskripsinya + melepas observer video + image lazy): kalau
+                   unmount massal itu satu commit dengan awal transisi grid
+                   500ms, main thread macet ~60–90ms tepat saat animasi mulai
+                   — bingkai-bingkai pertamanya hilang dan pembukaan terlihat
+                   patah / glitch. Maka daftar dikembalikan pendek DULU
+                   selagi lajur masih statis (satu reflow tanpa animasi
+                   berjalan), lajur baru melebar dua frame sesudahnya. */
+                setTengahSelesai(false);
+                requestAnimationFrame(() => {
+                  requestAnimationFrame(() => setTengahBuka(true));
+                });
+              }}
+              aria-expanded={tengahBuka}
+              aria-controls="peta"
+              title={teks.bukaPeta}
+              aria-label={teks.bukaPeta}
+              className={`group flex size-9 items-center justify-center rounded-xl text-white ring-1 ${aksenTombolPeta}
+                         transition hover:scale-105 active:scale-95
+                         focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
+            >
+              {/* Ikon bentang — pasangan tombol X penutup di atas. */}
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4"
+                   strokeLinecap="round" className="size-4 transition-transform group-hover:scale-110">
+                <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+              </svg>
+            </button>
+          </span>
+        )}
         <aside
           id="rel-kanan-pantau"
           data-lenis-prevent
@@ -435,7 +666,8 @@ export function HalamanPeta({
           inert={!kananBuka}
           className={`pantau-rel min-h-0 border-white/10 bg-pantau-konsol p-4 sm:p-5
                      aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10
-                     panggung:ml-2 panggung:h-full panggung:w-[var(--rel-kanan)] panggung:shrink-0 panggung:rounded-xl
+                     panggung:ml-2 panggung:h-full panggung:shrink-0 panggung:rounded-xl
+                     ${tengahBuka ? "panggung:w-[var(--rel-kanan)]" : "panggung:w-full panggung:ml-0"}
                      panggung:overflow-y-auto panggung:overscroll-contain panggung:py-5
                      transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none [contain:layout_paint] ${kananBuka ? "opacity-100" : "opacity-0"}`}
         >
@@ -529,15 +761,8 @@ export function HalamanPeta({
           <h2 className="sr-only">{teks.terbaru}</h2>
           {laporanTampil !== null ? (
             laporanTampil.length > 0 ? (
-              <ul className={modeRel === "daftar" ? "mt-2 divide-y divide-white/10" : "divide-y divide-white/10"}>
-                {laporanTampil.map((b) => (
-                  <li key={b.id} className="py-5 first:pt-0 last:pb-0">
-                    {modeRel === "kartu"
-                      ? <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
-                      : <ItemListLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
-                    }
-                  </li>
-                ))}
+              <ul className={kelasUlRel}>
+                {laporanTampil.map(itemRel)}
               </ul>
             ) : (
               <p className="mt-3 rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
@@ -545,21 +770,27 @@ export function HalamanPeta({
               </p>
             )
           ) : laporanTerbaru.length + laporanPopuler.length > 0 ? (
+            kartuGrid ? (
+              /* Model galeri: satu aliran masonry terbaru saja (bukan campur
+                 terpopuler) supaya tidak "muncul semua". */
+              daftarGrid.length > 0 ? (
+                <ul aria-label={filterMedia === "populer" ? teks.populer : teks.terbaru} className={kelasUlRel}>
+                  {daftarGrid.map(itemRel)}
+                </ul>
+              ) : (
+                <p className="mt-3 rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
+                  {teks.relKosong}
+                </p>
+              )
+            ) : (
             <>
               {laporanTerbaru.length > 0 && (
                 <section aria-label={teks.terbaru}>
                   {/*<h3 className="mt-4 font-mono text-[11px] font-semibold tracking-[0.18em] text-pantau-abu uppercase">
                     {teks.terbaru}
                   </h3>*/}
-                  <ul className={modeRel === "daftar" ? "mt-2 divide-y divide-white/10" : "mt-2 divide-y divide-white/10"}>
-                    {laporanTerbaru.map((b) => (
-                      <li key={b.id} className="py-5 first:pt-0 last:pb-0">
-                        {modeRel === "kartu"
-                          ? <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
-                          : <ItemListLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
-                        }
-                      </li>
-                    ))}
+                  <ul className={kelasUlRel}>
+                    {laporanTerbaru.map(itemRel)}
                   </ul>
                 </section>
               )}
@@ -568,19 +799,13 @@ export function HalamanPeta({
                   {/*<h3 className="font-mono text-[11px] font-semibold tracking-[0.18em] text-pantau-abu uppercase">
                     {teks.populer}
                   </h3>*/}
-                  <ul className={modeRel === "daftar" ? "mt-2 divide-y divide-white/10" : "mt-2 divide-y divide-white/10"}>
-                    {laporanPopuler.map((b) => (
-                      <li key={b.id} className="py-5 first:pt-0 last:pb-0">
-                        {modeRel === "kartu"
-                          ? <KartuLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
-                          : <ItemListLaporan b={b} bukaLabel={teks.bukaRincian} onBuka={() => bukaRincian(b)} />
-                        }
-                      </li>
-                    ))}
+                  <ul className={kelasUlRel}>
+                    {laporanPopuler.map(itemRel)}
                   </ul>
                 </section>
               )}
             </>
+            )
           ) : (
             <p className="mt-3 rounded-xl bg-pantau-sumur px-3.5 py-4 text-[13px] leading-relaxed text-pantau-abu ring-1 ring-white/10">
               {teks.relKosong}
@@ -1072,11 +1297,17 @@ function TabRel({ sisi, terbuka, kontrol, labelTutup, labelBuka, onUbah, modePet
   );
 }
 
-/** Satu kartu rel kanan: tanggal–judul–media, plus titik galeri bila
+/** Satu kartu rel kanan: tanggal–judul–media–deskripsi, plus titik galeri bila
  *  laporannya bermedia lebih dari satu (seperti TitikMedia beranda). Kartunya
  *  tumpukan grid satu sel: tombol dan titik menumpang di dalam gambar tanpa
- *  tombol di dalam tombol. */
-function KartuLaporan({ b, bukaLabel, onBuka }: { b: Berita; bukaLabel: string; onBuka: () => void }) {
+ *  tombol di dalam tombol. Deskripsi dipangkas tiga baris (line-clamp-3);
+ *  "baca selengkapnya" membuka rincian yang sama dengan klik kartu.
+ *
+ *  Mode `masonry` (rel kanan full): model galeri minimal — media rasio alami
+ *  tanpa crop di paling atas, lalu judul, baris meta lokasi–tanggal mono,
+ *  dan deskripsi; titik galeri disembunyikan (geser media tetap ada di
+ *  rincian). */
+function KartuLaporan({ b, bukaLabel, selengkapnya, lebihSedikit, masonry, onBuka }: { b: Berita; bukaLabel: string; selengkapnya: string; lebihSedikit: string; masonry?: boolean; onBuka: () => void }) {
   const [indeks, setIndeks] = useState(0);
   const jumlah = b.media.length;
   // Galeri bisa menyusut saat data dimuat ulang; indeks yang tertinggal di
@@ -1085,38 +1316,139 @@ function KartuLaporan({ b, bukaLabel, onBuka }: { b: Berita; bukaLabel: string; 
   const item = b.media[kini];
   const galeri = jumlah > 1;
   const adalahVideo = item?.jenis === "video";
+  // Laporan tanpa foto/video mana pun — blok media dilewati (lihat di bawah).
+  const adaMedia = Boolean(item ?? b.gambar ?? b.poster);
+
+  /* "… selengkapnya" gaya medsos: embel-embel HARUS bagian dari aliran teks
+     (inline di ujung potongan), bukan overlay absolut — overlay menimpa kata
+     di bawahnya sehingga titik-titiknya kotor/tak terbaca. Caranya: ukur
+     dengan klon tak terlihat (layout sama, React tak terganggu), cari
+     potongan terpanjang yang muat 3 baris via binary search, lalu render
+     potongan + embel-embel. Tanpa pemotongan bila teksnya muat utuh. */
+  const teksRef = useRef<HTMLSpanElement | null>(null);
+  const sufRef = useRef<HTMLButtonElement | null>(null);
+  const [potongan, setPotongan] = useState<string | null>(null);
+  // Bentang = deskripsi dibuka penuh di tempat (tidak membuka pop-up).
+  const [bentang, setBentang] = useState(false);
+  useEffect(() => {
+    const el = teksRef.current;
+    const deskripsi = b.deskripsi;
+    if (!el || !deskripsi || bentang) {
+      // Tanpa deskripsi caption tak dirender; saat dibentangkan pengukuran
+      // tak diperlukan (potongan lama dipakai lagi saat dilipat).
+      return;
+    }
+    // Variabel lokal, bukan b.deskripsi: TypeScript tak mempersempit properti
+    // objek di dalam closure cek() walau sudah dijaga di atas.
+    const cek = () => {
+      // Klon mewarisi kelas (termasuk line-clamp-3) + lebar kolomnya.
+      const ukur = el.cloneNode(false) as HTMLSpanElement;
+      ukur.style.width = `${el.clientWidth}px`;
+      ukur.style.position = "fixed";
+      ukur.style.visibility = "hidden";
+      ukur.style.pointerEvents = "none";
+      document.body.appendChild(ukur);
+      try {
+        ukur.textContent = deskripsi;
+        if (ukur.scrollHeight <= ukur.clientHeight + 1) {
+          setPotongan(null);
+          return;
+        }
+        let lo = 0;
+        let hi = deskripsi.length;
+        while (lo < hi) {
+          const mid = Math.ceil((lo + hi) / 2);
+          ukur.textContent = `${deskripsi.slice(0, mid).trimEnd()}... ${selengkapnya}`;
+          if (ukur.scrollHeight <= ukur.clientHeight + 1) lo = mid;
+          else hi = mid - 1;
+        }
+        setPotongan(deskripsi.slice(0, lo).trimEnd());
+      } finally {
+        ukur.remove();
+      }
+    };
+    cek();
+    window.addEventListener("resize", cek);
+    // Font Poppins bisa datang belakangan dan mengubah lebar baris.
+    let batal = false;
+    document.fonts?.ready.then(() => {
+      if (!batal) cek();
+    }).catch(() => {});
+    return () => {
+      batal = true;
+      window.removeEventListener("resize", cek);
+    };
+  }, [b.deskripsi, selengkapnya, bentang, masonry]);
+
+  /* Jaring pengaman: tombol "... selengkapnya" adalah <button> (bukan teks
+     polos seperti saat diukur) — beda sub-piksel bisa membuatnya lolos ke
+     baris keempat dan terpotong clamp. Bila itu terjadi, potong 10 karakter
+     lagi sampai muat. */
+  useEffect(() => {
+    if (potongan === null || bentang) return;
+    const el = teksRef.current;
+    const suf = sufRef.current;
+    if (!el || !suf) return;
+    const id = requestAnimationFrame(() => {
+      if (suf.getBoundingClientRect().bottom > el.getBoundingClientRect().bottom + 1) {
+        setPotongan((p) => (p && p.length > 10 ? p.slice(0, p.length - 10).trimEnd() : p));
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [potongan, bentang]);
 
   return (
     /* Tumpukan grid satu sel: tombol kartu dan titik galeri menempati sel yang
        sama sehingga titiknya menumpang di dalam gambar — tanpa tombol di dalam
-       tombol. Gambar adalah anak terakhir tombol, jadi dasar kartu = dasar
+       tombol. Gambar adalah anak terakhir tombol, jadi dasar tumpukan = dasar
        gambar dan titik selalu duduk di tepi bawah gambar. Celahnya
-       pointer-events-none supaya klik di luar titik tetap membuka laporan. */
+       pointer-events-none supaya klik di luar titik tetap membuka laporan.
+       Caption (deskripsi) berada di LUAR tumpukan sebagai tombol sendiri di
+       bawahnya — kalau ia di dalam tombol, dasar tumpukan ikut turun dan
+       titik keluar dari foto menimpa tulisan. */
+    <div>
     <div className="grid">
       <button
         type="button" onClick={onBuka}
         title={bukaLabel} aria-label={`${b.judul} — ${bukaLabel}`}
-        className="group col-start-1 row-start-1 block w-full text-left focus-visible:outline-none
+        className={`group col-start-1 row-start-1 w-full min-w-0 text-left focus-visible:outline-none
                    focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:ring-offset-2
-                   focus-visible:ring-offset-pantau-konsol"
+                   focus-visible:ring-offset-pantau-konsol ${masonry ? "flex flex-col" : "block"}`}
       >
-        <p className="font-mono text-[11px] tracking-[0.08em] text-pantau-abu uppercase">
-          {b.tanggal}
-        </p>
-        <p className="mt-1.5 text-[17px] leading-[1.25] font-bold tracking-tight text-white aliran:text-[15px]">
+        {/* Model galeri: tanggal pindah ke baris meta di bawah judul. */}
+        {!masonry && (
+          <p className="font-mono text-[11px] tracking-[0.08em] text-pantau-abu uppercase">
+            {b.tanggal}
+          </p>
+        )}
+        <p className={masonry
+          ? "order-2 mt-3 text-[15px] leading-snug text-pantau-tulang"
+          : "mt-1.5 text-[17px] leading-[1.25] font-bold tracking-tight text-white aliran:text-[15px]"}>
           {b.judul}
         </p>
-        {/* Potret dikunci max-w-360: di rel 300px ia selebar rel, tapi dalam
-            aliran selebar viewport kotak 3:4-nya meledak setinggi 1600px. */}
-        <span className={`relative mt-3 block overflow-hidden bg-black ${b.vertikal ? "mx-auto aspect-[3/4] w-full max-w-[360px]" : "aspect-[16/10]"}`}>
+        {/* Baris meta model galeri: lokasi kiri, tanggal kanan, mono redup. */}
+        {masonry && (
+          <span className="order-3 mt-1.5 flex items-baseline justify-between gap-3 font-mono text-[11px] tracking-wider text-pantau-abu uppercase">
+            <span className="truncate">{b.lokasi ?? b.provinsi ?? "Karhutla"}</span>
+            <span className="shrink-0">{b.tanggal}</span>
+          </span>
+        )}
+        {/* Masonry: rasio alami tanpa crop maupun kunci potret — tinggi kartu
+            mengikuti medianya seperti galeri foto. */}
+        {/* Tanpa media sama sekali, blok ini tidak dirender: di masonry ia jadi
+            kotak hitam tinggi berisi pil lokasi saja, dan kolomnya jadi timpang.
+            Kartunya cukup teks. */}
+        <span className={`${adaMedia ? "" : "hidden "}${masonry
+          ? "relative order-1 block min-w-0 overflow-hidden bg-black"
+          : `relative mt-3 block overflow-hidden bg-black ${b.vertikal ? "mx-auto aspect-[3/4] w-full max-w-[360px]" : "aspect-[16/10]"}`}`}>
           {item ? (
             item.jenis === "video" ? (
-              <VideoKeping key={item.url} url={item.url} poster={item.poster ?? b.poster} label={b.judul} />
+              <VideoKeping key={item.url} url={item.url} poster={item.poster ?? b.poster} label={b.judul} alami={masonry} />
             ) : (
-              <Keping key={item.url} berita={b} src={item.url} />
+              <Keping key={item.url} berita={b} src={item.url} alami={masonry} />
             )
           ) : (
-            <Keping berita={b} />
+            <Keping berita={b} alami={masonry} />
           )}
           {adalahVideo && (
             <span aria-hidden="true" className="absolute right-2 bottom-2 flex items-center gap-1.5 rounded-full bg-black/70 py-1 pr-2.5 pl-2 font-mono text-[10px] tracking-wider text-white uppercase ring-1 ring-white/25 backdrop-blur-sm">
@@ -1128,7 +1460,8 @@ function KartuLaporan({ b, bukaLabel, onBuka }: { b: Berita; bukaLabel: string; 
           )}
         </span>
       </button>
-      {galeri && (
+      {/* Model galeri minimal tanpa titik — geser media ada di rincian. */}
+      {galeri && !masonry && (
         <div role="group" aria-label={`Media ${kini + 1}/${jumlah}`}
              className="pointer-events-none col-start-1 row-start-1 flex items-end justify-center pb-2">
           {/* Alas pil gelap: titik menumpang di atas foto yang kecerahannya tak
@@ -1181,13 +1514,60 @@ function KartuLaporan({ b, bukaLabel, onBuka }: { b: Berita; bukaLabel: string; 
         </div>
       )}
     </div>
+    {/* Caption di luar tumpukan gambar (sejajar, bukan bersarang) supaya
+        titik galeri tetap di tepi bawah foto. "… selengkapnya" inline gaya
+        medsos: mengekliknya MEMBENTANGKAN teks di tempat (bukan membuka
+        pop-up) — klik gambar/judul yang membuka rincian. */}
+    {b.deskripsi && (
+      <div className={masonry ? "mt-2" : "mt-2.5"}>
+        {/* line-clamp-3 TANPA `block`: display:block menimpa -webkit-box
+            milik line-clamp sehingga pemotongan 3 baris gagal total. Saat
+            dibentangkan clamp dilepas supaya teks penuh tampil. */}
+        <span ref={teksRef} className={`${bentang ? "" : "line-clamp-3 "}leading-relaxed ${masonry ? "text-[13px] text-pantau-tulang/70" : "text-[13px] text-pantau-tulang/75"}`}>
+          {potongan === null || bentang ? (
+            b.deskripsi
+          ) : (
+            <>
+              {potongan}
+              <button
+                ref={sufRef}
+                type="button"
+                onClick={() => setBentang(true)}
+                aria-expanded={bentang}
+                aria-label={`${b.judul} — ${selengkapnya}`}
+                className="p-0 text-left text-pantau-abu transition-colors hover:text-white
+                           focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
+              >
+                ... {selengkapnya}
+              </button>
+            </>
+          )}
+        </span>
+        {bentang && potongan !== null && (
+          <button
+            type="button"
+            onClick={() => setBentang(false)}
+            aria-expanded={bentang}
+            className="mt-0.5 block p-0 text-left text-[13px] leading-relaxed text-pantau-abu transition-colors hover:text-white
+                       focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
+          >
+            {lebihSedikit}
+          </button>
+        )}
+      </div>
+    )}
+    </div>
   );
 }
 
 /** Pratinjau kartu rel kanan. Gambar yang lambat atau gagal tidak pernah
  *  memajang ikon rusak — pil lokasi di belakangnya yang tampil, dan gambar
- *  yang jadi memudar masuk di atasnya. */
-function Keping({ berita: b, src }: { berita: Berita; src?: string }) {
+ *  yang jadi memudar masuk di atasnya.
+ *
+ *  Varian `alami` (model galeri): gambar rasio aslinya, mengalir di dalam
+ *  wadah (bukan absolute mengisi bingkai crop) — tinggi kartu mengikuti
+ *  medianya. */
+function Keping({ berita: b, src, alami }: { berita: Berita; src?: string; alami?: boolean }) {
   const [keadaan, setKeadaan] = useState<"memuat" | "ok" | "gagal">("memuat");
   const sumur = src ?? b.gambar ?? b.poster;
 
@@ -1203,8 +1583,36 @@ function Keping({ berita: b, src }: { berita: Berita; src?: string }) {
   /* Sengaja <img>, bukan next/image: gambar bisa berupa URL remote warisan
      (host dinamis per lingkungan) yang tak bisa didaftarkan ke
      remotePatterns statis. */
+  if (alami) {
+    /* Abu konsol, bukan hitam pekat: kartu yang gambarnya belum tiba tampak
+       sebagai bidang kosong biasa, bukan kedipan hitam. */
+    return (
+      <span className="block bg-pantau-konsol">
+        {sumur && keadaan !== "gagal" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            ref={pasangImg}
+            src={sumur} alt="" loading="lazy"
+            onLoad={() => setKeadaan("ok")}
+            onError={() => setKeadaan("gagal")}
+            /* Tanpa fade masuk: tiap kali daftar kartu dibangun ulang (rel
+               melebar/menyempit) React membuat <img> baru, dan memulainya dari
+               opacity-0 membuat semua kartu berkedip hitam walau gambarnya
+               sudah ada di cache. Gambar cache kini tampil seketika. */
+            className="h-auto min-h-40 w-full transition-[filter] duration-500 group-hover:brightness-105"
+          />
+        ) : (
+          <span className="flex min-h-40 items-center justify-center p-4">
+            <span className="rounded-full bg-white/10 px-3 py-1 font-mono text-[11px] tracking-wider text-pantau-tulang/70 uppercase">
+              {b.lokasi ?? b.provinsi ?? "Karhutla"}
+            </span>
+          </span>
+        )}
+      </span>
+    );
+  }
   return (
-    <span className="absolute inset-0 flex items-center justify-center bg-pantau-sumur p-4">
+    <span className="absolute inset-0 flex items-center justify-center bg-pantau-konsol p-4">
       <span className="rounded-full bg-white/10 px-3 py-1 font-mono text-[11px] tracking-wider text-pantau-tulang/70 uppercase">
         {b.lokasi ?? b.provinsi ?? "Karhutla"}
       </span>
@@ -1215,8 +1623,9 @@ function Keping({ berita: b, src }: { berita: Berita; src?: string }) {
           src={sumur} alt="" loading="lazy"
           onLoad={() => setKeadaan("ok")}
           onError={() => setKeadaan("gagal")}
-          className={`absolute inset-0 h-full w-full object-cover transition duration-500
-                      group-hover:scale-[1.03] ${keadaan === "ok" ? "opacity-100" : "opacity-0"}`}
+          /* Sama seperti varian galeri: tampil seketika, tanpa fade yang
+             membuat kartu berkedip hitam saat daftar dibangun ulang. */
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
         />
       )}
     </span>
@@ -1227,12 +1636,18 @@ function Keping({ berita: b, src }: { berita: Berita; src?: string }) {
  *  (VideoKartu), tapi "aktif"-nya berarti kartu terlihat di layar: hanya yang
  *  terlihat yang diputar, sisanya dijeda, supaya 6 kartu tak mengunduh dan
  *  men-decode bersamaan. Tanpa suara dan tanpa kontrol (kartunya sendiri sudah
- *  tombol pembuka laporan); pengurang gerak berarti diam di poster. */
-function VideoKeping({ url, poster, label }: { url: string; poster: string | null; label: string }) {
+ *  tombol pembuka laporan); pengurang gerak berarti diam di poster.
+ *
+ *  Varian `alami` (model galeri): poster yang mengalir menentukan tinggi
+ *  wadah, video menutupinya penuh; tanpa poster, video sendiri yang
+ *  mengalir dengan rasio aslinya. */
+function VideoKeping({ url, poster, label, alami }: { url: string; poster: string | null; label: string; alami?: boolean }) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const terlihatRef = useRef(false);
   const [siap, setSiap] = useState(false);
-  const [posterSiap, setPosterSiap] = useState(false);
+  // Poster tampil seketika (gambar cache tak boleh berkedip hitam saat daftar
+  // kartu dibangun ulang); state ini hanya menandai poster yang gagal dimuat.
+  const [posterGagal, setPosterGagal] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -1268,20 +1683,58 @@ function VideoKeping({ url, poster, label }: { url: string; poster: string | nul
      sehingga penolakan putar (hemat daya) atau canplay yang macet berarti
      kotak hitam total. Dengan lapisan sendiri selalu ada bingkai terlihat. */
   const pasangPoster = useCallback((el: HTMLImageElement | null) => {
-    if (el && el.complete) setPosterSiap(el.naturalWidth > 0);
+    if (el && el.complete && el.naturalWidth === 0) setPosterGagal(true);
   }, []);
+
+  const videoEl = (kelas: string) => (
+    <video
+      ref={ref}
+      src={url}
+      aria-label={label}
+      muted
+      playsInline
+      loop
+      preload="metadata"
+      onCanPlay={(e) => cobaPutar(e.currentTarget)}
+      // canplay bisa lewat sebelum pendengarnya terpasang (video dari cache)
+      // — video lalu berputar tapi tetap opacity-0 di belakang poster.
+      // `playing` datang tiap kali pemutaran benar-benar mulai.
+      onPlaying={() => setSiap(true)}
+      className={kelas}
+    />
+  );
+
+  if (alami) {
+    return (
+      <span className="relative block bg-black">
+        {poster && !posterGagal ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              ref={pasangPoster}
+              src={poster} alt="" aria-hidden="true" loading="lazy"
+              onError={() => setPosterGagal(true)}
+              className="h-auto min-h-40 w-full transition-[filter] duration-500 group-hover:brightness-105"
+            />
+            {videoEl(`absolute inset-0 h-full w-full object-cover transition duration-500
+                      group-hover:brightness-105 ${siap ? "opacity-100" : "opacity-0"}`)}
+          </>
+        ) : (
+          videoEl("h-auto min-h-40 w-full")
+        )}
+      </span>
+    );
+  }
 
   return (
     <span className="absolute inset-0 bg-black">
-      {poster && (
+      {poster && !posterGagal && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           ref={pasangPoster}
           src={poster} alt="" aria-hidden="true" loading="lazy"
-          onLoad={() => setPosterSiap(true)}
-          onError={() => setPosterSiap(false)}
-          className={`absolute inset-0 h-full w-full object-cover transition duration-500
-                      group-hover:scale-[1.03] ${posterSiap ? "opacity-100" : "opacity-0"}`}
+          onError={() => setPosterGagal(true)}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
         />
       )}
       <video

@@ -121,14 +121,11 @@ export async function GET(req: NextRequest) {
           } catch(e) {}
 
           // 0b. Bungkam telemetri/analitik Windy (/ga/) dan endpoint privat
-          // (account.windy.com, capalerts, forecast/fragment).
-          // Endpoint-endpoint ini hanya mengizinkan Access-Control-Allow-Origin:
-          // https://www.windy.com, sehingga memicu galat CORS merah di console
-          // saat dijalankan dari origin web kita. Kita cegat SEBELUM ke jaringan
-          // dan balas respons kosong/JSON-sukses agar peta berjalan mulus tanpa CORS error.
+          // (account.windy.com, capalerts). Endpoint /forecast/fragment/ dibiarkan
+          // lolos karena mendukung CORS publik dan menyediakan data weather .now.temperature.
           var _windyBungkam = function(u) {
             try { u = String(u); } catch(e) { return false; }
-            return (u.indexOf('node.windy.com') !== -1 && (u.indexOf('/ga/') !== -1 || u.indexOf('/capalerts/') !== -1 || u.indexOf('/forecast/fragment/') !== -1)) ||
+            return (u.indexOf('node.windy.com') !== -1 && (u.indexOf('/ga/') !== -1 || u.indexOf('/capalerts/') !== -1)) ||
                    (u.indexOf('account.windy.com') !== -1);
           };
           try {
@@ -137,7 +134,7 @@ export async function GET(req: NextRequest) {
               var url = (input && typeof input === 'object' && input.url) ? input.url : input;
               if (_windyBungkam(url)) {
                 var urlStr = String(url);
-                var isJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1 || urlStr.indexOf('/forecast/fragment/') !== -1;
+                var isJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1;
                 return Promise.resolve(new Response(isJson ? '{}' : null, {
                   status: 200,
                   statusText: 'OK',
@@ -152,7 +149,7 @@ export async function GET(req: NextRequest) {
             XMLHttpRequest.prototype.open = function(method, url) {
               this.__windyBungkam = _windyBungkam(url);
               var urlStr = String(url);
-              this.__windyIsJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1 || urlStr.indexOf('/forecast/fragment/') !== -1;
+              this.__windyIsJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1;
               return _xhrOpen.apply(this, arguments);
             };
             var _xhrSend = XMLHttpRequest.prototype.send;
