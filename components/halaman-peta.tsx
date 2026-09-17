@@ -6,6 +6,7 @@ import type { KabupatenTerluas } from "@/lib/wms";
 import { BAHASA, TEKS_PETA, type Bahasa } from "@/lib/bahasa";
 import { gunakanParallax } from "@/hooks/gunakan-parallax";
 import { gunakanKolomMasonry } from "@/hooks/gunakan-kolom-masonry";
+import { KomposerLapor } from "@/components/komposer-lapor";
 import { TUTUP_OVERLAY } from "@/lib/peristiwa-popup";
 import {
   inferPulau,
@@ -403,6 +404,12 @@ export function HalamanPeta({
                      panggung:overflow-y-auto panggung:overscroll-contain
                      transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none [contain:layout_paint] ${kiriBuka ? "opacity-100" : "opacity-0"}`}
         >
+          {/* Isi rel diskalakan proporsional — lihat --skala-rel di
+              globals.css. Lebar relnya sudah mengecil lewat clamp, tapi ukuran
+              hurufnya piksel tetap; tanpa ini, di zoom peramban 125% teks
+              membengkak seperempat terhadap panelnya. Yang diskalakan ISI-nya,
+              bukan relnya: menskalakan rel ikut memperkecil lebarnya. */}
+          <div className="[zoom:var(--skala-rel)]">
           <form role="search" onSubmit={(e) => e.preventDefault()} className="relative">
             <label htmlFor="cari-pantau" className="sr-only">
               {teks.cari}
@@ -444,6 +451,7 @@ export function HalamanPeta({
             </button>
 
             {kelompokWilayah("pantau")}
+          </div>
           </div>
         </aside>
         </div>
@@ -514,6 +522,22 @@ export function HalamanPeta({
                          panggung:px-3.5 panggung:text-[clamp(24px,1.8vw,36px)]">
             {teks.judulHalaman}
           </h2>*/}
+
+          {/* Komposer lapor menempati ruang sisa di atas bingkai. Terukur
+              sisa itu 293px di 1920 sampai 158px di 1280, dan yang mengikat
+              ukuran peta adalah LEBAR kolom (tinggi selalu berlebih) — jadi
+              kotak ini tidak mengecilkan peta selama tingginya tetap di bawah
+              sisa tersebut. Hanya panggung: di aliran, layarnya sudah penuh
+              peta + laci. */}
+          {/* Hanya baris ajakannya yang duduk di sini (99px; sisa ruang paling
+              sempit 158px di 1280, jadi peta tak bergeser). Formulir lengkapnya
+              terbuka sebagai dialog, bukan melebar di tempat: versi yang
+              melebar terukur menutupi enam kontrol peta di 1280 — kedua pil
+              lapisan, Panduan Peta, kedua tombol zoom, dan tautan atribusi —
+              sampai tak bisa diklik. */}
+          <div className="mb-3 hidden panggung:block">
+            <KomposerLapor bahasa={bahasa} asapAktif={asapAktif} />
+          </div>
 
           {/* Ruang sisa antara judul dan kaki. Di panggung ia jadi container
               ukuran, sehingga lebar bingkai = min(lebar ruang, tinggi ruang ×
@@ -740,6 +764,8 @@ export function HalamanPeta({
                      panggung:overflow-y-auto panggung:overscroll-contain panggung:py-5
                      transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none [contain:layout_paint] ${kananBuka ? "opacity-100" : "opacity-0"}`}
         >
+          {/* Sama seperti rel kiri: isinya yang diskalakan, bukan relnya. */}
+          <div className="[zoom:var(--skala-rel)]">
           {/* Toolbar: filter terbaru/terpopuler + toggle tampilan */}
           <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-white/10">
             {/* Filter Terbaru / Terpopuler — icon buttons */}
@@ -887,6 +913,7 @@ export function HalamanPeta({
               {teks.relKosong}
             </p>
           )}
+          </div>
         </aside>
         </div>
       </div>

@@ -152,6 +152,30 @@
   :root { --mode: "panggung"; }
 }
 
+/* ── Skala isi rel konsol ─────────────────────────────────────────────────
+   Lebar rel /peta sudah proporsional (clamp 248px..320px), tapi ukuran
+   hurufnya tetap piksel. Akibatnya di zoom peramban 125% viewport menyusut ke
+   1536: relnya ikut mengecil ke 256px sementara hurufnya tidak, jadi teks
+   membengkak seperempat terhadap panelnya. Terukur: rasio tinggi baris per
+   1000px rel naik dari 76,8 di 1920 menjadi 95,9 di 1536.
+
+   Isi rel — bukan relnya — diskalakan sekali di pembungkus dalam, sehingga
+   huruf, padding, dan sela ikut mengecil bersama. Terukur balik ke 76,6.
+
+   Angka, bukan clamp(): `zoom` menolak ekspresi matematika (diuji, computed
+   value jatuh ke 1 dan rasionya tetap membengkak), tapi menerima var berisi
+   angka biasa. Karena itu tangganya bertahap.
+
+   Lantainya 0.775, bukan rasio viewport. Sejak ~1488px lebar rel mentok di
+   248px dan berhenti menyusut, jadi patokannya bukan lagi layar melainkan rel
+   itu sendiri: 248/320 = 0.775. Versi pertama memakai rasio viewport (0.71 di
+   1366) dan terukur meleset ke arah sebaliknya — huruf 9% lebih kecil daripada
+   proporsional. */
+:root { --skala-rel: 1; }
+
+@media (max-width: 1700px) { :root { --skala-rel: 0.8; } }
+@media (max-width: 1488px) { :root { --skala-rel: 0.775; } }
+
 html {
   background: var(--color-panggung);
   color: var(--color-tinta);
