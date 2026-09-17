@@ -308,7 +308,7 @@ export function HalamanPeta({
      pembagian tetap, kartu tak punya jalan untuk pindah kolom: yang tersisa
      hanya geser turun di dalam kolomnya sendiri. */
   const kartuGrid = !tengahBuka && modeRel === "kartu";
-  const jumlahKolom = gunakanKolomMasonry();
+  const jumlahKolom = gunakanKolomMasonry(kiriBuka);
   const kelasUlRel = kartuGrid ? "mt-2" : "mt-2 divide-y divide-white/10";
   const kelasLiRel = kartuGrid
     // Jarak antar kartu sama ke bawah dan ke samping (24px).
@@ -378,7 +378,7 @@ export function HalamanPeta({
             : "minmax(0,0px)",
         } as React.CSSProperties}
         className="relative flex min-h-0 w-full flex-1 flex-col panggung:p-2
-                   [--rel-kiri:300px] [--rel-kanan:340px] xl:[--rel-kiri:320px] xl:[--rel-kanan:360px]
+                   [--rel-kiri:clamp(248px,16.67vw,320px)] [--rel-kanan:clamp(272px,18.75vw,360px)]
                    panggung:grid panggung:min-h-0 panggung:grid-cols-[var(--kolom-kiri)_var(--kolom-tengah)_var(--kolom-kanan)]
                    panggung:transition-[grid-template-columns] panggung:duration-500 panggung:ease-[cubic-bezier(0.22,1,0.36,1)]
                    motion-reduce:transition-none"
@@ -486,6 +486,29 @@ export function HalamanPeta({
               isi, jadi hanya di layar panggung yang lega. */}
           <div aria-hidden="true" className="pantau-titik pantau-titik--kanan hidden panggung:block" />
           <div aria-hidden="true" className="pantau-titik pantau-titik--kiri hidden panggung:block" />
+          {/* Tombol X kedua — di atas pola titik kanan, pojok kanan atas
+              section (di LUAR bingkai peta). Penutup yang sama dengan pil di
+              bingkai (setTengahBuka(false)), hanya bentuknya X melayang. */}
+          {tengahBuka && (
+            <button
+              type="button"
+              onClick={() => setTengahBuka(false)}
+              aria-expanded={tengahBuka}
+              aria-controls="peta"
+              title={teks.tutupPeta}
+              aria-label={teks.tutupPeta}
+              className={`absolute top-1 right-2 z-[43] hidden size-9 items-center justify-center rounded-full
+                         text-white ring-1 backdrop-blur-sm ${aksenTombolPeta}
+                         transition hover:scale-105 active:scale-95
+                         focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none
+                         panggung:inline-flex`}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4"
+                   strokeLinecap="round" className="size-4">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
 
           {/*<h2 className="relative px-2 pt-4 pb-3 text-[28px] leading-[1.05] font-bold tracking-[-0.02em] text-white panggung:pt-0
                          panggung:px-3.5 panggung:text-[clamp(24px,1.8vw,36px)]">
@@ -603,8 +626,15 @@ export function HalamanPeta({
         {/* Pembuka kembali kolom tengah menempel di tepi kiri rel ini saat
             peta dilipat — rel kanan tetap penuh sampai batas rel kiri. */}
         <div className="relative min-h-0 aliran:hidden panggung:col-start-3 panggung:row-start-1 panggung:flex panggung:justify-start panggung:overflow-visible">
+        {/* left-3, bukan left-0 + -translate-x-1/2. Memusatkan tombol di garis
+            batas hanya aman selama ada kolom di kirinya; begitu rel kiri ikut
+            ditutup, garis itu JADI tepi layar dan separuh tombol jatuh ke luar
+            (terukur x = -10). Dijangkarkan ke dalam rel, ia utuh di semua
+            kombinasi. */}
         {!tengahBuka && (
-          <span className="absolute top-1/2 left-0 z-[41] hidden -translate-x-1/2 -translate-y-1/2 panggung:block">
+          <span className={`absolute top-1/2 z-[41] hidden -translate-y-1/2 panggung:block ${
+            kiriBuka ? "left-0 -translate-x-1/2" : "left-3"
+          }`}>
             <button
               type="button"
               onClick={() => {
@@ -635,6 +665,65 @@ export function HalamanPeta({
             </button>
           </span>
         )}
+        {/* Saat peta dilipat, TabRel kiri ikut tersembunyi di dalam section
+            peta (opacity-0) sehingga sidebar kiri tak bisa ditutup lagi —
+            tombol ini menggantikannya: menempel di tepi kiri rel kanan,
+            di bawah tombol buka-peta. Ikon X saat terbuka, ikon panel saat
+            tertutup (sekaligus pembuka kembali). Hanya panggung.
+
+            translate-y-7, bukan -6: dengan 6 jaraknya cuma 6px dari tombol
+            buka-peta dan keduanya terbaca sebagai satu gumpalan. Jangkarnya
+            left-3 dengan alasan yang sama seperti tombol di atas.
+
+            Warnanya SENGAJA bukan aksenTombolPeta. Dulu tombol ini kembar
+            total dengan tombol buka-peta — ukuran, radius, dan warna tema yang
+            sama — sehingga tak ada yang menandai mana yang memulihkan peta dan
+            mana yang mengatur sidebar. Buka-peta memulihkan isi utama konsol,
+            jadi ia yang memegang warna tema; penutup sidebar adalah perabot,
+            jadi ia turun ke permukaan konsol. */}
+        {!tengahBuka && (
+          <span className={`absolute top-1/2 z-[41] hidden translate-y-7 panggung:block ${
+            kiriBuka ? "left-0 -translate-x-1/2" : "left-3"
+          }`}>
+            <button
+              type="button"
+              onClick={() => setKiriBuka((b) => !b)}
+              aria-expanded={kiriBuka}
+              aria-controls="rel-kiri-pantau"
+              title={kiriBuka
+                ? (bahasa === "en" ? "Close left sidebar" : "Tutup sidebar kiri")
+                : (bahasa === "en" ? "Open left sidebar" : "Buka sidebar kiri")}
+              aria-label={kiriBuka
+                ? (bahasa === "en" ? "Close left sidebar" : "Tutup sidebar kiri")
+                : (bahasa === "en" ? "Open left sidebar" : "Buka sidebar kiri")}
+              className="group flex size-9 items-center justify-center rounded-xl bg-pantau-konsol/95
+                         text-white ring-1 ring-white/20 shadow-[0_6px_18px_rgb(0_0_0/0.5)] backdrop-blur-sm
+                         transition hover:scale-105 hover:bg-pantau-konsol hover:ring-white/35 active:scale-95
+                         focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              {kiriBuka ? (
+                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4"
+                     strokeLinecap="round" className="size-4 transition-transform group-hover:scale-110">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
+                     strokeLinecap="round" strokeLinejoin="round" className="size-4 transition-transform group-hover:scale-110">
+                  <rect x="4" y="5" width="16" height="14" rx="2" />
+                  <line x1="10" y1="5" x2="10" y2="19" />
+                </svg>
+              )}
+            </button>
+          </span>
+        )}
+        {/* pl-16 saat peta dilipat: selokan untuk tombol buka-peta dan penutup
+            sidebar yang mengapung di tepi kiri rel. Tombolnya berhenti 48px
+            dari tepi rel, jadi isi mulai di 64px — tanpa ini keduanya
+            melayang di atas foto dan judul kartu, dan kartu yang digulir lewat
+            di bawahnya. Hanya saat peta dilipat: kalau peta terbuka kedua
+            tombol itu tidak dirender, dan selokannya cuma jadi ruang kosong.
+            Angka ini dicerminkan di gunakanKolomMasonry — kalau diubah di sini
+            saja, perhitungan jumlah kolomnya ikut meleset. */}
         <aside
           id="rel-kanan-pantau"
           data-lenis-prevent
@@ -643,7 +732,11 @@ export function HalamanPeta({
           className={`pantau-rel min-h-0 border-white/10 bg-pantau-konsol p-4 sm:p-5
                      aliran:rounded-2xl aliran:ring-1 aliran:ring-white/10
                      panggung:ml-2 panggung:h-full panggung:shrink-0 panggung:rounded-xl
-                     ${tengahBuka ? "panggung:w-[var(--rel-kanan)]" : "panggung:w-full panggung:ml-0"}
+                     ${tengahBuka
+                       ? "panggung:w-[var(--rel-kanan)]"
+                       : kiriBuka
+                         ? "panggung:w-full panggung:ml-0"
+                         : "panggung:w-full panggung:ml-0 panggung:pl-16"}
                      panggung:overflow-y-auto panggung:overscroll-contain panggung:py-5
                      transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none [contain:layout_paint] ${kananBuka ? "opacity-100" : "opacity-0"}`}
         >

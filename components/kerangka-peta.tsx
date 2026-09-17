@@ -21,8 +21,7 @@ export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
         aria-hidden="true"
         className="relative flex h-[calc(100svh-4rem)] w-full animate-pulse flex-col
                    panggung:grid panggung:gap-2 panggung:p-2
-                   panggung:grid-cols-[300px_minmax(0,1fr)_340px]
-                   xl:grid-cols-[320px_minmax(0,1fr)_360px]"
+                   panggung:grid-cols-[clamp(248px,16.67vw,320px)_minmax(0,1fr)_clamp(272px,18.75vw,360px)]"
       >
         {/* Rel kiri — hanya panggung */}
         <div className="bg-pantau-konsol px-3 py-3.5 aliran:hidden panggung:rounded-xl">
