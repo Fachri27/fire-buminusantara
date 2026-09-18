@@ -38,9 +38,15 @@ export function proxy(request: NextRequest) {
       return new NextResponse(null, { status: 404 });
     }
     const kePeta = BAHASA.some((b) => pathname === `/${b}` || pathname === `/${b}/`);
+    // Panel situasi seluler ikut dibuka: di ponsel dasbor dipecah dua halaman
+    // — daftar laporan di /<locale> dan panel di /<locale>/karhutla/panel — dan
+    // bilah tab bawah menautkannya. Tanpa pengecualian ini tombol panelnya
+    // memulangkan pengunjung ke /id, yang terasa seperti tombol mati.
+    const kePanel = BAHASA.some((b) =>
+      pathname === `/${b}/karhutla/panel` || pathname === `/${b}/karhutla/panel/`);
     const aset = pathname.startsWith("/_next/") || pathname.startsWith("/assets/") || pathname.startsWith("/css/") ||
       pathname.startsWith("/api/") || pathname.startsWith("/media/") || pathname.includes(".");
-    if (!kePeta && !aset) {
+    if (!kePeta && !kePanel && !aset) {
       request.nextUrl.pathname = "/id";
       return NextResponse.redirect(request.nextUrl, 308);
     }
