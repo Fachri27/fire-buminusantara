@@ -1364,6 +1364,7 @@ export function LandingKarhutla(
      mengikuti breakpoint panggung/aliran halaman ini. */
   const bingkaiPetaRef = useRef<HTMLDivElement>(null);
  
+ 
   const isiPetaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const bingkai = bingkaiPetaRef.current;
@@ -1625,7 +1626,7 @@ export function LandingKarhutla(
                     onClick={() => setPetaPenuh(false)}
                     title={t.tutupPetaSelayar}
                     aria-label={t.tutupPetaSelayar}
-                    className="pointer-events-auto absolute top-4 right-4 z-[80] flex size-9 items-center justify-center rounded-full
+                    className="pointer-events-auto absolute top-4 right-4 z-[1100] flex size-9 items-center justify-center rounded-full
                                bg-black/70 text-white ring-1 ring-white/15 backdrop-blur-sm
                                transition hover:scale-105 hover:ring-[#ff5a26]/70 active:scale-95
                                motion-reduce:transition-none motion-reduce:hover:scale-100

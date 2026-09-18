@@ -4,16 +4,27 @@
 
 /* Kisi titik bara di tepi rel kiri — tekstur khas rujukan desain. Dipasang
    sebagai pita tipis yang memudar ke dalam halaman, bukan blok padat. */
+/* Topengnya DUA lapis yang dipotong-silang: pudar tegak (arahnya dibalik oleh
+   varian --bawah) dan ramp mendatar kiri->kanan. Hasilnya sisi kiri nyaris
+   kosong lalu titiknya menguat ke tepi kanan, bukan rata sepanjang pita.
+
+   Rampnya disimpan sebagai custom property karena .lk-titik--bawah menimpa
+   `mask-image` SEUTUHNYA — shorthand topeng tak bisa ditimpa separuh — jadi
+   lapisan mendatar harus disebut ulang di sana, dan angkanya sebaiknya hidup
+   di satu tempat saja. */
 .lk-titik {
+  --lk-titik-datar: linear-gradient(to right, transparent 0%, transparent 30%, #000 100%);
   background-image: radial-gradient(circle, rgb(255 90 38 / 0.55) 1px, transparent 1.6px);
   background-size: 9px 9px;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%), var(--lk-titik-datar);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%), var(--lk-titik-datar);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
 }
 
 .lk-titik--bawah {
-  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 0%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 100%), var(--lk-titik-datar);
+  mask-image: linear-gradient(to top, #000 0%, transparent 100%), var(--lk-titik-datar);
 }
 
 /* ── Overlay peta selayar ───────────────────────────────────────────────────
@@ -577,4 +588,24 @@
   .lk-bingkai {
     --sela-bawah: 76px;
   }
+}
+
+.lk-tombol-peta,
+.lk-tombol-peta * {
+  pointer-events: auto !important;
+}
+
+.lk-tombol-peta {
+  position: relative !important;
+  z-index: 9999 !important;
+}
+
+.lk-peta-penuh,
+.lk-peta-penuh * {
+  pointer-events: auto !important;
+}
+
+.lk-peta-penuh button {
+  position: relative !important;
+  z-index: 10000 !important;
 }
