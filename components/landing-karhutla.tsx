@@ -1286,6 +1286,9 @@ export function LandingKarhutla(
      trek grid sekaligus posisi tombolnya. */
   const LEBAR_REL_KIRI = "clamp(340px,33.5vw,680px)";
   const [kiriBuka, setKiriBuka] = useState(true);
+  /* Lembar panel seluler: terkatup atau mengintip. Hanya dipakai di halaman
+     panel; di panggung kelasnya tak punya gaya apa pun. */
+  const [lembarTutup, setLembarTutup] = useState(false);
   const panelTerlihat = tampil === "panel" || !aliran;
   const umpanTerlihat = tampil === "semua" || !aliran;
 
@@ -1482,7 +1485,7 @@ export function LandingKarhutla(
   const kolom = gunakanKolomUmpan(kiriBuka);
 
   return (
-    <div className="lk-bingkai min-h-dvh bg-[#0a0a0a] pt-16 text-[#f5f5f5] antialiased">
+    <div className={`lk-bingkai${tampil === "panel" ? " lk-mode-panel" : ""} min-h-dvh bg-[#0a0a0a] pt-16 text-[#f5f5f5] antialiased`}>
       {/* Bilah kepala SAMA dengan halaman index — <Nav gelap>: fixed h-16,
           logo Fire + merek + tombol Lapor + pemilih bahasa. pt-16 pada bingkai
           memberi ruang di bawah bilah yang fixed (pola halaman-peta.tsx). */}
@@ -1559,7 +1562,7 @@ export function LandingKarhutla(
               guliran halaman begitu kursor melintasi bingkai. */}
           <div
             ref={bingkaiPetaRef}
-            className="relative isolate aspect-[1080/544] min-h-[280px] w-full overflow-hidden rounded-md ring-1 ring-white/10"
+            className="lk-bingkai-peta relative isolate aspect-[1080/544] min-h-[280px] w-full overflow-hidden rounded-md ring-1 ring-white/10"
           >
             <div ref={isiPetaRef} className="lk-peta-isi">
               <Peta
@@ -1639,6 +1642,22 @@ export function LandingKarhutla(
               )
             : null}
 
+          {/* Pembungkus lembar bawah. Di panggung ia sekadar div tanpa gaya —
+              isinya mengalir seperti biasa; di halaman panel seluler CSS
+              mengangkatnya jadi lembar yang mengintip di atas peta selayar. */}
+          <div className={`lk-lembar-panel${lembarTutup ? " lk-panel-katup" : ""}`}>
+            <button
+              type="button"
+              className="lk-lembar-gagang"
+              onClick={() => setLembarTutup((v) => !v)}
+              aria-expanded={!lembarTutup}
+              aria-label={lembarTutup
+                ? (bahasa === "en" ? "Open situation panel" : "Buka panel situasi")
+                : (bahasa === "en" ? "Collapse situation panel" : "Tutup panel situasi")}
+            >
+              <span aria-hidden="true" />
+            </button>
+
           {/* Sumur lokasi + cuaca: panel abu di atas latar hitam, pil lokasi
               yang lebih gelap di dalamnya — sesuai rujukan. mx-4: blok ini
               sengaja lebih sempit dan menengah dibanding peta di atasnya. */}
@@ -1687,6 +1706,7 @@ export function LandingKarhutla(
           <p className="lk-kaki mx-auto mt-4 max-w-[46ch] px-2 text-center text-[11px] leading-relaxed text-[#a0a0a0]">
             <strong className="font-bold text-[#f5f5f5]">{t.merek}</strong> — {t.kaki}
           </p>
+          </div>
           <div aria-hidden="true" className="lk-titik lk-titik--bawah mt-3 h-9" />
         </aside>
         )}

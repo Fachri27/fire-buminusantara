@@ -342,6 +342,140 @@
     padding-inline: 0.75rem;
   }
 
+  /* ── Halaman panel seluler: pola peta-selayar ala aplikasi peta ──────────
+     Peta jadi alas yang mengisi layar, pil lokasi mengambang di atasnya
+     sebagai kolom pencarian, dan isi panel (cuaca, angka situasi, kaki) naik
+     jadi lembar bawah yang mengintip di atas bilah tab.
+
+     Seluruhnya lewat CSS: urutan DOM tidak diubah sama sekali, jadi pembaca
+     layar dan urutan Tab tetap melewati peta lalu isi panel seperti semula.
+     Pil lokasi pun tidak dipindahkan dari kartu cuacanya — `position: fixed`
+     mengeluarkannya dari aliran, dan kartunya menutup sendiri. */
+  .lk-mode-panel .lk-kiri {
+    padding: 0;
+  }
+
+  /* Pita titik itu hiasan rel; di tata letak ini ia hanya memotong peta. */
+  .lk-mode-panel .lk-titik {
+    display: none;
+  }
+
+  /* Bingkai peta jadi alas selayar. aspect-ratio & min-height DIBATALKAN —
+     keduanya utilitas Tailwind pada elemen yang sama, dan selektor dua-kelas
+     ini menang atas kelas tunggal tanpa bergantung urutan berkas. */
+  .lk-mode-panel .lk-bingkai-peta {
+    position: fixed;
+    inset: 4rem 0 0 0;
+    z-index: 0;
+    /* Beri tahu peta berapa ruang dasar yang sudah terpakai. peta-asap.tsx
+       memposisikan bilah waktu dan legendanya di `bottom: calc(--sela-bawah +
+       1rem)`, jadi variabel inilah yang mengangkatnya.
+
+       Terukur: dengan warisan 76px, bilah waktu duduk di y 739-808 sementara
+       lembar terkatup mulai di 780 — tertimpa 28px. Lembar terkatup tingginya
+       120px (76 + 2.75rem), jadi tepinya di 900-120=780; agar bilah berhenti
+       8px di atasnya, ia harus berakhir di 772, yang berarti 900-(X+16)=772
+       -> X=112px. */
+    --sela-bawah: 7rem;
+    aspect-ratio: auto;
+    min-height: 0;
+    width: auto;
+    border-radius: 0;
+    --tw-ring-shadow: 0 0 #0000;
+  }
+
+  /* Pil lokasi mengambang di atas peta — padanan kolom pencarian di rujukan. */
+  .lk-mode-panel .lk-lokasi {
+    position: fixed;
+    top: calc(4rem + 0.75rem);
+    /* Berhenti sebelum SEMUA penghuni sudut kanan atas peta, bukan sampai tepi
+       layar. Di layar 414 terukur dua penghuni: tumpukan kendali peta di
+       x 374-402, dan tombol bentang di x 342-378.
+
+       Percobaan pertama memakai 3rem (tepi pil di 366) dan itu kurang: saat
+       diukur, tombol bentang masih terlempar ke luar layar oleh bug
+       `position: relative !important` sehingga tak terhitung sebagai penghalang.
+       Begitu bug itu diperbaiki ia kembali ke x 342 dan langsung tertutup pil.
+       5rem menaruh tepi pil di 334 — celah 8px ke penghalang terkiri. */
+    right: 5rem;
+    left: 0.75rem;
+    z-index: 2;
+    margin: 0;
+    background: rgb(20 20 20 / 0.92);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Lembar bawah. Tingginya tetap dan isinya bergulir — BUKAN diseret:
+     seretan butuh JS, dan ini perubahan tata letak murni. Dasarnya berhenti di
+     atas bilah tab lewat --sela-bawah, variabel yang sama yang dipakai lembar
+     rincian. */
+  /* Dipancang bottom:0 dan latarnya menerus SAMPAI DASAR, lalu isinya diberi
+     padding bawah supaya tetap bebas dari bilah tab.
+
+     Versi sebelumnya memancangnya di var(--sela-bawah) = 76px, sementara bilah
+     tab sebenarnya 64px — menyisakan lubang 12px yang menembus ke peta. Angka
+     76 itu memang sengaja longgar demi env(safe-area-inset-bottom) di ponsel
+     bertakik, jadi menggantinya dengan 64 justru akan patah di sana. Dengan
+     latar yang menerus, celah mustahil muncul berapa pun tinggi bilahnya. */
+  .lk-mode-panel .lk-lembar-panel {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 2;
+    height: 38dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 0 calc(var(--sela-bawah, 0px) + 0.75rem);
+    background: #101010;
+    border-radius: 1.25rem 1.25rem 0 0;
+    box-shadow: 0 -12px 32px rgb(0 0 0 / 0.5);
+    transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Terkatup: tinggi menyusut sampai tinggal gagangnya, masih di atas bilah.
+
+     Namanya `lk-panel-katup`, BUKAN `lk-lembar-tutup`: nama itu sudah dipakai
+     tombol tutup pada lembar "..." kartu umpan, yang dipancang
+     `position: absolute; top: 0.75rem` tanpa media query. Memakainya di sini
+     membuat lembar mewarisi `top` itu — dan dengan top, bottom, serta height
+     terpasang sekaligus, kotaknya over-constrained sehingga CSS menuruti
+     top+height dan lembar melompat ke puncak layar (terukur y 12-132). */
+  .lk-mode-panel .lk-lembar-panel.lk-panel-katup {
+    height: calc(var(--sela-bawah, 0px) + 2.75rem);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lk-mode-panel .lk-lembar-panel {
+      transition: none;
+    }
+  }
+
+  /* Gagang: tombol sungguhan, bukan hiasan — menekannya mengatupkan lembar. */
+  .lk-mode-panel .lk-lembar-gagang {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 0;
+    cursor: pointer;
+    background: none;
+    border: 0;
+  }
+
+  .lk-mode-panel .lk-lembar-gagang span {
+    display: block;
+    width: 2.25rem;
+    height: 0.25rem;
+    margin: 0 auto;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.3);
+  }
+
+  /* Peta sudah selayar di sini, jadi tombol bentang tak ada gunanya. */
+  .lk-mode-panel .lk-tombol-peta {
+    display: none;
+  }
+
   .lk-kartu-media {
     order: 1;
   }
@@ -590,13 +724,30 @@
   }
 }
 
+/* Gagang lembar hanya hidup di halaman panel seluler; di tempat lain tombolnya
+   tetap ada di DOM tapi tak ditampilkan. */
+.lk-lembar-gagang {
+  display: none;
+}
+
 .lk-tombol-peta,
 .lk-tombol-peta * {
   pointer-events: auto !important;
 }
 
 .lk-tombol-peta {
-  position: relative !important;
+  /* `absolute`, bukan `relative`. Tombol ini dipasang `absolute top-2 right-9`
+     di dalam bingkai peta, dan `relative !important` mengalahkan utilitas itu:
+     offset `right: 36px` lalu diartikan sebagai geseran 36px ke KIRI dari
+     posisi statisnya, sehingga tombolnya terlempar ke luar layar. Terukur
+     x=-36..0 di panel ponsel dan x=-20..9 di desktop — pada halaman umpan
+     maupun panel.
+
+     Maksud aturan ini (bisa diklik, berada di atas) tetap utuh: `absolute`
+     juga membentuk konteks penumpukan, jadi z-index di bawah ini tetap
+     bekerja. Diuji di peramban sebelum diubah: dengan `absolute` tombolnya
+     mendarat di x=342..378 dalam bingkai 0..414 — tepat sudut kanan atas. */
+  position: absolute !important;
   z-index: 9999 !important;
 }
 
