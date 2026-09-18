@@ -1363,6 +1363,7 @@ export function LandingKarhutla(
      dari lebar rel yang diukur (lihat di bawah), sedangkan PILIHAN modenya
      mengikuti breakpoint panggung/aliran halaman ini. */
   const bingkaiPetaRef = useRef<HTMLDivElement>(null);
+ 
   const isiPetaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const bingkai = bingkaiPetaRef.current;
@@ -1495,7 +1496,7 @@ export function LandingKarhutla(
       {/* Kedua trek dinyatakan minmax(0,<panjang>) — TANPA fr. grid-template-columns
           hanya bisa dianimasikan kalau daftar treknya cocok tipe, dan satu trek
           yang tak cocok mematikan interpolasi seluruh daftar; lajur sisa karena
-          itu ditulis eksplisit sebagai 100% dikurangi rel dan selanya. Catatan
+          ditulis eksplisit sebagai 100% dikurangi rel dan selanya. Catatan
           yang sama ada di halaman-peta.tsx. */}
       <div
         style={{ "--lk-kiri": kiriBuka ? LEBAR_REL_KIRI : "0px" } as React.CSSProperties}
@@ -1624,7 +1625,7 @@ export function LandingKarhutla(
                     onClick={() => setPetaPenuh(false)}
                     title={t.tutupPetaSelayar}
                     aria-label={t.tutupPetaSelayar}
-                    className="absolute top-4 right-4 z-[43] flex size-9 items-center justify-center rounded-full
+                    className="pointer-events-auto absolute top-4 right-4 z-[80] flex size-9 items-center justify-center rounded-full
                                bg-black/70 text-white ring-1 ring-white/15 backdrop-blur-sm
                                transition hover:scale-105 hover:ring-[#ff5a26]/70 active:scale-95
                                motion-reduce:transition-none motion-reduce:hover:scale-100
