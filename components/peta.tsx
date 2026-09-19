@@ -83,9 +83,12 @@ type Props = {
   onModeChange?: (m: ModePeta) => void;
   /** Diteruskan ke PetaAsap — roda tetikus memperbesar peta. */
   zoomRoda?: boolean;
+  /** Diteruskan ke PetaAsap — logo pengganti untuk layar seluler. */
+  logoSelulerSrc?: string | null;
+  logoSelulerAlt?: string;
 };
 
-export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false }: Props) {
+export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt }: Props) {
   const [modeDalam, setModeDalam] = useState<ModePeta>("asap");
   // Terkendali kalau induk mengisi prop mode (+ onModeChange) — kalau tidak,
   // fallback ke state dalam supaya pemakaian lama (beranda) tak berubah.
@@ -525,6 +528,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           legendaRingkas={legendaRingkas}
           muatNusantara={muatNusantara}
           zoomRoda={zoomRoda}
+          logoSelulerSrc={logoSelulerSrc}
+          logoSelulerAlt={logoSelulerAlt}
         />
       </div>
 

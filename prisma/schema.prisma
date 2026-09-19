@@ -172,3 +172,20 @@ enum public_reports_status {
   approved
   rejected
 }
+
+// ── Sorotan angka landing karhutla ─────────────────────────────────────────
+// Enam angka kartu statistik (hotspot, api aktif, lahan terbakar, korban
+// ispa, kerugian ekonomi, korban satwa). Satu baris hidup (id terkecil yang
+// ada); belum ada baris = halaman memakai bawaan 5.000. Diisi lewat CMS
+// (/admin/statistik), bukan dari kejadian — angkanya dari sumber luar
+// (sipongi/BNPB/dll) yang disalin kurator.
+model sorotan_statistik {
+  id             BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  hotspot        Decimal  @default(5000) @db.Decimal(15, 2)
+  api_aktif      Decimal  @default(5000) @db.Decimal(15, 2)
+  lahan_terbakar Decimal  @default(5000) @db.Decimal(15, 2)
+  korban_ispa    Decimal  @default(5000) @db.Decimal(15, 2)
+  rugi_ekonomi   Decimal  @default(5000) @db.Decimal(15, 2)
+  korban_satwa   Decimal  @default(5000) @db.Decimal(15, 2)
+  updated_at     DateTime? @db.Timestamp(0)
+}

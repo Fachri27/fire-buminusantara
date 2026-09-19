@@ -88,7 +88,8 @@ async function lokasiDariIp(ip: string | null): Promise<HasilIp> {
   ) return kosong;
   try {
     const r = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
-      signal: AbortSignal.timeout(6000),
+        cache: "no-store",
+        signal: AbortSignal.timeout(6000),
       headers: { Accept: "application/json" },
     });
     if (!r.ok) return kosong;
@@ -116,7 +117,8 @@ async function kotaLokal(lat: number, lng: number, bahasa: string): Promise<stri
       latitude: String(lat), longitude: String(lng), localityLanguage: bahasa === "en" ? "en" : "id",
     });
     const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${param}`, {
-      signal: AbortSignal.timeout(6000),
+        cache: "no-store",
+        signal: AbortSignal.timeout(6000),
       headers: { Accept: "application/json" },
     });
     if (!r.ok) return null;
@@ -171,7 +173,8 @@ async function cuacaBmkg(adm4: string | null): Promise<Cuaca | null> {
   if (!adm4) return null;
   try {
     const r = await fetch(`https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${encodeURIComponent(adm4)}`, {
-      signal: AbortSignal.timeout(8000),
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
       headers: { Accept: "application/json" },
     });
     if (!r.ok) return null;

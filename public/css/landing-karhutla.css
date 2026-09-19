@@ -253,8 +253,11 @@
      turun di bawahnya — jadi kaitnya ikut pindah ke header. Dikurung
      .lk-bingkai, pola yang sama dengan aturan logo tepat di bawah, supaya
      halaman index yang memakai <Nav> yang sama tidak ikut berubah. */
-  .lk-bingkai header form[role="search"] svg,
-  .lk-bingkai header button[aria-controls="nav-panel-cari"] svg {
+  /* Hanya ikon DI DALAM kolomnya. Ikon sakelarnya sengaja tidak ikut: ia
+     diukur 1lh (satu kotak baris) supaya tingginya lahir dari sumber yang
+     sama dengan pil ID/EN di sebelahnya, dan clamp piksel di sini justru akan
+     menimpanya lalu memutus keterikatan itu. */
+  .lk-bingkai header form[role="search"] svg {
     width: clamp(17px, 1.146vw, 22px);
     height: clamp(17px, 1.146vw, 22px);
   }
@@ -349,8 +352,14 @@
      komponennya tak disentuh — aturannya dikurung `.lk-bingkai header` supaya
      hanya halaman ini yang terskala dan tampilan index tetap apa adanya.
      Merek 24px dan kontrolnya 14px. */
+  /* Sakelar cari ikut aturan ini. Ia sebuah <button>, jadi dulu terlewat oleh
+     selektor a/span dan hurufnya tertinggal 16px sementara pil di sebelahnya
+     menyusut ke 11px — dari situlah tombolnya tampak lebih besar. Karena
+     tingginya kini tumbuh dari kotak baris hurufnya sendiri, menyamakan huruf
+     inilah yang menyamakan tingginya di setiap lebar. */
   .lk-bingkai header a,
-  .lk-bingkai header span {
+  .lk-bingkai header span,
+  .lk-bingkai header button[aria-controls="nav-panel-cari"] {
     font-size: clamp(11px, 0.729vw, 14px);
   }
 
@@ -607,6 +616,23 @@
     display: none;
   }
 
+  /* Halaman panel seluler full-bleed: tanpa pias grid maupun rel, bingkai
+     peta kotak tanpa ring — peta menempel ke tepi layar. */
+  .lk-penuh-mobile {
+    padding: 0;
+    gap: 0;
+  }
+
+  .lk-penuh-mobile .lk-kiri {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .lk-penuh-mobile .lk-bingkai-peta {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   /* Kartu seluler: tanggal disembunyikan (judul saja), judul kecil sebaris
      dengan tombol "...". Tombol dan lembar hanya ada di seluler. */
   .lk-kartu-tanggal {
@@ -792,10 +818,10 @@
     display: flex;
     align-items: center;
     justify-content: space-around;
-    padding: 0.6rem 0.5rem calc(0.6rem + env(safe-area-inset-bottom));
-    background: rgb(10 10 10 / 0.92);
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
+    padding: 0.6rem 0.5rem max(0.75rem, env(safe-area-inset-bottom));
+    /* Pekat (bukan translusens): area gesture bar sistem di bawahnya
+       menampilkan warna yang sama sehingga tak ada garis celah. */
+    background: #0a0a0a;
     border-top: 1px solid rgb(255 255 255 / 0.08);
   }
 

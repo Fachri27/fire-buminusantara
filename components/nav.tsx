@@ -371,8 +371,8 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
               aria-controls="nav-panel-cari"
               aria-label={cari.terbuka ? teks.tutupCari : teks.cari}
               className={`${gelap
-                ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/[0.05] text-white ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
-                : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"}${
+                ? "inline-flex shrink-0 items-center justify-center rounded-md p-1 text-xs font-bold sm:p-1.5 sm:text-sm bg-white/[0.05] text-white ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+                : "inline-flex shrink-0 items-center justify-center rounded-full p-1 text-xs font-bold sm:p-1.5 sm:text-sm text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"}${
                 /* Selagi kolomnya terbuka, sakelar ini menyingkir di KEDUA
                    ukuran: kolomnya sudah membawa kaca pembesarnya sendiri di
                    ujung kiri dan silang penutup di ujung kanan, jadi tombol ini
@@ -381,7 +381,11 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 cari.terbuka ? " hidden" : ""
               }`}
             >
-              <IkonCari className="size-[22px]" />
+              {/* 1lh = satu kotak baris. Itu persis tinggi isi pil ID/EN, jadi
+                  dengan padding yang sama pula tinggi keduanya identik di
+                  setiap lebar — bukan disamakan lewat satu angka yang cuma
+                  benar di satu layar. */}
+              <IkonCari className="size-[1lh]" />
             </button>
           )}
 

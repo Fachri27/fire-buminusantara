@@ -37,6 +37,11 @@ type Props = {
    *  Dipakai konsol /peta yang halamannya tidak menggulir. Bawaan false:
    *  beranda meneruskan roda ke guliran halaman (Lenis). */
   zoomRoda?: boolean;
+  /** Logo pengganti untuk layar seluler (aliran). Bawaan null = logo
+   *  Copernicus di semua ukuran. Dipakai landing karhutla yang menampilkan
+   *  logo aplikasinya sendiri di ponsel. Tautan atribusi tak berubah. */
+  logoSelulerSrc?: string | null;
+  logoSelulerAlt?: string;
 };
 
 // GLSL Vertex Shader: Quad koordinat Mercator dunia [0, 1] dikalikan matriks proyeksi MapLibre GL
@@ -306,7 +311,7 @@ let globalZarrMetadata: ZarrMetadataResponse | null = null;
 const globalFrameCache: Record<string, Uint8Array> = {};
 let globalSyncSelesai = false;
 
-export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false }: Props) {
+export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt = "Lapor Karhutla" }: Props) {
   const wadahPetaRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const onPilihRef = useRef(onPilihWilayah);
@@ -1887,8 +1892,17 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             alt="Copernicus Atmosphere Monitoring Service"
             width={120}
             height={44}
-            className="h-5 sm:h-6 w-auto opacity-90 transition-opacity group-hover:opacity-100 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]"
+            className={`h-5 sm:h-6 w-auto opacity-90 transition-opacity group-hover:opacity-100 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]${logoSelulerSrc ? " aliran:hidden" : ""}`}
           />
+          {logoSelulerSrc && (
+            <Image
+              src={logoSelulerSrc}
+              alt={logoSelulerAlt}
+              width={120}
+              height={44}
+              className="hidden h-5 w-auto opacity-90 transition-opacity group-hover:opacity-100 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)] aliran:inline"
+            />
+          )}
         </a>
       </div>
 

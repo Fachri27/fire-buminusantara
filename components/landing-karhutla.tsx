@@ -10,6 +10,7 @@ import { Nav } from "@/components/nav";
 import { RincianLaporan } from "@/components/rincian-laporan";
 import { gunakanKolomUmpan } from "@/hooks/gunakan-kolom-umpan";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "@/lib/batas-laporan";
+import { KUNCI_SOROTAN, LABEL_SOROTAN, type KunciSorotan } from "@/lib/statistik-sorotan-teks";
 import type { Bahasa } from "@/lib/bahasa";
 import type { Berita } from "@/lib/events";
 import { kirimLaporan, type KeadaanLapor } from "@/app/[locale]/lapor/aksi";
@@ -47,14 +48,10 @@ type Laporan = {
   href: string;
 };
 
-const STATISTIK: { id: string; en: string }[] = [
-  { id: "Berapa jumlah hotspot", en: "How many hotspots" },
-  { id: "Berapa aktif api", en: "How many active fires" },
-  { id: "Berapa lahan terbakar", en: "How much land burned" },
-  { id: "Berapa korban ispa", en: "How many ARI cases" },
-  { id: "Berapa kerugian ekonomi", en: "How much economic loss" },
-  { id: "Berapa korban satwa", en: "How much wildlife affected" },
-];
+const STATISTIK: { kunci: KunciSorotan; id: string; en: string }[] = KUNCI_SOROTAN.map((kunci) => ({
+  kunci,
+  ...LABEL_SOROTAN[kunci],
+}));
 
 const TEKS = {
   id: {
@@ -653,15 +650,18 @@ function IkonTulis({ className = "size-7" }: { className?: string }) {
   );
 }
 
-/* Ikon penyeberang section: panel (kisi instrumen) dan umpan (tumpukan foto). */
+/* Ikon penyeberang section: panel (peta terlipat) dan umpan (tumpukan foto).
+   Panel memakai peta, bukan kisi instrumen seperti dulu — isi halaman yang
+   dituju memang peta sebaran, dan kisi abstrak tak memberi petunjuk apa pun
+   soal itu. Bukan pin lokasi: berkas ini sudah punya IkonPin dan IkonLokasi,
+   dan pin terbaca "tempat ini", bukan "peta". */
 function IkonPanel({ className = "size-7" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
          strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <rect x="4" y="4" width="7" height="7" rx="1.5" />
-      <rect x="13" y="4" width="7" height="7" rx="1.5" />
-      <rect x="4" y="13" width="7" height="7" rx="1.5" />
-      <rect x="13" y="13" width="7" height="7" rx="1.5" />
+      <path d="M3 6.2 9 4 15 6.2 21 4 21 17.8 15 20 9 17.8 3 20 Z" />
+      <path d="M9 4V17.8" />
+      <path d="M15 6.2V20" />
     </svg>
   );
 }
@@ -1262,7 +1262,7 @@ function TabRelKiri({ terbuka, onUbah, label, lebarRel }: {
 }
 
 export function LandingKarhutla(
-  { bahasa, jumlahLaporan, berita = [], tampil = "semua" }: {
+  { bahasa, jumlahLaporan, berita = [], tampil = "semua", sorotan }: {
     bahasa: Bahasa;
     /** Peta butuh angka provinsi — halaman umpan tak memakainya. */
     jumlahLaporan?: Record<string, number>;
@@ -1270,6 +1270,8 @@ export function LandingKarhutla(
     /** "semua" = dasbor (desktop dua rel; seluler hanya daftar laporan);
         "panel" = halaman panel situasi saja (peta+cuaca+statistik). */
     tampil?: "semua" | "panel";
+    /** Enam angka kartu statistik dari CMS (bawaan 5.000 bila kosong). */
+    sorotan: Record<KunciSorotan, number>;
   },
 ) {
   const t = TEKS[bahasa];
@@ -1286,11 +1288,53 @@ export function LandingKarhutla(
     setCariBuka(buka);
     if (!buka) setCari("");
   }, []);
+  /* Datang dari tombol cari di halaman panel seluler: di sana umpannya tidak
+     dirender, jadi tombolnya mengantar ke halaman ini dan penanda ?cari=1
+     inilah yang membuka kolomnya begitu sampai.
+
+     Penandanya langsung dihapus dari URL: ia perintah sekali pakai, bukan
+     keadaan halaman — kalau dibiarkan ia ikut terbagikan saat ditautkan dan
+     membuka kolom lagi setiap kali halaman dimuat ulang. Sengaja tanpa
+     dependensi apa pun: umpanTerlihat baru lahir jauh di bawah sini, dan
+     mencantumkannya berarti daftar dependensi ini dievaluasi sebelum variabel
+     itu ada. */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("cari") !== "1") return;
+    // Async (bukan sinkron) supaya lolos react-hooks/set-state-in-effect.
+    //
+    // Penghapusan penandanya WAJIB ikut di dalam callback ini, bukan di luar.
+    // Strict Mode menjalankan effect dua kali: kalau URL dibersihkan langsung
+    // di badan effect, jalan pertama menghapus penandanya sementara cleanup
+    // membatalkan timer-nya — tak ada yang terbuka — lalu jalan kedua membaca
+    // URL yang sudah telanjur kosong dan menyerah. Dengan keduanya ditunda
+    // bersama, jalan yang dibatalkan tidak meninggalkan jejak apa pun.
+    const jam = window.setTimeout(() => {
+      setCariBuka(true);
+      const params = new URLSearchParams(window.location.search);
+      params.delete("cari");
+      const sisa = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (sisa ? `?${sisa}` : ""));
+    }, 0);
+    return () => window.clearTimeout(jam);
+  }, []);
   /* Rel kiri (peta WebGL) hanya dirender bila terlihat: di halaman utama
      seluler ia dilepas supaya ponsel tak membayar MapLibre + tile + Zarr
      untuk peta yang tak tampil. Kelas lk-hanya-panggung tetap dipasang
      sebagai jaring pengaman (tanpa JS, CSS yang menyembunyikan). */
   const aliran = useAliran();
+  /* Halaman /panel hanya untuk seluler: pengunjung desktop yang membuka
+     langsung dikembalikan ke dasbor utuh. Dibaca live dari matchMedia (bukan
+     state aliran): saat efek ini jalan pertama kali, state masih memegang
+     snapshot server (panggung) sehingga membaca state salah mengusir
+     pengunjung seluler ke dasbor. */
+  const router = useRouter();
+  useEffect(() => {
+    if (tampil !== "panel") return;
+    const panggung = window.matchMedia("(min-width: 1100px) and (min-height: 640px)").matches;
+    if (panggung) {
+      router.replace(`/${bahasa}/karhutla`);
+    }
+  }, [tampil, bahasa, router]);
   /* Rel kiri bisa dilipat seperti di index. Lebarnya satu sumber: dipakai
      trek grid sekaligus posisi tombolnya. */
   const LEBAR_REL_KIRI = "clamp(340px,33.5vw,680px)";
@@ -1510,7 +1554,26 @@ export function LandingKarhutla(
                 setTerbuka: ubahCariBuka,
                 placeholder: t.cariLaporan,
               }
-            : undefined
+            : {
+                /* Panel seluler: umpannya tidak dirender di halaman ini, jadi
+                   kolom pencarian di sini hanya akan menyaring nol kartu.
+                   Tombolnya tetap ada supaya bilahnya sama di kedua halaman,
+                   tapi ia MENGANTAR ke daftar laporan — laporannya memang
+                   tinggal di sana. Karena itu `terbuka` selalu false: tak
+                   pernah ada kolom yang dibuka di halaman ini.
+
+                   Penanda ?cari=1 yang dibawa itulah yang membuka kolomnya
+                   begitu sampai — pembacanya ada di effect dekat deklarasi
+                   cariBuka, dan penandanya langsung dihapus dari URL di sana
+                   supaya tidak ikut terbagikan. */
+                nilai: "",
+                ubah: () => undefined,
+                terbuka: false,
+                setTerbuka: (buka: boolean) => {
+                  if (buka) router.push(`/${bahasa}/karhutla?cari=1`);
+                },
+                placeholder: t.cariLaporan,
+              }
         }
       />
       {/* H1 ikut bahasa halaman — pola yang sama dengan index. */}
@@ -1527,10 +1590,10 @@ export function LandingKarhutla(
           yang sama ada di halaman-peta.tsx. */}
       <div
         style={{ "--lk-kiri": kiriBuka ? LEBAR_REL_KIRI : "0px" } as React.CSSProperties}
-        className="lk-isi relative grid w-full gap-2 p-2 aliran:grid-cols-1
+        className={`lk-isi relative grid w-full gap-2 p-2 aliran:grid-cols-1${tampil === "panel" ? " lk-penuh-mobile" : ""}
                    panggung:grid-cols-[minmax(0,var(--lk-kiri))_minmax(0,calc(100%-var(--lk-kiri)-0.5rem))]
                    panggung:transition-[grid-template-columns] panggung:duration-500
-                   panggung:ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                   panggung:ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none`}
       >
         {panelTerlihat && tampil === "semua" && (
           <TabRelKiri
@@ -1715,9 +1778,9 @@ export function LandingKarhutla(
               tidak meluap di rel sempit. */}
           <dl className="mx-4 mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {STATISTIK.map((s) => (
-              <div key={s.id} className="flex min-w-0 flex-col rounded-2xl bg-[#1e1e1e] px-2 py-7 text-center">
+              <div key={s.kunci} className="flex min-w-0 flex-col rounded-2xl bg-[#1e1e1e] px-2 py-7 text-center">
                 <dd className="lk-angka order-1 text-[clamp(24px,2.2vw,44px)] leading-none font-medium">
-                  5.000
+                  {sorotan[s.kunci].toLocaleString("id-ID", { maximumFractionDigits: 2 })}
                 </dd>
                 <dt className="order-2 mt-2 text-[12px] leading-tight font-bold text-balance sm:text-[13px]">
                   {s[bahasa]}

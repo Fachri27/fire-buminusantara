@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { hitungLaporanProvinsi } from "@/lib/events";
+import { ambilSorotan } from "@/lib/statistik-sorotan";
 import { LandingKarhutla } from "@/components/landing-karhutla";
 import { BAHASA, adaBahasa, type Bahasa } from "@/lib/bahasa";
 
@@ -69,7 +70,10 @@ export default async function HalamanPanel({ params }: Props) {
 
   // Peta mewarnai tiap provinsi menurut jumlah laporannya.
   await connection();
-  const jumlahLaporan = await hitungLaporanProvinsi();
+  const [jumlahLaporan, sorotan] = await Promise.all([
+    hitungLaporanProvinsi(),
+    ambilSorotan(),
+  ]);
 
-  return <LandingKarhutla bahasa={locale} jumlahLaporan={jumlahLaporan} tampil="panel" />;
+  return <LandingKarhutla bahasa={locale} jumlahLaporan={jumlahLaporan} sorotan={sorotan} tampil="panel" />;
 }
