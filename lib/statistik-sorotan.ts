@@ -6,18 +6,34 @@ import {
 
 export { BAWAN_SOROTAN, KUNCI_SOROTAN, LABEL_SOROTAN, type KunciSorotan };
 
-/** Satu baris hidup (id terkecil); kosong = bawaan. */
+/** Cache singkat dalam-memori: angka nyaris statis (diubah manual via CMS),
+ *  tak perlu menekan pool basis data di setiap muat halaman — penting di
+ *  serverless yang pool-nya kecil dan dipakai bersama banyak instans. */
+const KAS_TTL = 60_000;
+let kas: { kedaluwarsa: number; nilai: Record<KunciSorotan, number> } | null = null;
+
+/** Satu baris hidup (id terkecil); kosong/gagal = bawaan. TAK PERNAH
+ *  melempar: galat basis data (pool habis, tabel belum migrasi, dsb) hanya
+ *  berarti angka bawaan — halaman publik tidak boleh 500 karenanya. */
 export async function ambilSorotan(): Promise<Record<KunciSorotan, number>> {
-  const baris = await prisma.sorotan_statistik.findFirst({ orderBy: { id: "asc" } });
-  if (!baris) return { ...BAWAN_SOROTAN };
-  return {
-    hotspot: Number(baris.hotspot),
-    api_aktif: Number(baris.api_aktif),
-    lahan_terbakar: Number(baris.lahan_terbakar),
-    korban_ispa: Number(baris.korban_ispa),
-    rugi_ekonomi: Number(baris.rugi_ekonomi),
-    korban_satwa: Number(baris.korban_satwa),
-  };
+  if (kas && kas.kedaluwarsa > Date.now()) return kas.nilai;
+  try {
+    const baris = await prisma.sorotan_statistik.findFirst({ orderBy: { id: "asc" } });
+    const nilai: Record<KunciSorotan, number> = baris
+      ? {
+          hotspot: Number(baris.hotspot),
+          api_aktif: Number(baris.api_aktif),
+          lahan_terbakar: Number(baris.lahan_terbakar),
+          korban_ispa: Number(baris.korban_ispa),
+          rugi_ekonomi: Number(baris.rugi_ekonomi),
+          korban_satwa: Number(baris.korban_satwa),
+        }
+      : { ...BAWAN_SOROTAN };
+    kas = { kedaluwarsa: Date.now() + KAS_TTL, nilai };
+    return nilai;
+  } catch {
+    return { ...BAWAN_SOROTAN };
+  }
 }
 
 /** Angka ala Indonesia ("5.000", "5,5") maupun Inggris ("5,000", "5.5"):
@@ -55,5 +71,6 @@ export async function simpanSorotan(
   } else {
     await prisma.sorotan_statistik.create({ data });
   }
+  kas = null;
   return { ok: true };
 }
