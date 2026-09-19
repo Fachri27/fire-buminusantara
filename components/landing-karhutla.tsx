@@ -1326,13 +1326,27 @@ export function LandingKarhutla(
      langsung dikembalikan ke dasbor utuh. Dibaca live dari matchMedia (bukan
      state aliran): saat efek ini jalan pertama kali, state masih memegang
      snapshot server (panggung) sehingga membaca state salah mengusir
-     pengunjung seluler ke dasbor. */
+     pengunjung seluler ke dasbor.
+
+     Tujuannya /<bahasa>, BUKAN /<bahasa>/karhutla. Keduanya merender dasbor
+     yang sama sejak akar bahasa dijadikan halaman karhutla, tapi di mode
+     etalase /<bahasa>/karhutla ditutup dan dialihkan 308 ke /<bahasa> — jadi
+     mengarah ke sana membuat pengunjung desktop memantul DUA kali sebelum
+     mendarat. Menuju akar bahasa langsung memangkas satu lompatan itu, dan
+     berlaku benar di kedua mode.
+
+     Catatan supaya tak salah duga di kemudian hari: sesudah pindah, DOM masih
+     memuat subtree rute lama (terukur: dua .lk-bingkai, dua <main>) dan salah
+     satunya membawa kelas mode panel. Itu bawaan navigasi lunak App Router,
+     BUKAN akibat rantai pengalihan di atas — gejalanya sama persis di lokal
+     yang tidak memakai mode etalase. Subtree itu display:none dan berukuran
+     nol, jadi tak terlihat pengunjung. */
   const router = useRouter();
   useEffect(() => {
     if (tampil !== "panel") return;
     const panggung = window.matchMedia("(min-width: 1100px) and (min-height: 640px)").matches;
     if (panggung) {
-      router.replace(`/${bahasa}/karhutla`);
+      router.replace(`/${bahasa}`);
     }
   }, [tampil, bahasa, router]);
   /* Rel kiri bisa dilipat seperti di index. Lebarnya satu sumber: dipakai
