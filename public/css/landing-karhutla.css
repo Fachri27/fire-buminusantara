@@ -641,7 +641,7 @@
 
   .lk-kartu-judulbar {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.25rem;
     margin-top: 0.5rem;
   }
@@ -677,18 +677,32 @@
 
 .lk-lembar {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(100%, 560px);
   max-height: 82dvh;
-  overflow-y: auto;
+  /* SENGAJA bukan overflow-y:auto. Begitu satu sumbu diberi auto, sumbu
+     satunya ikut memotong (terukur: overflow-x pun jadi auto), sehingga
+     thumbnail yang mencuat melewati tepi atas terpangkas — dulu ia malah
+     berakhir 8px di DALAM lembar. Gulirannya dipindah ke .lk-lembar-isi. */
+  overflow: visible;
   background: #1e1e1e;
   border-radius: 1.5rem 1.5rem 0 0;
   padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
   animation: lk-lembar-naik 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Ruang bagi thumbnail yang mencuat ke atas lembar. */
+/* Tak perlu ruang tambahan di atas: separuh thumbnail yang berada di dalam
+   lembar sudah dihitung lewat margin negatifnya sendiri. */
 .lk-lembar-bergambar {
-  padding-top: 3.5rem;
+  padding-top: 1.25rem;
+}
+
+/* Yang menggulir adalah isinya, bukan lembarnya. min-height:0 wajib — tanpa
+   itu anak flex menolak menyusut dan max-height lembarnya jadi percuma. */
+.lk-lembar-isi {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 @keyframes lk-lembar-gelap {
@@ -719,15 +733,60 @@
   background: rgb(255 255 255 / 0.1);
 }
 
+/* Kepala lembar: media potret yang TEPAT separuh tingginya duduk di luar
+   lembar, seperti rujukan.
+
+   Rasionya dipatok supaya tingginya deterministik dari lebarnya — dengan
+   `height: auto` tingginya ikut rasio tiap foto, dan margin piksel tetap
+   mustahil memberi separuh untuk semuanya. Dengan 3/4, setengah tinggi =
+   lebar x 2/3, dan itulah yang dinaikkan setelah padding atas lembar
+   (1.25rem) dilunasi lebih dulu.
+
+   Persen tidak bisa dipakai: margin-top persen dihitung dari LEBAR wadah,
+   bukan tinggi — ia akan meleset diam-diam. */
 .lk-lembar-gambar {
   display: block;
-  width: 160px;
-  max-height: 160px;
+  width: min(150px, 38vw);
+  aspect-ratio: 3 / 4;
+  height: auto;
   object-fit: cover;
+  background: #000;
   border-radius: 1rem;
-  margin: -3rem auto 0;
+  margin: calc(-1.25rem - min(150px, 38vw) * 2 / 3) auto 0;
   border: 1px solid rgb(255 255 255 / 0.15);
-  box-shadow: 0 8px 32px rgb(0 0 0 / 0.5);
+  box-shadow: 0 10px 34px rgb(0 0 0 / 0.55);
+}
+
+/* Varian video: kotaknya berbingkai, tombol video di dalamnya menempel penuh
+   tanpa margin atas. Lebarnya WAJIB sama dengan kelas dasarnya — selektor
+   `div.kelas` lebih kuat daripada `.kelas`, jadi angka yang berbeda di sini
+   akan diam-diam mengalahkan ukuran kepala lembar dan hanya cabang videonya
+   yang melenceng. */
+div.lk-lembar-gambar--video {
+  width: min(150px, 38vw);
+  overflow: hidden;
+  padding: 0;
+  background: #000;
+}
+
+.lk-lembar-gambar--video .lk-foto {
+  margin-top: 0;
+  border: none;
+  box-shadow: none;
+}
+
+/* Rantai di dalam kotak video (tombol > span > poster) harus setinggi
+   kotaknya. Tanpa ini poster yang menentukan tinggi, rasio 3/4 kotaknya jadi
+   percuma, dan videonya duduk di atas latar hitam yang menganga. */
+.lk-lembar-gambar--video > .lk-foto,
+.lk-lembar-gambar--video > .lk-foto > span {
+  display: block;
+  height: 100%;
+}
+
+.lk-lembar-gambar--video img.lk-foto {
+  height: 100%;
+  object-fit: cover;
 }
 
 .lk-lembar-info {

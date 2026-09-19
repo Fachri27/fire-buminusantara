@@ -507,7 +507,21 @@ function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
 }) {
   const t = TEKS[bahasa];
   const [tersalin, setTersalin] = useState(false);
-  const gambar = b.gambar ?? b.media.find((m) => m.jenis === "gambar")?.url ?? null;
+  /* Thumbnail lembar: foto dulu, lalu poster video. Tanpa cadangan poster,
+     laporan yang isinya video saja tak punya gambar apa pun di sini dan
+     lembarnya kehilangan kepalanya. */
+  const gambar =
+    b.gambar
+    ?? b.media.find((m) => m.jenis === "gambar")?.url
+    ?? b.media.find((m) => m.jenis === "video")?.poster
+    ?? b.poster
+    ?? null;
+  /* Video utama (bila ada): thumbnail lembar berupa video autoplay, bukan
+     gambar diam — sama seperti kartu umpannya. */
+  const video =
+    b.video
+    ?? b.media.find((m) => m.jenis === "video")?.url
+    ?? null;
 
   useEffect(() => {
     const saatTombol = (e: KeyboardEvent) => {
@@ -549,7 +563,7 @@ function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
         aria-modal="true"
         aria-label={b.judul}
         onClick={(e) => e.stopPropagation()}
-        className={`lk-lembar${gambar ? " lk-lembar-bergambar" : ""}`}
+        className={`lk-lembar${video || gambar ? " lk-lembar-bergambar" : ""}`}
       >
         <button
           type="button"
@@ -562,34 +576,45 @@ function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
         </button>
-        {gambar && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={gambar} alt="" aria-hidden="true" className="lk-lembar-gambar" />
+        {video ? (
+          <div className="lk-lembar-gambar lk-lembar-gambar--video">
+            <VideoOtomatis url={video} poster={gambar} label={b.judul} onBuka={onBuka} />
+          </div>
+        ) : (
+          gambar && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={gambar} alt="" aria-hidden="true" className="lk-lembar-gambar" />
+          )
         )}
-        <p className="lk-lembar-info">
-          {b.tanggal}{b.lokasi ? ` • ${b.lokasi}` : ""}
-        </p>
-        <h2 className="lk-lembar-judul">{b.judul}</h2>
-        {b.deskripsi && <p className="lk-lembar-deskripsi">{b.deskripsi}</p>}
-        <button type="button" onClick={onBuka} className="lk-lembar-besar">
-          {t.lembarBuka}
-        </button>
-        <ul className="lk-lembar-menu">
-          <li>
-            <button type="button" onClick={bagikan} className="lk-lembar-baris">
-              <IkonBagikan />
-              <span>{tersalin ? t.lembarTersalin : t.lembarBagikan}</span>
-            </button>
-          </li>
-          {gambar && (
+        {/* Isi lembar dibungkus tersendiri karena DIA yang menggulir, bukan
+            lembarnya. Lembar yang menggulir akan memotong thumbnail yang
+            mencuat melewati tepi atasnya. */}
+        <div className="lk-lembar-isi">
+          <p className="lk-lembar-info">
+            {b.tanggal}{b.lokasi ? ` • ${b.lokasi}` : ""}
+          </p>
+          <h2 className="lk-lembar-judul">{b.judul}</h2>
+          {b.deskripsi && <p className="lk-lembar-deskripsi">{b.deskripsi}</p>}
+          <button type="button" onClick={onBuka} className="lk-lembar-besar">
+            {t.lembarBuka}
+          </button>
+          <ul className="lk-lembar-menu">
             <li>
-              <a href={gambar} download className="lk-lembar-baris">
-                <IkonUnduh />
-                <span>{t.lembarUnduh}</span>
-              </a>
+              <button type="button" onClick={bagikan} className="lk-lembar-baris">
+                <IkonBagikan />
+                <span>{tersalin ? t.lembarTersalin : t.lembarBagikan}</span>
+              </button>
             </li>
-          )}
-        </ul>
+            {gambar && (
+              <li>
+                <a href={gambar} download className="lk-lembar-baris">
+                  <IkonUnduh />
+                  <span>{t.lembarUnduh}</span>
+                </a>
+              </li>
+            )}
+          </ul>
+        </div>
       </div>
     </div>
   );
