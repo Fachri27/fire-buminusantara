@@ -10,7 +10,48 @@ import { BAHASA, TEKS_NAV, type Bahasa } from "@/lib/bahasa";
 /** Bagian halaman yang bisa dituju dari bilah ini — dua layar utama. */
 const BAGIAN = ["beranda", "peta"] as const;
 
-type Props = { bahasa: Bahasa; gelap?: boolean };
+/**
+ * Pencarian umpan yang dititipkan ke bilah ini. Hanya halaman yang PUNYA umpan
+ * yang mengirimkannya; tanpa prop ini bilah tampil persis seperti semula, jadi
+ * beranda dan halaman rincian tidak ikut berubah.
+ *
+ * Nilainya dipegang pemanggil, bukan di sini: penyaring umpan dan kolom
+ * pencariannya harus membaca satu sumber yang sama.
+ */
+type PropsCari = {
+  nilai: string;
+  ubah: (nilai: string) => void;
+  terbuka: boolean;
+  setTerbuka: (terbuka: boolean) => void;
+  placeholder: string;
+};
+
+type Props = { bahasa: Bahasa; gelap?: boolean; cari?: PropsCari };
+
+/** Kaca pembesar. Bentuknya sengaja sama persis dengan ikon pencarian di
+ *  halaman karhutla: tombol ini menggantikan kolom yang dulu berdiri di atas
+ *  umpan, jadi ia harus terbaca sebagai benda yang sama yang cuma pindah. */
+function IkonCari({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
+         strokeLinecap="round" className={className}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
+
+/** Silang penutup kolom pencarian. Ketebalan garis dan ukurannya sengaja sama
+ *  dengan IkonCari supaya keduanya terbaca sebagai sepasang di ujung kolom
+ *  yang sama — kaca pembesar membuka, silang menutup. */
+function IkonSilang({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
+         strokeLinecap="round" className={className}>
+      <path d="M6 6 18 18M18 6 6 18" />
+    </svg>
+  );
+}
 
 /**
  * Bilah Navigasi Minimalis.
@@ -23,7 +64,7 @@ type Props = { bahasa: Bahasa; gelap?: boolean };
  * merek tertulis penuh, tanpa tautan bagian (jangkar #beranda/#peta milik
  * beranda). Ukuran luarnya identik — hanya warnanya yang berganti.
  */
-export function Nav({ bahasa, gelap = false }: Props) {
+export function Nav({ bahasa, gelap = false, cari }: Props) {
   const teks = TEKS_NAV[bahasa];
   const [aktif, setAktif] = useState<string>(BAGIAN[0]);
   const [tergulir, setTergulir] = useState(false);
@@ -79,6 +120,36 @@ export function Nav({ bahasa, gelap = false }: Props) {
     window.addEventListener("keydown", tombol);
     return () => window.removeEventListener("keydown", tombol);
   }, [menuTerbuka]);
+
+  /* Panel pencarian: kolomnya langsung menerima fokus begitu terbuka —
+     tombolnya baru saja diklik, jadi mengetik adalah langkah berikutnya yang
+     diharapkan — dan Escape menutupnya, sama seperti menu ponsel di atas.
+     Yang dijadikan dependensi adalah nilai primitifnya, bukan objek `cari`
+     yang identitasnya berganti tiap render pemanggil. */
+  const cariTerbuka = cari?.terbuka ?? false;
+  const setCariTerbuka = cari?.setTerbuka;
+  useEffect(() => {
+    if (!cariTerbuka) return;
+    document.getElementById("nav-cari")?.focus();
+    const tombol = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCariTerbuka?.(false);
+    };
+    window.addEventListener("keydown", tombol);
+    return () => window.removeEventListener("keydown", tombol);
+  }, [cariTerbuka, setCariTerbuka]);
+
+  /* Klik di luar bilah ikut menutup. Wajib ada sejak sakelarnya bersembunyi di
+     panggung selagi kolom terbuka: tanpa ini Escape jadi satu-satunya jalan
+     keluar, dan itu tidak kelihatan bagi yang memakai tetikus. */
+  useEffect(() => {
+    if (!cariTerbuka) return;
+    const diLuar = (e: MouseEvent) => {
+      const sasaran = e.target as HTMLElement | null;
+      if (!sasaran?.closest?.("header")) setCariTerbuka?.(false);
+    };
+    document.addEventListener("mousedown", diLuar);
+    return () => document.removeEventListener("mousedown", diLuar);
+  }, [cariTerbuka, setCariTerbuka]);
 
   /** Tukar prefiks bahasa pada URL */
   const tautanBahasa = useCallback(
@@ -197,6 +268,67 @@ export function Nav({ bahasa, gelap = false }: Props) {
           )}
         </Link>
 
+        {/* Kolom pencarian — SATU markup, dua rupa, dan SELALU terpasang.
+
+            Panggung: melipat keluar dari nol di dalam bilah dan berhenti
+            sebelum gugus kanan, pola konsol yang jadi rujukan.
+
+            Aliran: di 414px logo + ID/EN tak menyisakan ruang untuk kolom, jadi
+            ia keluar dari baris (absolute) dan turun ke bawah bilah. Karena
+            keluar dari aliran, tinggi bilah yang dipatok 4rem tetap utuh —
+            seluruh halaman menghitung jarak amannya dari angka itu.
+
+            Tidak dilepas-pasang mengikuti keadaannya: transisi tak pernah
+            berjalan pada elemen yang baru muncul saat itu juga. Lebar, opasitas
+            dan keadaan tertutupnya diurus landing-karhutla.css lewat
+            [data-buka]. */}
+        {cari && (
+          <form
+            role="search"
+            id="nav-panel-cari"
+            data-buka={cari.terbuka ? "1" : "0"}
+            onSubmit={(e) => e.preventDefault()}
+            className="min-w-0 flex-1
+                       aliran:absolute aliran:top-full aliran:left-0 aliran:w-full aliran:flex-none
+                       aliran:border-b aliran:border-white/10 aliran:bg-pantau-konsol aliran:px-4 aliran:py-3"
+          >
+            <label htmlFor="nav-cari" className="sr-only">{cari.placeholder}</label>
+            <div
+              className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${
+                gelap
+                  ? "bg-black ring-1 ring-white/5 focus-within:ring-2 focus-within:ring-[#ff5a26]"
+                  : "bg-black/[0.04] ring-1 ring-black/[0.06] focus-within:ring-2 focus-within:ring-api"
+              }`}
+            >
+              <IkonCari className={`size-[22px] shrink-0 ${gelap ? "text-[#a0a0a0]" : "text-tinta/50"}`} />
+              <input
+                id="nav-cari"
+                type="search"
+                value={cari.nilai}
+                onChange={(e) => cari.ubah(e.target.value)}
+                placeholder={cari.placeholder}
+                className={`w-full bg-transparent text-[15px] focus:outline-none ${
+                  gelap
+                    ? "text-[#f5f5f5] placeholder:text-[#a0a0a0]/70"
+                    : "text-tinta placeholder:text-tinta/40"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => cari.setTerbuka(false)}
+                aria-label={teks.tutupCari}
+                className={`shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                  gelap
+                    ? "text-[#a0a0a0] hover:text-[#f5f5f5] focus-visible:outline-[#ff5a26]"
+                    : "text-tinta/50 hover:text-tinta focus-visible:outline-api"
+                }`}
+              >
+                <IkonSilang className="size-[22px]" />
+              </button>
+            </div>
+          </form>
+        )}
+
         {/* Menu Navigasi & Penukar Bahasa */}
         <div className="flex items-center gap-2 sm:gap-5">
           {/* Tautan bagian hanya milik beranda — dasbor gelap tidak pakai. */}
@@ -229,17 +361,42 @@ export function Nav({ bahasa, gelap = false }: Props) {
           </nav>
           )}
 
-          {/* Jalan masuk ke form laporan warga — di cluster kanan untuk semua
-              ukuran layar (logo memakai pojok kiri). Tautan sungguhan, bukan
-              jangkar gulir seperti dua tombol di sebelahnya. */}
-          <Link
-            href={`/${bahasa}/lapor`}
-            className={gelap
-              ? "rounded-md bg-white/[0.05] px-3 py-1.5 text-xs font-bold tracking-wide uppercase text-pantau-bara ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api sm:px-4 sm:py-2 sm:text-sm"
-              : "rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"}
-          >
-            {teks.lapor}
-          </Link>
+          {/* Sakelar pencarian — ikon saja; kolomnya sendiri berdiri di sebelah
+              kiri gugus ini (panggung) atau turun di bawah bilah (aliran). */}
+          {cari && (
+            <button
+              type="button"
+              onClick={() => cari.setTerbuka(!cari.terbuka)}
+              aria-expanded={cari.terbuka}
+              aria-controls="nav-panel-cari"
+              aria-label={cari.terbuka ? teks.tutupCari : teks.cari}
+              className={`${gelap
+                ? "flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/[0.05] text-white ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+                : "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"}${
+                /* Selagi kolomnya terbuka, sakelar ini menyingkir di KEDUA
+                   ukuran: kolomnya sudah membawa kaca pembesarnya sendiri di
+                   ujung kiri dan silang penutup di ujung kanan, jadi tombol ini
+                   tak menyisakan pekerjaan — dan dua kaca pembesar berjajar di
+                   satu bilah hanya membingungkan. */
+                cari.terbuka ? " hidden" : ""
+              }`}
+            >
+              <IkonCari className="size-[22px]" />
+            </button>
+          )}
+
+          {/* Jalan masuk ke form laporan warga — hanya varian terang. Di dasbor
+              gelap tombol ini sengaja TIDAK ada: komposer di puncak umpan sudah
+              jadi jalan melapor di halaman itu, dan dua ajakan yang sama di satu
+              layar hanya saling berebut. */}
+          {!gelap && (
+            <Link
+              href={`/${bahasa}/lapor`}
+              className="rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+            >
+              {teks.lapor}
+            </Link>
+          )}
 
           {/* Garis Pemisah Tipis — hanya varian terang. */}
           {!gelap && (

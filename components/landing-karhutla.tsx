@@ -70,7 +70,7 @@ const TEKS = {
     petaLegenda: "Kepekatan aerosol asap kebakaran, dibaca dari satelit Sentinel-5P.",
     petaTipis: "Tipis",
     petaPekat: "Pekat",
-    kaki: "Laporan warga terkurasi sebelum ditampilkan. Menyaksikan kebakaran atau dampak asapnya? Tekan LAPOR.",
+    kaki: "Laporan warga terkurasi sebelum ditampilkan. Menyaksikan kebakaran atau dampak asapnya? Ceritakan di kotak laporan.",
     merek: "©2026 Lapor Karhutla",
     hasilKosong: "Tidak ada laporan yang cocok. Coba kata lain, atau kirim laporanmu sendiri.",
     umpan: "Laporan warga",
@@ -129,7 +129,7 @@ const TEKS = {
     petaLegenda: "Smoke aerosol density, read from the Sentinel-5P satellite.",
     petaTipis: "Thin",
     petaPekat: "Dense",
-    kaki: "Citizen reports are curated before they appear. Seeing a fire or its haze? Hit REPORT.",
+    kaki: "Citizen reports are curated before they appear. Seeing a fire or its haze? Tell us in the report box.",
     merek: "©2026 Lapor Karhutla",
     hasilKosong: "No reports match that. Try other words, or send a report of your own.",
     umpan: "Citizen reports",
@@ -940,7 +940,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
 
   if (terkirim) {
     return (
-      <div role="status" className="mt-3 rounded-xl bg-black p-5 text-center ring-1 ring-white/5">
+      <div role="status" className="rounded-xl bg-black p-5 text-center ring-1 ring-white/5">
         <p className="text-[15px] font-bold text-[#f5f5f5]">{t.terkirim}</p>
         <p className="mx-auto mt-1 max-w-[46ch] text-[13px] leading-relaxed text-[#a0a0a0]">
           {t.terkirimIsi}
@@ -961,7 +961,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
   const ikonAksi = "lk-ikon-aksi rounded-full p-2 text-[#ff5a26] transition hover:bg-[#ff5a26]/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]";
 
   return (
-    <div className="mt-3 rounded-xl bg-black p-4 ring-1 ring-white/5">
+    <div className="rounded-xl bg-black p-4 ring-1 ring-white/5">
       <div className="flex items-center gap-3">
         <span aria-hidden="true" className="lk-avatar flex size-11 shrink-0 items-center justify-center rounded-full bg-[#2f7d6d]">
           <IkonOrang className="size-6 text-white" />
@@ -1277,6 +1277,15 @@ export function LandingKarhutla(
   // lokasi memakai teks statis dan suhu memakai garis jeda.
   const cuaca = useCuacaLokal(bahasa, t.lokasi);
   const [cari, setCari] = useState("");
+  /* Kolom pencarian tinggal di bilah kepala dan baru turun saat ikonnya
+     diklik. Menutupnya sekaligus mengosongkan kata kuncinya: begitu kolomnya
+     tak terlihat, penyaring yang masih aktif berubah jadi keadaan tersembunyi
+     — umpan tampak memendek tanpa sebab yang kelihatan di layar. */
+  const [cariBuka, setCariBuka] = useState(false);
+  const ubahCariBuka = useCallback((buka: boolean) => {
+    setCariBuka(buka);
+    if (!buka) setCari("");
+  }, []);
   /* Rel kiri (peta WebGL) hanya dirender bila terlihat: di halaman utama
      seluler ia dilepas supaya ponsel tak membayar MapLibre + tile + Zarr
      untuk peta yang tak tampil. Kelas lk-hanya-panggung tetap dipasang
@@ -1489,7 +1498,21 @@ export function LandingKarhutla(
       {/* Bilah kepala SAMA dengan halaman index — <Nav gelap>: fixed h-16,
           logo Fire + merek + tombol Lapor + pemilih bahasa. pt-16 pada bingkai
           memberi ruang di bawah bilah yang fixed (pola halaman-peta.tsx). */}
-      <Nav bahasa={bahasa} gelap />
+      <Nav
+        bahasa={bahasa}
+        gelap
+        cari={
+          umpanTerlihat
+            ? {
+                nilai: cari,
+                ubah: setCari,
+                terbuka: cariBuka,
+                setTerbuka: ubahCariBuka,
+                placeholder: t.cariLaporan,
+              }
+            : undefined
+        }
+      />
       {/* H1 ikut bahasa halaman — pola yang sama dengan index. */}
       <h1 className="sr-only">{t.judul}</h1>
 
@@ -1718,21 +1741,6 @@ export function LandingKarhutla(
             tanpa batas lebar dan tanpa pemusatan. */}
         {umpanTerlihat && (
         <main aria-label={t.umpan} className="lk-kanan pantau-rel min-h-0 min-w-0">
-          <form role="search" onSubmit={(e) => e.preventDefault()}
-                className="flex items-center gap-3 rounded-xl bg-black px-4 py-3.5 ring-1 ring-white/5
-                           focus-within:ring-2 focus-within:ring-[#ff5a26]">
-            <IkonCari className="size-[22px] shrink-0 text-[#a0a0a0]" />
-            <label htmlFor="lk-cari" className="sr-only">{t.cariLaporan}</label>
-            <input
-              id="lk-cari"
-              type="search"
-              value={cari}
-              onChange={(e) => setCari(e.target.value)}
-              placeholder={t.cariLaporan}
-              className="w-full bg-transparent text-[15px] text-[#f5f5f5] placeholder:text-[#a0a0a0]/70 focus:outline-none"
-            />
-          </form>
-
           <KomposerLapor bahasa={bahasa} />
 
           {hasil.length === 0 ? (
@@ -1842,11 +1850,7 @@ export function LandingKarhutla(
             <button
               type="button"
               aria-label={t.tabCari}
-              onClick={() => {
-                const el = document.getElementById("lk-cari");
-                el?.scrollIntoView({ behavior: "smooth", block: "center" });
-                window.setTimeout(() => (el as HTMLInputElement | null)?.focus({ preventScroll: true }), 400);
-              }}
+              onClick={() => ubahCariBuka(!cariBuka)}
               className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
             >
               <IkonCari className="size-7" />

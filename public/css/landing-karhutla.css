@@ -54,6 +54,92 @@
   letter-spacing: -0.02em;
 }
 
+/* ── Kolom pencarian di bilah kepala ──────────────────────────────────────
+   `type="search"` dipertahankan karena membawa untung nyata: papan ketik
+   ponsel yang tepat. Tapi tombol hapus bawaan WebKit DIMATIKAN — kolom ini
+   sekarang punya tombol silang sendiri untuk menutup, dan dua silang berjajar
+   di satu kolom hanya membuat orang menebak mana yang mana. Tidak ada fungsi
+   yang hilang: menutup sekaligus mengosongkan kata kuncinya.
+
+   Dikurung .lk-bingkai seperti aturan header lainnya supaya halaman lain yang
+   memakai <Nav> yang sama tak ikut berubah. */
+.lk-bingkai #nav-cari::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+/* Form-nya SELALU terpasang, terbuka maupun tidak. Transisi tidak pernah
+   berjalan pada elemen yang baru dipasang saat itu juga — itulah sebabnya
+   kolom ini dulu muncul dan hilang dengan mengejut.
+
+   Keadaan tertutup memakai visibility:hidden, bukan sekadar opacity:0: yang
+   terakhir menyisakan kolom tak terlihat yang masih disinggahi Tab dan masih
+   dibacakan pembaca layar. */
+.lk-bingkai header #nav-panel-cari {
+  overflow: hidden;
+  transition:
+    flex-grow 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    visibility 0s;
+}
+
+.lk-bingkai header #nav-panel-cari[data-buka="0"] {
+  visibility: hidden;
+  opacity: 0;
+  /* visibility ditunda sampai lipatannya selesai; tanpa jeda ini ia lenyap
+     seketika dan animasi menutupnya tak pernah sempat terlihat. */
+  transition:
+    flex-grow 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    visibility 0s 320ms;
+}
+
+/* Panggung: kolomnya mengisi SELURUH ruang bebas antara logo dan gugus kanan
+   — tanpa batas lebar, sisa ruang di kanan tak lagi menganggur.
+
+   Yang dianimasikan flex-grow, bukan max-width. Dengan max-width, lebarnya
+   mentok ke ruang yang tersedia sebelum transisinya selesai, jadi ekor
+   easing-nya terpotong dan gerakannya berhenti mendadak. Flexbox membagikan
+   tepat sepecahan ruang bebas ketika jumlah faktor lenturnya di bawah 1,
+   sehingga 0→1 memetakan mulus ke nol→penuh, berapa pun lebar layarnya.
+
+   Padding 3px memberi ruang bagi cincin fokus kolom — tanpa itu ia terpotong
+   oleh overflow:hidden yang justru dipakai untuk melipatnya. */
+@media (min-width: 1100px) and (min-height: 640px) {
+  .lk-bingkai header #nav-panel-cari {
+    flex-grow: 1;
+    padding: 3px;
+    /* Tetangga kirinya merek bertulisan tebal 24px, bukan tombol — sela 16px
+       milik bilah terbaca mepet di sebelah huruf sebesar itu. Tambahan ini
+       HANYA di sisi kiri: sisi kanan sengaja dibiarkan 16px supaya kolomnya
+       tetap mengisi ruang sampai mentok gugus ID/EN. */
+    margin-inline-start: 1.5rem;
+  }
+
+  .lk-bingkai header #nav-panel-cari[data-buka="0"] {
+    flex-grow: 0;
+  }
+}
+
+/* Aliran: turun dari balik bilah alih-alih melipat — di sini ia sudah keluar
+   dari baris, jadi lebarnya tak punya apa pun untuk didorong. */
+@media not all and (min-width: 1100px) and (min-height: 640px) {
+  .lk-bingkai header #nav-panel-cari[data-buka="0"] {
+    transform: translateY(-0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-bingkai header #nav-panel-cari,
+  .lk-bingkai header #nav-panel-cari[data-buka="0"] {
+    transition-duration: 1ms;
+    transition-delay: 0s;
+  }
+}
+
 /* Umpan laporan memakai kolom flex yang dibagi di JS (UmpanMasonry di
    landing-karhutla.tsx, pola yang sama dengan MasonryKolom di index) —
    bukan CSS `columns`, supaya kartu tak meloncat kolom saat gambar telat
@@ -139,7 +225,7 @@
     font-size: clamp(10px, 0.677vw, 13px);
   }
 
-  .lk-kanan #lk-cari {
+  .lk-bingkai #nav-cari {
     font-size: clamp(12px, 0.781vw, 15px);
   }
 
@@ -163,7 +249,12 @@
     height: clamp(17px, 1.146vw, 22px);
   }
 
-  .lk-kanan form[role="search"] svg {
+  /* Kolom pencarian pindah ke bilah kepala — tombol ikon di bilah, panelnya
+     turun di bawahnya — jadi kaitnya ikut pindah ke header. Dikurung
+     .lk-bingkai, pola yang sama dengan aturan logo tepat di bawah, supaya
+     halaman index yang memakai <Nav> yang sama tidak ikut berubah. */
+  .lk-bingkai header form[role="search"] svg,
+  .lk-bingkai header button[aria-controls="nav-panel-cari"] svg {
     width: clamp(17px, 1.146vw, 22px);
     height: clamp(17px, 1.146vw, 22px);
   }

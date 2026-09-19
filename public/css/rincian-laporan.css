@@ -34,7 +34,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: calc(4rem + clamp(8px, 2vw, 20px)) clamp(8px, 3vw, 36px) clamp(8px, 2vw, 20px);
+  /* Sisi bawah menyisakan ruang bagi apa pun yang sudah menghuni dasar layar
+     (halaman karhutla punya bilah tab `fixed` di seluler dan mengumumkan
+     tingginya lewat --sela-bawah). Yang dipendekkan overlay-nya, sehingga
+     panel dan rel di dalamnya ikut berhenti di atas bilah — bukan pancang
+     sticky baris kirim yang dinaikkan, sebab sticky mengukur dari dasar wadah
+     gulir dan menaikkannya justru membuat baris itu menimpa deskripsi.
+     Bawaannya 0px: halaman tanpa penghuni dasar layar tak berubah. */
+  padding: calc(4rem + clamp(8px, 2vw, 20px)) clamp(8px, 3vw, 36px)
+           calc(clamp(8px, 2vw, 20px) + var(--sela-bawah, 0px));
   background: rgb(0 0 0 / 0.82);
 }
 
@@ -683,7 +691,17 @@ body:has(.rincian) iframe[src*="forecasting"] {
   gap: 10px;
   width: 100%;
   max-width: min(560px, 100vw);
-  max-height: 85svh;
+  /* Panel dipancang ke dasar viewport (induknya inset:0 + flex-end), dan di
+     halaman karhutla dasar itu dihuni bilah tab `fixed` yang z-index-nya lebih
+     tinggi — jadi tanpa ini ujung lembar tertimbun sampai tombol Kirim tak
+     terjangkau. Yang diangkat panelnya saja, BUKAN overlay-nya: overlay juga
+     memegang latar gelap, dan memendekkannya membuat latar itu berhenti lebih
+     awal sehingga isi di belakang bilah yang tembus pandang tak lagi teredam.
+     max-height ikut dikurangi supaya panel tak tumbuh kembali ke bawah bilah
+     saat isinya panjang. Bawaannya 0px — halaman tanpa penghuni dasar layar
+     tidak berubah. */
+  margin-bottom: var(--sela-bawah, 0px);
+  max-height: calc(85svh - var(--sela-bawah, 0px));
   overflow-y: auto;
   padding: 14px 20px calc(16px + env(safe-area-inset-bottom));
   border-radius: 14px 14px 0 0;
@@ -970,7 +988,11 @@ body:has(.rincian) iframe[src*="forecasting"] {
 /* --- Layar sempit: panel ditumpuk ---------------------------------------- */
 @media (max-width: 860px) {
   .rincian {
-    padding: calc(4rem + 6px) 6px 6px;
+    /* Shorthand, jadi ia menimpa padding dasar seutuhnya — termasuk sisi
+       bawahnya. --sela-bawah karena itu harus diulang di sini; tanpa itu
+       justru di ponsel, satu-satunya tempat bilah tab benar-benar ada,
+       insetnya hilang. */
+    padding: calc(4rem + 6px) 6px calc(6px + var(--sela-bawah, 0px));
   }
 
   .rincian__panel {
@@ -1025,6 +1047,12 @@ body:has(.rincian) iframe[src*="forecasting"] {
     background: var(--r-rel);
   }
 
+  /* Tetap dipancang di dasar wadahnya, BUKAN dinaikkan sejauh --sela-bawah.
+     Menaikkannya sempat dicoba dan salah arah: sticky mengukur dari dasar
+     wadah gulir, bukan dasar layar, jadi barisnya terangkat ke tengah area
+     baca sementara isi tetap mengalir di belakangnya — deskripsi tertimpa.
+     Yang dipendekkan seharusnya wadahnya (lihat padding .rincian di bawah),
+     bukan pancang barisnya. */
   .rincian__kirim {
     position: sticky;
     bottom: 0;

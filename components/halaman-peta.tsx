@@ -485,11 +485,16 @@ export function HalamanPeta({
             bisa diklik / meluber. */}
         <section id="peta" aria-label={teks.judulHalaman} inert={!tengahBuka}
           className={`relative flex min-h-0 flex-col aliran:flex-1 aliran:[--sela-bawah:272px]
-                      panggung:z-10 panggung:col-start-2 panggung:row-start-1 panggung:py-6
+                      panggung:z-10 panggung:col-start-2 panggung:row-start-1 panggung:py-6 panggung:overflow-hidden
                       transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none
                       ${tengahBuka
                         ? "panggung:opacity-100"
-                        : "panggung:pointer-events-none panggung:overflow-hidden panggung:opacity-0"}`}>
+                        : "panggung:pointer-events-none panggung:opacity-0"}`}>
+          {/* Pola titik dekoratif — di dalam section (bukan grid) supaya tak
+            menambah lajur grid tak terduga. Kiri menempel penuh ke rel kiri
+            (inset-y-0), kanan inset-y-6 dan terpotong bingkai — asimetri
+            disengaja khas dasbor gosip. Disembunyikan saat peta dilipat supaya
+            tak mengambang di atas rel kanan yang melebar. */}
           {/* Pola titik bara di dua pojok berseberangan — tekstur, bukan
               isi, jadi hanya di layar panggung yang lega. */}
           <div aria-hidden="true" className="pantau-titik pantau-titik--kanan hidden panggung:block" />
