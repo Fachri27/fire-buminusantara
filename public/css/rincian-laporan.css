@@ -634,6 +634,12 @@ body:has(.rincian) iframe[src*="forecasting"] {
 /* --- Kolom kirim: dipatok di dasar rel, seperti rujukan ------------------ */
 .rincian__kirim {
   display: grid;
+  /* minmax(0, 1fr): tanpa ini kolom grid `auto` memakai min-width:auto pada
+     itemnya (= max-content baris nama+email / baris ketik yang intrinsiknya
+     ~2×size/cols bawaan) — "grid blowout" — sehingga di HP sempit (≤384px)
+     seluruh formulir, termasuk tombol Kirim, lewat tepi layar dan terpotong.
+     Pola yang sama dengan .rincian__sheet-panel di bawah. */
+  grid-template-columns: minmax(0, 1fr);
   flex-shrink: 0;
   gap: 8px;
   border-top: 1px solid var(--r-garis);

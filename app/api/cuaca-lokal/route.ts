@@ -159,8 +159,10 @@ function wmoDariBmkg(angka: unknown): number | null {
  * Aturannya meniru widget BMKG sendiri: yang tampil nilai blok 3-jaman yang
  * SEDANG BERJALAN (lantai, bukan terdekat). Contoh: pukul 17:16 widget
  * menampilkan slot 15:00 (29°C), bukan slot 18:00 (28°C). Karena API hanya
- * memberi slot ke depan, slot-slot lama disimpan di cache (6 jam) — selama
- * server hidup, blok berjalan selalu ketemu. Tanpa jejak: slot terdekat.
+ * memberi slot ke depan (respons jam 23:25 sudah mulai besok 00:00), slot
+ * lampau hari ini disimpan di cache (6 jam) — selama server hidup, blok
+ * berjalan selalu ketemu dan angkanya sama dengan widget BMKG. Tanpa jejak
+ * (serverless dingin tepat di jendela tengah malam): slot terdekat.
  *
  * Batas BMKG 60/menit/IP — satu request halaman = satu request BMKG, aman.
  */
@@ -182,7 +184,14 @@ async function cuacaBmkg(adm4: string | null): Promise<Cuaca | null> {
       data?: { cuaca?: { local_datetime?: unknown; t?: unknown; weather?: unknown }[][] }[];
     };
     const daftar = j.data?.[0]?.cuaca?.flat() ?? [];
-    const kiniJakarta = Date.now() + (7 * 60 + new Date().getTimezoneOffset()) * 60_000;
+    // "Kini" sebagai instan absolut (Date.now) — SENGAJA bukan rumus lama
+    // (Date.now() + (7*60 + getTimezoneOffset())*60000): rumus itu hanya benar
+    // bila zona waktu server UTC (seperti Vercel); di laptop WIB ia maju
+    // 7 jam sehingga deploy dan lokal memilih slot BMKG yang berbeda untuk
+    // adm4 yang sama (26° vs 27°). Perbandingan slot memakai instan absolut
+    // (zona waktu tak relevan); hanya label siang/malam yang butuh jam WIB
+    // = getUTCHours(kini + 7 jam).
+    const kini = Date.now();
     const baru: Slot[] = [];
     for (const s of daftar) {
       if (typeof s?.local_datetime !== "string" || typeof s?.t !== "number" || !Number.isFinite(s.t)) continue;
@@ -197,22 +206,23 @@ async function cuacaBmkg(adm4: string | null): Promise<Cuaca | null> {
     const gabung = new Map<number, Slot>();
     if (lama && lama.kedaluwarsa > Date.now()) {
       for (const s of lama.slot) {
-        if (kiniJakarta - s.ms < 12 * 60 * 60_000) gabung.set(s.ms, s);
+        if (kini - s.ms < 12 * 60 * 60_000) gabung.set(s.ms, s);
       }
     }
     for (const s of baru) gabung.set(s.ms, s);
     const semua = [...gabung.values()].sort((a, b) => a.ms - b.ms);
     slotKas.set(adm4, { kedaluwarsa: Date.now() + SLOT_TTL, slot: semua });
+    // Blok berjalan (lantai): yang terbaru yang tidak melewati kini.
     let terbaik: Slot | null = null;
     for (const s of semua) {
-      if (s.ms <= kiniJakarta) terbaik = s;
+      if (s.ms <= kini) terbaik = s;
       else break;
     }
     // Belum ada slot lampau (server baru hidup): slot terdekat.
     if (!terbaik) {
       let selisihTerkecil = Infinity;
       for (const s of semua) {
-        const selisih = Math.abs(s.ms - kiniJakarta);
+        const selisih = Math.abs(s.ms - kini);
         if (selisih < selisihTerkecil) {
           selisihTerkecil = selisih;
           terbaik = s;
@@ -220,7 +230,7 @@ async function cuacaBmkg(adm4: string | null): Promise<Cuaca | null> {
       }
     }
     if (!terbaik) return kosong;
-    const jam = new Date(kiniJakarta).getUTCHours();
+    const jam = new Date(kini + 7 * 60 * 60_000).getUTCHours();
     return { suhu: terbaik.t, kode: wmoDariBmkg(terbaik.weather), siang: jam >= 6 && jam < 18 };
   } catch {
     return null;

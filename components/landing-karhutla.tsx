@@ -387,13 +387,6 @@ function IkonOrang({ className = "size-6" }: { className?: string }) {
   );
 }
 
-/* Umpan masonry berkolom tetap — pola yang sama dengan MasonryKolom di index:
-   kartu dibagi bergiliran (0,1,2,0,1,2…) ke sejumlah daftar terpisah, lalu
-   daftar-daftar itu dijajar. Sengaja BUKAN CSS `columns`: di sana peramban
-   yang memutuskan isi tiap kolom dan menghitung ulangnya setiap tinggi isi
-   berubah — gambar yang baru termuat melempar kartu ke kolom lain. Di sini
-   penempatan ditentukan indeks, jadi kekal: gambar yang telat hanya mendorong
-   kartu di bawahnya dalam kolom yang sama. */
 /* Seluler atau bukan — cerminan varian aliran/panggung di JS. Snapshot server
    sengaja panggung (kedua rel dirender) supaya markup SSR lengkap; klien
    seluler melepas rel kiri setelah hidrasi. Pola yang sama dengan
@@ -451,10 +444,13 @@ function IkonUlang({ className = "size-7" }: { className?: string }) {
    terakhir dengan tombol putar ulang di tengah — bukan loop.
    Pengurang gerak berarti diam di poster. Poster di lapisan sendiri supaya
    kegagalan putar tak berarti kotak hitam. */
-function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = null, bahasa }: {
-  url: string; poster: string | null; label: string; onBuka: () => void;
+function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, tanpaBuka = false, kredit = null, bahasa }: {
+  url: string; poster: string | null; label: string; onBuka?: () => void;
   /** true di dalam carousel — margin atas milik wadah, bukan tombol. */
   tanpaMt?: boolean;
+  /** true = media murni tampilan, tanpa tombol buka (dipakai halaman detail:
+      videonya sudah berada di tempatnya, mengklik tak boleh membuka apa pun). */
+  tanpaBuka?: boolean;
   /** Nama kredit untuk pil © — null = tanpa pil. */
   kredit?: string | null;
   bahasa: Bahasa;
@@ -528,61 +524,73 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
     el.play().catch(() => {});
   }
 
+  const isiMedia = poster && !posterGagal ? (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={poster} alt="" aria-hidden="true" loading="lazy"
+        onError={() => setPosterGagal(true)}
+        className="lk-foto h-auto w-full"
+      />
+      <video
+        ref={ref}
+        src={url}
+        muted={bisu}
+        playsInline
+        preload="metadata"
+        aria-hidden="true"
+        // SENGAJA tanpa tabIndex: video ini dekoratif di dalam tombol
+        // bernama. Dengan tabIndex={-1} Chrome memindahkan fokus ke
+        // sini saat diklik — lalu browser memblokir aria-hidden karena
+        // fokus tak boleh disembunyikan dari teknologi asistif.
+        onPlay={() => setUsai(false)}
+        onEnded={() => setUsai(true)}
+        onCanPlay={(e) => cobaPutar(e.currentTarget)}
+        onPlaying={() => setSiap(true)}
+        className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-500 ${siap ? "opacity-100" : "opacity-0"}`}
+      />
+    </>
+  ) : (
+    <video
+      ref={ref}
+      src={url}
+      muted={bisu}
+      playsInline
+      preload="metadata"
+      aria-hidden="true"
+      // Tanpa tabIndex seperti cabang berposter di atas: tabIndex={-1}
+      // membuat klik memindahkan fokus ke video aria-hidden ini.
+      onPlay={() => setUsai(false)}
+      onEnded={() => setUsai(true)}
+      onCanPlay={(e) => cobaPutar(e.currentTarget)}
+      onPlaying={() => setSiap(true)}
+      className="lk-foto h-auto w-full"
+    />
+  );
+
   return (
     // Wadah div (bukan button): tombol bisu/ulang bersarang di dalamnya dan
     // button-di-dalam-button tidak valid. Tombol buka-rincian melingkupi
-    // medianya; tombol bisu/ulang menghentikan rambatan supaya tidak ikut
-    // membuka rincian.
+    // medianya kecuali tanpaBuka; tombol bisu/ulang menghentikan rambatan
+    // supaya tidak ikut membuka rincian.
     <div
       className={`lk-foto block w-full${tanpaMt ? "" : " mt-3"}`}
     >
       <span className="relative block">
-        <button
-          type="button"
-          onClick={onBuka}
-          aria-label={label}
-          className="block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
-        >
-          {poster && !posterGagal ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={poster} alt="" aria-hidden="true" loading="lazy"
-                onError={() => setPosterGagal(true)}
-                className="lk-foto h-auto w-full"
-              />
-              <video
-                ref={ref}
-                src={url}
-                muted={bisu}
-                playsInline
-                preload="metadata"
-                aria-hidden="true"
-                tabIndex={-1}
-                onPlay={() => setUsai(false)}
-                onEnded={() => setUsai(true)}
-                onCanPlay={(e) => cobaPutar(e.currentTarget)}
-                onPlaying={() => setSiap(true)}
-                className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-500 ${siap ? "opacity-100" : "opacity-0"}`}
-              />
-            </>
-          ) : (
-            <video
-              ref={ref}
-              src={url}
-              muted={bisu}
-              playsInline
-              preload="metadata"
-              aria-hidden="true"
-              tabIndex={-1}
-              onPlay={() => setUsai(false)}
-              onEnded={() => setUsai(true)}
-              onCanPlay={(e) => cobaPutar(e.currentTarget)}
-              onPlaying={() => setSiap(true)}
-              className="lk-foto h-auto w-full"
-            />
-          )}
-        </button>
+        {tanpaBuka || !onBuka ? (
+          <span className="block w-full">
+            {isiMedia}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onBuka}
+            aria-label={label}
+            className="block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+          >
+            {isiMedia}
+          </button>
+        )}
         {usai ? (
           <span className="lk-video-ulang-wadah">
             <button
@@ -765,11 +773,10 @@ export function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
    (desktop langsung ke rincian). Bilah kembali + judul, baris penulis,
    media selebar layar (dots ketuk, tanpa geser), baris aksi (suka
    perangkat-lokal, komentar, bagikan), caption + selengkapnya + tanggal. */
-export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomentar, statis = false }: {
+export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, statis = false }: {
   laporan: Laporan;
   bahasa: Bahasa;
   onTutup: () => void;
-  onBuka: () => void;
   onKomentar: () => void;
   /** true di halaman detail tersendiri: mengalir normal, bukan overlay fixed. */
   statis?: boolean;
@@ -823,6 +830,15 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
     : [{ url: "", jenis: "gambar" as const }];
   const n = items.length;
   const aktif = items[Math.min(idx, n - 1)];
+  /* Jendela titik carousel: media bisa belasan (11 titik berjajar penuh dan
+     terlihat berantakan). Di atas 7, hanya 5 titik di sekitar posisi aktif
+     yang digambar — polanya meniru carousel IG. */
+  const MAKS_TITIK = 5;
+  const AMBANG_JENDELA = 7;
+  const awalTitik = n > AMBANG_JENDELA ? Math.min(Math.max(idx - 2, 0), n - MAKS_TITIK) : 0;
+  const titikTampil: number[] = items
+    .map((_, i) => i)
+    .filter((i) => i >= awalTitik && i < awalTitik + (n > AMBANG_JENDELA ? MAKS_TITIK : n));
 
   useEffect(() => {
     const saatTombol = (e: KeyboardEvent) => {
@@ -891,7 +907,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
         }}
       >
         {aktif.jenis === "video" ? (
-          <VideoOtomatis url={aktif.url} poster={aktif.poster ?? l.gambar} label={l.judul} onBuka={onBuka} tanpaMt kredit={aktif.keterangan ?? "anonim"} bahasa={bahasa} />
+          <VideoOtomatis url={aktif.url} poster={aktif.poster ?? l.gambar} label={l.judul} tanpaMt tanpaBuka kredit={aktif.keterangan ?? "anonim"} bahasa={bahasa} />
         ) : aktif.url ? (
           <span className="lk-media-statis">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -903,9 +919,9 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
         ) : null}
         {n > 1 && (
           <div className="lk-postingan-titik" role="group" aria-label={`${idx + 1} / ${n}`}>
-            {items.map((m, i) => (
+            {titikTampil.map((i) => (
               <button
-                key={`${m.url}-${i}`}
+                key={`${items[i].url}-${i}`}
                 type="button"
                 onClick={() => setIdx(i)}
                 aria-label={`${i + 1} / ${n}`}
@@ -1026,6 +1042,13 @@ export function LembarKomentar({ id, bahasa, onTutup }: {
   );
 }
 
+/* Umpan masonry berkolom tetap — pola yang sama dengan MasonryKolom di index:
+   kartu dibagi bergiliran (0,1,2,0,1,2…) ke sejumlah daftar terpisah, lalu
+   daftar-daftar itu dijajar. Sengaja BUKAN CSS `columns`: di sana peramban
+   yang memutuskan isi tiap kolom dan menghitung ulangnya setiap tinggi isi
+   berubah — gambar yang baru termuat melempar kartu ke kolom lain. Di sini
+   penempatan ditentukan indeks, jadi kekal: gambar yang telat hanya mendorong
+   kartu di bawahnya dalam kolom yang sama. */
 function UmpanMasonry({ daftar, kolom, kartu }: {
   daftar: Laporan[];
   kolom: number;

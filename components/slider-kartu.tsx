@@ -53,7 +53,7 @@ export function SliderKartu({
         // Poster per-media (bingkai videonya sendiri) menang atas thumbnail
         // kejadian — kartu multi-video tidak berbagi satu gambar yang salah.
         <VideoKartu key={`v${kini}`} src={m.url} poster={m.poster ?? poster} label={label} aktif={aktif}
-                    kurangiGerak={kurangiGerak} className={kelasMedia} onBuka={onBuka} />
+                    kurangiGerak={kurangiGerak} className={kelasMedia} />
       ) : (
         <FotoKartu key={`g${kini}`} src={m.url} alt={label} aktif={aktif}
                    className={kelasMedia} onBuka={onBuka} />
