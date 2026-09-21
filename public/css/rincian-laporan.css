@@ -102,6 +102,72 @@ body:has(.rincian) iframe[src*="forecasting"] {
   outline: none;
 }
 
+/* --- Masuknya pop-up -----------------------------------------------------
+   Sebelumnya panel muncul seketika: latar gelap dan panel penuh terpasang di
+   frame yang sama, terasa menyentak. Dua animasi pendek ini memakai kurva yang
+   sama dengan lembar komentar di bawah supaya satu bahasa gerak. Murni CSS —
+   mount-nya sudah dikendalikan React, tak perlu state transisi. */
+.rincian {
+  animation: rincian-latar-muncul 180ms ease-out;
+}
+
+.rincian__panel {
+  animation: rincian-panel-muncul 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes rincian-latar-muncul {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes rincian-panel-muncul {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Keluar: cermin dari animasi masuk. Komponen menahan unmount sampai
+   animationend overlay ini, jadi durasinya boleh diubah di sini saja. */
+.rincian--keluar {
+  animation: rincian-latar-lenyap 200ms ease-in forwards;
+}
+
+.rincian--keluar .rincian__panel {
+  animation: rincian-panel-lenyap 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Sengaja nama keyframes tersendiri, bukan animasi masuk yang dibalik:
+   animasi dicocokkan peramban lewat nama, jadi memakai nama yang sama hanya
+   mengubah setelan animasi masuk yang SUDAH selesai — ia tak berjalan ulang
+   dan animationend tak pernah menyala lagi, alias pop-up tak pernah tertutup. */
+@keyframes rincian-latar-lenyap {
+  to { opacity: 0; }
+}
+
+@keyframes rincian-panel-lenyap {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+}
+
+/* Hanya animasi MASUK yang dimatikan di sini. Animasi keluar sengaja
+   dibiarkan: penutupan menunggu animationend-nya, dan `animation: none`
+   membuat peristiwa itu tak pernah menyala — pop-up macet terbuka. Jalur
+   reduced-motion-nya ditangani di JS (mintaTutup langsung memanggil onTutup),
+   jadi kelas ini memang tak pernah terpasang bagi mereka. */
+@media (prefers-reduced-motion: reduce) {
+  .rincian,
+  .rincian__panel {
+    animation: none;
+  }
+}
+
 /* --- Panel media ---------------------------------------------------------
    Kotak media menempel pada rasio medianya, seperti modal Instagram: media
    disetel setinggi panel, lebarnya mengikuti rasio aslinya. Rekaman vertikal
@@ -679,6 +745,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
   /* Jaring pengaman: pangkas overflow horizontal apa pun supaya panel tak
      pernah "lewat layar". */
   overflow-x: hidden;
+  animation: rincian-sheet-muncul 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .rincian__sheet-panel {
@@ -708,6 +775,34 @@ body:has(.rincian) iframe[src*="forecasting"] {
   border-radius: 14px 14px 0 0;
   background: var(--r-rel);
   box-shadow: 0 -12px 40px -12px rgb(0 0 0 / 0.45);
+  animation: rincian-sheet-naik 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes rincian-sheet-muncul {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rincian-sheet-naik {
+  from {
+    transform: translateY(48px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rincian__sheet,
+  .rincian__sheet-panel {
+    animation: none;
+  }
 }
 
 .rincian__sheet-kepala {
@@ -1114,7 +1209,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
   pointer-events: none;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   /* Transisi turun-naik mengikuti muncul-hilangnya bilah kendali video. */
-  transition: bottom 250ms ease;
+  transition: transform 250ms ease;
 }
 
 .rincian__kredit-tanda {
@@ -1125,7 +1220,15 @@ body:has(.rincian) iframe[src*="forecasting"] {
 /* Slide video: bilah kendali bawaan peramban menghuni dasar media — angkat
    label ke atasnya, setinggi varian dots yang setara. */
 .rincian__kredit--di-kendali {
-  bottom: 60px;
+  transform: translateY(-44px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rincian__kredit,
+  .rincian__kredit--di-kendali {
+    transition: none;
+    transform: none;
+  }
 }
 
 @media (max-width: 640px) {

@@ -29,12 +29,46 @@
 
 /* ── Overlay peta selayar ───────────────────────────────────────────────────
    Dibuka lewat tombol bentang di sudut bingkai: fixed selayar di atas segalanya
-   (z-[70], di atas Nav), alas malam #0a0a0a khas konsol. Isinya instance <Peta>
-   kedua yang mengisi penuh tanpa wrapper skala transform. Peta menempel ke
-   tepi overlay (tanpa pt-16) supaya tak ada celah hitam di atas. */
+   (z-[70], di atas Nav), alas malam #0a0a0a khas konsol. Isinya node <Peta>
+   yang sama dengan bingkai kecil, dipindah ke sini — bukan instance kedua.
+   Peta menempel ke tepi overlay (tanpa pt-16) supaya tak ada celah hitam di
+   atas.
+
+   Membentang & menutup dianimasikan: tanpa itu peta muncul seketika dan
+   terbaca seperti kedipan, persis keluhan yang dulu memang kedipan sungguhan.
+   Fill SENGAJA tidak `both` pada animasi masuk — transform yang tertahan di
+   akhir membuat overlay ini jadi containing block bagi keturunan `fixed`. */
 .lk-peta-penuh {
   height: 100dvh;
   overflow: hidden;
+  animation: lk-peta-masuk 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Fase tutup — durasinya dicerminkan DURASI_TUTUP_PETA di landing-karhutla.tsx,
+   yang menahan overlay tetap terpasang sampai animasinya habis. */
+.lk-peta-penuh--tutup {
+  animation: lk-peta-keluar 200ms ease both;
+}
+
+@keyframes lk-peta-masuk {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@keyframes lk-peta-keluar {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-peta-penuh,
+  .lk-peta-penuh--tutup {
+    animation: none;
+  }
 }
 
 /* ── Bingkai peta ─────────────────────────────────────────────────────────
@@ -498,27 +532,9 @@
     --tw-ring-shadow: 0 0 #0000;
   }
 
-  /* Pil lokasi mengambang di atas peta — padanan kolom pencarian di rujukan. */
-  .lk-mode-panel .lk-lokasi {
-    position: fixed;
-    top: calc(4rem + 0.75rem);
-    /* Berhenti sebelum SEMUA penghuni sudut kanan atas peta, bukan sampai tepi
-       layar. Di layar 414 terukur dua penghuni: tumpukan kendali peta di
-       x 374-402, dan tombol bentang di x 342-378.
-
-       Percobaan pertama memakai 3rem (tepi pil di 366) dan itu kurang: saat
-       diukur, tombol bentang masih terlempar ke luar layar oleh bug
-       `position: relative !important` sehingga tak terhitung sebagai penghalang.
-       Begitu bug itu diperbaiki ia kembali ke x 342 dan langsung tertutup pil.
-       5rem menaruh tepi pil di 334 — celah 8px ke penghalang terkiri. */
-    right: 5rem;
-    left: 0.75rem;
-    z-index: 2;
-    margin: 0;
-    background: rgb(20 20 20 / 0.92);
-    box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+  /* Sembunyikan bilah lokasi di tampilan seluler */
+  .lk-lokasi {
+    display: none !important;
   }
 
   /* Lembar bawah. Tingginya tetap dan isinya bergulir — BUKAN diseret:
@@ -1362,28 +1378,20 @@ button.lk-postingan-komentar {
   z-index: 9999 !important;
 }
 
-.lk-peta-penuh,
-.lk-peta-penuh * {
-  pointer-events: auto !important;
-}
+/* Sengaja TANPA aturan pointer-events/z-index borongan di sini.
+   Dulu overlay ini memaksa `pointer-events: auto !important` ke SELURUH
+   keturunannya demi "menjaga klikabilitas". Yang terjadi sebaliknya: hamparan
+   sinkronisasi PetaAsap (`absolute inset-0 z-[500]`) mematikan dirinya dengan
+   `pointer-events-none` saat sinkron selesai — dan aturan borongan itu
+   menghidupkannya lagi. Hasilnya lembar tembus pandang seukuran layar di atas
+   kanvas peta dan di atas bilah linimasa (z-450): peta tak bisa digeser/zoom
+   dan slider waktu tak bisa digeser, sementara tombol-tombolnya masih jalan
+   karena aturan `button { position: relative; z-index: 10000 }` mengangkatnya
+   lewat hamparan itu.
 
-.lk-peta-penuh button {
-  position: relative !important;
-  z-index: 10000 !important;
-}
+   Peta inline di halaman yang sama tak pernah punya masalah ini justru karena
+   ia tak punya aturan ini. Jadi obatnya bukan pengecualian keempat, melainkan
+   membuang resepnya: z-index bawaan komponen peta sudah benar, dan silang
+   penutup di atasnya memakai z-[1100] yang lebih tinggi dari semuanya. */
 
-/* KECUALI silang penutupnya. Aturan di atas menyasar SEMUA tombol di dalam
-   overlay demi menjaga klikabilitasnya, tapi silang ini dipasang
-   `absolute top-4 right-4` — dan `relative !important` mengalahkan utilitas
-   itu, sehingga `right: 16px` berubah makna jadi geseran 16px ke KIRI dari
-   posisi statisnya. Karena ia anak terakhir dalam aliran, hasilnya mendarat di
-   tepi kiri layar dan terpotong, berhimpit dengan chip legenda peta.
-
-   Mekanisme yang sama persis sudah tercatat untuk .lk-tombol-peta di atas;
-   ini kambuhnya pada overlay selayar. Aturan ini hanya mengembalikan
-   `position` — z-index 10000 dari aturan di atas tetap berlaku, jadi
-   klikabilitas yang dijaganya tidak berubah. */
-.lk-peta-penuh .lk-tutup-peta {
-  position: absolute !important;
-}
 

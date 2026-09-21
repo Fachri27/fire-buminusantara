@@ -78,11 +78,17 @@ export async function GET(req: NextRequest) {
   // Landing karhutla: tombol bentang selayar dipasang di tumpukan zoom iframe
   // — kliknya mengirim BUKA_SELAYAR ke halaman induk lewat postMessage.
   const bentang = searchParams.get("bentang") === "1";
+  // ringkas: legendaRingkas aktif (bingkai sempit / panggung dasbor)
+  const ringkas = searchParams.get("ringkas") === "1";
+  // Kontrol zoom ditaruh di top 16px bila ada tombol bentang selayar di atasnya
+  // atau saat mode ringkas aktif tanpa modal selayar. Saat di modal selayar (!bentang && !ringkas),
+  // tombol tutup selayar (X) menempati top 16px, sehingga tumpukan zoom mulai di top 80px (sama persis dengan PetaAsap).
+  const topControls = bentang || ringkas ? "16px" : "80px";
   // Dibangun di sisi server (bukan backtick bersarang di dalam template skrip)
   // dan disisipkan sebagai anak pertama tumpukan — sama seperti posisi tombol
   // bentang di tumpukan kendali lapisan Aerosol (PetaAsap).
   const tombolBentang = bentang
-    ? '<button id="btn-bentang" type="button" aria-label="Buka peta selayar" title="Buka peta selayar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /></svg></button>'
+    ? '<button id="btn-bentang" type="button" aria-label="Buka peta selayar" title="Buka peta selayar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /></svg></button>'
     : "";
 
   // Router Windy hanya mengenali zoom bulat di URL — zoom pecahan membuatnya
@@ -660,7 +666,7 @@ export async function GET(req: NextRequest) {
 
           #custom-zoom-controls {
             right: 12px;
-            top: 80px;
+            top: ${topControls};
           }
         }
 
@@ -838,69 +844,72 @@ export async function GET(req: NextRequest) {
           border-top-color: rgba(20, 16, 15, 0.88) !important;
         }
 
-        /* Tombol kontrol zoom kustom */
+        /* Tombol kontrol zoom kustom (Posisi, ukuran, dan glassmorphism seragam dengan PetaAsap) */
         #custom-zoom-controls {
           position: fixed;
-          right: 20px;
-          top: 86px;
+          right: 12px;
+          top: ${topControls};
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          align-items: flex-end;
+          gap: 8px;
           z-index: 999;
           pointer-events: auto;
         }
+        @media (min-width: 640px) {
+          #custom-zoom-controls {
+            right: 16px;
+          }
+        }
         #custom-zoom-controls button {
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
-          background: rgba(20, 16, 15, 0.9);
-          border: 1px solid rgba(255, 255, 255, 0.25);
-          color: #ffffff;
-          font-size: 20px;
-          line-height: 1;
-          font-weight: 500;
+          cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-          transition: background 0.15s ease, transform 0.15s ease;
-          user-select: none;
-        }
-        #custom-zoom-controls button:hover {
-          background: rgba(45, 38, 35, 0.9);
-          transform: scale(1.05);
-        }
-        #custom-zoom-controls button:active {
-          transform: scale(0.95);
-        }
-        ${konsol ? `/* Konsol /peta: samakan tombol dengan tombol navigasi lapisan
-           Aerosol — ukuran 28px + ikon 13px, sela 8px, rapat 16px ke sudut
-           kanan atas bingkai, sudut 12px, kaca hitam 75% bercincin tipis.
-           !important karena blok ponsel di atas memakai media query. */
-        #custom-zoom-controls {
-          gap: 8px !important;
-          top: 16px !important;
-          right: 16px !important;
-        }
-        #custom-zoom-controls button {
-          width: 28px !important;
-          height: 28px !important;
-          border-radius: 12px !important;
-          background: rgba(0, 0, 0, 0.75) !important;
-          border: 0 !important;
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+          border-radius: 12px;
+          background: rgba(0, 0, 0, 0.75);
+          border: 0;
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          color: rgba(255, 255, 255, 0.9) !important;
+          color: rgba(255, 255, 255, 0.9);
+          user-select: none;
+          transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
         }
         #custom-zoom-controls button:hover {
-          background: #000000 !important;
-          color: #ffffff !important;
-          transform: none !important;
+          background: #000000;
+          color: #ffffff;
         }
-        #custom-zoom-controls button:active { transform: scale(0.9) !important; }
-        #custom-zoom-controls button svg { width: 13px !important; height: 13px !important; }` : ""}
+        #custom-zoom-controls button:active {
+          transform: scale(0.9);
+        }
+        #custom-zoom-controls button svg {
+          pointer-events: none;
+        }
+
+        /* Tombol bentang selayar — selalu 36px (h-9 w-9) */
+        #btn-bentang {
+          width: 36px !important;
+          height: 36px !important;
+        }
+        #btn-bentang svg {
+          width: 16px !important;
+          height: 16px !important;
+        }
+
+        /* Tombol navigasi (+, -, home) — 28px jika ringkas (legendaRingkas), default 36px */
+        #btn-zoom-in,
+        #btn-zoom-out,
+        #btn-zoom-home {
+          width: ${ringkas ? "28px" : "36px"} !important;
+          height: ${ringkas ? "28px" : "36px"} !important;
+        }
+        #btn-zoom-in svg,
+        #btn-zoom-out svg,
+        #btn-zoom-home svg {
+          width: ${ringkas ? "13px" : "16px"} !important;
+          height: ${ringkas ? "13px" : "16px"} !important;
+        }
 
         /* MOBILE: Pastikan sentuhan pan dan pinch-to-zoom di perangkat sentuh mulus dan responsif */
         @media (pointer: coarse), (max-width: 640px) {
@@ -938,7 +947,7 @@ export async function GET(req: NextRequest) {
           // Konsol /peta: roda memperbesar peta, dan zoom awalnya pecahan (hasil
           // cameraForBounds lapisan Aerosol) — jangan dibulatkan ke bawah.
           const KONSOL = ${konsol};
-          const ZOOM_AWAL = KONSOL ? parseFloat('${zoom}') : parseInt('${zoom}', 10);
+          const ZOOM_AWAL = parseFloat('${zoom}');
           let tampilanAwal = { pusat: [parseFloat('${lat}'), parseFloat('${lon}')], zoom: ZOOM_AWAL };
           // Kamera terakhir lapisan Aerosol yang dikirim parent (SET_KAMERA) —
           // bila ada, dipakai menggantikan tampilanAwal saat memosisikan ulang.
@@ -1181,22 +1190,18 @@ export async function GET(req: NextRequest) {
               map.setView([parseFloat('${lat}'), parseFloat('${lon}')], ZOOM_AWAL);
             } catch (e) {}
 
-            // Konsol /peta: Windy masih memosisikan ulang peta beberapa saat
-            // setelah siap (router + pemulihan posisi), menimpa kamera di atas.
-            // Terapkan ulang kamera yang sama dengan lapisan Aerosol sampai
-            // pengunjung sendiri menyentuh peta.
-            if (KONSOL) {
-              ['pointerdown', 'wheel', 'touchstart', 'keydown'].forEach(function(jenis) {
-                window.addEventListener(jenis, function() { interaksiPengguna = true; }, { capture: true, passive: true });
-              });
-              [400, 1200, 2500, 4500].forEach(function(jeda) {
-                setTimeout(function() {
-                  if (interaksiPengguna) return;
-                  const k = kameraTarget || tampilanAwal;
-                  try { map.setView(k.pusat, k.zoom, { animate: false }); } catch (e) {}
-                }, jeda);
-              });
-            }
+            // Windy masih memosisikan ulang peta beberapa saat setelah siap (router + pemulihan posisi).
+            // Terapkan ulang kamera yang sama dengan lapisan Aerosol / posisi awal sampai pengunjung menyentuh peta.
+            ['pointerdown', 'wheel', 'touchstart', 'keydown'].forEach(function(jenis) {
+              window.addEventListener(jenis, function() { interaksiPengguna = true; }, { capture: true, passive: true });
+            });
+            [400, 1200, 2500, 4500].forEach(function(jeda) {
+              setTimeout(function() {
+                if (interaksiPengguna) return;
+                const k = kameraTarget || tampilanAwal;
+                try { map.setView(k.pusat, k.zoom, { animate: false }); } catch (e) {}
+              }, jeda);
+            });
 
             // Buat tombol kontrol zoom kustom (+ / − / home).
             // Saat query bentang=1 (dipakai landing karhutla), tombol bentang
@@ -1207,7 +1212,10 @@ export async function GET(req: NextRequest) {
             if (!document.getElementById('custom-zoom-controls')) {
               const zoomBox = document.createElement('div');
               zoomBox.id = 'custom-zoom-controls';
-              zoomBox.innerHTML = '${tombolBentang}<button id="btn-zoom-in" type="button" aria-label="Perbesar peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-out" type="button" aria-label="Perkecil peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-home" type="button" aria-label="Kembali ke tampilan awal peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H4a1 1 0 0 1-1-1v-9.5z" /></svg></button>';
+              zoomBox.innerHTML = '${tombolBentang}' +
+                '<button id="btn-zoom-in" type="button" aria-label="Perbesar peta" title="Perbesar peta"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button>' +
+                '<button id="btn-zoom-out" type="button" aria-label="Perkecil peta" title="Perkecil peta"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12" /></svg></button>' +
+                '<button id="btn-zoom-home" type="button" aria-label="Fokus seluruh Nusantara" title="Fokus seluruh Nusantara"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg></button>';
               document.body.appendChild(zoomBox);
 
               document.getElementById('btn-bentang')?.addEventListener('click', function(e) {
@@ -1231,10 +1239,11 @@ export async function GET(req: NextRequest) {
                 e.stopPropagation();
                 if (window.W && window.W.map && window.W.map.map) {
                   const m = window.W.map.map;
+                  const k = kameraTarget || tampilanAwal;
                   // Pada Leaflet/MapLibre wrapper Windy, flyTo meneruskan zoom langsung ke MapLibre tanpa -1
-                  // (sedangkan getZoom() adalah maplibreZoom + 1). Oleh karena itu tampilanAwal.zoom dikurangi 1
-                  // agar hasil flyTo mengembalikan peta tepat ke default zoom (level 5).
-                  m.flyTo(tampilanAwal.pusat, tampilanAwal.zoom - 1, { duration: 1.2 });
+                  // (sedangkan getZoom() adalah maplibreZoom + 1). Oleh karena itu zoom dikurangi 1
+                  // agar hasil flyTo mengembalikan peta tepat ke zoom target.
+                  m.flyTo(k.pusat, k.zoom - 1, { duration: 1.2 });
                 }
               });
             }
@@ -1477,12 +1486,17 @@ export async function GET(req: NextRequest) {
                 penundaDelta = setTimeout(terapkanDeltaTertunda, 300);
               }
             } else if (data.type === 'SET_KAMERA') {
-              // Konsol /peta: samakan kamera dengan lapisan Aerosol saat pengunjung
-              // berpindah lapisan. Zoom sudah dalam skala Windy (Aerosol + 1).
-              if (KONSOL && isFinite(data.lat) && isFinite(data.lon) && isFinite(data.zoom)) {
+              // Samakan kamera dengan lapisan Aerosol / Nusantara saat beralih mode atau masuk selayar.
+              // Zoom sudah dalam skala Windy (Aerosol + 1).
+              if (isFinite(data.lat) && isFinite(data.lon) && isFinite(data.zoom)) {
                 kameraTarget = { pusat: [data.lat, data.lon], zoom: data.zoom };
+                tampilanAwal = { pusat: [data.lat, data.lon], zoom: data.zoom };
                 if (window.W && window.W.map && window.W.map.map) {
-                  try { window.W.map.map.setView(kameraTarget.pusat, kameraTarget.zoom, { animate: false }); } catch (e) {}
+                  try {
+                    window.W.map.map.setView(kameraTarget.pusat, kameraTarget.zoom, { animate: false });
+                    const mml = window.W.map.map._maplibreMap;
+                    if (mml && typeof mml.resize === 'function') mml.resize();
+                  } catch (e) {}
                 }
               }
             } else if (data.type === 'WINDY_ACTIVE') {

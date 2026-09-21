@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Peta, type ModePeta } from "@/components/peta";
+import { Peta } from "@/components/peta";
 import { Nav } from "@/components/nav";
 import { RincianLaporan } from "@/components/rincian-laporan";
 import { PopupPeta } from "@/components/popup-peta";
@@ -13,13 +13,18 @@ import { UlasanKomentar, FormulirKomentar } from "@/components/kolom-komentar";
 import { gunakanKomentar } from "@/hooks/gunakan-komentar";
 import { gunakanKolomUmpan } from "@/hooks/gunakan-kolom-umpan";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "@/lib/batas-laporan";
-import { KUNCI_SOROTAN, LABEL_SOROTAN, type KunciSorotan } from "@/lib/statistik-sorotan-teks";
+import { ambilStatistik, type Statistik as DataStatistik } from "@/lib/statistik";
+import type { KunciSorotan } from "@/lib/statistik-sorotan-teks";
 import type { Bahasa } from "@/lib/bahasa";
 import type { Berita } from "@/lib/events";
 import { kirimLaporan, type KeadaanLapor } from "@/app/[locale]/lapor/aksi";
 
 /** Site key Turnstile — sama seperti form /lapor. */
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+
+/** Panjang animasi keluar overlay peta selayar. Harus sama dengan
+ *  @keyframes lk-peta-keluar di public/css/landing-karhutla.css. */
+const DURASI_TUTUP_PETA = 200;
 
 /* Jenis berkas ditulis satu per satu, BUKAN "image/*,video/*" — sama seperti
    form /lapor: dengan daftar eksplisit, iOS mengubah foto HEIC-nya jadi JPEG
@@ -56,10 +61,6 @@ export type Laporan = {
   href: string;
 };
 
-const STATISTIK: { kunci: KunciSorotan; id: string; en: string }[] = KUNCI_SOROTAN.map((kunci) => ({
-  kunci,
-  ...LABEL_SOROTAN[kunci],
-}));
 
 const TEKS = {
   id: {
@@ -69,6 +70,12 @@ const TEKS = {
     cariLaporan: "Lapor apa yang kamu lihat",
     lokasi: "Kalimantan Barat",
     lokasiOtomatis: "secara otomatis dibaca lokasi",
+    lokasiTerdeteksi: "lokasi terdeteksi",
+    lokasiDicari: "lokasi dicari",
+    cariLokasiCuaca: "Cari kota/provinsi...",
+    cariLokasiCuacaAria: "Cari lokasi cuaca",
+    deteksiGpsCuacaAria: "Deteksi lokasi cuaca via GPS",
+    batalCariCuaca: "Batal cari lokasi cuaca",
     petaJudul: "Aerosol Karhutla",
     petaAngin: "Angin dan kualitas udara",
     petaWaktu: "8 Sep, 00:00 WIB",
@@ -139,6 +146,12 @@ const TEKS = {
     cariLaporan: "Report what you see",
     lokasi: "West Kalimantan",
     lokasiOtomatis: "location read automatically",
+    lokasiTerdeteksi: "detected location",
+    lokasiDicari: "searched location",
+    cariLokasiCuaca: "Search city/province...",
+    cariLokasiCuacaAria: "Search weather location",
+    deteksiGpsCuacaAria: "Detect weather location via GPS",
+    batalCariCuaca: "Cancel weather location search",
     petaJudul: "Wildfire Aerosol",
     petaAngin: "Wind and air quality",
     petaWaktu: "8 Sep, 00:00 WIB",
@@ -257,26 +270,109 @@ function useCuacaLokal(bahasa: Bahasa, lokasiAwal: string) {
   const [kodeCuaca, setKodeCuaca] = useState<number | null>(null);
   const [siang, setSiang] = useState(true);
   const [sumber, setSumber] = useState<"bmkg" | "model" | null>(null);
+  const [memuat, setMemuat] = useState(false);
+  const [sumberLokasi, setSumberLokasi] = useState<"otomatis" | "gps" | "cari">("otomatis");
+
+  type Muatan = {
+    nama?: unknown; suhu?: unknown; kodeCuaca?: unknown; siang?: unknown; sumber?: unknown;
+  };
+  const terapkan = useCallback((j: Muatan): void => {
+    if (typeof j.nama === "string" && j.nama.trim() !== "") setLokasi(j.nama.trim());
+    if (typeof j.suhu === "number" && Number.isFinite(j.suhu)) setSuhu(Math.round(j.suhu));
+    if (typeof j.kodeCuaca === "number" && Number.isFinite(j.kodeCuaca)) setKodeCuaca(j.kodeCuaca);
+    if (typeof j.siang === "boolean") setSiang(j.siang);
+    if (j.sumber === "bmkg" || j.sumber === "model") setSumber(j.sumber);
+  }, []);
+
+  const cari = useCallback(async (kueri: string): Promise<boolean> => {
+    const q = kueri.trim();
+    if (!q) return false;
+    setMemuat(true);
+    try {
+      const r = await fetch(`/api/cuaca-lokal?bahasa=${bahasa}&q=${encodeURIComponent(q)}`, {
+        signal: AbortSignal.timeout(12000),
+        headers: { Accept: "application/json" },
+      });
+      if (!r.ok) return false;
+      const j = (await r.json()) as Muatan;
+      terapkan(j);
+      setSumberLokasi("cari");
+      try {
+        window.localStorage.setItem(
+          `lk-cuaca-${bahasa}`,
+          JSON.stringify({ t: Date.now(), data: j, sumberLokasi: "cari" })
+        );
+      } catch {
+        /* penyimpanan penuh/diblokir */
+      }
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setMemuat(false);
+    }
+  }, [bahasa, terapkan]);
+
+  const deteksiGps = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      return;
+    }
+    setMemuat(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const r = await fetch(
+            `/api/cuaca-lokal?bahasa=${bahasa}&lat=${latitude}&lng=${longitude}`,
+            {
+              signal: AbortSignal.timeout(12000),
+              headers: { Accept: "application/json" },
+            }
+          );
+          if (!r.ok) return;
+          const j = (await r.json()) as Muatan;
+          terapkan(j);
+          setSumberLokasi("gps");
+          try {
+            window.localStorage.setItem(
+              `lk-cuaca-${bahasa}`,
+              JSON.stringify({ t: Date.now(), data: j, sumberLokasi: "gps" })
+            );
+          } catch {
+            /* penyimpanan penuh/diblokir */
+          }
+        } catch {
+          // gagal fetch cuaca dari gps
+        } finally {
+          setMemuat(false);
+        }
+      },
+      () => {
+        setMemuat(false);
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+    );
+  }, [bahasa, terapkan]);
 
   useEffect(() => {
     let hidup = true;
-    type Muatan = {
-      nama?: unknown; suhu?: unknown; kodeCuaca?: unknown; siang?: unknown; sumber?: unknown;
-    };
-    const terapkan = (j: Muatan): void => {
-      if (typeof j.nama === "string" && j.nama.trim() !== "") setLokasi(j.nama.trim());
-      if (typeof j.suhu === "number" && Number.isFinite(j.suhu)) setSuhu(Math.round(j.suhu));
-      if (typeof j.kodeCuaca === "number" && Number.isFinite(j.kodeCuaca)) setKodeCuaca(j.kodeCuaca);
-      if (typeof j.siang === "boolean") setSiang(j.siang);
-      if (j.sumber === "bmkg" || j.sumber === "model") setSumber(j.sumber);
-    };
     // Cache lokal 15 menit: refresh langsung menampilkan angka terakhir
     // tanpa menunggu rantai server — lalu tetap divalidasi ulang di bawah.
     try {
       const mentah = window.localStorage.getItem(`lk-cuaca-${bahasa}`);
       if (mentah) {
-        const { t, data } = JSON.parse(mentah) as { t: number; data: Muatan };
-        if (data && typeof t === "number" && Date.now() - t < 15 * 60_000) terapkan(data);
+        const { t, data, sumberLokasi: sl } = JSON.parse(mentah) as {
+          t: number;
+          data: Muatan;
+          sumberLokasi?: "otomatis" | "gps" | "cari";
+        };
+        if (data && typeof t === "number" && Date.now() - t < 15 * 60_000) {
+          setTimeout(() => {
+            if (!hidup) return;
+            terapkan(data);
+            if (sl) setSumberLokasi(sl);
+          }, 0);
+        }
       }
     } catch {
       /* cache rusak: abaikan, fetch segar di bawah */
@@ -292,13 +388,14 @@ function useCuacaLokal(bahasa: Bahasa, lokasiAwal: string) {
           headers: { Accept: "application/json" },
         });
         if (!r.ok) return false;
-        const j = (await r.json()) as {
-          nama?: unknown; suhu?: unknown; kodeCuaca?: unknown; siang?: unknown; sumber?: unknown;
-        };
+        const j = (await r.json()) as Muatan;
         if (!hidup) return true;
         terapkan(j);
         try {
-          window.localStorage.setItem(`lk-cuaca-${bahasa}`, JSON.stringify({ t: Date.now(), data: j }));
+          window.localStorage.setItem(
+            `lk-cuaca-${bahasa}`,
+            JSON.stringify({ t: Date.now(), data: j, sumberLokasi: "otomatis" })
+          );
         } catch {
           /* penyimpanan penuh/diblokir: abaikan */
         }
@@ -314,9 +411,53 @@ function useCuacaLokal(bahasa: Bahasa, lokasiAwal: string) {
     return () => {
       hidup = false;
     };
-  }, [bahasa]);
+  }, [bahasa, terapkan]);
 
-  return { lokasi, suhu, kodeCuaca, siang, sumber };
+  const pilihSaran = useCallback(
+    async (item: {
+      nama: string;
+      provinsi: string;
+      lat: number;
+      lng: number;
+      adm4?: string;
+    }): Promise<boolean> => {
+      setMemuat(true);
+      try {
+        const param = new URLSearchParams({
+          bahasa,
+          lat: String(item.lat),
+          lng: String(item.lng),
+          nama: item.nama,
+          provinsi: item.provinsi,
+          ...(item.adm4 ? { adm4: item.adm4 } : {}),
+        });
+        const r = await fetch(`/api/cuaca-lokal?${param}`, {
+          signal: AbortSignal.timeout(12000),
+          headers: { Accept: "application/json" },
+        });
+        if (!r.ok) return false;
+        const j = (await r.json()) as Muatan;
+        terapkan(j);
+        setSumberLokasi("cari");
+        try {
+          window.localStorage.setItem(
+            `lk-cuaca-${bahasa}`,
+            JSON.stringify({ t: Date.now(), data: j, sumberLokasi: "cari" })
+          );
+        } catch {
+          /* penyimpanan penuh/diblokir */
+        }
+        return true;
+      } catch {
+        return false;
+      } finally {
+        setMemuat(false);
+      }
+    },
+    [bahasa, terapkan]
+  );
+
+  return { lokasi, suhu, kodeCuaca, siang, sumber, memuat, sumberLokasi, cari, deteksiGps, pilihSaran };
 }
 
 /** Ikon cuaca garis putih meniru IkonMatahari: matahari/bulan, awan, hujan, petir, kabut. */
@@ -541,7 +682,7 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
           type="button"
           onClick={onBuka}
           aria-label={label}
-          className="block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+          className="block w-full cursor-pointer transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
         >
           {poster && !posterGagal ? (
             <>
@@ -590,7 +731,7 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
               onClick={putarUlang}
               aria-label={t.videoUlang}
               title={t.videoUlang}
-              className="lk-video-ulang"
+              className="lk-video-ulang cursor-pointer"
             >
               <IkonUlang />
             </button>
@@ -602,7 +743,7 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
             aria-label={bisu ? t.videoBisu : t.videoSenyap}
             title={bisu ? t.videoBisu : t.videoSenyap}
             aria-pressed={!bisu}
-            className="lk-video-bisu"
+            className="lk-video-bisu cursor-pointer"
           >
             {bisu ? <IkonBisu /> : <IkonSuara />}
           </button>
@@ -698,7 +839,7 @@ export function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
   }
 
   return (
-    <div className="lk-lembar-latar" onClick={onTutup}>
+    <div className="lk-lembar-latar cursor-pointer" onClick={onTutup}>
       <div
         role="dialog"
         aria-modal="true"
@@ -710,7 +851,7 @@ export function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
           type="button"
           onClick={onTutup}
           aria-label={t.lembarTutup}
-          className="lk-lembar-tutup"
+          className="lk-lembar-tutup cursor-pointer"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
                strokeLinecap="round" className="size-7">
@@ -736,12 +877,12 @@ export function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
           </p>
           <h2 className="lk-lembar-judul">{b.judul}</h2>
           {b.deskripsi && <p className="lk-lembar-deskripsi">{b.deskripsi}</p>}
-          <button type="button" onClick={onBuka} className="lk-lembar-besar">
+          <button type="button" onClick={onBuka} className="lk-lembar-besar cursor-pointer">
             {t.lembarBuka}
           </button>
           <ul className="lk-lembar-menu">
             <li>
-              <button type="button" onClick={bagikan} className="lk-lembar-baris">
+              <button type="button" onClick={bagikan} className="lk-lembar-baris cursor-pointer">
                 <IkonBagikan />
                 <span>{tersalin ? t.lembarTersalin : t.lembarBagikan}</span>
               </button>
@@ -910,7 +1051,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
                 onClick={() => setIdx(i)}
                 aria-label={`${i + 1} / ${n}`}
                 aria-current={i === idx}
-                className="lk-postingan-titik-tombol"
+                className="lk-postingan-titik-tombol cursor-pointer"
               >
                 <span aria-hidden="true" data-aktif={i === idx} />
               </button>
@@ -920,7 +1061,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
       </div>
 
       <div className="lk-postingan-aksi">
-        <button type="button" onClick={onKomentar} aria-label={t.komentar} className="lk-postingan-ikon lk-postingan-komentar">
+        <button type="button" onClick={onKomentar} aria-label={t.komentar} className="lk-postingan-ikon lk-postingan-komentar cursor-pointer">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
                strokeLinecap="round" strokeLinejoin="round" className="size-7">
             <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
@@ -929,7 +1070,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
             <span aria-hidden="true">{jumlahKomentar.toLocaleString("id-ID")}</span>
           )}
         </button>
-        <button type="button" onClick={bagikan} aria-label={tersalin ? t.lembarTersalin : t.lembarBagikan} className="lk-postingan-ikon">
+        <button type="button" onClick={bagikan} aria-label={tersalin ? t.lembarTersalin : t.lembarBagikan} className="lk-postingan-ikon cursor-pointer">
           <IkonBagikan />
         </button>
       </div>
@@ -940,7 +1081,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
           <p className="lk-postingan-caption-isi">
             <span ref={descRef} className={descPenuh ? "" : "lk-postingan-caption-pendek"}>{l.deskripsi}</span>{" "}
             {descTerpotong && (
-              <button type="button" onClick={() => setDescPenuh((v) => !v)} className="lk-postingan-selengkapnya">
+              <button type="button" onClick={() => setDescPenuh((v) => !v)} className="lk-postingan-selengkapnya cursor-pointer">
                 {descPenuh ? t.lebihSedikit : t.selengkapnya}
               </button>
             )}
@@ -975,7 +1116,7 @@ export function LembarKomentar({ id, bahasa, onTutup }: {
   }, [onTutup]);
 
   return (
-    <div className="lk-komentar-latar" onClick={onTutup}>
+    <div className="lk-komentar-latar cursor-pointer" onClick={onTutup}>
       <div
         role="dialog"
         aria-modal="true"
@@ -1379,7 +1520,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
         <button
           type="button"
           onClick={() => setTerkirim(false)}
-          className="mt-3 rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[14px] font-bold text-black transition
+          className="mt-3 cursor-pointer rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[14px] font-bold text-black transition
                      hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
           {t.tulisLagi}
@@ -1389,12 +1530,12 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
 }
 
   const galat = galatKlien || (keadaan && !keadaan.ok ? keadaan.galat : "");
-  const ikonAksi = "lk-ikon-aksi rounded-full p-2 text-[#ff5a26] transition hover:bg-[#ff5a26]/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]";
+  const ikonAksi = "lk-ikon-aksi cursor-pointer rounded-full p-2 text-[#ff5a26] transition hover:bg-[#ff5a26]/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]";
 
   return (
     <div className="rounded-xl bg-black p-4 ring-1 ring-white/5">
       <div className="flex items-center gap-3">
-        <span aria-hidden="true" className="lk-avatar flex size-11 shrink-0 items-center justify-center rounded-full bg-[#2f7d6d]">
+        <span aria-hidden="true" className="lk-avatar flex size-11 shrink-0 items-center justify-center rounded-full bg-[#ff5a26]">
           <IkonOrang className="size-6 text-white" />
         </span>
         {!buka ? (
@@ -1402,7 +1543,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
             type="button"
             id="lk-tulis"
             onClick={() => setBuka(true)}
-            className="flex-1 truncate py-2 text-left text-[17px] text-[#a0a0a0]/70 transition-colors hover:text-[#a0a0a0]
+            className="flex-1 cursor-pointer truncate py-2 text-left text-[17px] text-[#a0a0a0]/70 transition-colors hover:text-[#a0a0a0]
                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
           >
             {t.tulis}
@@ -1444,7 +1585,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
           <button
             type="button"
             onClick={() => setBuka(true)}
-            className="lk-kirim ml-auto rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[15px] font-bold text-black transition
+            className="lk-kirim ml-auto cursor-pointer rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[15px] font-bold text-black transition
                        hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             {t.kirim}
@@ -1551,10 +1692,10 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
             <input id="lk-nama" name="nama" maxLength={100} disabled={anonim} autoComplete="name"
                    value={nama} onChange={(e) => setNama(e.target.value)} placeholder={t.namaPh}
                    className="lk-isian min-w-[120px] flex-1 rounded-md bg-white/5 px-2 py-1.5 text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-[#ff5a26] disabled:opacity-40" />
-            <label className="lk-anonim flex items-center gap-1.5 text-[13px] whitespace-nowrap text-[#a0a0a0]">
+            <label className="lk-anonim cursor-pointer flex items-center gap-1.5 text-[13px] whitespace-nowrap text-[#a0a0a0]">
               <input type="checkbox" name="anonim" value="1" checked={anonim}
                      onChange={(e) => setAnonim(e.target.checked)}
-                     className="lk-centang size-4 accent-[#ff5a26]" />
+                     className="lk-centang cursor-pointer size-4 accent-[#ff5a26]" />
               {t.anonim}
             </label>
             {(mencariLokasi || lokasiAda) && (
@@ -1611,7 +1752,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               <IkonVideo />
             </button>
             <button type="button" onClick={() => setBuka(false)}
-                    className="lk-batal ml-auto px-3 py-1.5 text-[14px] text-[#a0a0a0] transition hover:text-white
+                    className="lk-batal cursor-pointer ml-auto px-3 py-1.5 text-[14px] text-[#a0a0a0] transition hover:text-white
                                focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
               {t.batal}
             </button>
@@ -1619,9 +1760,9 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               type="submit"
               disabled={mengirim || menungguToken}
               aria-busy={mengirim || menungguToken}
-              className="lk-kirim rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[15px] font-bold text-black transition
+              className="lk-kirim cursor-pointer rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[15px] font-bold text-black transition
                          hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
-                         disabled:opacity-60"
+                         disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {mengirim ? t.mengirim : menungguToken ? t.memverifikasi : t.kirim}
             </button>
@@ -1645,19 +1786,17 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
  *  sendiri. Keyframe apungnya dipakai bersama — sudah ada di app/globals.css.
  *
  *  Posisi `left` sengaja dua nilai panjang yang konkret, bukan calc berisi
- *  var: custom property tidak diinterpolasi, jadi tombolnya akan melompat
- *  sementara kolomnya beranimasi. */
-function TabRelKiri({ terbuka, onUbah, label, lebarRel }: {
+   var: custom property tidak diinterpolasi, jadi tombolnya akan melompat
+   sementara kolomnya beranimasi. */
+function TabRelKiri({ terbuka, onUbah, label }: {
   terbuka: boolean;
   onUbah: () => void;
   label: string;
-  lebarRel: string;
 }) {
   return (
     <span
-      style={{ left: terbuka ? `calc(0.5rem + ${lebarRel})` : "0.5rem" }}
-      className={`absolute top-1/2 z-[41] hidden -translate-y-1/2
-                  transition-[left,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]
+      className={`absolute top-1/2 left-full z-[41] hidden -translate-y-1/2
+                  transition-[translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]
                   motion-reduce:transition-none panggung:block ${
         terbuka ? "-translate-x-1/2" : "translate-x-3"
       }`}
@@ -1669,7 +1808,7 @@ function TabRelKiri({ terbuka, onUbah, label, lebarRel }: {
         aria-controls="lk-rel-kiri"
         aria-label={label}
         title={label}
-        className="lk-tab-rel group flex size-9 items-center justify-center rounded-full bg-[#ff5a26] text-black
+        className="lk-tab-rel cursor-pointer group flex size-9 items-center justify-center rounded-full bg-[#ff5a26] text-black
                    ring-1 ring-inset ring-white/25 shadow-[0_6px_20px_rgb(255_90_38/0.45)]
                    transition-[scale,box-shadow,background-color] duration-300 ease-out
                    hover:scale-110 hover:shadow-[0_10px_28px_rgb(255_90_38/0.6)] active:scale-90
@@ -1693,7 +1832,13 @@ function TabRelKiri({ terbuka, onUbah, label, lebarRel }: {
 }
 
 export function LandingKarhutla(
-  { bahasa, jumlahLaporan, berita = [], tampil = "semua", sorotan }: {
+  {
+    bahasa,
+    jumlahLaporan,
+    berita = [],
+    tampil = "semua",
+    statistik,
+  }: {
     bahasa: Bahasa;
     /** Peta butuh angka provinsi — halaman umpan tak memakainya. */
     jumlahLaporan?: Record<string, number>;
@@ -1702,13 +1847,102 @@ export function LandingKarhutla(
         "panel" = halaman panel situasi saja (peta+cuaca+statistik). */
     tampil?: "semua" | "panel";
     /** Enam angka kartu statistik dari CMS (bawaan 5.000 bila kosong). */
-    sorotan: Record<KunciSorotan, number>;
+    sorotan?: Record<KunciSorotan, number>;
+    /** Empat angka kartu statistik historis. */
+    statistik?: DataStatistik[];
   },
 ) {
   const t = TEKS[bahasa];
+  const daftarStatistik = statistik ?? ambilStatistik(bahasa);
   // Lokasi + suhu otomatis dari IP (tanpa izin geolokasi); sebelum tiba,
   // lokasi memakai teks statis dan suhu memakai garis jeda.
   const cuaca = useCuacaLokal(bahasa, t.lokasi);
+  const [modeCariCuaca, setModeCariCuaca] = useState(false);
+  const [kueriCuaca, setKueriCuaca] = useState("");
+  const inputCuacaRef = useRef<HTMLInputElement>(null);
+  const wadahSelectRef = useRef<HTMLDivElement>(null);
+  const [daftarSaran, setDaftarSaran] = useState<
+    Array<{
+      id: string;
+      nama: string;
+      provinsi: string;
+      lat: number;
+      lng: number;
+      adm4?: string;
+      tipe?: string;
+    }>
+  >([]);
+  const [memuatSaran, setMemuatSaran] = useState(false);
+  const [indeksPilihan, setIndeksPilihan] = useState(-1);
+
+  useEffect(() => {
+    let aktif = true;
+    if (!modeCariCuaca || !kueriCuaca.trim()) {
+      const resetTimer = setTimeout(() => {
+        if (!aktif) return;
+        setDaftarSaran([]);
+        setMemuatSaran(false);
+        setIndeksPilihan(-1);
+      }, 0);
+      return () => {
+        aktif = false;
+        clearTimeout(resetTimer);
+      };
+    }
+    const startTimer = setTimeout(() => {
+      if (!aktif) return;
+      setMemuatSaran(true);
+    }, 0);
+    const timer = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/cuaca-lokal?saran=${encodeURIComponent(kueriCuaca.trim())}`, {
+          signal: AbortSignal.timeout(6000),
+          headers: { Accept: "application/json" },
+        });
+        if (!aktif) return;
+        if (r.ok) {
+          const j = (await r.json()) as Array<{
+            id: string;
+            nama: string;
+            provinsi: string;
+            lat: number;
+            lng: number;
+            adm4?: string;
+            tipe?: string;
+          }>;
+          setDaftarSaran(Array.isArray(j) ? j : []);
+          setIndeksPilihan(Array.isArray(j) && j.length > 0 ? 0 : -1);
+        } else {
+          setDaftarSaran([]);
+        }
+      } catch {
+        if (aktif) setDaftarSaran([]);
+      } finally {
+        if (aktif) setMemuatSaran(false);
+      }
+    }, 220);
+
+    return () => {
+      aktif = false;
+      clearTimeout(startTimer);
+      clearTimeout(timer);
+    };
+  }, [modeCariCuaca, kueriCuaca]);
+
+  useEffect(() => {
+    if (!modeCariCuaca) return;
+    const tanganiKlikLuar = (e: MouseEvent) => {
+      if (wadahSelectRef.current && !wadahSelectRef.current.contains(e.target as Node)) {
+        setModeCariCuaca(false);
+        setKueriCuaca("");
+        setDaftarSaran([]);
+      }
+    };
+    document.addEventListener("mousedown", tanganiKlikLuar);
+    return () => {
+      document.removeEventListener("mousedown", tanganiKlikLuar);
+    };
+  }, [modeCariCuaca]);
   const [cari, setCari] = useState("");
   /* Kolom pencarian tinggal di bilah kepala dan baru turun saat ikonnya
      diklik. Menutupnya sekaligus mengosongkan kata kuncinya: begitu kolomnya
@@ -1842,13 +2076,23 @@ export function LandingKarhutla(
   // Dibaca live (bukan state aliran) supaya selalu benar.
   const lembar = lembarId !== null ? (berita.find((b) => b.id === lembarId) ?? null) : null;
   /* Overlay peta selayar — dibuka lewat tombol bentang di sudut bingkai.
-     Di-render sebagai instance <Peta> kedua di portal body (Opsi A): sederhana
-     dan ikut pola komposer-lapor/popup-peta. Datanya sama (jumlahLaporan),
-     kameranya mulai dari Nusantara seperti bingkai kecil. */
+     Di-render di portal body, tapi petanya BUKAN instance kedua: node <Peta>
+     yang sudah hidup dipindah ke sini (lihat hostPeta di bawah). */
   const [petaPenuh, setPetaPenuh] = useState(false);
-  /* Mode overlay selayar — supaya tombol tutup bisa menyingkir dari tumpukan
-     kendali saat Windy (sama seperti tombol X konsol). */
-  const [modePenuh, setModePenuh] = useState<ModePeta>("asap");
+  /* Fase tutup: overlay bertahan selama animasi keluar, baru dilepas — tanpa
+     ini petanya lompat balik ke bingkai tanpa transisi. */
+  const [menutupPenuh, setMenutupPenuh] = useState(false);
+  const menutupRef = useRef(false);
+  const tutupPenuh = useCallback(() => {
+    if (menutupRef.current) return;
+    menutupRef.current = true;
+    setMenutupPenuh(true);
+    setTimeout(() => {
+      menutupRef.current = false;
+      setMenutupPenuh(false);
+      setPetaPenuh(false);
+    }, DURASI_TUTUP_PETA);
+  }, []);
 
   /* Escape menutup overlay — pola yang sama dengan pop-up lain di konsol.
      Badan dikunci supaya roda/sentuh di belakang overlay tak ikut menggulir
@@ -1856,7 +2100,7 @@ export function LandingKarhutla(
   useEffect(() => {
     if (!petaPenuh) return;
     const tekan = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPetaPenuh(false);
+      if (e.key === "Escape") tutupPenuh();
     };
     window.addEventListener("keydown", tekan);
     const limpahan = document.body.style.overflow;
@@ -1865,7 +2109,7 @@ export function LandingKarhutla(
       window.removeEventListener("keydown", tekan);
       document.body.style.overflow = limpahan;
     };
-  }, [petaPenuh]);
+  }, [petaPenuh, tutupPenuh]);
 
   /* Skala bingkai peta. Dua hal dipisah di sini: BESAR pengecilnya dihitung
      dari lebar rel yang diukur (lihat di bawah), sedangkan PILIHAN modenya
@@ -1892,7 +2136,7 @@ export function LandingKarhutla(
        603px) — 1728 sudah 539px, dan di zoom 125% (viewport 1536) relnya 475px,
        sehingga peta balik ke ukuran asli. */
     const RASIO = 1080 / 544;
-    const SASARAN = 0.35;
+    const SASARAN = 0.65;
     const LANTAI_HAMPARAN = 0.6;
     const AMBANG_SEMPIT = 800;
     const LEBAR_LOGIS_MAKS = 1760;
@@ -1919,7 +2163,9 @@ export function LandingKarhutla(
       const lebar = bingkai.clientWidth;
       if (!lebar) return;
       const gaya = isi.style;
-      if (panggung.matches) {
+      /* Selagi membentang selayar, node peta tinggal di overlay: slot ini
+         kosong dan skalanya tak berlaku lagi. */
+      if (panggung.matches && !petaPenuh) {
         const logis = Math.min(
           LEBAR_LOGIS_MAKS,
           Math.max(AMBANG_SEMPIT, (LANTAI_HAMPARAN / SASARAN) * lebar),
@@ -1961,7 +2207,42 @@ export function LandingKarhutla(
       amati.disconnect();
       panggung.removeEventListener("change", skalakan);
     };
-  }, []);
+  }, [petaPenuh]);
+
+  /* SATU instance <Peta> untuk bingkai kecil DAN overlay selayar. Node-nya
+     dipindah antar slot lewat appendChild; React merendernya ke wadah lepas
+     ini sekali saja, jadi tak ada pemasangan ulang.
+
+     Instance kedua — pola sebelumnya — berarti MapLibre baru, konteks WebGL
+     baru, dan 61 frame sebaran asap diunduh ulang ke cache instance itu:
+     itulah kedipan saat membentang, walau peta kecilnya sudah lama siap.
+     Kanvas tetap hidup saat dipindah; MapLibre menyesuaikan diri lewat
+     ResizeObserver miliknya di peta-asap.tsx. */
+  /* Wadahnya baru ada SESUDAH pasang. Bukan kerewelan: server tak merender
+     portal sama sekali, jadi render pertama klien harus ikut kosong — kalau
+     tidak, portalnya sudah ada saat hidrasi sementara HTML server tidak dan
+     React membuang seluruh pohon ini ("Hydration failed").
+
+     Gerbangnya useSyncExternalStore, bukan setState di effect: snapshot server
+     (false) yang dipakai React saat hidrasi itulah yang menjamin kecocokan,
+     dan aturan set-state-in-effect repo ini melarang jalur satunya. */
+  const terpasang = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const [wadahPeta] = useState<HTMLDivElement | null>(() => {
+    if (typeof document === "undefined") return null;
+    const el = document.createElement("div");
+    el.style.cssText = "position:absolute;inset:0";
+    return el;
+  });
+  const hostPeta = terpasang ? wadahPeta : null;
+  const slotPenuhRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const tujuan = petaPenuh ? slotPenuhRef.current : isiPetaRef.current;
+    if (hostPeta && tujuan && hostPeta.parentNode !== tujuan) tujuan.appendChild(hostPeta);
+  }, [hostPeta, petaPenuh]);
   /* Umpan langsung dari basis data — SELURUH kejadian tayang, terbaru dulu,
      sama seperti arsip di index. Media utama (video pertama, kalau tidak foto
      pertama) untuk tampilan tunggal; galeri penuh untuk carousel kartu
@@ -1993,7 +2274,11 @@ export function LandingKarhutla(
   );
   const kata = cari.trim().toLowerCase();
   const hasil = laporan.filter((l) => l.judul.toLowerCase().includes(kata));
-  const kolom = gunakanKolomUmpan(kiriBuka);
+  // Jumlah kolom umpan stabil menurut lebar layar (3 kolom di desktop),
+  // bukan berganti 3<->4 saat rel ditutup-buka. Pergantian kolom merombak
+  // seluruh partisi kartu (isi[i % kolom]) yang membuat kartu meloncat
+  // antar-kolom dan memicu kedipan/flickering pada gambar dan layout.
+  const kolom = gunakanKolomUmpan(true);
   const bukaMedia = useCallback(
     (id: number) => {
       const panggung = window.matchMedia("(min-width: 1100px) and (min-height: 640px)").matches;
@@ -2064,27 +2349,45 @@ export function LandingKarhutla(
           ditulis eksplisit sebagai 100% dikurangi rel dan selanya. Catatan
           yang sama ada di halaman-peta.tsx. */}
       <div
-        style={{ "--lk-kiri": kiriBuka ? LEBAR_REL_KIRI : "0px" } as React.CSSProperties}
-        className={`lk-isi relative grid w-full gap-2 p-2 aliran:grid-cols-1${tampil === "panel" ? " lk-penuh-mobile" : ""}
-                   panggung:grid-cols-[minmax(0,var(--lk-kiri))_minmax(0,calc(100%-var(--lk-kiri)-0.5rem))]
+        style={{
+          "--lk-kiri": LEBAR_REL_KIRI,
+          "--kolom-kiri": kiriBuka
+            ? "minmax(0,calc(var(--lk-kiri) + 0.5rem))"
+            : "minmax(0,0px)",
+          "--kolom-kanan": kiriBuka
+            ? "minmax(0,calc(100% - var(--lk-kiri) - 0.5rem))"
+            : "minmax(0,100%)",
+        } as React.CSSProperties}
+        className={`lk-isi relative grid w-full gap-2 aliran:gap-2 p-2 aliran:grid-cols-1 panggung:gap-0${tampil === "panel" ? " lk-penuh-mobile" : ""}
+                   panggung:grid-cols-[var(--kolom-kiri)_var(--kolom-kanan)]
                    panggung:transition-[grid-template-columns] panggung:duration-500
                    panggung:ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none`}
       >
-        {panelTerlihat && tampil === "semua" && (
-          <TabRelKiri
-            terbuka={kiriBuka}
-            onUbah={() => setKiriBuka((b) => !b)}
-            lebarRel={LEBAR_REL_KIRI}
-            label={kiriBuka
-              ? (bahasa === "en" ? "Collapse situation panel" : "Tutup panel situasi")
-              : (bahasa === "en" ? "Open situation panel" : "Buka panel situasi")}
-          />
-        )}
         {/* ── Rel kiri: instrumen ──
             Tanpa panel sendiri: isinya berdiri langsung di atas latar halaman,
             dan kartu-kartu hitam di dalamnyalah yang memberi bentuk. */}
         {panelTerlihat && (
-        <aside id="lk-rel-kiri" aria-label={t.situasi} className={`lk-kiri min-h-0 min-w-0 px-2 pt-1${tampil === "semua" ? " lk-hanya-panggung" : ""}`}>
+          <div
+            className={`min-h-0 min-w-0 relative ${
+              tampil === "semua" ? "aliran:hidden panggung:block" : "w-full"
+            } panggung:col-start-1 panggung:row-start-1 panggung:h-full panggung:z-30`}
+          >
+            {/* Pembungkus tirai: memotong rel selebar lajur grid. Rel di dalamnya
+                tetap selebar penuh (shrink-0) dan menempel ke tepi kanan lajur (justify-end),
+                sehingga saat dilipat ia bergeser masuk ke balik bingkai kiri tanpa
+                membuat teks atau kartu di dalamnya terlipat/menciut. */}
+            <div className="min-h-0 min-w-0 panggung:h-full panggung:w-full panggung:overflow-hidden panggung:flex panggung:justify-end">
+              <aside
+                id="lk-rel-kiri"
+                aria-label={t.situasi}
+                inert={!kiriBuka}
+                className={`lk-kiri min-h-0 min-w-0 px-2 pt-1
+                           panggung:w-[var(--lk-kiri)] panggung:shrink-0 panggung:mr-2
+                           panggung:transition-opacity panggung:duration-500 panggung:ease-[cubic-bezier(0.22,1,0.36,1)]
+                           motion-reduce:transition-none panggung:[contain:layout_paint]
+                           ${kiriBuka ? "panggung:opacity-100" : "panggung:opacity-0 panggung:pointer-events-none"}
+                           ${tampil === "semua" ? " lk-hanya-panggung" : ""}`}
+              >
           <div aria-hidden="true" className="lk-titik h-9" />
 
           {/* Peta yang sama persis dengan halaman index — komponen <Peta>,
@@ -2125,23 +2428,33 @@ export function LandingKarhutla(
             ref={bingkaiPetaRef}
             className="lk-bingkai-peta relative isolate aspect-[1080/544] min-h-[280px] w-full overflow-hidden rounded-md ring-1 ring-white/10"
           >
-            <div ref={isiPetaRef} className="lk-peta-isi">
-              <Peta
-                jumlahLaporan={jumlahLaporan ?? {}}
-                /* Provinsi bisa ditekan seperti di konsol: pop-upnya memakai
-                   komponen dan data yang sama (berita + hitungan provinsi). */
-                onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
-                legendaRingkas
-                tombolRapat
-                muatNusantara
-                onExpand={() => setPetaPenuh(true)}
-                expandLabel={t.bukaPetaSelayar}
-              />
-            </div>
+            {/* Slot bingkai kecil — isinya hostPeta, ditempelkan lewat effect. */}
+            <div ref={isiPetaRef} className="lk-peta-isi" />
           </div>
-          {/* Overlay selayar — instance <Peta> kedua TANPA wrapper skala:
-              langsung inset-0 ukuran penuh, zoom roda dinyalakan karena
-              badan halaman dikunci (tak ada guliran yang bisa terbajak).
+          {/* Instance <Peta> satu-satunya. Dirender ke wadah lepas (hostPeta)
+              yang dipindah antara slot bingkai dan slot overlay; prop yang
+              berbeda antar kedua tempat cukup ikut `petaPenuh`.
+              zoomRoda hanya menyala di selayar: di bingkai kecil halaman masih
+              menggulir, jadi roda yang dibajak peta akan mengunci guliran. */}
+          {hostPeta
+            ? createPortal(
+                <Peta
+                  jumlahLaporan={jumlahLaporan ?? {}}
+                  /* Provinsi bisa ditekan seperti di konsol: pop-upnya memakai
+                     komponen dan data yang sama (berita + hitungan provinsi). */
+                  onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
+                  isPenuh={petaPenuh}
+                  legendaRingkas={!petaPenuh}
+                  tombolRapat
+                  muatNusantara
+                  zoomRoda={petaPenuh}
+                  onExpand={petaPenuh ? null : () => setPetaPenuh(true)}
+                  expandLabel={t.bukaPetaSelayar}
+                />,
+                hostPeta,
+              )
+            : null}
+          {/* Overlay selayar — hanya cangkang: peta, tombol tutup, pop-up.
               Portal ke body: bingkai memakai `isolate`, fixed di dalamnya
               tertahan (pola komposer-lapor/popup-peta). */}
           {petaPenuh
@@ -2151,33 +2464,19 @@ export function LandingKarhutla(
                   role="dialog"
                   aria-modal="true"
                   aria-label={t.bukaPetaSelayar}
-                  className="lk-peta-penuh fixed inset-0 z-[70] bg-[#0a0a0a]"
+                  className={`lk-peta-penuh fixed inset-0 z-[70] bg-[#0a0a0a]${menutupPenuh ? " lk-peta-penuh--tutup" : ""}`}
                 >
-                  <div className="absolute inset-0">
-                    <Peta
-                      jumlahLaporan={jumlahLaporan ?? {}}
-                      /* Sama seperti peta inline: provinsi bisa ditekan, dan
-                         pop-upnya dipasang di dalam portal ini (lihat di bawah)
-                         supaya tidak tertimbun overlay z-70. */
-                      onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
-                      mode={modePenuh}
-                      onModeChange={setModePenuh}
-                      tombolRapat
-                      muatNusantara
-                      zoomRoda
-                    />
-                  </div>
+                  <div ref={slotPenuhRef} className="absolute inset-0" />
                   <button
                     type="button"
-                    onClick={() => setPetaPenuh(false)}
+                    onClick={tutupPenuh}
                     title={t.tutupPetaSelayar}
                     aria-label={t.tutupPetaSelayar}
-                    className={`lk-tutup-peta pointer-events-auto absolute right-4 z-[1100] flex size-9 items-center justify-center rounded-full
+                    className="lk-tutup-peta cursor-pointer pointer-events-auto absolute right-4 top-4 z-[1100] flex size-9 items-center justify-center rounded-full
                                bg-black/70 text-white ring-1 ring-white/15 backdrop-blur-sm
                                transition hover:scale-105 hover:ring-[#ff5a26]/70 active:scale-95
                                motion-reduce:transition-none motion-reduce:hover:scale-100
-                               focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none
-                               ${modePenuh === "windy" ? "top-60" : "top-4"}`}
+                               focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
                   >
                     <IkonTutup className="size-4" />
                   </button>
@@ -2218,7 +2517,7 @@ export function LandingKarhutla(
           <div className={`lk-lembar-panel${lembarTutup ? " lk-panel-katup" : ""}`}>
             <button
               type="button"
-              className="lk-lembar-gagang"
+              className="lk-lembar-gagang cursor-pointer"
               onClick={() => setLembarTutup((v) => !v)}
               aria-expanded={!lembarTutup}
               aria-label={lembarTutup
@@ -2232,15 +2531,205 @@ export function LandingKarhutla(
               yang lebih gelap di dalamnya — sesuai rujukan. mx-4: blok ini
               sengaja lebih sempit dan menengah dibanding peta di atasnya. */}
           <div className="mx-4 mt-3 rounded-2xl bg-[#1e1e1e] p-5">
-            <p className="lk-lokasi flex items-center gap-3 rounded-xl bg-black/50 px-5 py-4 text-[13px] sm:text-[15px]">
-              <IkonCari className="size-[18px] shrink-0 text-[#a0a0a0]" />
-              <span className="truncate" aria-live="polite" title={cuaca.lokasi}>
-                {cuaca.lokasi}
-                <span className="text-[#a0a0a0]">/{t.lokasiOtomatis}</span>
-              </span>
-              <IkonLokasi className="ml-auto size-[22px] shrink-0 text-[#a0a0a0]" />
-            </p>
-            <p className="lk-angka mt-4 flex items-center gap-4 px-3 pb-1 text-[clamp(44px,3.8vw,68px)] leading-none font-semibold"
+            <div
+              ref={wadahSelectRef}
+              className={`lk-lokasi relative hidden panggung:flex items-center gap-3 rounded-xl px-5 py-4 text-[13px] sm:text-[15px] transition-all ${
+                modeCariCuaca
+                  ? "bg-[#161616] border border-white/20 shadow-xl ring-1 ring-white/10"
+                  : "bg-black/50 border border-white/5 hover:bg-black/70"
+              }`}
+            >
+              {modeCariCuaca ? (
+                <div className="flex w-full items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (indeksPilihan >= 0 && indeksPilihan < daftarSaran.length) {
+                        await cuaca.pilihSaran(daftarSaran[indeksPilihan]);
+                      } else if (kueriCuaca.trim()) {
+                        await cuaca.cari(kueriCuaca);
+                      }
+                      setModeCariCuaca(false);
+                      setKueriCuaca("");
+                      setDaftarSaran([]);
+                    }}
+                    disabled={cuaca.memuat}
+                    aria-label={t.cariLokasiCuacaAria}
+                    className="text-[#a0a0a0] transition-colors hover:text-white"
+                  >
+                    <IkonCari className="size-[18px] shrink-0" />
+                  </button>
+                  <input
+                    ref={inputCuacaRef}
+                    type="text"
+                    value={kueriCuaca}
+                    onChange={(e) => setKueriCuaca(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setModeCariCuaca(false);
+                        setKueriCuaca("");
+                        setDaftarSaran([]);
+                      } else if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        if (daftarSaran.length > 0) {
+                          setIndeksPilihan((idx) => (idx + 1) % daftarSaran.length);
+                        }
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        if (daftarSaran.length > 0) {
+                          setIndeksPilihan((idx) => (idx - 1 + daftarSaran.length) % daftarSaran.length);
+                        }
+                      } else if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (indeksPilihan >= 0 && indeksPilihan < daftarSaran.length) {
+                          await cuaca.pilihSaran(daftarSaran[indeksPilihan]);
+                          setModeCariCuaca(false);
+                          setKueriCuaca("");
+                          setDaftarSaran([]);
+                        } else if (kueriCuaca.trim()) {
+                          await cuaca.cari(kueriCuaca);
+                          setModeCariCuaca(false);
+                          setKueriCuaca("");
+                          setDaftarSaran([]);
+                        }
+                      }
+                    }}
+                    placeholder={t.cariLokasiCuaca}
+                    className="min-w-0 flex-1 bg-transparent text-[13px] text-[#f5f5f5] placeholder:text-[#707070] focus:outline-none sm:text-[15px]"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModeCariCuaca(false);
+                      setKueriCuaca("");
+                      setDaftarSaran([]);
+                    }}
+                    aria-label={t.batalCariCuaca}
+                    className="text-[#a0a0a0] transition-colors hover:text-white"
+                  >
+                    <IkonTutup className="size-4 shrink-0" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModeCariCuaca(true);
+                      setTimeout(() => inputCuacaRef.current?.focus(), 50);
+                    }}
+                    aria-label={t.cariLokasiCuacaAria}
+                    className="text-[#a0a0a0] transition-colors hover:text-white"
+                  >
+                    <IkonCari className="size-[18px] shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModeCariCuaca(true);
+                      setTimeout(() => inputCuacaRef.current?.focus(), 50);
+                    }}
+                    className="min-w-0 flex-1 truncate text-left transition-colors hover:text-white focus:outline-none"
+                    title={cuaca.lokasi}
+                  >
+                    <span className="truncate" aria-live="polite">
+                      {cuaca.lokasi}
+                      <span className="text-[#a0a0a0]">
+                        /{cuaca.sumberLokasi === "gps"
+                          ? t.lokasiTerdeteksi
+                          : cuaca.sumberLokasi === "cari"
+                          ? t.lokasiDicari
+                          : t.lokasiOtomatis}
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cuaca.deteksiGps()}
+                    disabled={cuaca.memuat}
+                    aria-label={t.deteksiGpsCuacaAria}
+                    className="ml-auto text-[#a0a0a0] transition-colors hover:text-white disabled:opacity-50"
+                  >
+                    <IkonLokasi className={`size-[22px] shrink-0 ${cuaca.memuat ? "animate-spin" : ""}`} />
+                  </button>
+                </>
+              )}
+
+              {/* Dropdown Select2 mengambang tepat di bawah bilah pencarian */}
+              {modeCariCuaca && (kueriCuaca.trim() !== "" || memuatSaran || daftarSaran.length > 0) && (
+                <div
+                  role="listbox"
+                  aria-label={bahasa === "en" ? "Location suggestions" : "Saran lokasi"}
+                  className="absolute top-full left-0 right-0 mt-2 z-50 max-h-60 overflow-y-auto rounded-xl border border-white/15 bg-[#1a1a1a]/95 p-1.5 shadow-2xl backdrop-blur-xl"
+                >
+                  {memuatSaran && daftarSaran.length === 0 ? (
+                    <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] text-[#a0a0a0]">
+                      <svg
+                        className="size-4 shrink-0 animate-spin text-white"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        />
+                      </svg>
+                      <span>{bahasa === "en" ? "Searching locations..." : "Mencari lokasi..."}</span>
+                    </div>
+                  ) : daftarSaran.length > 0 ? (
+                    daftarSaran.map((item, idx) => {
+                      const dipilih = idx === indeksPilihan;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          role="option"
+                          aria-selected={dipilih}
+                          onMouseEnter={() => setIndeksPilihan(idx)}
+                          onClick={async () => {
+                            await cuaca.pilihSaran(item);
+                            setModeCariCuaca(false);
+                            setKueriCuaca("");
+                            setDaftarSaran([]);
+                          }}
+                          className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] transition-colors ${
+                            dipilih
+                              ? "bg-white/15 text-white"
+                              : "text-[#d0d0d0] hover:bg-white/10 hover:text-white"
+                          }`}
+                        >
+                          <IkonPin
+                            className={`size-4 shrink-0 ${
+                              dipilih ? "text-orange-400" : "text-[#888888] group-hover:text-orange-400"
+                            }`}
+                          />
+                          <span className="truncate font-medium">{item.nama}</span>
+                          <span className="ml-auto shrink-0 rounded bg-white/5 px-2 py-0.5 text-[11px] text-[#909090]">
+                            {item.provinsi}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="px-3 py-3 text-center text-[13px] text-[#888888]">
+                      {bahasa === "en" ? "No locations found" : "Tidak ada lokasi yang cocok"}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="lk-angka mt-0 panggung:mt-4 flex items-center gap-4 px-3 pb-1 text-[clamp(44px,3.8vw,68px)] leading-none font-semibold"
                aria-live="polite"
                aria-label={cuaca.suhu === null ? t.suhuMenunggu : `${cuaca.suhu} derajat celcius di ${cuaca.lokasi}`}>
               {cuaca.suhu === null ? "–" : `${cuaca.suhu}°`}
@@ -2257,17 +2746,17 @@ export function LandingKarhutla(
             )}
           </div>
 
-          {/* Enam angka situasi — mx-4: sejajar dengan panel cuaca, menengah
+          {/* Empat angka situasi — mx-4: sejajar dengan panel cuaca, menengah
               terhadap peta. Kartu diberi min-w-0 + padding ramping supaya angka
               tidak meluap di rel sempit. */}
-          <dl className="mx-4 mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {STATISTIK.map((s) => (
-              <div key={s.kunci} className="flex min-w-0 flex-col rounded-2xl bg-[#1e1e1e] px-2 py-7 text-center">
-                <dd className="lk-angka order-1 text-[clamp(24px,2.2vw,44px)] leading-none font-medium">
-                  {sorotan[s.kunci].toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+          <dl className="mx-4 mt-4 grid grid-cols-2 gap-3">
+            {daftarStatistik.map((s, idx) => (
+              <div key={s.keterangan || idx} className="flex min-w-0 flex-col justify-center rounded-2xl bg-[#1e1e1e] px-3 py-6 text-center">
+                <dd className="lk-angka order-1 text-[clamp(20px,1.8vw,32px)] leading-tight font-medium text-[#f5f5f5]">
+                  {s.nilai}
                 </dd>
-                <dt className="order-2 mt-2 text-[12px] leading-tight font-bold text-balance sm:text-[13px]">
-                  {s[bahasa]}
+                <dt className="order-2 mt-2 text-[12px] leading-tight font-medium text-balance sm:text-[13px] text-[#a0a0a0]">
+                  {s.keterangan}
                 </dt>
               </div>
             ))}
@@ -2278,7 +2767,19 @@ export function LandingKarhutla(
           </p>
           </div>
           <div aria-hidden="true" className="lk-titik lk-titik--bawah mt-3 h-9" />
-        </aside>
+              </aside>
+            </div>
+
+            {tampil === "semua" && (
+              <TabRelKiri
+                terbuka={kiriBuka}
+                onUbah={() => setKiriBuka((b) => !b)}
+                label={kiriBuka
+                  ? (bahasa === "en" ? "Collapse situation panel" : "Tutup panel situasi")
+                  : (bahasa === "en" ? "Open situation panel" : "Buka panel situasi")}
+              />
+            )}
+          </div>
         )}
 
         {/* ── Rel kanan: umpan laporan ──
@@ -2287,7 +2788,10 @@ export function LandingKarhutla(
             Saat rel dilipat, isinya sengaja dibiarkan memakai lebar penuh —
             tanpa batas lebar dan tanpa pemusatan. */}
         {umpanTerlihat && (
-        <main aria-label={t.umpan} className="lk-kanan pantau-rel min-h-0 min-w-0">
+          <main
+            aria-label={t.umpan}
+            className="lk-kanan pantau-rel min-h-0 min-w-0 panggung:col-start-2 panggung:row-start-1"
+          >
           <KomposerLapor bahasa={bahasa} />
 
           {hasil.length === 0 ? (
@@ -2307,7 +2811,7 @@ export function LandingKarhutla(
                         <button
                           type="button"
                           onClick={() => bukaMedia(l.id)}
-                          className="text-left transition-colors hover:text-[#ff5a26] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
+                          className="cursor-pointer text-left transition-colors hover:text-[#ff5a26] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
                         >
                           {l.judul}
                         </button>
@@ -2318,7 +2822,7 @@ export function LandingKarhutla(
                         title={t.titikMenu}
                         aria-label={`${t.titikMenu}: ${l.judul}`}
                         aria-haspopup="dialog"
-                        className="lk-kartu-titik shrink-0 rounded-full p-1.5 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+                        className="lk-kartu-titik cursor-pointer shrink-0 rounded-full p-1.5 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
                       >
                         <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" className="size-5">
                           <circle cx="5" cy="12" r="1.8" />
@@ -2357,7 +2861,7 @@ export function LandingKarhutla(
                       type="button"
                       onClick={() => bukaMedia(l.id)}
                       aria-label={l.judul}
-                      className="lk-foto relative mt-3 block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+                      className="lk-foto cursor-pointer relative mt-3 block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false} className="lk-foto h-auto w-full" />
@@ -2392,7 +2896,7 @@ export function LandingKarhutla(
         <Link
           href={`/${bahasa}`}
           aria-label={t.tabBeranda}
-          className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+          className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
         >
           <IkonBeranda />
         </Link>
@@ -2400,7 +2904,7 @@ export function LandingKarhutla(
           <Link
             href={`/${bahasa}`}
             aria-label={t.tabUmpan}
-            className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
           >
             <IkonUmpan />
           </Link>
@@ -2408,7 +2912,7 @@ export function LandingKarhutla(
           <Link
             href={`/${bahasa}/karhutla/panel`}
             aria-label={t.tabPanel}
-            className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
           >
             <IkonPanel />
           </Link>
@@ -2419,7 +2923,7 @@ export function LandingKarhutla(
               type="button"
               aria-label={t.tabCari}
               onClick={() => ubahCariBuka(!cariBuka)}
-              className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+              className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
             >
               <IkonCari className="size-7" />
             </button>
@@ -2430,7 +2934,7 @@ export function LandingKarhutla(
                 (document.getElementById("lk-tulis") as HTMLButtonElement | null)?.click();
                 window.setTimeout(() => document.getElementById("lk-judul")?.focus({ preventScroll: true }), 150);
               }}
-              className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+              className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
             >
               <IkonPlus />
             </button>
@@ -2440,14 +2944,14 @@ export function LandingKarhutla(
             <Link
               href={`/${bahasa}/karhutla`}
               aria-label={t.tabTulis}
-              className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+              className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
             >
               <IkonPlus />
             </Link>
             <Link
               href={`/${bahasa}/lapor`}
               aria-label={t.tabLapor}
-              className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+              className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
             >
               <IkonTulis />
             </Link>

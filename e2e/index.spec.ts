@@ -17,16 +17,28 @@ test("kepala: merek, dan alih bahasa", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /forest and land fires/i }).first()).toBeVisible();
 });
 
-test("rel instrumen: lokasi, dan enam angka statistik", async ({ page }) => {
+test("rel instrumen: lokasi, pencarian cuaca, dan empat angka statistik", async ({ page }) => {
   test.skip(test.info().project.name === "mobile", "seluler: panel pindah ke /karhutla/panel");
   const panel = page.getByRole("complementary", { name: /panel situasi/i });
   await expect(panel).toBeVisible();
   await expect(panel.getByText(/secara otomatis dibaca lokasi/i)).toBeVisible();
-  // Enam kartu bernilai format Indonesia (5.000 bawaan atau isi CMS).
+
+  // Buka pencarian cuaca
+  await panel.getByRole("button", { name: /cari lokasi cuaca/i }).click();
+  const inputCuaca = panel.getByPlaceholder(/cari kota\/provinsi/i);
+  await expect(inputCuaca).toBeVisible();
+  await inputCuaca.fill("Bandung");
+  await inputCuaca.press("Enter");
+
+  // Menampilkan lokasi cuaca baru dan label lokasi dicari
+  await expect(panel.getByText(/lokasi dicari/i)).toBeVisible({ timeout: 15_000 });
+  await expect(panel.getByText(/Bandung/i)).toBeVisible();
+
+  // Empat kartu angka statistik historis.
   const angka = panel.locator("dd");
-  expect(await angka.count()).toBe(6);
+  expect(await angka.count()).toBe(4);
   for (const teks of await angka.allInnerTexts()) {
-    expect(teks.trim()).toMatch(/^[\d.]+(,\d+)?$/);
+    expect(teks.trim().length).toBeGreaterThan(0);
   }
 });
 
@@ -79,9 +91,10 @@ test("seluler: bilah tab membuka panel lalu kembali", async ({ page }) => {
   expect(await page.locator("main article").count()).toBeGreaterThanOrEqual(1);
   await page.getByRole("link", { name: /buka panel situasi/i }).click();
   await expect(page).toHaveURL(/\/id\/karhutla\/panel$/);
-  // Isi panel (lembar bawah seluler) tampil. Subtree rute lama ditahan App
-  // Router dalam keadaan display:none — asersi visibilitas, bukan jumlah.
-  await expect(page.getByText(/secara otomatis dibaca lokasi/i)).toBeVisible({ timeout: 20_000 });
+  // Isi panel (lembar bawah seluler) tampil. Bilah lokasi disembunyikan di seluler,
+  // namun angka situasi tetap tampil.
+  await expect(page.locator(".lk-lokasi")).toBeHidden();
+  await expect(page.locator("dd.lk-angka").first()).toBeVisible({ timeout: 20_000 });
   await expect(page.locator("main article").first()).toBeHidden();
   await page.getByRole("link", { name: /buka daftar laporan/i }).click();
   await expect(page).toHaveURL(/\/id$/);

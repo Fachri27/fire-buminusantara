@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { gunakanKomentar } from "@/hooks/gunakan-komentar";
 import { useKurangiGerak } from "@/hooks/use-media-query";
 import type { Bahasa } from "@/lib/bahasa";
@@ -25,6 +25,15 @@ export function RincianLaporan({
   const kurangiGerak = useKurangiGerak();
   const [toastTersalin, setToastTersalin] = useState(false);
   const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Pop-up ini di-unmount induknya begitu onTutup dipanggil, jadi animasi
+  // keluar mustahil lewat CSS saja. Satu tanda `keluar` menahannya satu
+  // animasi lebih lama, lalu animationend yang memanggil onTutup sungguhan —
+  // tanpa timer yang harus disamakan manual dengan durasi di CSS.
+  const [keluar, setKeluar] = useState(false);
+  const mintaTutup = useCallback(() => {
+    if (kurangiGerak) { onTutup(); return; }
+    setKeluar(true);
+  }, [kurangiGerak, onTutup]);
 
   const {
     daftar, memuat, mengirim, galat,
@@ -45,12 +54,12 @@ export function RincianLaporan({
     const saatTombol = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopImmediatePropagation();
-        onTutup();
+        mintaTutup();
       }
     };
     window.addEventListener("keydown", saatTombol, true);
     return () => window.removeEventListener("keydown", saatTombol, true);
-  }, [onTutup]);
+  }, [mintaTutup]);
 
   async function bagikan() {
     const tautan = typeof window !== "undefined"
@@ -93,9 +102,13 @@ export function RincianLaporan({
        menelan roda dengan preventDefault; satu atribut di akar ini
        mengecualikan seluruh panel — rel kanan dan badan komentarnya — dari
        penangkapan itu, jadi keduanya bisa menggulir secara native. */
-    <div className={gelap ? "rincian rincian--gelap" : "rincian"} data-lenis-prevent
-         onClick={(e) => { if (e.target === e.currentTarget) onTutup(); }}>
-      <div role="dialog" aria-modal="true" aria-label="Rincian laporan karhutla" className="rincian__panel">
+    <div className={`${gelap ? "rincian rincian--gelap" : "rincian"}${keluar ? " rincian--keluar" : ""} cursor-pointer`} data-lenis-prevent
+         onClick={(e) => { if (e.target === e.currentTarget) mintaTutup(); }}
+         /* animationend menggelembung dari anak (slider, lembar komentar);
+            currentTarget menyaring supaya hanya animasi overlay ini yang
+            menutup. Animasi masuk lolos karena `keluar` masih false. */
+         onAnimationEnd={(e) => { if (keluar && e.target === e.currentTarget) onTutup(); }}>
+      <div role="dialog" aria-modal="true" aria-label="Rincian laporan karhutla" className="rincian__panel cursor-default">
         {toastTersalin && (
           <div role="status" className="rincian__toast">
             {bahasa === "en" ? "Link copied to clipboard" : "Tautan disalin ke papan klip"}
@@ -203,7 +216,7 @@ export function RincianLaporan({
           aria-label={bahasa === "en" ? "Share incident" : "Bagikan kejadian"}
           title={bahasa === "en" ? "Share incident" : "Bagikan kejadian"}
           onClick={bagikan}
-          className="rincian__bagikan"
+          className="rincian__bagikan cursor-pointer"
         >
           <svg
             viewBox="0 0 24 24"
@@ -222,7 +235,7 @@ export function RincianLaporan({
           </svg>
         </button>
 
-        <button type="button" aria-label="Tutup rincian" onClick={onTutup} className="rincian__tutup">
+        <button type="button" aria-label="Tutup rincian" onClick={mintaTutup} className="rincian__tutup cursor-pointer">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>

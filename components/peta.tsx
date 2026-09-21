@@ -31,10 +31,10 @@ type PetaAerosol = {
 /** Kamera Windy yang sama dengan kamera Nusantara lapisan Aerosol, atau null
  *  bila peta Aerosol belum siap. Zoom Windy (skala Leaflet) = zoom MapLibre + 1
  *  — lihat catatan tombol rumah di app/api/forecasting/route.ts. */
-function kameraWindyNusantara(): { lat: number; lon: number; zoom: number } | null {
+function kameraWindyNusantara(isPenuh?: boolean): { lat: number; lon: number; zoom: number } | null {
   const peta = (window as unknown as { _maplibreMap?: PetaAerosol })._maplibreMap;
   if (!peta) return null;
-  const kamera = peta.cameraForBounds(BATAS_NUSANTARA, { padding: selaNusantara(peta.getContainer()) });
+  const kamera = peta.cameraForBounds(BATAS_NUSANTARA, { padding: selaNusantara(peta.getContainer(), isPenuh) });
   if (!kamera || kamera.zoom === undefined) return null;
   const [lon, lat] = Array.isArray(kamera.center) ? kamera.center : [kamera.center.lng, kamera.center.lat];
   return { lat, lon, zoom: kamera.zoom + 1 };
@@ -89,16 +89,29 @@ type Props = {
   /** Diteruskan ke PetaAsap — tombol bentang selayar di tumpukan kendali. */
   onExpand?: (() => void) | null;
   expandLabel?: string;
+  /** Status mode peta selayar penuh */
+  isPenuh?: boolean;
 };
 
-export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt, onExpand = null, expandLabel }: Props) {
+export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt, onExpand = null, expandLabel, isPenuh = false }: Props) {
   const [modeDalam, setModeDalam] = useState<ModePeta>("asap");
   // Terkendali kalau induk mengisi prop mode (+ onModeChange) — kalau tidak,
   // fallback ke state dalam supaya pemakaian lama (beranda) tak berubah.
   const terkendali = modeLuar !== undefined && onModeChange !== undefined;
   const mode = terkendali ? modeLuar : modeDalam;
-  const [hasOpenedWindy, setHasOpenedWindy] = useState(false);
-  const [windySrc, setWindySrc] = useState<string>("/api/forecasting?lat=0.200&lon=118.000&zoom=5");
+  const [hasOpenedWindy, setHasOpenedWindy] = useState(() => (modeLuar ?? "asap") === "windy");
+  /* Hanya kamera awalnya yang disimpan sebagai state. Sisa parameter iframe
+     dirangkai saat render, BUKAN dibekukan saat Windy pertama dibuka: bingkai
+     yang sama bisa membentang jadi selayar (beranda), dan tombol bentang serta
+     zoom roda ikut dipanggang ke URL ini. Dibekukan, iframe yang sudah terbuka
+     akan membawa parameter bingkai lamanya — roda membajak guliran halaman di
+     bingkai kecil, dan tombol bentang muncul di peta yang sudah selayar.
+     Ganti src berarti iframe memuat ulang; itu memang sudah pasti terjadi,
+     sebab memindahkan <iframe> di DOM selalu memuatnya ulang. */
+  const [windyKamera, setWindyKamera] = useState("lat=0.200&lon=118.000&zoom=5");
+  const windySrc = `/api/forecasting?${windyKamera}${zoomRoda ? "&konsol=1" : ""}${
+    onExpand ? "&bentang=1" : ""
+  }${legendaRingkas ? "&ringkas=1" : ""}${tombolRapat ? "&rapat=1" : ""}`;
   const [sedangSyncAsap, setSedangSyncAsap] = useState(true);
 
   // Peta asap baru dipasang begitu layarnya mendekati pandangan. Begitu
@@ -154,61 +167,6 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   }, [onExpand]);
 
 
-  // Aktifkan pemuatan iframe saat pertama kali beralih ke mode Windy
-  const handlePilihMode = (m: ModePeta) => {
-    if (terkendali) onModeChange?.(m);
-    else setModeDalam(m);
-    // Konsol /peta: kamera ikut berpindah lapisan — zoom dan geseran terakhir
-    // pengunjung terbawa, bukan kembali ke tampilan awal lapisan tujuan.
-    if (muatNusantara && m === mode) {
-      // Pil yang sama ditekan lagi — tak ada yang perlu disamakan.
-    } else if (muatNusantara && m === "windy") {
-      const kamera = kameraAerosolKini();
-      if (kamera) {
-        kameraTertundaRef.current = kamera;
-        if (iframeReadyRef.current) kirimData({ type: "SET_KAMERA", ...kamera });
-      }
-    } else if (muatNusantara && m === "asap" && hasOpenedWindy) {
-      try {
-        const windy = (iframeRef.current?.contentWindow as unknown as { W?: { map?: { map?: PetaWindy } } } | null)?.W?.map?.map;
-        const aerosol = (window as unknown as {
-          _maplibreMap?: { jumpTo: (o: { center: [number, number]; zoom: number }) => void };
-        })._maplibreMap;
-        if (windy && aerosol) {
-          const c = windy.getCenter();
-          aerosol.jumpTo({ center: [c.lng, c.lat], zoom: windy.getZoom() - 1 });
-        }
-      } catch {
-        // Iframe belum siap atau tak terjangkau — biarkan kamera Aerosol apa adanya.
-      }
-    }
-    if (m === "windy") {
-      if (!hasOpenedWindy && typeof window !== "undefined") {
-        const isMobile = window.innerWidth < 640;
-        // Konsol /peta: kamera dan zoom roda disamakan dengan lapisan Aerosol.
-        const kamera = muatNusantara ? kameraWindyNusantara() : null;
-        const konsol = zoomRoda ? "&konsol=1" : "";
-        // Tombol bentang selayar di dalam iframe hanya dipasang bila induk
-        // memberi onExpand — overlay selayar (sudah fullscreen) dan konsol
-        // tidak memintanya, jadi iframe mereka tak punya tombol itu.
-        const bentang = onExpand ? "&bentang=1" : "";
-        setWindySrc(
-          kamera
-            ? `/api/forecasting?lat=${kamera.lat.toFixed(3)}&lon=${kamera.lon.toFixed(3)}&zoom=${kamera.zoom.toFixed(2)}${konsol}${bentang}`
-            : isMobile
-              ? `/api/forecasting?lat=-1.000&lon=118.000&zoom=3.8${konsol}${bentang}`
-              : `/api/forecasting?lat=0.200&lon=118.000&zoom=5${konsol}${bentang}`
-        );
-      }
-      setHasOpenedWindy(true);
-      kirimData({ type: "WINDY_ACTIVE" });
-      kirimData({ type: "SET_JUMLAH", jumlahLaporan });
-      if (berita && berita.length > 0) {
-        kirimData({ type: "SET_EVENTS", events: berita });
-      }
-    }
-  };
-
   // Kirim data ke iframe Windy
   const kirimData = useCallback((data: Record<string, unknown>) => {
     if (!iframeRef.current?.contentWindow) return;
@@ -218,6 +176,60 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       // Abaikan jika belum siap
     }
   }, []);
+
+  // Aktifkan pemuatan iframe saat pertama kali beralih ke mode Windy
+  const handlePilihMode = (m: ModePeta) => {
+    if (terkendali) onModeChange?.(m);
+    else setModeDalam(m);
+
+    if (m === mode) {
+      return;
+    }
+
+    if (m === "windy") {
+      // Konsol / beranda: samakan kamera dan tingkat zoom persis dengan lapisan Aerosol
+      const kamera = kameraAerosolKini() ?? (muatNusantara ? kameraWindyNusantara(isPenuh) : null);
+      if (kamera) {
+        kameraTertundaRef.current = kamera;
+        if (iframeReadyRef.current) kirimData({ type: "SET_KAMERA", ...kamera });
+      }
+
+      if (!hasOpenedWindy && typeof window !== "undefined") {
+        const isMobile = window.innerWidth < 640;
+        setWindyKamera(
+          kamera
+            ? `lat=${kamera.lat.toFixed(3)}&lon=${kamera.lon.toFixed(3)}&zoom=${kamera.zoom.toFixed(2)}`
+            : isMobile
+              ? "lat=-1.000&lon=118.000&zoom=4.20"
+              : "lat=0.200&lon=118.000&zoom=5.00"
+        );
+      }
+      setHasOpenedWindy(true);
+      kirimData({ type: "WINDY_ACTIVE" });
+      kirimData({ type: "SET_JUMLAH", jumlahLaporan });
+      if (berita && berita.length > 0) {
+        kirimData({ type: "SET_EVENTS", events: berita });
+      }
+    } else if (m === "asap" && hasOpenedWindy) {
+      try {
+        const windy = (iframeRef.current?.contentWindow as unknown as {
+          W?: { map?: { map?: PetaWindy & { _maplibreMap?: { getZoom: () => number } } } };
+        } | null)?.W?.map?.map;
+        const aerosol = (window as unknown as {
+          _maplibreMap?: { jumpTo: (o: { center: [number, number]; zoom: number }) => void };
+        })._maplibreMap;
+        if (windy && aerosol) {
+          const c = windy.getCenter();
+          const z = typeof windy._maplibreMap?.getZoom === "function"
+            ? windy._maplibreMap.getZoom()
+            : windy.getZoom() - 1;
+          aerosol.jumpTo({ center: [c.lng, c.lat], zoom: z });
+        }
+      } catch {
+        // Iframe belum siap atau tak terjangkau — biarkan kamera Aerosol apa adanya.
+      }
+    }
+  };
 
   // Update antrean dan kirim hanya jika iframe sudah siap menerima
   useEffect(() => {
@@ -248,8 +260,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       if (data.type === "FORECASTING_READY") {
         iframeReadyRef.current = true;
         setMemuatWindy(false);
-        if (kameraTertundaRef.current) {
-          kirimData({ type: "SET_KAMERA", ...kameraTertundaRef.current });
+        const kamera = kameraTertundaRef.current ?? (isPenuh ? kameraWindyNusantara(true) : kameraAerosolKini());
+        if (kamera) {
+          kirimData({ type: "SET_KAMERA", ...kamera });
         }
         // Kuras data jumlah laporan dan kejadian yang tertunda saat inisialisasi awal
         if (pendingJumlahRef.current) {
@@ -308,7 +321,47 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
     window.addEventListener("message", saatPesan);
     return () => window.removeEventListener("message", saatPesan);
-  }, [kirimData, berita, onBukaRincian]);
+  }, [kirimData, berita, onBukaRincian, isPenuh]);
+
+  /* Saat mode selayar dibuka ATAU ditutup, sesuaikan kamera Windy dinamis ke
+     Nusantara. Sela selayar dan sela bingkai kecil berbeda jauh, jadi tanpa
+     cabang tutup iframe tertinggal di kamera selayar yang jauh lebih rapat —
+     bingkai kecil lalu memotong Sumatra dan Papua.
+
+     Dikunci ke perubahan isPenuh saja; `mode` dibaca lewat ref. Kalau `mode`
+     ikut jadi dependensi, tiap ganti tab kamera dipaksa balik ke framing
+     Nusantara dan geseran/zoom pengunjung hilang — padahal handlePilihMode
+     sudah menyamakan kamera antar-tab dari kamera Aerosol yang sedang tampil. */
+  const modeRef = useRef(mode);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+  useEffect(() => {
+    if (modeRef.current !== "windy") return;
+    if (!isPenuh && !muatNusantara) return;
+    // Satu frame: wadah MapLibre adalah acuan selaNusantara, jadi ia harus
+    // sudah memakai ukuran barunya sebelum kameranya dihitung.
+    const frameId = requestAnimationFrame(() => {
+      const kamera = kameraWindyNusantara(isPenuh);
+      if (!kamera) return;
+      kameraTertundaRef.current = kamera;
+      if (iframeReadyRef.current) kirimData({ type: "SET_KAMERA", ...kamera });
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [isPenuh, muatNusantara, kirimData]);
+
+  // Saat resize dalam mode selayar, sesuaikan kamera Windy dinamis
+  useEffect(() => {
+    if (!isPenuh || mode !== "windy") return;
+    const penanganResize = () => {
+      const kamera = kameraWindyNusantara(true);
+      if (kamera && iframeReadyRef.current) {
+        kirimData({ type: "SET_KAMERA", ...kamera });
+      }
+    };
+    window.addEventListener("resize", penanganResize);
+    return () => window.removeEventListener("resize", penanganResize);
+  }, [isPenuh, mode, kirimData]);
 
   /* Konsol /peta: saat rel dilipat bingkai berubah ukuran tiap frame. Kalau
      iframe Windy ikut di-resize tiap frame, petanya patah-patah dan zoomnya
@@ -375,10 +428,10 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
   /* Pil alih mode versi rapat untuk bingkai dasbor — sedikit lebih kecil
      dari versi fullscreen beranda. */
-  const kelasPil = `flex items-center gap-1 sm:gap-2 rounded-full font-semibold transition-all ${
+  const kelasPil = `flex cursor-pointer items-center gap-1 sm:gap-2 rounded-full font-semibold transition-all ${
     tombolRapat ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs"
   }`;
-  const kelasInfo = `flex items-center justify-center rounded-full bg-black/85 text-white/80 shadow-2xl ring-1 ring-white/20 backdrop-blur-md transition-all hover:bg-black hover:text-white hover:ring-white/40 active:scale-95 ${
+  const kelasInfo = `flex cursor-pointer items-center justify-center rounded-full bg-black/85 text-white/80 shadow-2xl ring-1 ring-white/20 backdrop-blur-md transition-all hover:bg-black hover:text-white hover:ring-white/40 active:scale-95 ${
     tombolRapat ? "h-7 w-7" : "h-8 w-8 sm:h-9 sm:w-9"
   }`;
 
@@ -454,11 +507,11 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           ponsel serta bilah navigasi. */}
       {bukaInfoPerbedaan && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex cursor-pointer items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
           onClick={() => setBukaInfoPerbedaan(false)}
         >
           <div
-            className="relative w-full max-w-lg max-h-[calc(100svh-2rem)] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-pantau-konsol p-4 sm:p-5 shadow-2xl text-white"
+            className="relative w-full max-w-lg max-h-[calc(100svh-2rem)] flex cursor-default flex-col overflow-hidden rounded-2xl border border-white/10 bg-pantau-konsol p-4 sm:p-5 shadow-2xl text-white"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -472,7 +525,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
               <button
                 type="button"
                 onClick={() => setBukaInfoPerbedaan(false)}
-                className="rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-white transition-colors"
+                className="rounded-lg cursor-pointer p-1.5 text-white/40 hover:bg-white/10 hover:text-white transition-colors"
                 aria-label="Tutup panduan"
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
@@ -589,6 +642,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             logoSelulerAlt={logoSelulerAlt}
             onExpand={onExpand}
             expandLabel={expandLabel}
+            isPenuh={isPenuh}
           />
         )}
       </div>

@@ -150,7 +150,7 @@ function Panah({ arah, label, onClick }: { arah: -1 | 1; label: string; onClick:
     : "right-0 panggung:right-[9px]";
   return (
     <button type="button" aria-label={label} onClick={onClick}
-            className={`absolute top-1/2 ${sisi} z-20 grid size-[var(--panah-ukuran)] -translate-y-1/2
+            className={`cursor-pointer absolute top-1/2 ${sisi} z-20 grid size-[var(--panah-ukuran)] -translate-y-1/2
                         place-items-center rounded-full bg-black/30 text-white backdrop-blur-[6px]
                         transition-colors hover:bg-black/55 focus-visible:outline-2
                         focus-visible:outline-offset-2 focus-visible:outline-white

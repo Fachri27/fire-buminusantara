@@ -444,7 +444,7 @@ export function HalamanPeta({
                 document.getElementById("rel-kanan-pantau")?.scrollTo({ top: 0 });
               }}
               aria-pressed={filterMedia === "terbaru"}
-              className="block w-full rounded-md px-3 pb-1.5 text-left text-base leading-snug font-semibold text-white
+              className="cursor-pointer block w-full rounded-md px-3 pb-1.5 text-left text-base leading-snug font-semibold text-white
                          transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
             >
               {teks.terbaru}
@@ -512,7 +512,7 @@ export function HalamanPeta({
               aria-controls="peta"
               title={teks.tutupPeta}
               aria-label={teks.tutupPeta}
-              className={`absolute right-2 z-[43] hidden size-9 items-center justify-center rounded-full
+              className={`cursor-pointer absolute right-2 z-[43] hidden size-9 items-center justify-center rounded-full
                           text-white ring-1 backdrop-blur-sm ${aksenTombolPeta}
                           transition hover:scale-105 active:scale-95
                           focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none
@@ -611,7 +611,7 @@ export function HalamanPeta({
                 aria-controls="peta"
                 title={teks.tutupPeta}
                 aria-label={teks.tutupPeta}
-                className={`group absolute top-3 right-14 z-[42] hidden items-center gap-1.5 rounded-full
+                className={`cursor-pointer group absolute top-3 right-14 z-[42] hidden items-center gap-1.5 rounded-full
                            py-2 pr-4 pl-3 text-[13px] leading-none font-semibold tracking-tight
                            text-white ring-1 backdrop-blur-sm ${aksenTombolPeta}
                            transition hover:scale-[1.03] active:scale-95
@@ -684,7 +684,7 @@ export function HalamanPeta({
               aria-controls="peta"
               title={teks.bukaPeta}
               aria-label={teks.bukaPeta}
-              className={`group flex size-9 items-center justify-center rounded-xl text-white ring-1 ${aksenTombolPeta}
+              className={`cursor-pointer group flex size-9 items-center justify-center rounded-xl text-white ring-1 ${aksenTombolPeta}
                          transition hover:scale-105 active:scale-95
                          focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
             >
@@ -727,7 +727,7 @@ export function HalamanPeta({
               aria-label={kiriBuka
                 ? (bahasa === "en" ? "Close left sidebar" : "Tutup sidebar kiri")
                 : (bahasa === "en" ? "Open left sidebar" : "Buka sidebar kiri")}
-              className="group flex size-9 items-center justify-center rounded-xl bg-pantau-konsol/95
+              className="cursor-pointer group flex size-9 items-center justify-center rounded-xl bg-pantau-konsol/95
                          text-white ring-1 ring-white/20 shadow-[0_6px_18px_rgb(0_0_0/0.5)] backdrop-blur-sm
                          transition hover:scale-105 hover:bg-pantau-konsol hover:ring-white/35 active:scale-95
                          focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -784,7 +784,7 @@ export function HalamanPeta({
                 title={bahasa === "en" ? "Filter: Latest reports" : "Filter: Laporan terbaru"}
                 aria-label={bahasa === "en" ? "Filter: Latest reports" : "Filter: Laporan terbaru"}
                 aria-pressed={filterMedia === "terbaru" || filterMedia === "semua"}
-                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                className={`cursor-pointer flex items-center justify-center rounded-md p-1.5 transition-colors ${
                   filterMedia === "terbaru" || filterMedia === "semua"
                     ? aksenFilter
                     : "text-pantau-abu hover:text-pantau-tulang hover:bg-white/10"
@@ -803,7 +803,7 @@ export function HalamanPeta({
                 title={bahasa === "en" ? "Filter: Popular reports" : "Filter: Laporan terpopuler"}
                 aria-label={bahasa === "en" ? "Filter: Popular reports" : "Filter: Laporan terpopuler"}
                 aria-pressed={filterMedia === "populer"}
-                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                className={`cursor-pointer flex items-center justify-center rounded-md p-1.5 transition-colors ${
                   filterMedia === "populer"
                     ? aksenFilter
                     : "text-pantau-abu hover:text-pantau-tulang hover:bg-white/10"
@@ -825,7 +825,7 @@ export function HalamanPeta({
                 title={bahasa === "en" ? "Card view" : "Tampilan kartu"}
                 aria-label={bahasa === "en" ? "Card view" : "Tampilan kartu"}
                 aria-pressed={modeRel === "kartu"}
-                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                className={`cursor-pointer flex items-center justify-center rounded-md p-1.5 transition-colors ${
                   modeRel === "kartu"
                     ? "bg-white/15 text-pantau-tulang"
                     : "text-pantau-abu hover:text-pantau-tulang hover:bg-white/10"
@@ -844,7 +844,7 @@ export function HalamanPeta({
                 title={bahasa === "en" ? "List view" : "Tampilan daftar"}
                 aria-label={bahasa === "en" ? "List view" : "Tampilan daftar"}
                 aria-pressed={modeRel === "daftar"}
-                className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                className={`cursor-pointer flex items-center justify-center rounded-md p-1.5 transition-colors ${
                   modeRel === "daftar"
                     ? "bg-white/15 text-pantau-tulang"
                     : "text-pantau-abu hover:text-pantau-tulang hover:bg-white/10"
@@ -973,11 +973,11 @@ function KelompokWilayah({
   // Rel kiri: daftar bergulir sendiri setinggi 300px. Laci: laci sudah
   // bergulir, jadi daftar dibiarkan memanjang (tanpa gulir bersarang).
   const kelasDaftar = lega ? "pb-3" : "pantau-rel max-h-[300px] overflow-y-auto overscroll-contain pb-3";
-  const kelasItem = `block w-full truncate rounded-md pr-2 pl-[18px] text-left leading-snug text-white/70
+  const kelasItem = `cursor-pointer block w-full truncate rounded-md pr-2 pl-[18px] text-left leading-snug text-white/70
                      transition-colors hover:bg-white/[0.06] hover:text-white
                      focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none
                      ${lega ? "py-2 text-[15px]" : "py-[3px] text-[13.5px]"}`;
-  const kelasJudul = "flex w-full items-center justify-between gap-2 rounded-md px-3 pb-1 text-left text-base leading-snug font-semibold text-white transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none";
+  const kelasJudul = "cursor-pointer flex w-full items-center justify-between gap-2 rounded-md px-3 pb-1 text-left text-base leading-snug font-semibold text-white transition-colors hover:text-pantau-tulang focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none";
   const panah = (buka: boolean) => (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
          strokeLinecap="round" strokeLinejoin="round"
@@ -1204,7 +1204,7 @@ function LaciPeta({ teks, cari, onCari, laporan, onBuka, asapAktif, wilayah, ten
           }}
           aria-expanded={terbuka}
           aria-label={terbuka ? teks.laciTutup : teks.laciBuka}
-          className="mx-auto flex h-5 w-20 items-center justify-center rounded-full
+          className="cursor-pointer mx-auto flex h-5 w-20 items-center justify-center rounded-full
                      focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
         >
           <span aria-hidden="true" className="block h-1 w-10 rounded-full bg-white/30" />
@@ -1244,7 +1244,7 @@ function LaciPeta({ teks, cari, onCari, laporan, onBuka, asapAktif, wilayah, ten
                 role="tab"
                 aria-selected={tab === t}
                 onClick={() => setTab(t)}
-                className={`relative rounded-md pb-2.5 text-[15px] font-semibold transition-colors
+                className={`cursor-pointer relative rounded-md pb-2.5 text-[15px] font-semibold transition-colors
                             focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none
                             ${tab === t ? "text-white" : "text-white/45"}`}
               >
@@ -1275,7 +1275,7 @@ function LaciPeta({ teks, cari, onCari, laporan, onBuka, asapAktif, wilayah, ten
                   type="button"
                   onClick={() => onBuka(b)}
                   aria-label={`${b.judul} — ${teks.bukaRincian}`}
-                  className="group block w-full rounded-lg text-left focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
+                  className="cursor-pointer group block w-full rounded-lg text-left focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none"
                 >
                   {/* Tinggi gambar tetap (bukan rasio) dan judul selalu memesan
                       dua baris — tinggi deret kartu sama di semua lebar layar,
@@ -1385,7 +1385,7 @@ function TabRel({ sisi, terbuka, kontrol, labelTutup, labelBuka, onUbah, modePet
         aria-controls={kontrol}
         aria-label={label}
         title={label}
-        className={`group flex size-9 items-center justify-center rounded-full text-white ring-1 ring-inset
+        className={`cursor-pointer group flex size-9 items-center justify-center rounded-full text-white ring-1 ring-inset
                     transition-[scale,box-shadow,background-color] duration-300 ease-out
                     hover:scale-110 active:scale-90
                     focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
@@ -1580,7 +1580,7 @@ function KartuLaporan({ b, bukaLabel, selengkapnya, lebihSedikit, masonry, onBuk
       <button
         type="button" onClick={onBuka}
         title={bukaLabel} aria-label={`${b.judul} — ${bukaLabel}`}
-        className={`group col-start-1 row-start-1 w-full min-w-0 text-left focus-visible:outline-none
+        className={`cursor-pointer group col-start-1 row-start-1 w-full min-w-0 text-left focus-visible:outline-none
                    focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:ring-offset-2
                    focus-visible:ring-offset-pantau-konsol ${masonry ? "flex flex-col" : "block"}`}
       >
@@ -1650,12 +1650,12 @@ function KartuLaporan({ b, bukaLabel, selengkapnya, lebihSedikit, masonry, onBuk
                   onClick={() => setIndeks(i)}
                   aria-label={`Media ${i + 1}/${jumlah}`}
                   aria-current={i === kini}
-                  className="pointer-events-auto flex h-[24px] min-w-0 flex-1 items-center
+                  className="cursor-pointer pointer-events-auto flex h-[24px] min-w-0 flex-1 items-center
                              focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
                 >
                   <span
                     aria-hidden="true"
-                    className={`h-[3px] w-full rounded-full transition-all ${
+                    className={`h-[3px] w-full rounded-full transition-[transform,background-color] duration-150 motion-reduce:transition-none ${
                       i === kini ? "bg-white" : "bg-white/40 hover:bg-white/70"
                     }`}
                   />
@@ -1670,12 +1670,12 @@ function KartuLaporan({ b, bukaLabel, selengkapnya, lebihSedikit, masonry, onBuk
               onClick={() => setIndeks(i)}
               aria-label={`Media ${i + 1}/${jumlah}`}
               aria-current={i === kini}
-              className="pointer-events-auto flex min-h-[24px] min-w-[24px] items-center justify-center rounded-full
+              className="cursor-pointer pointer-events-auto flex min-h-[24px] min-w-[24px] items-center justify-center rounded-full
                          focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
             >
               <span
                 aria-hidden="true"
-                className={`block size-[5px] rounded-full transition-all ${
+                className={`block size-[5px] rounded-full transition-[transform,background-color] duration-150 motion-reduce:transition-none ${
                   i === kini ? "scale-110 bg-white" : "bg-white/55 hover:bg-white/85"
                 }`}
               />
@@ -1707,7 +1707,7 @@ function KartuLaporan({ b, bukaLabel, selengkapnya, lebihSedikit, masonry, onBuk
                 onClick={() => setBentang(true)}
                 aria-expanded={bentang}
                 aria-label={`${b.judul} — ${selengkapnya}`}
-                className="p-0 text-left text-pantau-abu transition-colors hover:text-white
+                className="cursor-pointer p-0 text-left text-pantau-abu transition-colors hover:text-white
                            focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
               >
                 ... {selengkapnya}
@@ -1720,7 +1720,7 @@ function KartuLaporan({ b, bukaLabel, selengkapnya, lebihSedikit, masonry, onBuk
             type="button"
             onClick={() => setBentang(false)}
             aria-expanded={bentang}
-            className="mt-0.5 block p-0 text-left text-[13px] leading-relaxed text-pantau-abu transition-colors hover:text-white
+            className="cursor-pointer mt-0.5 block p-0 text-left text-[13px] leading-relaxed text-pantau-abu transition-colors hover:text-white
                        focus-visible:ring-2 focus-visible:ring-pantau-bara focus-visible:outline-none"
           >
             {lebihSedikit}
@@ -1950,7 +1950,7 @@ function ItemListLaporan({ b, bukaLabel, onBuka }: { b: Berita; bukaLabel: strin
       onClick={onBuka}
       title={bukaLabel}
       aria-label={`${b.judul} — ${bukaLabel}`}
-      className="group flex w-full items-center gap-3 rounded-xl px-1 py-1.5 text-left transition-colors
+      className="cursor-pointer group flex w-full items-center gap-3 rounded-xl px-1 py-1.5 text-left transition-colors
                  hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2
                  focus-visible:ring-pantau-bara focus-visible:ring-offset-2 focus-visible:ring-offset-pantau-konsol"
     >

@@ -464,7 +464,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
           <button
             type="button"
             onClick={buka}
-            className="shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-[12.5px] font-semibold
+            className="cursor-pointer shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-[12.5px] font-semibold
                        text-pantau-tulang transition hover:bg-white/15
                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
@@ -476,7 +476,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
           <button
             type="button"
             onClick={buka}
-            className="min-w-0 flex-1 truncate py-1 text-left text-[15px] text-pantau-abu transition
+            className="cursor-pointer min-w-0 flex-1 truncate py-1 text-left text-[15px] text-pantau-abu transition
                        hover:text-pantau-tulang focus-visible:outline-2 focus-visible:outline-offset-2
                        focus-visible:outline-white"
           >
@@ -485,7 +485,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
           <button
             type="button"
             onClick={buka}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold text-white ring-1
+            className={`cursor-pointer shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold text-white ring-1
                         ring-white/15 transition ${aksen.isi}
                         focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
           >
@@ -503,7 +503,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
      mengecil sementara dialognya tetap 25% lebih besar. */
   const dialog = (
     <div
-      className="fixed inset-0 z-[80] grid place-items-start justify-center overflow-y-auto
+      className="cursor-pointer fixed inset-0 z-[80] grid place-items-start justify-center overflow-y-auto
                  bg-black/70 px-4 py-[8vh] backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) setTerbuka(false);
@@ -514,7 +514,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
         role="dialog"
         aria-modal="true"
         aria-label={ajakan.judulDialog}
-        className="w-full max-w-[560px] rounded-2xl bg-pantau-konsol p-5 ring-1 ring-white/15
+        className="cursor-default w-full max-w-[560px] rounded-2xl bg-pantau-konsol p-5 ring-1 ring-white/15
                    shadow-[0_24px_80px_rgb(0_0_0/0.6)] [zoom:var(--skala-rel)]"
       >
         {/* Kepala: logo + judul yang TERLIHAT. Sebelumnya dialog ini hanya
@@ -591,7 +591,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
                     type="button"
                     onClick={() => buangBerkas(b)}
                     aria-label={`${teks.hapusBerkas} ${b.name}`}
-                    className="absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full
+                    className="cursor-pointer absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full
                                bg-black/80 text-[11px] text-white ring-1 ring-white/25 transition
                                hover:bg-black focus-visible:outline-2 focus-visible:outline-white"
                   >
@@ -644,7 +644,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
             type="button"
             onClick={lokasiSaya}
             disabled={mencariLokasi}
-            className={`rounded-full px-3 py-1.5 text-[12.5px] transition disabled:opacity-50
+            className={`cursor-pointer disabled:cursor-not-allowed rounded-full px-3 py-1.5 text-[12.5px] transition disabled:opacity-50
                         ${aksen.teks} ${aksen.sentuh}
                         focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
           >
@@ -696,7 +696,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
               value="1"
               checked={anonim}
               onChange={(e) => setAnonim(e.target.checked)}
-              className={`size-3.5 ${aksen.kotak}`}
+              className={`cursor-pointer size-3.5 ${aksen.kotak}`}
             />
             {teks.anonim}
           </label>
@@ -705,7 +705,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
             <button
               type="button"
               onClick={() => setTerbuka(false)}
-              className="rounded-full px-3 py-1.5 text-[12.5px] text-pantau-abu transition hover:text-pantau-tulang
+              className="cursor-pointer rounded-full px-3 py-1.5 text-[12.5px] text-pantau-abu transition hover:text-pantau-tulang
                          focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
               {ajakan.tutup}
@@ -714,8 +714,8 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
               type="submit"
               disabled={!siapKirim || mengirim}
               aria-busy={mengirim}
-              className={`rounded-full px-4 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15
-                          transition disabled:cursor-not-allowed disabled:opacity-40 ${aksen.isi}
+              className={`cursor-pointer disabled:cursor-not-allowed rounded-full px-4 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15
+                          transition disabled:opacity-40 ${aksen.isi}
                           focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
             >
               {mengirim ? teks.mengirim : teks.kirim}

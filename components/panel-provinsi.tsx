@@ -77,7 +77,7 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
           type="button"
           onClick={() => setTerbuka(true)}
           aria-expanded="false"
-          className="pointer-events-auto flex items-center gap-2 rounded-full bg-api
+          className="cursor-pointer pointer-events-auto flex items-center gap-2 rounded-full bg-api
                      px-[clamp(14px,4vw,18px)] py-[clamp(9px,2.6vw,12px)]
                      text-[length:var(--ukuran-catatan)] font-semibold tracking-wide uppercase text-white
                      shadow-[0_4px_16px_rgb(0_0_0/0.28)] transition-transform active:scale-95"
@@ -101,7 +101,7 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
           type="button"
           onClick={() => { setTerbuka(false); setCari(""); }}
           aria-label="Tutup panel provinsi"
-          className="flex items-center gap-1.5 rounded-full bg-white/95 px-[clamp(12px,3.4vw,16px)]
+          className="cursor-pointer flex items-center gap-1.5 rounded-full bg-white/95 px-[clamp(12px,3.4vw,16px)]
                      py-[clamp(7px,2vw,10px)] text-[length:var(--ukuran-catatan)] font-semibold text-tinta
                      shadow-[0_3px_14px_rgb(0_0_0/0.22)] transition-transform active:scale-95"
         >
@@ -138,7 +138,7 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
               hasil.map((nama) => (
                 <li key={nama}>
                   <button type="button" onClick={(e) => pilih(nama, e)}
-                          className="flex w-full items-center gap-3 px-[clamp(12px,3.4vw,16px)] py-[10px] text-left
+                          className="cursor-pointer flex w-full items-center gap-3 px-[clamp(12px,3.4vw,16px)] py-[10px] text-left
                                      transition-colors hover:bg-black/5">
                     <Siluet jalur={siluet[nama]} className="size-[clamp(24px,7vw,32px)] shrink-0" />
                     <span className="min-w-0 flex-1 truncate text-[length:var(--ukuran-nama)] font-semibold">
@@ -174,7 +174,7 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
               return (
                 <li key={p.nama}>
                   <button type="button" onClick={(e) => pilih(nama, e)}
-                          className="flex w-full items-center gap-[clamp(10px,3vw,18px)] rounded-[10px] bg-white
+                          className="cursor-pointer flex w-full items-center gap-[clamp(10px,3vw,18px)] rounded-[10px] bg-white
                                      p-[clamp(12px,3.6vw,18px)] text-left shadow-[0_4px_18px_rgb(0_0_0/0.16)]
                                      transition hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgb(0_0_0/0.22)]">
                     <Siluet jalur={siluet[nama]}

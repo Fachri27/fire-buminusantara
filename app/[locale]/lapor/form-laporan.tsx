@@ -526,7 +526,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
                    className={`${ISIAN} w-40`} />
           </label>
           <button type="button" onClick={lokasiSaya} disabled={mencariLokasi}
-                  className={`${TOMBOL_GARIS} disabled:opacity-50`}>
+                  className={`${TOMBOL_GARIS} cursor-pointer disabled:cursor-not-allowed disabled:opacity-50`}>
             {mencariLokasi ? teks.mencariLokasi : teks.pakaiLokasi}
           </button>
         </div>
@@ -539,10 +539,10 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         <input id="lapor-nama" name="nama" maxLength={100} disabled={anonim} autoComplete="name"
                value={nama} onChange={(e) => setNama(e.target.value)}
                className={`${ISIAN} disabled:bg-black/[0.03] disabled:text-tinta/35`} />
-        <label className="mt-3 flex w-fit items-center gap-2.5 text-[13.5px]">
+        <label className="mt-3 flex w-fit cursor-pointer items-center gap-2.5 text-[13.5px]">
           <input type="checkbox" name="anonim" value="1" checked={anonim}
                  onChange={(e) => setAnonim(e.target.checked)}
-                 className="size-4 accent-[var(--color-api)]" />
+                 className="cursor-pointer size-4 accent-[var(--color-api)]" />
           {teks.anonim}
         </label>
       </Bidang>
@@ -569,7 +569,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
           type="submit"
           disabled={mengirim || menungguToken}
           aria-busy={mengirim || menungguToken}
-          className={`${TOMBOL_UTAMA} disabled:opacity-60`}
+          className={`${TOMBOL_UTAMA} cursor-pointer disabled:cursor-not-allowed disabled:opacity-60`}
         >
           {mengirim
             ? teks.mengirim
@@ -577,7 +577,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
             ? (bahasa === "en" ? "Verifying…" : "Memverifikasi…")
             : teks.kirim}
         </button>
-        <Link href={`/${bahasa}`} className="text-[13px] text-tinta/50 underline-offset-4 hover:underline">
+        <Link href={`/${bahasa}`} className="cursor-pointer text-[13px] text-tinta/50 underline-offset-4 hover:underline">
           {teks.kembali}
         </Link>
       </div>
@@ -591,12 +591,12 @@ const ISIAN =
   "focus:ring-2 focus:ring-api/15";
 
 const TOMBOL_UTAMA =
-  "inline-flex items-center rounded-md bg-api px-5 py-2.5 text-[13.5px] font-semibold text-white " +
+  "inline-flex items-center rounded-md bg-api px-5 py-2.5 text-[13.5px] font-semibold text-white cursor-pointer " +
   "transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "focus-visible:outline-api";
 
 const TOMBOL_GARIS =
-  "inline-flex items-center rounded-md border border-black/[0.16] bg-white px-4 py-2 text-[13px] " +
+  "inline-flex items-center rounded-md border border-black/[0.16] bg-white px-4 py-2 text-[13px] cursor-pointer " +
   "font-medium text-tinta transition-colors hover:border-black/30 focus-visible:outline-2 " +
   "focus-visible:outline-offset-2 focus-visible:outline-api";
 
