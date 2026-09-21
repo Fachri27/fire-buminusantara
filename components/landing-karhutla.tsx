@@ -5,9 +5,12 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Peta } from "@/components/peta";
+import { Peta, type ModePeta } from "@/components/peta";
 import { Nav } from "@/components/nav";
 import { RincianLaporan } from "@/components/rincian-laporan";
+import { PopupPeta } from "@/components/popup-peta";
+import { UlasanKomentar, FormulirKomentar } from "@/components/kolom-komentar";
+import { gunakanKomentar } from "@/hooks/gunakan-komentar";
 import { gunakanKolomUmpan } from "@/hooks/gunakan-kolom-umpan";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "@/lib/batas-laporan";
 import { KUNCI_SOROTAN, LABEL_SOROTAN, type KunciSorotan } from "@/lib/statistik-sorotan-teks";
@@ -38,13 +41,18 @@ function kunciBerkas(b: File): string {
   return `${b.name}|${b.size}|${b.lastModified}`;
 }
 
-type Laporan = {
+export type Laporan = {
   id: number;
   gambar: string | null; // foto — atau poster bingkai bila laporannya video
   video?: string; // mp4 bila laporannya video
+  /** Seluruh media galeri (berurut) — >1 berarti ada lencana. */
+  galeri: { url: string; jenis: "gambar" | "video"; poster?: string; keterangan?: string }[];
   alt: string;
   judul: string;
   tanggal: string;
+  lokasi: string | null;
+  deskripsi: string | null;
+  slug: string | null;
   href: string;
 };
 
@@ -109,6 +117,17 @@ const TEKS = {
     tabPanel: "Buka panel situasi",
     tabUmpan: "Buka daftar laporan",
     titikMenu: "Opsi laporan",
+    videoBisu: "Nyalakan suara video",
+    videoSenyap: "Bisukan video",
+    videoUlang: "Putar ulang video",
+    galeriSebelumnya: "Foto sebelumnya",
+    galeriBerikutnya: "Foto berikutnya",
+    postingan: "Postingan",
+    kembali: "Kembali",
+    suka: "Suka",
+    komentar: "Komentar",
+    selengkapnya: "selengkapnya",
+    lebihSedikit: "lebih sedikit",
     lembarBuka: "Buka laporan",
     lembarBagikan: "Bagikan",
     lembarUnduh: "Unduh gambar",
@@ -168,6 +187,17 @@ const TEKS = {
     tabPanel: "Open situation panel",
     tabUmpan: "Open report list",
     titikMenu: "Report options",
+    videoBisu: "Unmute video",
+    videoSenyap: "Mute video",
+    videoUlang: "Replay video",
+    galeriSebelumnya: "Previous photo",
+    galeriBerikutnya: "Next photo",
+    postingan: "Post",
+    kembali: "Back",
+    suka: "Like",
+    komentar: "Comments",
+    selengkapnya: "more",
+    lebihSedikit: "less",
     lembarBuka: "Open report",
     lembarBagikan: "Share",
     lembarUnduh: "Download image",
@@ -193,17 +223,6 @@ function IkonLokasi({ className = "size-6" }: { className?: string }) {
       <circle cx="12" cy="12" r="7" />
       <circle cx="12" cy="12" r="2.5" />
       <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** Ikon bentang 4-sudut — pasangan tombol X penutup. Sama seperti ikon
- *  buka-peta di halaman-peta.tsx, supaya bahasanya satu konsol. */
-function IkonBentang({ className = "size-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4"
-         strokeLinecap="round" className={className}>
-      <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
     </svg>
   );
 }
@@ -391,18 +410,69 @@ function useAliran(): boolean {
   );
 }
 
-/* Video kartu umpan — pola yang sama dengan VideoKeping index: autoplay bisu
-   berulang saat terlihat di layar (IntersectionObserver 25%), dijeda saat
-   tidak; tanpa kontrol dan tanpa suara (kliknya membuka rincian); pengurang
-   gerak berarti diam di poster. Poster di lapisan sendiri supaya kegagalan
-   putar tak berarti kotak hitam. */
-function VideoOtomatis({ url, poster, label, onBuka }: {
+/* Ikon suara video ala IG: speaker + gelombang (bersuara) / speaker + silang
+   (bisu), dan panah melingkar untuk putar ulang. Garis 1.9 ala ikon tab. */
+function IkonSuara({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M11 5 6.5 9H3v6h3.5L11 19V5Z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18.2 6a9 9 0 0 1 0 12" />
+    </svg>
+  );
+}
+
+function IkonBisu({ className = "size-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M11 5 6.5 9H3v6h3.5L11 19V5Z" />
+      <path d="m16 9.5 5 5M21 9.5l-5 5" />
+    </svg>
+  );
+}
+
+function IkonUlang({ className = "size-7" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 4.5V10h5.5" />
+    </svg>
+  );
+}
+
+/* Video kartu umpan — autoplay bisu saat terlihat di layar
+   (IntersectionObserver 25%), dijeda saat tidak; tanpa kontrol bawaan.
+
+   Gaya Instagram: mulai bisu (syarat autoplay peramban), lencana bisu di kanan
+   bawah untuk menyalakan/mematikan suara, dan setelah habis berhenti di bingkai
+   terakhir dengan tombol putar ulang di tengah — bukan loop.
+   Pengurang gerak berarti diam di poster. Poster di lapisan sendiri supaya
+   kegagalan putar tak berarti kotak hitam. */
+function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = null, bahasa }: {
   url: string; poster: string | null; label: string; onBuka: () => void;
+  /** true di dalam carousel — margin atas milik wadah, bukan tombol. */
+  tanpaMt?: boolean;
+  /** Nama kredit untuk pil © — null = tanpa pil. */
+  kredit?: string | null;
+  bahasa: Bahasa;
 }) {
+  const t = TEKS[bahasa];
   const ref = useRef<HTMLVideoElement | null>(null);
   const terlihatRef = useRef(false);
   const [siap, setSiap] = useState(false);
   const [posterGagal, setPosterGagal] = useState(false);
+  const [bisu, setBisu] = useState(true);
+  const [usai, setUsai] = useState(false);
+
+  // Sinkronkan PROPERTI muted setiap berubah — sebagian peramban hanya
+  // mengizinkan autoplay bila propertinya true, bukan sekadar atributnya.
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.muted = bisu;
+  }, [bisu]);
 
   useEffect(() => {
     const el = ref.current;
@@ -413,8 +483,10 @@ function VideoOtomatis({ url, poster, label, onBuka }: {
     const amati = new IntersectionObserver(
       (masuk) => {
         terlihatRef.current = masuk.some((m) => m.isIntersecting);
-        if (terlihatRef.current) el.play().catch(() => {});
-        else el.pause();
+        // Yang sudah habis tidak ikut diputar lagi — menunggu tombol ulang.
+        if (terlihatRef.current) {
+          if (!el.ended) el.play().catch(() => {});
+        } else el.pause();
       },
       { threshold: 0.25 },
     );
@@ -423,61 +495,130 @@ function VideoOtomatis({ url, poster, label, onBuka }: {
       amati.disconnect();
       el.pause();
     };
-  }, []);
+  }, [url]);
 
   const cobaPutar = useCallback((el: HTMLVideoElement) => {
     setSiap(true);
-    if (terlihatRef.current) el.play().catch(() => {});
+    if (terlihatRef.current && !el.ended) el.play().catch(() => {});
   }, []);
 
+  function sakelarBisu(e: React.MouseEvent) {
+    e.stopPropagation();
+    const el = ref.current;
+    if (!el) return;
+    setBisu((v) => {
+      const jadi = !v;
+      el.muted = jadi;
+      // Menyalakan suara sekaligus memastikan videonya berjalan — ia bisa
+      // sedang dijeda di luar layar, atau sudah habis.
+      if (!jadi) {
+        if (el.ended) { setUsai(false); el.currentTime = 0; }
+        el.play().catch(() => {});
+      }
+      return jadi;
+    });
+  }
+
+  function putarUlang(e: React.MouseEvent) {
+    e.stopPropagation();
+    const el = ref.current;
+    if (!el) return;
+    setUsai(false);
+    el.currentTime = 0;
+    el.play().catch(() => {});
+  }
+
   return (
-    <button
-      type="button"
-      onClick={onBuka}
-      aria-label={label}
-      className="lk-foto mt-3 block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+    // Wadah div (bukan button): tombol bisu/ulang bersarang di dalamnya dan
+    // button-di-dalam-button tidak valid. Tombol buka-rincian melingkupi
+    // medianya; tombol bisu/ulang menghentikan rambatan supaya tidak ikut
+    // membuka rincian.
+    <div
+      className={`lk-foto block w-full${tanpaMt ? "" : " mt-3"}`}
     >
       <span className="relative block">
-        {poster && !posterGagal ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={poster} alt="" aria-hidden="true" loading="lazy"
-              onError={() => setPosterGagal(true)}
-              className="lk-foto h-auto w-full"
-            />
+        <button
+          type="button"
+          onClick={onBuka}
+          aria-label={label}
+          className="block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+        >
+          {poster && !posterGagal ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={poster} alt="" aria-hidden="true" loading="lazy"
+                onError={() => setPosterGagal(true)}
+                className="lk-foto h-auto w-full"
+              />
+              <video
+                ref={ref}
+                src={url}
+                muted={bisu}
+                playsInline
+                preload="metadata"
+                aria-hidden="true"
+                tabIndex={-1}
+                onPlay={() => setUsai(false)}
+                onEnded={() => setUsai(true)}
+                onCanPlay={(e) => cobaPutar(e.currentTarget)}
+                onPlaying={() => setSiap(true)}
+                className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-500 ${siap ? "opacity-100" : "opacity-0"}`}
+              />
+            </>
+          ) : (
             <video
               ref={ref}
               src={url}
-              muted
+              muted={bisu}
               playsInline
-              loop
               preload="metadata"
+              aria-hidden="true"
+              tabIndex={-1}
+              onPlay={() => setUsai(false)}
+              onEnded={() => setUsai(true)}
               onCanPlay={(e) => cobaPutar(e.currentTarget)}
               onPlaying={() => setSiap(true)}
-              className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-500 ${siap ? "opacity-100" : "opacity-0"}`}
+              className="lk-foto h-auto w-full"
             />
-          </>
+          )}
+        </button>
+        {usai ? (
+          <span className="lk-video-ulang-wadah">
+            <button
+              type="button"
+              onClick={putarUlang}
+              aria-label={t.videoUlang}
+              title={t.videoUlang}
+              className="lk-video-ulang"
+            >
+              <IkonUlang />
+            </button>
+          </span>
         ) : (
-          <video
-            ref={ref}
-            src={url}
-            muted
-            playsInline
-            loop
-            preload="metadata"
-            onCanPlay={(e) => cobaPutar(e.currentTarget)}
-            onPlaying={() => setSiap(true)}
-            className="lk-foto h-auto w-full"
-          />
+          <button
+            type="button"
+            onClick={sakelarBisu}
+            aria-label={bisu ? t.videoBisu : t.videoSenyap}
+            title={bisu ? t.videoBisu : t.videoSenyap}
+            aria-pressed={!bisu}
+            className="lk-video-bisu"
+          >
+            {bisu ? <IkonBisu /> : <IkonSuara />}
+          </button>
+        )}
+        {kredit !== null && (
+          <span aria-hidden="true" className="lk-kredit">
+            ©&nbsp;{kredit || "anonim"}
+          </span>
         )}
       </span>
-    </button>
+    </div>
   );
 }
 
-/* Ikon menu lembar — garis 1.8 ala rujukan. */
-function IkonBagikan({ className = "size-6" }: { className?: string }) {
+
+/* Ikon menu lembar — garis 1.8 ala rujukan. */function IkonBagikan({ className = "size-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"
          strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -502,7 +643,7 @@ function IkonUnduh({ className = "size-6" }: { className?: string }) {
 
 /* Lembar bawah seluler ala Pinterest: thumbnail + judul + deskripsi +
    aksi (buka laporan, bagikan, unduh). Hanya dipakai di aliran. */
-function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
+export function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
   berita: Berita; bahasa: Bahasa; onTutup: () => void; onBuka: () => void;
 }) {
   const t = TEKS[bahasa];
@@ -578,7 +719,7 @@ function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
         </button>
         {video ? (
           <div className="lk-lembar-gambar lk-lembar-gambar--video">
-            <VideoOtomatis url={video} poster={gambar} label={b.judul} onBuka={onBuka} />
+            <VideoOtomatis url={video} poster={gambar} label={b.judul} onBuka={onBuka} bahasa={bahasa} />
           </div>
         ) : (
           gambar && (
@@ -620,6 +761,271 @@ function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
   );
 }
 
+/* Tampilan "Postingan" seluler ala IG — dibuka dari tap gambar di umpan
+   (desktop langsung ke rincian). Bilah kembali + judul, baris penulis,
+   media selebar layar (dots ketuk, tanpa geser), baris aksi (suka
+   perangkat-lokal, komentar, bagikan), caption + selengkapnya + tanggal. */
+export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomentar, statis = false }: {
+  laporan: Laporan;
+  bahasa: Bahasa;
+  onTutup: () => void;
+  onBuka: () => void;
+  onKomentar: () => void;
+  /** true di halaman detail tersendiri: mengalir normal, bukan overlay fixed. */
+  statis?: boolean;
+}) {
+  const t = TEKS[bahasa];
+  const [idx, setIdx] = useState(0);
+  const [tersalin, setTersalin] = useState(false);
+  const [descPenuh, setDescPenuh] = useState(false);
+  const sentuh = useRef<{ x: number; y: number } | null>(null);
+  // Jumlah komentar untuk angka di samping ikon — diambil sekali saat buka.
+  const [jumlahKomentar, setJumlahKomentar] = useState<number | null>(null);
+  useEffect(() => {
+    let hidup = true;
+    fetch(`/api/laporan/${l.id}/komentar`, { headers: { Accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: unknown) => {
+        if (!hidup) return;
+        const daftar = Array.isArray((j as { komentar?: unknown })?.komentar)
+          ? ((j as { komentar: { balasan?: unknown[] }[] }).komentar)
+          : [];
+        setJumlahKomentar(
+          daftar.reduce((n, k) => n + 1 + (Array.isArray(k.balasan) ? k.balasan.length : 0), 0),
+        );
+      })
+      .catch(() => {
+        /* gagal muat: angka disembunyikan, bukan dinolkan */
+      });
+    return () => {
+      hidup = false;
+    };
+  }, [l.id]);
+  // "Selengkapnya" hanya bila deskripsi benar-benar terpotong clamp —
+  // diukur, bukan ditebak dari panjang teks (responsif di semua lebar).
+  const descRef = useRef<HTMLSpanElement | null>(null);
+  const [descTerpotong, setDescTerpotong] = useState(false);
+  useEffect(() => {
+    const ukur = () => {
+      // Saat mengembang jangan ukur (tak terpotong) — tombolnya harus tetap
+      // ada supaya bisa melipat lagi.
+      if (descPenuh) return;
+      const el = descRef.current;
+      setDescTerpotong(!!el && el.scrollHeight > el.clientHeight + 1);
+    };
+    ukur();
+    window.addEventListener("resize", ukur);
+    return () => window.removeEventListener("resize", ukur);
+  }, [l.deskripsi, descPenuh]);
+  // Satu media utama bila galeri kosong (jaga-jaga): bangun dari gambar/video.
+  const items = l.galeri.length > 0
+    ? l.galeri
+    : [{ url: "", jenis: "gambar" as const }];
+  const n = items.length;
+  const aktif = items[Math.min(idx, n - 1)];
+
+  useEffect(() => {
+    const saatTombol = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onTutup();
+    };
+    window.addEventListener("keydown", saatTombol);
+    // Kunci badan hanya mode overlay — varian halaman (statis) harus bisa
+    // menggulir normal.
+    if (statis) {
+      return () => window.removeEventListener("keydown", saatTombol);
+    }
+    const limpahan = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", saatTombol);
+      document.body.style.overflow = limpahan;
+    };
+  }, [onTutup, statis]);
+
+  async function bagikan() {
+    const tautan = `${window.location.origin}${l.href}`;
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile && typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: l.judul, url: tautan });
+        return;
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(tautan);
+      setTersalin(true);
+      window.setTimeout(() => setTersalin(false), 2000);
+    } catch {
+      /* izin clipboard diblokir */
+    }
+  }
+
+  return (
+    <div className={`lk-postingan${statis ? " lk-postingan--statis" : ""}`} role="dialog" aria-modal="true" aria-label={l.judul}>
+      <div className="lk-postingan-penulis">
+        <Image src="/assets/img/logo-fire.png" alt="" aria-hidden="true" width={99} height={160} className="lk-postingan-avatar" />
+        <div className="min-w-0 flex-1">
+          <p className="lk-postingan-nama">Lapor Karhutla</p>
+          {l.lokasi && <p className="lk-postingan-lokasi">{l.lokasi}</p>}
+        </div>
+      </div>
+
+      <div
+        className="lk-postingan-media"
+        onTouchStart={(e) => {
+          const s = e.touches[0];
+          sentuh.current = { x: s.clientX, y: s.clientY };
+        }}
+        onTouchEnd={(e) => {
+          const awal = sentuh.current;
+          sentuh.current = null;
+          if (!awal || n < 2) return;
+          const s = e.changedTouches[0];
+          const dx = s.clientX - awal.x;
+          const dy = s.clientY - awal.y;
+          if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            setIdx((i) => (i + (dx < 0 ? 1 : -1) + n) % n);
+          }
+        }}
+      >
+        {aktif.jenis === "video" ? (
+          <VideoOtomatis url={aktif.url} poster={aktif.poster ?? l.gambar} label={l.judul} onBuka={onBuka} tanpaMt kredit={aktif.keterangan ?? "anonim"} bahasa={bahasa} />
+        ) : aktif.url ? (
+          <span className="lk-media-statis">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={aktif.url} alt={l.alt} className="lk-postingan-foto" />
+            <span aria-hidden="true" className="lk-kredit">
+              ©&nbsp;{aktif.keterangan ?? "anonim"}
+            </span>
+          </span>
+        ) : null}
+        {n > 1 && (
+          <div className="lk-postingan-titik" role="group" aria-label={`${idx + 1} / ${n}`}>
+            {items.map((m, i) => (
+              <button
+                key={`${m.url}-${i}`}
+                type="button"
+                onClick={() => setIdx(i)}
+                aria-label={`${i + 1} / ${n}`}
+                aria-current={i === idx}
+                className="lk-postingan-titik-tombol"
+              >
+                <span aria-hidden="true" data-aktif={i === idx} />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="lk-postingan-aksi">
+        <button type="button" onClick={onKomentar} aria-label={t.komentar} className="lk-postingan-ikon lk-postingan-komentar">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
+               strokeLinecap="round" strokeLinejoin="round" className="size-7">
+            <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
+          </svg>
+          {jumlahKomentar !== null && (
+            <span aria-hidden="true">{jumlahKomentar.toLocaleString("id-ID")}</span>
+          )}
+        </button>
+        <button type="button" onClick={bagikan} aria-label={tersalin ? t.lembarTersalin : t.lembarBagikan} className="lk-postingan-ikon">
+          <IkonBagikan />
+        </button>
+      </div>
+
+      <div className="lk-postingan-caption">
+        <p className="lk-postingan-caption-judul">{l.judul}</p>
+        {l.deskripsi && (
+          <p className="lk-postingan-caption-isi">
+            <span ref={descRef} className={descPenuh ? "" : "lk-postingan-caption-pendek"}>{l.deskripsi}</span>{" "}
+            {descTerpotong && (
+              <button type="button" onClick={() => setDescPenuh((v) => !v)} className="lk-postingan-selengkapnya">
+                {descPenuh ? t.lebihSedikit : t.selengkapnya}
+              </button>
+            )}
+          </p>
+        )}
+        <p className="lk-postingan-tanggal">{l.tanggal}</p>
+      </div>
+    </div>
+  );
+}
+
+/* Lembar komentar seluler ala IG: gagang + judul + daftar + formulir,
+   memakai sistem komentar yang sama dengan rincian (bukan tiruan).
+   Lembar tulis bawaan formulir dinaikkan di atas lembar ini via CSS. */
+export function LembarKomentar({ id, bahasa, onTutup }: {
+  id: number; bahasa: Bahasa; onTutup: () => void;
+}) {
+  const t = TEKS[bahasa];
+  const k = gunakanKomentar(id);
+
+  useEffect(() => {
+    const saatTombol = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onTutup();
+    };
+    window.addEventListener("keydown", saatTombol);
+    const limpahan = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", saatTombol);
+      document.body.style.overflow = limpahan;
+    };
+  }, [onTutup]);
+
+  return (
+    <div className="lk-komentar-latar" onClick={onTutup}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.komentar}
+        onClick={(e) => e.stopPropagation()}
+        className="lk-komentar rincian--gelap"
+      >
+        <span aria-hidden="true" className="lk-komentar-gagang" />
+        <h2>{t.komentar}</h2>
+        <div className="lk-komentar-daftar">
+          <UlasanKomentar
+            daftar={k.daftar}
+            memuat={k.memuat}
+            galat={k.galat}
+            tampilkanBalasan={k.tampilkanBalasan}
+            alihkanBalasan={k.alihkanBalasan}
+            mulaiBalas={k.mulaiBalas}
+            sebutanDari={k.sebutanDari}
+            isiTanpaSebutan={k.isiTanpaSebutan}
+          />
+        </div>
+        <div className="lk-komentar-form">
+          <FormulirKomentar
+            mengirim={k.mengirim}
+            galat={k.galat}
+            nama={k.nama}
+            setNama={k.setNama}
+            email={k.email}
+            setEmail={k.setEmail}
+            anonim={k.anonim}
+            setAnonim={k.setAnonim}
+            isi={k.isi}
+            setIsi={k.setIsi}
+            website={k.website}
+            setWebsite={k.setWebsite}
+            balasKe={k.balasKe}
+            balasNama={k.balasNama}
+            batalBalas={k.batalBalas}
+            kirim={k.kirim}
+            ketikRef={k.ketikRef}
+            captchaRef={k.captchaRef}
+            pasangCaptcha={k.pasangCaptcha}
+            tanpaSheet
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function UmpanMasonry({ daftar, kolom, kartu }: {
   daftar: Laporan[];
   kolom: number;
@@ -645,7 +1051,7 @@ function UmpanMasonry({ daftar, kolom, kartu }: {
 }
 
 /* Ikon bilah tab seluler — garis 2, gaya X. */
-function IkonBeranda({ className = "size-7" }: { className?: string }) {
+export function IkonBeranda({ className = "size-7" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
          strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -665,7 +1071,7 @@ function IkonPlus({ className = "size-7" }: { className?: string }) {
   );
 }
 
-function IkonTulis({ className = "size-7" }: { className?: string }) {
+export function IkonTulis({ className = "size-7" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
          strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -691,7 +1097,7 @@ function IkonPanel({ className = "size-7" }: { className?: string }) {
   );
 }
 
-function IkonUmpan({ className = "size-7" }: { className?: string }) {
+export function IkonUmpan({ className = "size-7" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
          strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -978,9 +1384,9 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
         >
           {t.tulisLagi}
         </button>
-      </div>
-    );
-  }
+    </div>
+  );
+}
 
   const galat = galatKlien || (keadaan && !keadaan.ok ? keadaan.galat : "");
   const ikonAksi = "lk-ikon-aksi rounded-full p-2 text-[#ff5a26] transition hover:bg-[#ff5a26]/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]";
@@ -1385,14 +1791,22 @@ export function LandingKarhutla(
   const umpanTerlihat = tampil === "semua" || !aliran;
 
   // Pop-up rincian seperti index: tetap di halaman ini, URL ikut ke
-  // /fire/<slug> supaya bisa dibagikan, kembali saat ditutup.
+  // /fire/<slug> supaya bisa dibagikan, kembali ke halaman ASAL saat ditutup
+  // (rute mana pun yang me-render komponen ini: /, /karhutla, /panel).
   const [sorot, setSorot] = useState<Berita | null>(null);
   // Lembar bawah seluler ("..."): pratinjau deskripsi per kartu.
   const [lembarId, setLembarId] = useState<number | null>(null);
+  /* Provinsi yang ditekan di peta — pop-upnya tumbuh dari titik layar itu,
+     pola yang sama dengan konsol /peta. */
+  const [wilayah, setWilayah] = useState<
+    { nama: string; pulau: string | null; asal: { x: number; y: number } } | null
+  >(null);
+  const pathAwalRef = useRef<string>("");
   const bukaRincian = useCallback(
     (b: Berita) => {
       setSorot(b);
       if (typeof window !== "undefined") {
+        pathAwalRef.current = window.location.pathname;
         const pathTujuan = b.slug ? `/${bahasa}/fire/${b.slug}` : window.location.pathname;
         if (window.location.pathname !== pathTujuan) {
           window.history.replaceState({ lkRincian: b.slug ?? true }, "", pathTujuan);
@@ -1403,16 +1817,13 @@ export function LandingKarhutla(
   );
   const tutupRincian = useCallback(() => {
     setSorot(null);
-    if (typeof window !== "undefined") {
-      const pathAwal = `/${bahasa}/karhutla${tampil === "panel" ? "/panel" : ""}`;
-      if (window.location.pathname !== pathAwal) {
-        window.history.replaceState(null, "", pathAwal);
-      }
+    if (typeof window !== "undefined" && pathAwalRef.current && window.location.pathname !== pathAwalRef.current) {
+      window.history.replaceState(null, "", pathAwalRef.current);
     }
-  }, [bahasa, tampil]);
+  }, []);
   useEffect(() => {
     const saatPopState = () => {
-      if (window.location.pathname.endsWith("/karhutla") || window.location.pathname.endsWith("/karhutla/panel")) {
+      if (!/\/fire\/[^/]+$/.test(window.location.pathname)) {
         setSorot(null);
       }
     };
@@ -1426,17 +1837,22 @@ export function LandingKarhutla(
     },
     [berita, bukaRincian],
   );
+  // Tap media: di seluler pindah ke halaman Postingan; di desktop langsung
+  // pop-up rincian. Tanpa slug (tak bisa ditautkan) langsung pop-up juga.
+  // Dibaca live (bukan state aliran) supaya selalu benar.
   const lembar = lembarId !== null ? (berita.find((b) => b.id === lembarId) ?? null) : null;
   /* Overlay peta selayar — dibuka lewat tombol bentang di sudut bingkai.
      Di-render sebagai instance <Peta> kedua di portal body (Opsi A): sederhana
      dan ikut pola komposer-lapor/popup-peta. Datanya sama (jumlahLaporan),
      kameranya mulai dari Nusantara seperti bingkai kecil. */
   const [petaPenuh, setPetaPenuh] = useState(false);
-  const tombolBentangRef = useRef<HTMLButtonElement>(null);
+  /* Mode overlay selayar — supaya tombol tutup bisa menyingkir dari tumpukan
+     kendali saat Windy (sama seperti tombol X konsol). */
+  const [modePenuh, setModePenuh] = useState<ModePeta>("asap");
 
   /* Escape menutup overlay — pola yang sama dengan pop-up lain di konsol.
      Badan dikunci supaya roda/sentuh di belakang overlay tak ikut menggulir
-     halaman; fokus dikembalikan ke tombol pemicu saat overlay ditutup. */
+     halaman. */
   useEffect(() => {
     if (!petaPenuh) return;
     const tekan = (e: KeyboardEvent) => {
@@ -1445,12 +1861,9 @@ export function LandingKarhutla(
     window.addEventListener("keydown", tekan);
     const limpahan = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    /* Salin ref ke variabel: nilai .current bisa berubah saat cleanup jalan. */
-    const pemicu = tombolBentangRef.current;
     return () => {
       window.removeEventListener("keydown", tekan);
       document.body.style.overflow = limpahan;
-      pemicu?.focus();
     };
   }, [petaPenuh]);
 
@@ -1458,8 +1871,8 @@ export function LandingKarhutla(
      dari lebar rel yang diukur (lihat di bawah), sedangkan PILIHAN modenya
      mengikuti breakpoint panggung/aliran halaman ini. */
   const bingkaiPetaRef = useRef<HTMLDivElement>(null);
- 
- 
+
+
   const isiPetaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const bingkai = bingkaiPetaRef.current;
@@ -1550,9 +1963,9 @@ export function LandingKarhutla(
     };
   }, []);
   /* Umpan langsung dari basis data — SELURUH kejadian tayang, terbaru dulu,
-     sama seperti arsip di index. Satu kartu satu media utama: video pertama
-     di galeri bila ada (kolom `video` lama ikut dihitung), kalau tidak foto
-     pertama; tanpa media sama sekali kartunya memakai placeholder. */
+     sama seperti arsip di index. Media utama (video pertama, kalau tidak foto
+     pertama) untuk tampilan tunggal; galeri penuh untuk carousel kartu
+     bermedia banyak; tanpa media sama sekali kartunya memakai placeholder. */
   const laporan = useMemo<Laporan[]>(
     () =>
       berita.map((b) => {
@@ -1564,9 +1977,15 @@ export function LandingKarhutla(
             ? (vid.poster ?? b.poster ?? b.gambar)
             : (gbr?.url ?? b.gambar ?? b.poster),
           video: vid?.url ?? b.video ?? undefined,
+          galeri: b.media
+            .filter((m) => (m.jenis === "gambar" || m.jenis === "video") && m.url)
+            .map((m) => ({ url: m.url, jenis: m.jenis, poster: m.poster, keterangan: m.keterangan })),
           alt: b.alt,
           judul: b.judul,
           tanggal: b.tanggal,
+          lokasi: b.lokasi ?? b.provinsi,
+          deskripsi: b.deskripsi,
+          slug: b.slug,
           href: b.slug ? `/${bahasa}/fire/${b.slug}` : `/${bahasa}`,
         };
       }),
@@ -1575,6 +1994,23 @@ export function LandingKarhutla(
   const kata = cari.trim().toLowerCase();
   const hasil = laporan.filter((l) => l.judul.toLowerCase().includes(kata));
   const kolom = gunakanKolomUmpan(kiriBuka);
+  const bukaMedia = useCallback(
+    (id: number) => {
+      const panggung = window.matchMedia("(min-width: 1100px) and (min-height: 640px)").matches;
+      if (panggung) {
+        bukaDariId(id);
+        return;
+      }
+      const l = laporan.find((x) => x.id === id);
+      if (l?.slug) {
+        router.push(`/${bahasa}/fire/${l.slug}`);
+      } else {
+        bukaDariId(id);
+      }
+    },
+    [bukaDariId, laporan, bahasa, router],
+  );
+  const [komentarId, setKomentarId] = useState<number | null>(null);
 
   return (
     <div className={`lk-bingkai${tampil === "panel" ? " lk-mode-panel" : ""} min-h-dvh bg-[#0a0a0a] pt-16 text-[#f5f5f5] antialiased`}>
@@ -1692,39 +2128,16 @@ export function LandingKarhutla(
             <div ref={isiPetaRef} className="lk-peta-isi">
               <Peta
                 jumlahLaporan={jumlahLaporan ?? {}}
-                /* Halaman muka tidak punya pop-up provinsi seperti konsol —
-                   petanya di sini untuk dilihat, bukan untuk ditelusuri. */
-                onPilihWilayah={() => undefined}
+                /* Provinsi bisa ditekan seperti di konsol: pop-upnya memakai
+                   komponen dan data yang sama (berita + hitungan provinsi). */
+                onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
                 legendaRingkas
                 tombolRapat
                 muatNusantara
+                onExpand={() => setPetaPenuh(true)}
+                expandLabel={t.bukaPetaSelayar}
               />
             </div>
-            {/* Tombol bentang — DI LUAR isiPetaRef supaya tak ikut
-                transform: scale panggung. Ikon 4-sudut khas konsol /peta. */}
-            <button
-              ref={tombolBentangRef}
-              type="button"
-              onClick={() => setPetaPenuh(true)}
-              aria-expanded={petaPenuh}
-              aria-controls="lk-peta-selayar"
-              title={t.bukaPetaSelayar}
-              aria-label={t.bukaPetaSelayar}
-              /* right-9, bukan right-2: PetaAsap menaruh tumpukan kendalinya
-                 sendiri (zoom, rumah, muat ulang) di sudut yang sama, dan
-                 tombol ini menimbuninya. Tepi kiri tumpukan itu terukur 26px
-                 dari tepi bingkai di 1920 MAUPUN 1536 — ia ikut terskala
-                 bersama peta — jadi satu offset tetap sudah aman di semua
-                 lebar, tanpa perlu rumus proporsional. 36px menyisakan celah
-                 10px, dan mendarat di zona atas-tengah yang kosong. */
-              className="lk-tombol-peta absolute top-2 right-9 z-[43] flex size-9 items-center justify-center rounded-full
-                         bg-black/70 text-white ring-1 ring-white/15 backdrop-blur-sm
-                         transition hover:scale-105 hover:ring-[#ff5a26]/70 active:scale-95
-                         motion-reduce:transition-none motion-reduce:hover:scale-100
-                         focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
-            >
-              <IkonBentang className="size-4" />
-            </button>
           </div>
           {/* Overlay selayar — instance <Peta> kedua TANPA wrapper skala:
               langsung inset-0 ukuran penuh, zoom roda dinyalakan karena
@@ -1743,7 +2156,12 @@ export function LandingKarhutla(
                   <div className="absolute inset-0">
                     <Peta
                       jumlahLaporan={jumlahLaporan ?? {}}
-                      onPilihWilayah={() => undefined}
+                      /* Sama seperti peta inline: provinsi bisa ditekan, dan
+                         pop-upnya dipasang di dalam portal ini (lihat di bawah)
+                         supaya tidak tertimbun overlay z-70. */
+                      onPilihWilayah={(nama, pulau, asal) => setWilayah({ nama, pulau, asal })}
+                      mode={modePenuh}
+                      onModeChange={setModePenuh}
                       tombolRapat
                       muatNusantara
                       zoomRoda
@@ -1754,14 +2172,41 @@ export function LandingKarhutla(
                     onClick={() => setPetaPenuh(false)}
                     title={t.tutupPetaSelayar}
                     aria-label={t.tutupPetaSelayar}
-                    className="pointer-events-auto absolute top-4 right-4 z-[1100] flex size-9 items-center justify-center rounded-full
+                    className={`lk-tutup-peta pointer-events-auto absolute right-4 z-[1100] flex size-9 items-center justify-center rounded-full
                                bg-black/70 text-white ring-1 ring-white/15 backdrop-blur-sm
                                transition hover:scale-105 hover:ring-[#ff5a26]/70 active:scale-95
                                motion-reduce:transition-none motion-reduce:hover:scale-100
-                               focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+                               focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none
+                               ${modePenuh === "windy" ? "top-60" : "top-4"}`}
                   >
                     <IkonTutup className="size-4" />
                   </button>
+                  {/* Pop-up provinsi DI DALAM portal selayar. Latarnya z-44,
+                      sedangkan overlay ini z-70 — dipasang di tingkat halaman
+                      ia akan tertimbun peta dan tak pernah terlihat. Di sini ia
+                      ikut konteks penumpukan overlay, jadi tampil di atas peta
+                      tanpa perlu mengubah z-index komponen bersamanya. */}
+                  {wilayah && (
+                    <PopupPeta
+                      nama={wilayah.nama}
+                      pulau={wilayah.pulau}
+                      jumlah={jumlahLaporan?.[wilayah.nama] ?? null}
+                      asal={wilayah.asal}
+                      berita={berita}
+                      jumlahLaporan={jumlahLaporan ?? {}}
+                      onBukaRincian={(i) => {
+                        const ketemu = berita[i];
+                        if (!ketemu) return;
+                        // Rincian juga z-70: tutup petanya dulu supaya tidak
+                        // beradu di lapisan yang sama.
+                        setWilayah(null);
+                        setPetaPenuh(false);
+                        bukaRincian(ketemu);
+                      }}
+                      onTutup={() => setWilayah(null)}
+                      gelap
+                    />
+                  )}
                 </div>,
                 document.body,
               )
@@ -1861,7 +2306,7 @@ export function LandingKarhutla(
                       <h2 className="mt-1.5 min-w-0 flex-1 text-[16px] leading-[1.25] font-bold tracking-tight sm:text-[19px]">
                         <button
                           type="button"
-                          onClick={() => bukaDariId(l.id)}
+                          onClick={() => bukaMedia(l.id)}
                           className="text-left transition-colors hover:text-[#ff5a26] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
                         >
                           {l.judul}
@@ -1889,21 +2334,42 @@ export function LandingKarhutla(
                       media sama sekali: placeholder logo. */}
                   <div className="lk-kartu-media">
                   {l.video ? (
-                    <VideoOtomatis
-                      url={l.video}
-                      poster={l.gambar}
-                      label={l.judul}
-                      onBuka={() => bukaDariId(l.id)}
-                    />
+                    <span className="lk-media-statis">
+                      <VideoOtomatis
+                        url={l.video}
+                        poster={l.gambar}
+                        label={l.judul}
+                        onBuka={() => bukaMedia(l.id)}
+                        bahasa={bahasa}
+                      />
+                      {l.galeri.length > 1 && (
+                        <span aria-hidden="true" className="lk-galeri-lencana">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                               strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="8" y="8" width="12" height="12" rx="2.5" fill="rgb(0 0 0 / 0.35)" />
+                            <path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4H6.5A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8" />
+                          </svg>
+                        </span>
+                      )}
+                    </span>
                   ) : l.gambar ? (
                     <button
                       type="button"
-                      onClick={() => bukaDariId(l.id)}
+                      onClick={() => bukaMedia(l.id)}
                       aria-label={l.judul}
-                      className="block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+                      className="lk-foto relative mt-3 block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={l.gambar} alt={l.alt} loading="lazy" className="lk-foto mt-3" />
+                      <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false} className="lk-foto h-auto w-full" />
+                      {l.galeri.length > 1 && (
+                        <span aria-hidden="true" className="lk-galeri-lencana">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                               strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="8" y="8" width="12" height="12" rx="2.5" fill="rgb(0 0 0 / 0.35)" />
+                            <path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4H6.5A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8" />
+                          </svg>
+                        </span>
+                      )}
                     </button>
                   ) : (
                     <span className="lk-foto mt-3 flex aspect-[16/10] items-center justify-center" role="img" aria-label={l.alt}>
@@ -1932,7 +2398,7 @@ export function LandingKarhutla(
         </Link>
         {tampil === "panel" ? (
           <Link
-            href={`/${bahasa}/karhutla`}
+            href={`/${bahasa}`}
             aria-label={t.tabUmpan}
             className="rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
           >
@@ -1987,16 +2453,6 @@ export function LandingKarhutla(
             </Link>
           </>
         )}
-        <button
-          type="button"
-          aria-label={t.tabBeranda}
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="rounded-full p-2 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
-        >
-          <span aria-hidden="true" className="flex size-7 items-center justify-center rounded-full bg-[#2f7d6d]">
-            <IkonOrang className="size-4 text-white" />
-          </span>
-        </button>
       </nav>
       <div aria-hidden="true" className="lk-tabbar-ruang" />
 
@@ -2006,6 +2462,28 @@ export function LandingKarhutla(
         <RincianLaporan berita={sorot} bahasa={bahasa} onTutup={tutupRincian} gelap />
       )}
 
+      {/* Pop-up provinsi untuk peta INLINE. Digerbangi !petaPenuh karena versi
+          selayar punya salinannya sendiri di dalam portal — tanpa gerbang ini
+          keduanya akan terpasang bersamaan dari satu state yang sama. */}
+      {wilayah && !petaPenuh && (
+        <PopupPeta
+          nama={wilayah.nama}
+          pulau={wilayah.pulau}
+          jumlah={jumlahLaporan?.[wilayah.nama] ?? null}
+          asal={wilayah.asal}
+          berita={berita}
+          jumlahLaporan={jumlahLaporan ?? {}}
+          onBukaRincian={(i) => {
+            const ketemu = berita[i];
+            if (!ketemu) return;
+            setWilayah(null);
+            bukaRincian(ketemu);
+          }}
+          onTutup={() => setWilayah(null)}
+          gelap
+        />
+      )}
+
       {/* Lembar deskripsi seluler dari tombol "...". */}
       {lembar && (
         <LembarLaporan
@@ -2013,9 +2491,24 @@ export function LandingKarhutla(
           bahasa={bahasa}
           onTutup={() => setLembarId(null)}
           onBuka={() => {
+            // Ke halaman detail, bukan pop-up.
+            const slug = lembar.slug;
             setLembarId(null);
-            bukaRincian(lembar);
+            if (slug) {
+              router.push(`/${bahasa}/fire/${slug}`);
+            } else {
+              bukaRincian(lembar);
+            }
           }}
+        />
+      )}
+
+      {/* Lembar komentar seluler dari ikon komentar postingan. */}
+      {komentarId !== null && (
+        <LembarKomentar
+          id={komentarId}
+          bahasa={bahasa}
+          onTutup={() => setKomentarId(null)}
         />
       )}
     </div>

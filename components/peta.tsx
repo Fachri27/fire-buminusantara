@@ -86,9 +86,12 @@ type Props = {
   /** Diteruskan ke PetaAsap — logo pengganti untuk layar seluler. */
   logoSelulerSrc?: string | null;
   logoSelulerAlt?: string;
+  /** Diteruskan ke PetaAsap — tombol bentang selayar di tumpukan kendali. */
+  onExpand?: (() => void) | null;
+  expandLabel?: string;
 };
 
-export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt }: Props) {
+export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt, onExpand = null, expandLabel }: Props) {
   const [modeDalam, setModeDalam] = useState<ModePeta>("asap");
   // Terkendali kalau induk mengisi prop mode (+ onModeChange) — kalau tidak,
   // fallback ke state dalam supaya pemakaian lama (beranda) tak berubah.
@@ -109,6 +112,13 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   useEffect(() => {
     onPilihRef.current = onPilihWilayah;
   }, [onPilihWilayah]);
+
+  // onExpand dibaca lewat ref supaya pendengar pesan iframe tidak perlu
+  // dipasang ulang setiap induk membuat ulang closure-nya.
+  const onExpandRef = useRef(onExpand);
+  useEffect(() => {
+    onExpandRef.current = onExpand;
+  }, [onExpand]);
 
 
   // Aktifkan pemuatan iframe saat pertama kali beralih ke mode Windy
@@ -145,12 +155,16 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         // Konsol /peta: kamera dan zoom roda disamakan dengan lapisan Aerosol.
         const kamera = muatNusantara ? kameraWindyNusantara() : null;
         const konsol = zoomRoda ? "&konsol=1" : "";
+        // Tombol bentang selayar di dalam iframe hanya dipasang bila induk
+        // memberi onExpand — overlay selayar (sudah fullscreen) dan konsol
+        // tidak memintanya, jadi iframe mereka tak punya tombol itu.
+        const bentang = onExpand ? "&bentang=1" : "";
         setWindySrc(
           kamera
-            ? `/api/forecasting?lat=${kamera.lat.toFixed(3)}&lon=${kamera.lon.toFixed(3)}&zoom=${kamera.zoom.toFixed(2)}${konsol}`
+            ? `/api/forecasting?lat=${kamera.lat.toFixed(3)}&lon=${kamera.lon.toFixed(3)}&zoom=${kamera.zoom.toFixed(2)}${konsol}${bentang}`
             : isMobile
-              ? `/api/forecasting?lat=-1.000&lon=118.000&zoom=3.8${konsol}`
-              : `/api/forecasting?lat=0.200&lon=118.000&zoom=5${konsol}`
+              ? `/api/forecasting?lat=-1.000&lon=118.000&zoom=3.8${konsol}${bentang}`
+              : `/api/forecasting?lat=0.200&lon=118.000&zoom=5${konsol}${bentang}`
         );
       }
       setHasOpenedWindy(true);
@@ -224,6 +238,10 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           y: (rect?.top ?? 0) + (data.asal?.y ?? 0),
         };
         onPilihRef.current(data.nama, data.pulau ?? null, asal);
+      } else if (data.type === "BUKA_SELAYAR") {
+        // Tombol bentang di dalam iframe Windy (route /api/forecasting
+        // memasangnya bila query bentang=1): teruskan aksinya ke induk.
+        onExpandRef.current?.();
       } else if (data.type === "BUKA_RINCIAN_KEJADIAN") {
         const ketemu = berita?.find((b) => b.id === data.eventId || b.slug === data.slug);
         if (ketemu && onBukaRincian) {
@@ -530,6 +548,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           zoomRoda={zoomRoda}
           logoSelulerSrc={logoSelulerSrc}
           logoSelulerAlt={logoSelulerAlt}
+          onExpand={onExpand}
+          expandLabel={expandLabel}
         />
       </div>
 

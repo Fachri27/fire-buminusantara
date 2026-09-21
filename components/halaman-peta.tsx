@@ -501,7 +501,9 @@ export function HalamanPeta({
           <div aria-hidden="true" className="pantau-titik pantau-titik--kiri hidden panggung:block" />
           {/* Tombol X kedua — di atas pola titik kanan, pojok kanan atas
               section (di LUAR bingkai peta). Penutup yang sama dengan pil di
-              bingkai (setTengahBuka(false)), hanya bentuknya X melayang. */}
+              bingkai (setTengahBuka(false)), hanya bentuknya X melayang.
+              Mode Windy selayar: tumpukan kendali peta (+/−/rumah) menempati
+              sudut itu, jadi X turun ke bawah tumpukan (satu lajur). */}
           {tengahBuka && (
             <button
               type="button"
@@ -510,11 +512,11 @@ export function HalamanPeta({
               aria-controls="peta"
               title={teks.tutupPeta}
               aria-label={teks.tutupPeta}
-              className={`absolute top-1 right-2 z-[43] hidden size-9 items-center justify-center rounded-full
-                         text-white ring-1 backdrop-blur-sm ${aksenTombolPeta}
-                         transition hover:scale-105 active:scale-95
-                         focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none
-                         panggung:inline-flex`}
+              className={`absolute right-2 z-[43] hidden size-9 items-center justify-center rounded-full
+                          text-white ring-1 backdrop-blur-sm ${aksenTombolPeta}
+                          transition hover:scale-105 active:scale-95
+                          focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none
+                          panggung:inline-flex ${modePeta === "windy" ? "top-60" : "top-1"}`}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.4"
                    strokeLinecap="round" className="size-4">

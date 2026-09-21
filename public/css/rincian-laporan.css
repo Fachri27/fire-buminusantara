@@ -197,6 +197,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
   pointer-events: none;
 }
 
+
 /* Lanskap: ikut lebar kolom, tingginya mengikuti rasio 16:9 — sama seperti
    area gambar media 16:9 yang terhambat max-width di kolom yang sempit. */
 .rincian__media--lanskap .rincian__kerangka {
@@ -634,9 +635,9 @@ body:has(.rincian) iframe[src*="forecasting"] {
 .rincian__kirim {
   display: grid;
   flex-shrink: 0;
-  gap: 10px;
+  gap: 8px;
   border-top: 1px solid var(--r-garis);
-  padding: 14px 22px;
+  padding: 12px 16px;
 }
 
 /* --- Pemicu & sheet komentar (ponsel) --------------------------------------
@@ -747,10 +748,11 @@ body:has(.rincian) iframe[src*="forecasting"] {
   max-width: 100%;
 }
 
-/* Isian nama + email di atas kolom komentar. */
+/* Isian nama + email di atas kolom komentar: selalu sebaris (mapan di
+   semua lebar; isinya menggulir di dalam bila panjang). */
 .rincian__identitas {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* Pilihan anonim: satu baris kecil di bawah isian identitas. */
@@ -759,6 +761,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
   align-items: center;
   gap: 8px;
   width: fit-content;
+  padding: 6px 2px;
   font-size: 12.5px;
   color: var(--r-redup);
   cursor: pointer;
@@ -774,18 +777,17 @@ body:has(.rincian) iframe[src*="forecasting"] {
 
 /* Isian identitas yang dimatikan karena anonim. */
 .rincian__input:disabled {
-  color: var(--r-redup);
-  border-bottom-style: dotted;
+  opacity: 0.45;
 }
 
 .rincian__input {
   flex: 1;
   min-width: 0;
-  border: 0;
-  border-bottom: 1px solid var(--r-garis);
-  padding: 8px 0;
-  background: transparent;
-  font-size: 13.5px;
+  border: 1px solid var(--r-garis);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--r-sorot);
+  font-size: 13px;
   line-height: 1.4;
   color: var(--r-teks);
 }
@@ -796,13 +798,13 @@ body:has(.rincian) iframe[src*="forecasting"] {
 
 .rincian__input:focus {
   outline: none;
-  border-bottom-color: var(--r-tautan);
+  border-color: var(--r-tautan);
 }
 
 .rincian__baris {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 /* Di dalam SHEET komentar (ponsel) textarea-nya rows=3 sehingga kotaknya
@@ -835,6 +837,14 @@ body:has(.rincian) iframe[src*="forecasting"] {
 .rincian__ketik-bungkus {
   flex: 1;
   min-width: 0;
+  background: var(--r-sorot);
+  border: 1px solid var(--r-garis);
+  border-radius: 16px;
+  padding: 2px 14px;
+}
+
+.rincian__ketik-bungkus:focus-within {
+  border-color: var(--r-tautan);
 }
 
 .rincian__ketik {
@@ -869,11 +879,17 @@ body:has(.rincian) iframe[src*="forecasting"] {
   flex-shrink: 0;
   cursor: pointer;
   border: 0;
-  background: transparent;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--r-tautan);
-  transition: opacity 0.2s ease;
+  border-radius: 9999px;
+  background: #e7e9ea;
+  color: #000;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 7px 16px;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.rincian__tombol-kirim:hover {
+  filter: brightness(1.08);
 }
 
 .rincian__tombol-kirim:disabled {

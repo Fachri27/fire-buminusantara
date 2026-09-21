@@ -42,6 +42,11 @@ type Props = {
    *  logo aplikasinya sendiri di ponsel. Tautan atribusi tak berubah. */
   logoSelulerSrc?: string | null;
   logoSelulerAlt?: string;
+  /** Tombol bentang selayar sebagai anak pertama tumpukan kendali — selalu
+   *  sejajar dan ikut terskala bersama tombol lain. Bawaan null = tak ada
+   *  (konsol /peta tak memakainya). */
+  onExpand?: (() => void) | null;
+  expandLabel?: string;
 };
 
 // GLSL Vertex Shader: Quad koordinat Mercator dunia [0, 1] dikalikan matriks proyeksi MapLibre GL
@@ -311,7 +316,7 @@ let globalZarrMetadata: ZarrMetadataResponse | null = null;
 const globalFrameCache: Record<string, Uint8Array> = {};
 let globalSyncSelesai = false;
 
-export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt = "Lapor Karhutla" }: Props) {
+export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt = "Lapor Karhutla", onExpand = null, expandLabel = "Buka peta selayar" }: Props) {
   const wadahPetaRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const onPilihRef = useRef(onPilihWilayah);
@@ -1619,8 +1624,30 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           wadahTooltip
         )}
 
-      {/* Kontrol Navigasi Peta (Kanan Atas) — rapat ke atas di bingkai dasbor. */}
-      <div className={`absolute right-3 z-[400] flex flex-col gap-2 sm:right-4 ${legendaRingkas ? "top-4" : "top-20"}`}>
+      {/* Kontrol Navigasi Peta (Kanan Atas) — rapat ke atas di bingkai dasbor.
+          items-end: tombol bentang selayar SELALU ukuran default (h-9 w-9)
+          sementara tombol lain bisa h-7 w-7 (legendaRingkas) — tanpa ini
+          semua tombol rata kiri kolom dan tepi kanannya gerigi. */}
+      <div className={`absolute right-3 z-[400] flex flex-col items-end gap-2 sm:right-4 ${legendaRingkas ? "top-4" : "top-20"}`}>
+        {/* Tombol Bentang Selayar — anak pertama tumpukan supaya selalu
+            sejajar dengan tombol lain. Ukurannya SELALU default (h-9 w-9,
+            ikon 16) — tidak ikut versi rapat legendaRingkas, karena di
+            landing karhutla tombol ini sudah mengecil dua lapis oleh
+            wrapper transform:scale; mengecilkan lagi di sini membuatnya
+            tinggal ~16px tampak dan sulit disentuh. */}
+        {onExpand && (
+          <button
+            type="button"
+            onClick={onExpand}
+            aria-label={expandLabel}
+            title={expandLabel}
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white"
+          >
+            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+            </svg>
+          </button>
+        )}
         {/* Tombol Zoom In */}
         <button
           type="button"

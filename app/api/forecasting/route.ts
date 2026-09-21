@@ -75,6 +75,15 @@ export async function GET(req: NextRequest) {
   // Konsol /peta: halamannya tak menggulir, jadi roda tetikus memperbesar
   // peta seperti lapisan Aerosol, bukan diteruskan ke guliran halaman.
   const konsol = searchParams.get("konsol") === "1";
+  // Landing karhutla: tombol bentang selayar dipasang di tumpukan zoom iframe
+  // — kliknya mengirim BUKA_SELAYAR ke halaman induk lewat postMessage.
+  const bentang = searchParams.get("bentang") === "1";
+  // Dibangun di sisi server (bukan backtick bersarang di dalam template skrip)
+  // dan disisipkan sebagai anak pertama tumpukan — sama seperti posisi tombol
+  // bentang di tumpukan kendali lapisan Aerosol (PetaAsap).
+  const tombolBentang = bentang
+    ? '<button id="btn-bentang" type="button" aria-label="Buka peta selayar" title="Buka peta selayar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /></svg></button>'
+    : "";
 
   // Router Windy hanya mengenali zoom bulat di URL — zoom pecahan membuatnya
   // membuang seluruh posisi dan jatuh ke lokasi GeoIP. Pecahannya diterapkan
@@ -1189,12 +1198,24 @@ export async function GET(req: NextRequest) {
               });
             }
 
-            // Buat tombol kontrol zoom kustom (+ / − / home)
+            // Buat tombol kontrol zoom kustom (+ / − / home).
+            // Saat query bentang=1 (dipakai landing karhutla), tombol bentang
+            // selayar dipasang sebagai anak pertama — posisi & perannya sama
+            // dengan tombol bentang di tumpukan kendali lapisan Aerosol
+            // (PetaAsap). Kliknya mengirim BUKA_SELAYAR ke halaman induk;
+            // membuka selayar adalah keputusan halaman, bukan iframe.
             if (!document.getElementById('custom-zoom-controls')) {
               const zoomBox = document.createElement('div');
               zoomBox.id = 'custom-zoom-controls';
-              zoomBox.innerHTML = '<button id="btn-zoom-in" type="button" aria-label="Perbesar peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-out" type="button" aria-label="Perkecil peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-home" type="button" aria-label="Kembali ke tampilan awal peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H4a1 1 0 0 1-1-1v-9.5z" /></svg></button>';
+              zoomBox.innerHTML = '${tombolBentang}<button id="btn-zoom-in" type="button" aria-label="Perbesar peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-out" type="button" aria-label="Perkecil peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-home" type="button" aria-label="Kembali ke tampilan awal peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H4a1 1 0 0 1-1-1v-9.5z" /></svg></button>';
               document.body.appendChild(zoomBox);
+
+              document.getElementById('btn-bentang')?.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (window.parent && window.parent !== window) {
+                  window.parent.postMessage({ type: 'BUKA_SELAYAR' }, '*');
+                }
+              });
 
               document.getElementById('btn-zoom-in')?.addEventListener('click', function(e) {
                 e.stopPropagation();
