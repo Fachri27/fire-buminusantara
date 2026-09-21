@@ -65,13 +65,32 @@ export async function GET(req: NextRequest) {
     : Math.min(Math.max(rawLon, 90.0), 145.0);
   const safeZoom = Number.isNaN(rawZoom) || !Number.isFinite(rawZoom)
     ? 5.0
-    : Math.min(Math.max(rawZoom, 3.0), 18.0);
+    : Math.min(Math.max(rawZoom, 2.0), 18.0);
 
   const lat = safeLat.toFixed(3);
   const lon = safeLon.toFixed(3);
-  const zoom = safeZoom.toFixed(1);
+  // Dua desimal: konsol /peta mengirim zoom pecahan hasil cameraForBounds
+  // lapisan Aerosol, dan pembulatan ke satu desimal sudah menggeser Papua.
+  const zoom = safeZoom.toFixed(2);
+  // Konsol /peta: halamannya tak menggulir, jadi roda tetikus memperbesar
+  // peta seperti lapisan Aerosol, bukan diteruskan ke guliran halaman.
+  const konsol = searchParams.get("konsol") === "1";
+  // Landing karhutla: tombol bentang selayar dipasang di tumpukan zoom iframe
+  // — kliknya mengirim BUKA_SELAYAR ke halaman induk lewat postMessage.
+  const bentang = searchParams.get("bentang") === "1";
+  // Dibangun di sisi server (bukan backtick bersarang di dalam template skrip)
+  // dan disisipkan sebagai anak pertama tumpukan — sama seperti posisi tombol
+  // bentang di tumpukan kendali lapisan Aerosol (PetaAsap).
+  const tombolBentang = bentang
+    ? '<button id="btn-bentang" type="button" aria-label="Buka peta selayar" title="Buka peta selayar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /></svg></button>'
+    : "";
 
-  const targetUrl = `https://www.windy.com/-Air-quality-index-aqi?cams,aqi,${lat},${lon},${zoom}`;
+  // Router Windy hanya mengenali zoom bulat di URL — zoom pecahan membuatnya
+  // membuang seluruh posisi dan jatuh ke lokasi GeoIP. Pecahannya diterapkan
+  // belakangan lewat setView (ZOOM_AWAL di skrip).
+  const zoomUrl = Math.round(safeZoom);
+
+  const targetUrl = `https://www.windy.com/-Air-quality-index-aqi?cams,aqi,${lat},${lon},${zoomUrl}`;
 
   try {
     const resWindy = await fetch(targetUrl, {
@@ -111,14 +130,11 @@ export async function GET(req: NextRequest) {
           } catch(e) {}
 
           // 0b. Bungkam telemetri/analitik Windy (/ga/) dan endpoint privat
-          // (account.windy.com, capalerts, forecast/fragment).
-          // Endpoint-endpoint ini hanya mengizinkan Access-Control-Allow-Origin:
-          // https://www.windy.com, sehingga memicu galat CORS merah di console
-          // saat dijalankan dari origin web kita. Kita cegat SEBELUM ke jaringan
-          // dan balas respons kosong/JSON-sukses agar peta berjalan mulus tanpa CORS error.
+          // (account.windy.com, capalerts). Endpoint /forecast/fragment/ dibiarkan
+          // lolos karena mendukung CORS publik dan menyediakan data weather .now.temperature.
           var _windyBungkam = function(u) {
             try { u = String(u); } catch(e) { return false; }
-            return (u.indexOf('node.windy.com') !== -1 && (u.indexOf('/ga/') !== -1 || u.indexOf('/capalerts/') !== -1 || u.indexOf('/forecast/fragment/') !== -1)) ||
+            return (u.indexOf('node.windy.com') !== -1 && (u.indexOf('/ga/') !== -1 || u.indexOf('/capalerts/') !== -1)) ||
                    (u.indexOf('account.windy.com') !== -1);
           };
           try {
@@ -127,7 +143,7 @@ export async function GET(req: NextRequest) {
               var url = (input && typeof input === 'object' && input.url) ? input.url : input;
               if (_windyBungkam(url)) {
                 var urlStr = String(url);
-                var isJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1 || urlStr.indexOf('/forecast/fragment/') !== -1;
+                var isJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1;
                 return Promise.resolve(new Response(isJson ? '{}' : null, {
                   status: 200,
                   statusText: 'OK',
@@ -142,7 +158,7 @@ export async function GET(req: NextRequest) {
             XMLHttpRequest.prototype.open = function(method, url) {
               this.__windyBungkam = _windyBungkam(url);
               var urlStr = String(url);
-              this.__windyIsJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1 || urlStr.indexOf('/forecast/fragment/') !== -1;
+              this.__windyIsJson = urlStr.indexOf('account.windy.com') !== -1 || urlStr.indexOf('/capalerts/') !== -1;
               return _xhrOpen.apply(this, arguments);
             };
             var _xhrSend = XMLHttpRequest.prototype.send;
@@ -209,7 +225,7 @@ export async function GET(req: NextRequest) {
 
           // B. Pre-seed URL path & search before router parses window.location
           var targetPath = '/-Air-quality-index-aqi';
-          var targetSearch = '?cams,aqi,${lat},${lon},${zoom}';
+          var targetSearch = '?cams,aqi,${lat},${lon},${zoomUrl}';
           try {
             if (!window.location.pathname.includes('Air-quality-index') || !window.location.search.includes('aqi')) {
               window.history.replaceState(null, '', _docOrigin + targetPath + targetSearch);
@@ -699,7 +715,7 @@ export async function GET(req: NextRequest) {
           margin: 0 !important;
           padding: 0 !important;
           overflow: hidden !important;
-          background-color: #0a0f18 !important;
+          background-color: #000000 !important;
         }
 
         /* I. Administrative Polygon Styling */
@@ -858,6 +874,33 @@ export async function GET(req: NextRequest) {
         #custom-zoom-controls button:active {
           transform: scale(0.95);
         }
+        ${konsol ? `/* Konsol /peta: samakan tombol dengan tombol navigasi lapisan
+           Aerosol — ukuran 28px + ikon 13px, sela 8px, rapat 16px ke sudut
+           kanan atas bingkai, sudut 12px, kaca hitam 75% bercincin tipis.
+           !important karena blok ponsel di atas memakai media query. */
+        #custom-zoom-controls {
+          gap: 8px !important;
+          top: 16px !important;
+          right: 16px !important;
+        }
+        #custom-zoom-controls button {
+          width: 28px !important;
+          height: 28px !important;
+          border-radius: 12px !important;
+          background: rgba(0, 0, 0, 0.75) !important;
+          border: 0 !important;
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1) !important;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          color: rgba(255, 255, 255, 0.9) !important;
+        }
+        #custom-zoom-controls button:hover {
+          background: #000000 !important;
+          color: #ffffff !important;
+          transform: none !important;
+        }
+        #custom-zoom-controls button:active { transform: scale(0.9) !important; }
+        #custom-zoom-controls button svg { width: 13px !important; height: 13px !important; }` : ""}
 
         /* MOBILE: Pastikan sentuhan pan dan pinch-to-zoom di perangkat sentuh mulus dan responsif */
         @media (pointer: coarse), (max-width: 640px) {
@@ -892,19 +935,100 @@ export async function GET(req: NextRequest) {
           let hasSyncedTime = false;
           let mapInitialized = false;
           // Tampilan awal peta: disinkronkan dengan zoom/center asli Windy sampai pengguna berinteraksi
-          let tampilanAwal = { pusat: [parseFloat('${lat}'), parseFloat('${lon}')], zoom: parseInt('${zoom}', 10) };
+          // Konsol /peta: roda memperbesar peta, dan zoom awalnya pecahan (hasil
+          // cameraForBounds lapisan Aerosol) — jangan dibulatkan ke bawah.
+          const KONSOL = ${konsol};
+          const ZOOM_AWAL = KONSOL ? parseFloat('${zoom}') : parseInt('${zoom}', 10);
+          let tampilanAwal = { pusat: [parseFloat('${lat}'), parseFloat('${lon}')], zoom: ZOOM_AWAL };
+          // Kamera terakhir lapisan Aerosol yang dikirim parent (SET_KAMERA) —
+          // bila ada, dipakai menggantikan tampilanAwal saat memosisikan ulang.
+          let kameraTarget = null;
+
+          // Selisih zoom dari parent (SKALA_ZOOM) yang menunggu iframe
+          // di-resize. Diterapkan di handler resize — sebelum Windy sempat
+          // menggambar — atau lewat cadangan waktu bila resize tak datang.
+          let deltaTertunda = 0;
+          let penundaDelta = null;
+          function terapkanDeltaTertunda() {
+            clearTimeout(penundaDelta);
+            const delta = deltaTertunda;
+            deltaTertunda = 0;
+            if (!delta || !window.W || !window.W.map || !window.W.map.map) return;
+            const m = window.W.map.map;
+            try {
+              const mml = m._maplibreMap;
+              if (mml && typeof mml.resize === 'function') mml.resize();
+            } catch (e) {}
+            try {
+              if (typeof m.invalidateSize === 'function') m.invalidateSize({ animate: false, pan: false });
+            } catch (e) {}
+            try {
+              m.setView(m.getCenter(), m.getZoom() + delta, { animate: false });
+            } catch (e) {}
+            try {
+              const mml = m._maplibreMap;
+              if (mml && typeof mml.redraw === 'function') mml.redraw();
+            } catch (e) {}
+            // Tombol rumah ikut menyesuaikan, tetap memuat Nusantara penuh.
+            tampilanAwal = { pusat: tampilanAwal.pusat, zoom: tampilanAwal.zoom + delta };
+            if (kameraTarget) kameraTarget = { pusat: kameraTarget.pusat, zoom: kameraTarget.zoom + delta };
+          }
+          // MapLibre milik Windy me-resize kanvasnya lewat ResizeObserver lalu
+          // baru menggambar di frame berikutnya — satu frame basi (zoom lama,
+          // kanvas kosong di tepi) sempat tampil saat bingkai konsol berubah.
+          // Di konsol pelacakan itu dimatikan dan resize ditangani sinkron di
+          // event resize: ubah ukuran, terapkan selisih zoom, gambar ulang —
+          // semuanya sebelum browser melukis frame.
+          function petaMapLibreWindy() {
+            try {
+              const m = window.W && window.W.map && window.W.map.map;
+              return m && m._maplibreMap ? m._maplibreMap : null;
+            } catch (e) { return null; }
+          }
+          function matikanLacakResize() {
+            const mml = petaMapLibreWindy();
+            if (mml && mml._trackResize) mml._trackResize = false;
+          }
+          if (KONSOL) {
+            // Dipanggil parent secara SINKRON (iframe ini satu origin) tepat
+            // setelah parent melepas ukuran iframe — resize kanvas, geser zoom,
+            // dan gambar ulang terjadi di tugas yang sama, sebelum frame dilukis.
+            // Event resize di bawah tetap ada untuk resize jendela biasa.
+            window.__skalaKonsol = function(delta) {
+              matikanLacakResize();
+              const mml = petaMapLibreWindy();
+              if (typeof delta === 'number' && isFinite(delta) && delta !== 0) {
+                deltaTertunda += delta;
+                terapkanDeltaTertunda();
+              } else {
+                try { if (mml) { mml.resize(); mml.redraw(); } } catch (e) {}
+              }
+            };
+            window.addEventListener('resize', function() {
+              matikanLacakResize();
+              const mml = petaMapLibreWindy();
+              try { if (mml) mml.resize(); } catch (e) {}
+              if (deltaTertunda) {
+                terapkanDeltaTertunda();
+              } else {
+                try { if (mml) mml.redraw(); } catch (e) {}
+              }
+            });
+          }
           let interaksiPengguna = false;
 
           function disableMapScrollZoom(map) {
             if (!map) return;
+            // Di konsol /peta zoom roda justru dinyalakan — sama seperti lapisan Aerosol.
+            const aksi = KONSOL ? 'enable' : 'disable';
             try {
-              if (map.scrollWheelZoom && typeof map.scrollWheelZoom.disable === 'function') {
-                map.scrollWheelZoom.disable();
+              if (map.scrollWheelZoom && typeof map.scrollWheelZoom[aksi] === 'function') {
+                map.scrollWheelZoom[aksi]();
               }
             } catch (e) {}
             try {
-              if (map._maplibreMap && map._maplibreMap.scrollZoom && typeof map._maplibreMap.scrollZoom.disable === 'function') {
-                map._maplibreMap.scrollZoom.disable();
+              if (map._maplibreMap && map._maplibreMap.scrollZoom && typeof map._maplibreMap.scrollZoom[aksi] === 'function') {
+                map._maplibreMap.scrollZoom[aksi]();
               }
             } catch (e) {}
             // Pastikan sentuhan geser (panning) dan cubit (pinch-to-zoom) selalu aktif dan mulus di mobile
@@ -1046,6 +1170,7 @@ export async function GET(req: NextRequest) {
 
             const map = window.W.map.map;
             disableMapScrollZoom(map);
+            if (KONSOL) matikanLacakResize();
             if (window.W && window.W.store && typeof window.W.store.set === 'function') {
               try {
                 window.W.store.set('product', 'cams');
@@ -1053,15 +1178,44 @@ export async function GET(req: NextRequest) {
               } catch (e) {}
             }
             try {
-              map.setView([parseFloat('${lat}'), parseFloat('${lon}')], parseInt('${zoom}', 10));
+              map.setView([parseFloat('${lat}'), parseFloat('${lon}')], ZOOM_AWAL);
             } catch (e) {}
 
-            // Buat tombol kontrol zoom kustom (+ / − / home)
+            // Konsol /peta: Windy masih memosisikan ulang peta beberapa saat
+            // setelah siap (router + pemulihan posisi), menimpa kamera di atas.
+            // Terapkan ulang kamera yang sama dengan lapisan Aerosol sampai
+            // pengunjung sendiri menyentuh peta.
+            if (KONSOL) {
+              ['pointerdown', 'wheel', 'touchstart', 'keydown'].forEach(function(jenis) {
+                window.addEventListener(jenis, function() { interaksiPengguna = true; }, { capture: true, passive: true });
+              });
+              [400, 1200, 2500, 4500].forEach(function(jeda) {
+                setTimeout(function() {
+                  if (interaksiPengguna) return;
+                  const k = kameraTarget || tampilanAwal;
+                  try { map.setView(k.pusat, k.zoom, { animate: false }); } catch (e) {}
+                }, jeda);
+              });
+            }
+
+            // Buat tombol kontrol zoom kustom (+ / − / home).
+            // Saat query bentang=1 (dipakai landing karhutla), tombol bentang
+            // selayar dipasang sebagai anak pertama — posisi & perannya sama
+            // dengan tombol bentang di tumpukan kendali lapisan Aerosol
+            // (PetaAsap). Kliknya mengirim BUKA_SELAYAR ke halaman induk;
+            // membuka selayar adalah keputusan halaman, bukan iframe.
             if (!document.getElementById('custom-zoom-controls')) {
               const zoomBox = document.createElement('div');
               zoomBox.id = 'custom-zoom-controls';
-              zoomBox.innerHTML = '<button id="btn-zoom-in" type="button" aria-label="Perbesar peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-out" type="button" aria-label="Perkecil peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-home" type="button" aria-label="Kembali ke tampilan awal peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H4a1 1 0 0 1-1-1v-9.5z" /></svg></button>';
+              zoomBox.innerHTML = '${tombolBentang}<button id="btn-zoom-in" type="button" aria-label="Perbesar peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-out" type="button" aria-label="Perkecil peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12" /></svg></button><button id="btn-zoom-home" type="button" aria-label="Kembali ke tampilan awal peta"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H4a1 1 0 0 1-1-1v-9.5z" /></svg></button>';
               document.body.appendChild(zoomBox);
+
+              document.getElementById('btn-bentang')?.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (window.parent && window.parent !== window) {
+                  window.parent.postMessage({ type: 'BUKA_SELAYAR' }, '*');
+                }
+              });
 
               document.getElementById('btn-zoom-in')?.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -1310,6 +1464,27 @@ export async function GET(req: NextRequest) {
                 const map = window.W.map.map;
                 map.flyTo([info.titik[1], info.titik[0]], 6, { duration: 1.2 });
               }
+            } else if (data.type === 'SKALA_ZOOM') {
+              // Konsol /peta: bingkai membesar/mengecil (rel dilipat). Parent
+              // mengirim selisih zoom = log2(lebar baru / lebar lama) supaya
+              // wilayah yang tampil tetap sama — Nusantara ikut membesar.
+              // Selisihnya disimpan dulu dan diterapkan pada event resize iframe
+              // (parent melepas ukuran iframe sesudah pesan ini) — zoom baru dan
+              // ukuran baru tergambar di frame yang sama, tanpa kedipan.
+              if (KONSOL && typeof data.delta === 'number' && isFinite(data.delta)) {
+                deltaTertunda += data.delta;
+                clearTimeout(penundaDelta);
+                penundaDelta = setTimeout(terapkanDeltaTertunda, 300);
+              }
+            } else if (data.type === 'SET_KAMERA') {
+              // Konsol /peta: samakan kamera dengan lapisan Aerosol saat pengunjung
+              // berpindah lapisan. Zoom sudah dalam skala Windy (Aerosol + 1).
+              if (KONSOL && isFinite(data.lat) && isFinite(data.lon) && isFinite(data.zoom)) {
+                kameraTarget = { pusat: [data.lat, data.lon], zoom: data.zoom };
+                if (window.W && window.W.map && window.W.map.map) {
+                  try { window.W.map.map.setView(kameraTarget.pusat, kameraTarget.zoom, { animate: false }); } catch (e) {}
+                }
+              }
             } else if (data.type === 'WINDY_ACTIVE') {
               if (window.W && window.W.store && typeof window.W.store.set === 'function') {
                 try {
@@ -1352,6 +1527,8 @@ export async function GET(req: NextRequest) {
 
           // Tangkap event wheel: cegah zoom peta dan teruskan ke parent window agar halaman dapat di-scroll naik/turun
           window.addEventListener('wheel', function(e) {
+            // Konsol /peta: biarkan peta Windy menangani roda sendiri (zoom biasa).
+            if (KONSOL) return;
             // Jika pengguna menekan Ctrl atau Meta (Cmd), izinkan perbesaran peta
             if (e.ctrlKey || e.metaKey) {
               e.preventDefault();

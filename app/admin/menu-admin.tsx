@@ -12,6 +12,7 @@ const TAUTAN: { href: string; label: string; tepat?: boolean; admin?: boolean }[
   { href: "/admin/komentar", label: "Komentar", tepat: true },
   { href: "/admin/komentar/reaksi", label: "Reaksi" },
   { href: "/admin/laporan", label: "Laporan warga" },
+  { href: "/admin/statistik", label: "Statistik", tepat: true },
   { href: "/admin/pengguna", label: "Pengguna", admin: true },
 ];
 

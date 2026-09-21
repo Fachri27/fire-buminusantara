@@ -146,6 +146,7 @@ function KopLapor({ bahasa }: { bahasa: Bahasa }) {
   return (
     <header className="sticky top-0 z-50 h-16 w-full border-b border-black/[0.06] bg-white/85 backdrop-blur-md">
       <div className="mx-auto flex h-full max-w-[680px] items-center justify-between gap-4 px-[var(--pias)]">
+        {/* Pulang ke halaman utama (konsol peta) — /beranda ditutup proxy. */}
         <Link href={`/${bahasa}`}
               className="text-[13px] font-semibold text-tinta/70 underline-offset-4 transition-colors hover:text-tinta">
           ← {teks.bagian.beranda}

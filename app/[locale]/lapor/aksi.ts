@@ -30,6 +30,8 @@ export async function kirimLaporan(
   if (hasil.ok || Boolean((hasil as { sukses?: boolean }).sukses)) {
     revalidatePath("/[locale]", "page");
     revalidatePath("/[locale]/lapor", "page");
+    // Umpan landing karhutla membaca kejadian tayang yang sama.
+    revalidatePath("/[locale]/karhutla", "page");
   }
   return hasil;
 }

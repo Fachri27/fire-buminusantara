@@ -125,6 +125,9 @@ type FormProps = {
   ketikRef: Kendali["ketikRef"];
   captchaRef: Kendali["captchaRef"];
   pasangCaptcha: Kendali["pasangCaptcha"];
+  /** true = selalu inline ringkas (tanpa baris pemicu + sheet), untuk
+   *  dipasang di dalam lembar bawah lain yang ruangnya sudah sempit. */
+  tanpaSheet?: boolean;
 };
 
 /** Kolom kirim, dipatok di dasar rel. Cukup isi nama dan email, tidak perlu
@@ -139,6 +142,7 @@ export function FormulirKomentar({
   mengirim, galat, nama, setNama, email, setEmail, anonim, setAnonim, isi, setIsi,
   website, setWebsite, balasKe, balasNama, batalBalas,
   kirim, ketikRef, captchaRef, pasangCaptcha,
+  tanpaSheet = false,
 }: FormProps) {
   const belumLengkap = mengirim || !isi.trim() || (!anonim && (!nama.trim() || !email.trim()));
 
@@ -162,10 +166,11 @@ export function FormulirKomentar({
   // Wadah captcha di desktop terpasang langsung (form inline); di ponsel ikut
   // sheet yang di-mount/unmount — pasang widget saat wadahnya siap di DOM.
   // Sebelumnya hanya (ponsel && sheet), jadi di desktop widget tak pernah
-  // ter-render → token kosong → "Verifikasi captcha gagal".
+  // ter-render → token kosong → "Verifikasi captcha gagal". Mode tanpaSheet
+  // ikut dipasang karena wadahnya selalu di DOM.
   useEffect(() => {
-    if (!ponsel || sheet) pasangCaptcha();
-  }, [ponsel, sheet, pasangCaptcha]);
+    if (!ponsel || sheet || tanpaSheet) pasangCaptcha();
+  }, [ponsel, sheet, tanpaSheet, pasangCaptcha]);
 
   // Fokus ke kotak ketik begitu sheet terbuka.
   useEffect(() => {
@@ -273,8 +278,9 @@ export function FormulirKomentar({
     </div>
   );
 
-  // ── Desktop: formulir lengkap inline di dasar rel, seperti sebelumnya. ──
-  if (!ponsel) {
+  // ── Desktop (dan mode tanpaSheet): formulir lengkap inline di dasar rel,
+  //  seperti sebelumnya. ──
+  if (!ponsel || tanpaSheet) {
     return (
       <form
         className="rincian__kirim"

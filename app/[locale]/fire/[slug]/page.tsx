@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { headers } from "next/headers";
 import { cacheLife, cacheTag } from "next/cache";
 import { ambilBerita, ambilBeritaSlug, ambilSemuaBerita, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +10,7 @@ import { JsonLd } from "@/components/json-ld";
 import { ambilTigaTeratas } from "@/lib/wms";
 import { ambilStatistik } from "@/lib/statistik";
 import { HalamanFire } from "@/components/halaman-fire";
+import { HalamanPostingan } from "@/components/postingan-halaman";
 import { KerangkaBeranda } from "@/components/kerangka-beranda";
 import { Nav } from "@/components/nav";
 import { adaBahasa, type Bahasa } from "@/lib/bahasa";
@@ -236,6 +238,15 @@ export default async function HalamanKejadian({ params }: Props) {
   // HTTP status 404 yang benar alih-alih HTTP 200 soft 404.
   const kejadian = await ambilBeritaSlug(slug);
   if (!kejadian) notFound();
+
+  // Seluler: desain Postingan (penulis–media–aksi–caption); desktop tetap
+  // HalamanFire seperti semula. Dibaca dari user-agent karena yang menentukan
+  // adalah perangkat, bukan lebar jendela — dan rute ini dinamis per request
+  // sehingga tak ada masalah cache.
+  const ua = (await headers()).get("user-agent") ?? "";
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) {
+    return <HalamanPostingan berita={kejadian} bahasa={locale as Bahasa} />;
+  }
 
   return (
     <>

@@ -12,7 +12,9 @@ const BASE_URL = (
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   await connection();
 
-  // Halaman statis: beranda bilingual lengkap dengan hreflang alternates
+  // Halaman statis: index (konsol peta) bilingual prioritas penuh, lengkap
+  // dengan hreflang alternates. /beranda sengaja tak dicantumkan — rute itu
+  // ditutup 404 oleh proxy.
   const statis: MetadataRoute.Sitemap = [
     {
       url: `${BASE_URL}/id`,

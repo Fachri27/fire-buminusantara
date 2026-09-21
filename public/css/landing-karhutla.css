@@ -1,0 +1,1389 @@
+/* ── Landing Karhutla (/[locale]/karhutla) ─────────────────────────────────
+   Dasbor laporan warga: rel instrumen kiri + umpan laporan kanan.
+   Kelas-kelas di sini SELALU diawali `lk-` supaya tak bertabrakan. */
+
+/* Kisi titik bara di tepi rel kiri — tekstur khas rujukan desain. Dipasang
+   sebagai pita tipis yang memudar ke dalam halaman, bukan blok padat. */
+/* Topengnya DUA lapis yang dipotong-silang: pudar tegak (arahnya dibalik oleh
+   varian --bawah) dan ramp mendatar kiri->kanan. Hasilnya sisi kiri nyaris
+   kosong lalu titiknya menguat ke tepi kanan, bukan rata sepanjang pita.
+
+   Rampnya disimpan sebagai custom property karena .lk-titik--bawah menimpa
+   `mask-image` SEUTUHNYA — shorthand topeng tak bisa ditimpa separuh — jadi
+   lapisan mendatar harus disebut ulang di sana, dan angkanya sebaiknya hidup
+   di satu tempat saja. */
+.lk-titik {
+  --lk-titik-datar: linear-gradient(to right, transparent 0%, transparent 30%, #000 100%);
+  background-image: radial-gradient(circle, rgb(255 90 38 / 0.55) 1px, transparent 1.6px);
+  background-size: 9px 9px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%), var(--lk-titik-datar);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 100%), var(--lk-titik-datar);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.lk-titik--bawah {
+  -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 100%), var(--lk-titik-datar);
+  mask-image: linear-gradient(to top, #000 0%, transparent 100%), var(--lk-titik-datar);
+}
+
+/* ── Overlay peta selayar ───────────────────────────────────────────────────
+   Dibuka lewat tombol bentang di sudut bingkai: fixed selayar di atas segalanya
+   (z-[70], di atas Nav), alas malam #0a0a0a khas konsol. Isinya instance <Peta>
+   kedua yang mengisi penuh tanpa wrapper skala transform. Peta menempel ke
+   tepi overlay (tanpa pt-16) supaya tak ada celah hitam di atas. */
+.lk-peta-penuh {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ── Bingkai peta ─────────────────────────────────────────────────────────
+   Keadaan bawaan: peta mengisi bingkainya apa adanya. Pada bingkai yang cukup
+   lebar, landing-karhutla.tsx menimpanya dengan gaya sebaris — digambar pada
+   ukuran desain konsol lalu dikecilkan lewat transform. Ambang dan alasannya
+   ada di komentar effect-nya; sengaja di JS, sebab yang menentukan lebar rel,
+   bukan lebar layar. */
+.lk-peta-isi {
+  position: absolute;
+  inset: 0;
+}
+
+/* Angka instrumen: selalu tabular supaya sejajar. */
+.lk-angka {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ── Kolom pencarian di bilah kepala ──────────────────────────────────────
+   `type="search"` dipertahankan karena membawa untung nyata: papan ketik
+   ponsel yang tepat. Tapi tombol hapus bawaan WebKit DIMATIKAN — kolom ini
+   sekarang punya tombol silang sendiri untuk menutup, dan dua silang berjajar
+   di satu kolom hanya membuat orang menebak mana yang mana. Tidak ada fungsi
+   yang hilang: menutup sekaligus mengosongkan kata kuncinya.
+
+   Dikurung .lk-bingkai seperti aturan header lainnya supaya halaman lain yang
+   memakai <Nav> yang sama tak ikut berubah. */
+.lk-bingkai #nav-cari::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+/* Sakelar cari menyingkir selagi kolomnya terbuka: kolom itu sudah membawa
+   kaca pembesarnya sendiri di ujung kiri dan silang penutup di ujung kanan,
+   jadi tombol ini tak menyisakan pekerjaan.
+
+   Dikunci ke [aria-expanded], BUKAN mengandalkan utilitas `hidden` dari
+   Tailwind. Kelas itu terpasang (terukur: className berakhir "… hidden")
+   tetapi kalah — display terhitungnya tetap `flex`. Atribut status inilah
+   sumber kebenaran yang sama dengan yang dibaca pembaca layar, dan
+   spesifisitasnya cukup untuk menang tanpa !important. Di luar media query
+   supaya berlaku di panggung maupun aliran. */
+.lk-bingkai header button[aria-controls="nav-panel-cari"][aria-expanded="true"] {
+  display: none;
+}
+
+/* Form-nya SELALU terpasang, terbuka maupun tidak. Transisi tidak pernah
+   berjalan pada elemen yang baru dipasang saat itu juga — itulah sebabnya
+   kolom ini dulu muncul dan hilang dengan mengejut.
+
+   Keadaan tertutup memakai visibility:hidden, bukan sekadar opacity:0: yang
+   terakhir menyisakan kolom tak terlihat yang masih disinggahi Tab dan masih
+   dibacakan pembaca layar. */
+.lk-bingkai header #nav-panel-cari {
+  overflow: hidden;
+  transition:
+    flex-grow 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    visibility 0s;
+}
+
+.lk-bingkai header #nav-panel-cari[data-buka="0"] {
+  visibility: hidden;
+  opacity: 0;
+  /* visibility ditunda sampai lipatannya selesai; tanpa jeda ini ia lenyap
+     seketika dan animasi menutupnya tak pernah sempat terlihat. */
+  transition:
+    flex-grow 320ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 200ms ease,
+    transform 260ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    visibility 0s 320ms;
+}
+
+/* Panggung: kolomnya mengisi SELURUH ruang bebas antara logo dan gugus kanan
+   — tanpa batas lebar, sisa ruang di kanan tak lagi menganggur.
+
+   Yang dianimasikan flex-grow, bukan max-width. Dengan max-width, lebarnya
+   mentok ke ruang yang tersedia sebelum transisinya selesai, jadi ekor
+   easing-nya terpotong dan gerakannya berhenti mendadak. Flexbox membagikan
+   tepat sepecahan ruang bebas ketika jumlah faktor lenturnya di bawah 1,
+   sehingga 0→1 memetakan mulus ke nol→penuh, berapa pun lebar layarnya.
+
+   Padding 3px memberi ruang bagi cincin fokus kolom — tanpa itu ia terpotong
+   oleh overflow:hidden yang justru dipakai untuk melipatnya. */
+@media (min-width: 1100px) and (min-height: 640px) {
+  .lk-bingkai header #nav-panel-cari {
+    flex-grow: 1;
+    padding: 3px;
+    /* Tetangga kirinya merek bertulisan tebal 24px, bukan tombol — sela 16px
+       milik bilah terbaca mepet di sebelah huruf sebesar itu. Tambahan ini
+       HANYA di sisi kiri: sisi kanan sengaja dibiarkan 16px supaya kolomnya
+       tetap mengisi ruang sampai mentok gugus ID/EN. */
+    margin-inline-start: 1.5rem;
+  }
+
+  .lk-bingkai header #nav-panel-cari[data-buka="0"] {
+    flex-grow: 0;
+  }
+}
+
+/* Aliran: turun dari balik bilah alih-alih melipat — di sini ia sudah keluar
+   dari baris, jadi lebarnya tak punya apa pun untuk didorong. */
+@media not all and (min-width: 1100px) and (min-height: 640px) {
+  .lk-bingkai header #nav-panel-cari[data-buka="0"] {
+    transform: translateY(-0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-bingkai header #nav-panel-cari,
+  .lk-bingkai header #nav-panel-cari[data-buka="0"] {
+    transition-duration: 1ms;
+    transition-delay: 0s;
+  }
+}
+
+/* Umpan laporan memakai kolom flex yang dibagi di JS (UmpanMasonry di
+   landing-karhutla.tsx, pola yang sama dengan MasonryKolom di index) —
+   bukan CSS `columns`, supaya kartu tak meloncat kolom saat gambar telat
+   muat. Jarak antar kartu: gap-6 di kolomnya. */
+
+/* Foto laporan: rasio aslinya dipertahankan (tinggi kolom yang berbeda-beda
+   itulah yang membuat masonry terbaca), hanya sudutnya yang dilunakkan. */
+.lk-foto {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Batasnya longgar saja: cukup memotong foto potret yang ekstrem (satu foto
+     setinggi layar penuh akan memanjangkan satu kolom masonry jauh melewati
+     tetangganya), tapi foto biasa dibiarkan setinggi rasio aslinya supaya
+     kartu-kartunya bervariasi seperti rujukan. */
+  max-height: 620px;
+  object-fit: cover;
+  /* Rujukan memakai foto dan video kotak tanpa sudut membulat. */
+  border-radius: 0;
+  background: #000;
+}
+
+/* ── Gulir terkunci ───────────────────────────────────────────────────────
+   Di layar panggung halaman ini bertingkah seperti aplikasi: bingkai setinggi
+   viewport, rel KIRI terkunci (tak ikut menggulir), dan hanya rel KANAN yang
+   menggulir sendiri. Di layar aliran (satu kolom menumpuk) semuanya kembali
+   menjadi halaman biasa yang menggulir normal. */
+@media (min-width: 1100px) and (min-height: 640px) {
+  .lk-bingkai {
+    display: flex;
+    flex-direction: column;
+    /* Nav index yang dipakai bersama (fixed h-16) menutupi 4rem teratas —
+       tingginya dikurangkan dari 100dvh, bukan ditumpuk sebagai padding, supaya
+       geometri rel tetap satu viewport persis seperti sebelumnya (pola
+       pt-16 di halaman-peta.tsx). */
+    height: calc(100dvh - 4rem);
+    overflow: hidden;
+  }
+
+  .lk-isi {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* Satu baris setinggi sisa viewport — inilah yang memberi kedua rel
+       tinggi yang pasti, sehingga `overflow` di bawahnya punya acuan. */
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .lk-kiri {
+    overflow: hidden;
+  }
+
+  /* ── Tipografi cair ────────────────────────────────────────────────────
+     Di zoom peramban 125% pada layar 1920, viewport CSS jadi 1536. Lebar di
+     halaman ini sudah berbasis vw sehingga ikut menyusut proporsional —
+     terukur: rel 643->515, kartu 388->303, bingkai peta 627->499, semuanya
+     rasio ~0,80. Yang TIDAK ikut adalah ukuran huruf yang ditulis piksel
+     tetap: judul, tanggal, label statistik, pencarian, dan komposer semuanya
+     terukur rasio 1,000 — jadi teksnya tampak seperempat lebih besar terhadap
+     panelnya.
+
+     Perbaikannya membuat huruf itu cair, BUKAN mem-`zoom` wadahnya seperti di
+     konsol index. `zoom` mengubah lebar terrender tanpa mengubah angka yang
+     dibaca JS, sedangkan halaman ini menghitung jumlah kolom dari
+     window.innerWidth dan menskalakan peta dari clientWidth — keduanya akan
+     berselisih dengan tata letak sebenarnya.
+
+     Pecahan vw = nilai_di_1920 / 19,2, pola yang sama dengan angka statistik
+     yang sudah terukur pas 0,800. Lantai clamp sengaja di bawah sasaran 1536
+     (mis. judul 15,2px) supaya tidak justru mengunci nilainya; ia hanya
+     menahan di ujung sempit panggung (~1100px). Ukuran ponsel tak tersentuh:
+     seluruh blok ini terkurung di media query panggung, dan sasaran 1536
+     memang lebih kecil daripada lantai ponselnya sendiri sehingga satu clamp
+     tunggal mustahil melayani keduanya. */
+  .lk-kartu-judulbar h2 {
+    font-size: clamp(13px, 0.990vw, 19px);
+  }
+
+  .lk-kanan .lk-kartu-tanggal {
+    font-size: clamp(11px, 0.729vw, 14px);
+  }
+
+  .lk-kiri dl dt {
+    font-size: clamp(10px, 0.677vw, 13px);
+  }
+
+  .lk-bingkai #nav-cari {
+    font-size: clamp(12px, 0.781vw, 15px);
+  }
+
+  .lk-kanan #lk-tulis {
+    font-size: clamp(13px, 0.885vw, 17px);
+  }
+
+  /* ── Ikon dan kotak berukuran tetap ───────────────────────────────────
+     Sapuan kedua menemukan 17 elemen ber-ukuran pasti yang tak ikut menyusut:
+     ikon ditulis `size-[..]` dalam piksel, jadi di 1536 ia tampak seperempat
+     lebih besar terhadap teks di sebelahnya. Rumusnya sama dengan tipografi:
+     nilai_di_1920 / 19,2 vw. Yang di bawah ini bisa ditarget lewat kait yang
+     sudah ada, tanpa menambah penanda di TSX. */
+  .lk-lokasi svg:first-child {
+    width: clamp(14px, 0.938vw, 18px);
+    height: clamp(14px, 0.938vw, 18px);
+  }
+
+  .lk-lokasi svg:last-child {
+    width: clamp(17px, 1.146vw, 22px);
+    height: clamp(17px, 1.146vw, 22px);
+  }
+
+  /* Kolom pencarian pindah ke bilah kepala — tombol ikon di bilah, panelnya
+     turun di bawahnya — jadi kaitnya ikut pindah ke header. Dikurung
+     .lk-bingkai, pola yang sama dengan aturan logo tepat di bawah, supaya
+     halaman index yang memakai <Nav> yang sama tidak ikut berubah. */
+  /* Hanya ikon DI DALAM kolomnya. Ikon sakelarnya sengaja tidak ikut: ia
+     diukur 1lh (satu kotak baris) supaya tingginya lahir dari sumber yang
+     sama dengan pil ID/EN di sebelahnya, dan clamp piksel di sini justru akan
+     menimpanya lalu memutus keterikatan itu. */
+  .lk-bingkai header form[role="search"] svg {
+    width: clamp(17px, 1.146vw, 22px);
+    height: clamp(17px, 1.146vw, 22px);
+  }
+
+  /* Logo bilah kepala — tingginya yang dipatok (lebar mengikuti rasio).
+     Sama seperti aturan teks nav: dikurung .lk-bingkai supaya halaman index
+     yang memakai <Nav> yang sama tidak ikut berubah. */
+  .lk-bingkai header img {
+    height: clamp(34px, 2.292vw, 44px);
+  }
+
+  /* Kontrol di form komposer yang MENGEMBANG. Keadaan ini tak pernah terukur
+     oleh sapuan pertama — ia hanya ada setelah komposer diklik, jadi seluruh
+     isinya lolos sampai keadaan itu ikut disisir. */
+  .lk-isian,
+  .lk-anonim {
+    font-size: clamp(10px, 0.677vw, 13px);
+  }
+
+  /* Kolom judul dan area cerita komposer. Keduanya merender placeholder, jadi
+     ukuran hurufnya terlihat — tapi lolos dari sapuan pertama yang hanya
+     memeriksa elemen dengan simpul teks, dan input tidak punya itu. */
+  .lk-tulis-isi {
+    font-size: clamp(12px, 0.781vw, 15px);
+  }
+
+  #lk-lat.lk-koord,
+  #lk-lng.lk-koord {
+    width: clamp(69px, 4.479vw, 86px);
+  }
+
+  .lk-centang {
+    width: clamp(13px, 0.833vw, 16px);
+    height: clamp(13px, 0.833vw, 16px);
+  }
+
+  .lk-batal {
+    font-size: clamp(11px, 0.729vw, 14px);
+  }
+
+  /* Ikon yang perlu penanda sendiri karena tak punya kait yang bisa ditarget.
+     Tombol aksi komposer 36px berasal dari padding 8px + ikon 20px, jadi
+     keduanya diskalakan; kalau hanya ikonnya, lingkaran sentuhnya tetap besar
+     dan jaraknya jadi janggal. */
+  .lk-ikon-aksi {
+    padding: clamp(6px, 0.417vw, 8px);
+  }
+
+  .lk-ikon-aksi svg {
+    width: clamp(16px, 1.042vw, 20px);
+    height: clamp(16px, 1.042vw, 20px);
+  }
+
+  .lk-avatar {
+    width: clamp(35px, 2.292vw, 44px);
+    height: clamp(35px, 2.292vw, 44px);
+  }
+
+  .lk-avatar svg {
+    width: clamp(19px, 1.25vw, 24px);
+    height: clamp(19px, 1.25vw, 24px);
+  }
+
+  .lk-tab-rel,
+  .lk-tombol-peta {
+    width: clamp(29px, 1.875vw, 36px);
+    height: clamp(29px, 1.875vw, 36px);
+  }
+
+  .lk-tab-rel svg,
+  .lk-tombol-peta svg {
+    width: clamp(13px, 0.833vw, 16px);
+    height: clamp(13px, 0.833vw, 16px);
+  }
+
+  /* Sisa teks yang sapuan menyeluruh temukan masih terpaku di rasio 1,000.
+     Pecahan vw memakai rumus yang sama: nilai_di_1920 / 19,2. */
+  .lk-lokasi {
+    font-size: clamp(12px, 0.781vw, 15px);
+  }
+
+  .lk-sumber,
+  .lk-kaki {
+    font-size: clamp(9px, 0.573vw, 11px);
+  }
+
+  .lk-kirim {
+    font-size: clamp(12px, 0.781vw, 15px);
+  }
+
+  /* Bilah kepala memakai <Nav gelap> yang DIPAKAI BERSAMA halaman index, jadi
+     komponennya tak disentuh — aturannya dikurung `.lk-bingkai header` supaya
+     hanya halaman ini yang terskala dan tampilan index tetap apa adanya.
+     Merek 24px dan kontrolnya 14px. */
+  /* Sakelar cari ikut aturan ini. Ia sebuah <button>, jadi dulu terlewat oleh
+     selektor a/span dan hurufnya tertinggal 16px sementara pil di sebelahnya
+     menyusut ke 11px — dari situlah tombolnya tampak lebih besar. Karena
+     tingginya kini tumbuh dari kotak baris hurufnya sendiri, menyamakan huruf
+     inilah yang menyamakan tingginya di setiap lebar. */
+  .lk-bingkai header a,
+  .lk-bingkai header span,
+  .lk-bingkai header button[aria-controls="nav-panel-cari"] {
+    font-size: clamp(11px, 0.729vw, 14px);
+  }
+
+  .lk-bingkai header a:first-child span {
+    font-size: clamp(17px, 1.25vw, 24px);
+  }
+
+  /* Suhu terukur 0,858, bukan 1,000: clamp-nya sudah cair tapi atapnya (68px)
+     menggigit di 1920 sehingga suku vw hanya berlaku di lebar kecil. Pecahan
+     diturunkan supaya 1920 mendarat tepat di atap, dan 1536 jatuh ke 54,4 =
+     68 x 0,8. Hanya <p> — <dd> angka statistik memakai .lk-angka yang sama
+     tapi rasionya sudah benar. */
+  p.lk-angka {
+    font-size: clamp(40px, 3.542vw, 68px);
+  }
+
+  .lk-kanan {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Rupa panel hanya milik panggung. Dulu utilitas ini menempel di <main>
+       tanpa kualifikasi mode, jadi latar abunya ikut membungkus umpan di
+       seluler — padahal di sana kartunya harus berdiri langsung di atas latar
+       halaman. Paddingnya juga dulu `p-4 sm:p-5`, dan `sm` itu ambang 640px
+       milik Tailwind, bukan ambang panggung halaman ini. */
+    background: #1e1e1e;
+    border-radius: 1rem;
+    padding: 1.25rem;
+  }
+}
+
+/* Panggung yang pendek: isi rel kiri bisa lebih tinggi dari viewport. Supaya
+   kaki halaman tak terpotong, rel kiri boleh menggulir DARURAT — bilahnya
+   disembunyikan agar tetap terbaca sebagai panel yang terkunci. */
+@media (min-width: 1100px) and (min-height: 640px) and (max-height: 899px) {
+  .lk-kiri {
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .lk-kiri::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── Kartu umpan: susunan + jarak ─────────────────────────────────────────
+   Desktop (panggung): teks (tanggal–judul) lalu media — urutan naskah.
+   Seluler (aliran) ala rujukan: foto dulu, teks ringkas di bawahnya. */
+.lk-kartu {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lk-masonry {
+  gap: 1.5rem;
+}
+
+.lk-masonry-kolom {
+  gap: 1.5rem;
+}
+
+@media (min-width: 1100px) and (min-height: 640px) {
+  .lk-kartu-teks {
+    order: 1;
+  }
+
+  .lk-kartu-media {
+    order: 2;
+  }
+}
+
+@media not all and (min-width: 1100px) and (min-height: 640px) {
+  /* Selokan tepi seluler. Grid induk cuma memberi p-2 (8px), sementara jarak
+     antar-kolom 12px dan antar-kartu 16px — tepi layar jadi LEBIH rapat
+     daripada celah di dalam umpannya sendiri, dan itulah yang terbaca mepet.
+     12px di sini membuatnya 20px total: sedikit lebih lega daripada selokan
+     antar-kolom, bukan lebih sempit. Kolom pencarian dan komposer ikut lepas
+     dari tepi karena keduanya anak .lk-kanan. */
+  .lk-kanan {
+    padding-inline: 0.75rem;
+  }
+
+  /* ── Halaman panel seluler: pola peta-selayar ala aplikasi peta ──────────
+     Peta jadi alas yang mengisi layar, pil lokasi mengambang di atasnya
+     sebagai kolom pencarian, dan isi panel (cuaca, angka situasi, kaki) naik
+     jadi lembar bawah yang mengintip di atas bilah tab.
+
+     Seluruhnya lewat CSS: urutan DOM tidak diubah sama sekali, jadi pembaca
+     layar dan urutan Tab tetap melewati peta lalu isi panel seperti semula.
+     Pil lokasi pun tidak dipindahkan dari kartu cuacanya — `position: fixed`
+     mengeluarkannya dari aliran, dan kartunya menutup sendiri. */
+  .lk-mode-panel .lk-kiri {
+    padding: 0;
+  }
+
+  /* Pita titik itu hiasan rel; di tata letak ini ia hanya memotong peta. */
+  .lk-mode-panel .lk-titik {
+    display: none;
+  }
+
+  /* Bingkai peta jadi alas selayar. aspect-ratio & min-height DIBATALKAN —
+     keduanya utilitas Tailwind pada elemen yang sama, dan selektor dua-kelas
+     ini menang atas kelas tunggal tanpa bergantung urutan berkas. */
+  .lk-mode-panel .lk-bingkai-peta {
+    position: fixed;
+    inset: 4rem 0 0 0;
+    z-index: 0;
+    /* Beri tahu peta berapa ruang dasar yang sudah terpakai. peta-asap.tsx
+       memposisikan bilah waktu dan legendanya di `bottom: calc(--sela-bawah +
+       1rem)`, jadi variabel inilah yang mengangkatnya.
+
+       Terukur: dengan warisan 76px, bilah waktu duduk di y 739-808 sementara
+       lembar terkatup mulai di 780 — tertimpa 28px. Lembar terkatup tingginya
+       120px (76 + 2.75rem), jadi tepinya di 900-120=780; agar bilah berhenti
+       8px di atasnya, ia harus berakhir di 772, yang berarti 900-(X+16)=772
+       -> X=112px. */
+    --sela-bawah: 7rem;
+    aspect-ratio: auto;
+    min-height: 0;
+    width: auto;
+    border-radius: 0;
+    --tw-ring-shadow: 0 0 #0000;
+  }
+
+  /* Pil lokasi mengambang di atas peta — padanan kolom pencarian di rujukan. */
+  .lk-mode-panel .lk-lokasi {
+    position: fixed;
+    top: calc(4rem + 0.75rem);
+    /* Berhenti sebelum SEMUA penghuni sudut kanan atas peta, bukan sampai tepi
+       layar. Di layar 414 terukur dua penghuni: tumpukan kendali peta di
+       x 374-402, dan tombol bentang di x 342-378.
+
+       Percobaan pertama memakai 3rem (tepi pil di 366) dan itu kurang: saat
+       diukur, tombol bentang masih terlempar ke luar layar oleh bug
+       `position: relative !important` sehingga tak terhitung sebagai penghalang.
+       Begitu bug itu diperbaiki ia kembali ke x 342 dan langsung tertutup pil.
+       5rem menaruh tepi pil di 334 — celah 8px ke penghalang terkiri. */
+    right: 5rem;
+    left: 0.75rem;
+    z-index: 2;
+    margin: 0;
+    background: rgb(20 20 20 / 0.92);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.45);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+
+  /* Lembar bawah. Tingginya tetap dan isinya bergulir — BUKAN diseret:
+     seretan butuh JS, dan ini perubahan tata letak murni. Dasarnya berhenti di
+     atas bilah tab lewat --sela-bawah, variabel yang sama yang dipakai lembar
+     rincian. */
+  /* Dipancang bottom:0 dan latarnya menerus SAMPAI DASAR, lalu isinya diberi
+     padding bawah supaya tetap bebas dari bilah tab.
+
+     Versi sebelumnya memancangnya di var(--sela-bawah) = 76px, sementara bilah
+     tab sebenarnya 64px — menyisakan lubang 12px yang menembus ke peta. Angka
+     76 itu memang sengaja longgar demi env(safe-area-inset-bottom) di ponsel
+     bertakik, jadi menggantinya dengan 64 justru akan patah di sana. Dengan
+     latar yang menerus, celah mustahil muncul berapa pun tinggi bilahnya. */
+  .lk-mode-panel .lk-lembar-panel {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 2;
+    height: 38dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 0 calc(var(--sela-bawah, 0px) + 0.75rem);
+    background: #101010;
+    border-radius: 1.25rem 1.25rem 0 0;
+    box-shadow: 0 -12px 32px rgb(0 0 0 / 0.5);
+    transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Terkatup: tinggi menyusut sampai tinggal gagangnya, masih di atas bilah.
+
+     Namanya `lk-panel-katup`, BUKAN `lk-lembar-tutup`: nama itu sudah dipakai
+     tombol tutup pada lembar "..." kartu umpan, yang dipancang
+     `position: absolute; top: 0.75rem` tanpa media query. Memakainya di sini
+     membuat lembar mewarisi `top` itu — dan dengan top, bottom, serta height
+     terpasang sekaligus, kotaknya over-constrained sehingga CSS menuruti
+     top+height dan lembar melompat ke puncak layar (terukur y 12-132). */
+  .lk-mode-panel .lk-lembar-panel.lk-panel-katup {
+    height: calc(var(--sela-bawah, 0px) + 2.75rem);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lk-mode-panel .lk-lembar-panel {
+      transition: none;
+    }
+  }
+
+  /* Gagang: tombol sungguhan, bukan hiasan — menekannya mengatupkan lembar. */
+  .lk-mode-panel .lk-lembar-gagang {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 0;
+    cursor: pointer;
+    background: none;
+    border: 0;
+  }
+
+  .lk-mode-panel .lk-lembar-gagang span {
+    display: block;
+    width: 2.25rem;
+    height: 0.25rem;
+    margin: 0 auto;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.3);
+  }
+
+  /* Peta sudah selayar di sini, jadi tombol bentang tak ada gunanya. */
+  .lk-mode-panel .lk-tombol-peta {
+    display: none;
+  }
+
+  .lk-kartu-media {
+    order: 1;
+  }
+
+  .lk-kartu-teks {
+    order: 2;
+    margin-top: 0.5rem;
+  }
+
+  .lk-kartu-media .lk-foto {
+    margin-top: 0;
+  }
+
+  /* Rujukan seluler: foto membulat secukupnya, selokan rapat. */
+  .lk-foto {
+    border-radius: 0.5rem;
+  }
+
+  /* Video hamparan (VideoOtomatis): radius sendiri — rounded-[inherit] tak
+     bisa dipakai karena induk langsungnya span tanpa radius. */
+  .lk-video {
+    border-radius: 0.5rem;
+  }
+
+  .lk-masonry {
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .lk-masonry-kolom {
+    gap: 1rem;
+  }
+
+  /* Dasbor penuh di seluler hanya menampilkan daftar (halaman utama) —
+     panel kiri punya halaman sendiri (/panel). Jaring pengaman bila JS mati
+     (komponen melepas relnya sendiri setelah hidrasi). */
+  .lk-hanya-panggung {
+    display: none;
+  }
+
+  /* Halaman panel seluler full-bleed: tanpa pias grid maupun rel, bingkai
+     peta kotak tanpa ring — peta menempel ke tepi layar. */
+  .lk-penuh-mobile {
+    padding: 0;
+    gap: 0;
+  }
+
+  .lk-penuh-mobile .lk-kiri {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .lk-penuh-mobile .lk-bingkai-peta {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* Kartu seluler: tanggal disembunyikan (judul saja), judul kecil sebaris
+     dengan tombol "...". Tombol dan lembar hanya ada di seluler. */
+  .lk-kartu-tanggal {
+    display: none;
+  }
+
+  .lk-kartu-judulbar {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+  }
+
+  .lk-kartu-judulbar h2 {
+    font-size: 12px;
+    margin-top: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 1100px) and (min-height: 640px) {
+  .lk-kartu-titik,
+  .lk-lembar-latar {
+    display: none;
+  }
+}
+
+/* ── Lembar bawah seluler ─────────────────────────────────────────────── */
+.lk-lembar-latar {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(0 0 0 / 0.6);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: lk-lembar-gelap 200ms ease-out;
+}
+
+.lk-lembar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 560px);
+  max-height: 82dvh;
+  /* SENGAJA bukan overflow-y:auto. Begitu satu sumbu diberi auto, sumbu
+     satunya ikut memotong (terukur: overflow-x pun jadi auto), sehingga
+     thumbnail yang mencuat melewati tepi atas terpangkas — dulu ia malah
+     berakhir 8px di DALAM lembar. Gulirannya dipindah ke .lk-lembar-isi. */
+  overflow: visible;
+  background: #1e1e1e;
+  border-radius: 1.5rem 1.5rem 0 0;
+  padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+  animation: lk-lembar-naik 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Tak perlu ruang tambahan di atas: separuh thumbnail yang berada di dalam
+   lembar sudah dihitung lewat margin negatifnya sendiri. */
+.lk-lembar-bergambar {
+  padding-top: 1.25rem;
+}
+
+/* Yang menggulir adalah isinya, bukan lembarnya. min-height:0 wajib — tanpa
+   itu anak flex menolak menyusut dan max-height lembarnya jadi percuma. */
+.lk-lembar-isi {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@keyframes lk-lembar-gelap {
+  from { opacity: 0; }
+}
+
+@keyframes lk-lembar-naik {
+  from { transform: translateY(48px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-lembar-latar,
+  .lk-lembar {
+    animation: none;
+  }
+}
+
+.lk-lembar-tutup {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 9999px;
+  color: #f5f5f5;
+}
+
+.lk-lembar-tutup:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+/* Kepala lembar: media potret yang TEPAT separuh tingginya duduk di luar
+   lembar, seperti rujukan.
+
+   Rasionya dipatok supaya tingginya deterministik dari lebarnya — dengan
+   `height: auto` tingginya ikut rasio tiap foto, dan margin piksel tetap
+   mustahil memberi separuh untuk semuanya. Dengan 3/4, setengah tinggi =
+   lebar x 2/3, dan itulah yang dinaikkan setelah padding atas lembar
+   (1.25rem) dilunasi lebih dulu.
+
+   Persen tidak bisa dipakai: margin-top persen dihitung dari LEBAR wadah,
+   bukan tinggi — ia akan meleset diam-diam. */
+.lk-lembar-gambar {
+  display: block;
+  width: min(150px, 38vw);
+  aspect-ratio: 3 / 4;
+  height: auto;
+  object-fit: cover;
+  background: #000;
+  border-radius: 1rem;
+  margin: calc(-1.25rem - min(150px, 38vw) * 2 / 3) auto 0;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  box-shadow: 0 10px 34px rgb(0 0 0 / 0.55);
+}
+
+/* Varian video: kotaknya berbingkai, tombol video di dalamnya menempel penuh
+   tanpa margin atas. Lebarnya WAJIB sama dengan kelas dasarnya — selektor
+   `div.kelas` lebih kuat daripada `.kelas`, jadi angka yang berbeda di sini
+   akan diam-diam mengalahkan ukuran kepala lembar dan hanya cabang videonya
+   yang melenceng. */
+div.lk-lembar-gambar--video {
+  width: min(150px, 38vw);
+  overflow: hidden;
+  padding: 0;
+  background: #000;
+}
+
+.lk-lembar-gambar--video .lk-foto {
+  margin-top: 0;
+  border: none;
+  box-shadow: none;
+}
+
+/* Rantai di dalam kotak video (tombol > span > poster) harus setinggi
+   kotaknya. Tanpa ini poster yang menentukan tinggi, rasio 3/4 kotaknya jadi
+   percuma, dan videonya duduk di atas latar hitam yang menganga. */
+.lk-lembar-gambar--video > .lk-foto,
+.lk-lembar-gambar--video > .lk-foto > span {
+  display: block;
+  height: 100%;
+}
+
+.lk-lembar-gambar--video img.lk-foto {
+  height: 100%;
+  object-fit: cover;
+}
+
+.lk-lembar-info {
+  margin-top: 0.75rem;
+  font-size: 14px;
+  text-align: center;
+  color: rgb(245 245 245 / 0.85);
+}
+
+.lk-lembar-judul {
+  margin-top: 0.25rem;
+  font-size: 17px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.lk-lembar-deskripsi {
+  margin-top: 0.5rem;
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
+  color: rgb(245 245 245 / 0.75);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Tombol besar ala rujukan — membuka rincian penuh. */
+.lk-lembar-besar {
+  display: block;
+  width: min(100%, 320px);
+  margin: 1rem auto 0;
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 0.1);
+  color: #f5f5f5;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 0.9rem 1.25rem;
+}
+
+.lk-lembar-besar:hover {
+  background: rgb(255 255 255 / 0.16);
+}
+
+/* Menu ikon ala rujukan: baris-baris rata kiri. */
+.lk-lembar-menu {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.lk-lembar-baris {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.7rem 0.25rem;
+  font-size: 17px;
+  font-weight: 500;
+  color: #f5f5f5;
+  text-align: left;
+  border-radius: 0.75rem;
+}
+
+.lk-lembar-baris:hover {
+  background: rgb(255 255 255 / 0.06);
+}
+
+/* ── Carousel kartu bermedia banyak ───────────────────────────────────────
+   Kini hanya lencana multi-gambar (tanpa geser, tanpa titik, tanpa panah):
+   kartu selalu satu media statis; semua slide ada di popup rincian. */
+.lk-media-statis {
+  position: relative;
+  display: block;
+}
+
+.lk-galeri-lencana {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: block;
+  width: 24px;
+  height: 24px;
+  color: #fff;
+  filter: drop-shadow(0 1px 4px rgb(0 0 0 / 0.7));
+  pointer-events: none;
+}
+
+.lk-galeri-lencana > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Tampilan Postingan seluler ala IG ─────────────────────────────────────
+   Layar penuh di atas umpan: bilah kembali, penulis, media, aksi, caption.
+   Hanya dibuka dari tap gambar di seluler (logika di komponen). */
+/* Duduk DI ANTARA bilah kepala dan bilah tab, bukan menutupi keduanya.
+   Nav dan .lk-tabbar sudah ada di pohon yang sama (keduanya z-50) dan hanya
+   tertimbun overlay ini — jadi keduanya cukup dibiarkan tampak, bukan disalin
+   ke dalam dialog. Menyalinnya akan menghasilkan dua <header> dan dua bilah
+   tab sekaligus.
+
+   Atas dipancang 4rem: tinggi Nav memang kontrak tetap yang didokumentasikan
+   di nav.tsx, jadi angka itu tak bisa meleset. Bawah TIDAK dipancang ke tinggi
+   bilah tab — tingginya ikut env(safe-area-inset-bottom) dan pernah menyisakan
+   lubang 12px saat ditebak. Overlay tetap bottom:0 (celah mustahil) dan
+   isinya yang diberi padding supaya bebas dari bilah. */
+.lk-postingan {
+  position: fixed;
+  top: 4rem;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 55;
+  overflow-y: auto;
+  padding-bottom: var(--sela-bawah, 76px);
+  background: #000;
+  color: #f5f5f5;
+  animation: lk-lembar-gelap 200ms ease-out;
+}
+
+/* Varian halaman detail: mengalir normal di bawah Nav dan di atas tab —
+   tanpa fixed, tanpa padding tab. */
+.lk-postingan--statis {
+  position: static;
+  z-index: auto;
+  overflow: visible;
+  padding-bottom: 1.5rem;
+  animation: none;
+}
+
+.lk-postingan-kepala {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgb(0 0 0 / 0.92);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.lk-postingan-kepala h2 {
+  flex: 1;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.lk-postingan-ikon {
+  display: grid;
+  place-items: center;
+  padding: 0.5rem;
+  border-radius: 9999px;
+  color: #f5f5f5;
+}
+
+button.lk-postingan-ikon:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+/* ── Tombol bisu + putar ulang video ala IG ─────────────────────────────────
+   Pil hitam bulat khas IG: lencana bisu di kanan bawah media, tombol ulang di
+   tengah setelah video habis. GLOBAL (bukan di dalam media query): VideoOtomatis
+   dipakai di kartu, postingan full-bleed, DAN kepala lembar — semuanya perlu.
+
+   Menang atas aturan radius kartu (.lk-foto 0.5rem, postingan 0) TANPA
+   !important: selektor .lk-video-bisu ganda bobotnya (0,2,0) vs satu kelas
+   (0,1,0); specificity selalu menang tanpa peduli urutan berkas. z-index 2:
+   di atas <video> yang tak ber-lapis, di bawah lencana galeri (z 3). Tanpa
+   backdrop-filter — kartu duduk di atas foto latar parallax (lihat
+   kartu-video.css). */
+.lk-video-bisu.lk-video-bisu {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.75);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.lk-video-bisu:hover {
+  background: rgb(0 0 0 / 0.8);
+  transform: scale(1.06);
+}
+
+.lk-video-bisu:focus-visible {
+  outline: 2px solid #e8590c;
+  outline-offset: 3px;
+}
+
+.lk-video-bisu svg {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+/* Wadah tembus-klik menutupi media supaya tombolnya tepat di tengah; klik di
+   luar tombol tetap milik tombol buka-rincian di bawahnya. */
+.lk-video-ulang-wadah {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.lk-video-ulang.lk-video-ulang {
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.62);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.75);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.lk-video-ulang:hover {
+  background: rgb(0 0 0 / 0.8);
+  transform: scale(1.06);
+}
+
+.lk-video-ulang:focus-visible {
+  outline: 2px solid #e8590c;
+  outline-offset: 3px;
+}
+
+.lk-video-ulang svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-video-bisu,
+  .lk-video-ulang {
+    transition: none;
+  }
+
+  .lk-video-bisu:hover,
+  .lk-video-ulang:hover {
+    transform: none;
+  }
+}
+
+/* Tombol komentar membawa angka di samping ikon. */
+button.lk-postingan-komentar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lk-postingan-penulis {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem 0.75rem;
+}
+
+.lk-postingan-avatar {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  object-fit: contain;
+  background: #1e1e1e;
+  padding: 4px;
+}
+
+.lk-postingan-nama {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.lk-postingan-lokasi {
+  font-size: 12px;
+  color: rgb(245 245 245 / 0.65);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lk-postingan-media {
+  position: relative;
+  background: #000;
+}
+
+.lk-postingan-media .lk-foto,
+.lk-postingan-media .lk-video {
+  border-radius: 0;
+  margin-top: 0;
+}
+
+.lk-postingan-media img.lk-postingan-foto {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 75dvh;
+  object-fit: contain;
+  background: #000;
+}
+
+.lk-postingan-titik {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.6rem;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.lk-postingan-titik-tombol {
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.lk-postingan-titik-tombol > span {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.45);
+}
+
+.lk-postingan-titik-tombol > span[data-aktif="true"] {
+  background: #4da3ff;
+}
+
+.lk-postingan-aksi {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.5rem 0;
+}
+
+.lk-postingan-caption {
+  padding: 0.25rem 1rem calc(2rem + env(safe-area-inset-bottom));
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.lk-postingan-caption-judul {
+  font-weight: 700;
+}
+
+.lk-postingan-caption-isi {
+  color: rgb(245 245 245 / 0.9);
+}
+
+.lk-postingan-caption-pendek {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lk-postingan-selengkapnya {
+  color: rgb(245 245 245 / 0.55);
+}
+
+.lk-postingan-tanggal {
+  margin-top: 0.5rem;
+  font-size: 12px;
+  color: rgb(245 245 245 / 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-postingan {
+    animation: none;
+  }
+}
+
+/* ── Lembar komentar seluler ala IG ────────────────────────────────────────
+   Gagang + judul + daftar menggulir + formulir. Lembar tulis bawaan
+   formulir (rincian__sheet, z-48) dinaikkan di atas lembar ini. */
+.lk-komentar-latar {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgb(0 0 0 / 0.6);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: lk-lembar-gelap 200ms ease-out;
+}
+
+.lk-komentar {
+  width: min(100%, 560px);
+  max-height: 70dvh;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  border-radius: 1.5rem 1.5rem 0 0;
+  padding: 0.5rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  animation: lk-lembar-naik 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lk-komentar .rincian__sheet {
+  z-index: 70;
+}
+
+.lk-komentar-gagang {
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 0.25rem auto 0.5rem;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.3);
+}
+
+.lk-komentar h2 {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.lk-komentar-daftar {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  margin-top: 0.5rem;
+  overscroll-behavior: contain;
+}
+
+.lk-komentar-form {
+  /* Tanpa garis sendiri: .rincian__kirim di dalamnya sudah bergaris atas —
+     dua garis bertumpuk terlihat ganda. */
+  padding-top: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-komentar-latar,
+  .lk-komentar {
+    animation: none;
+  }
+}
+/* ── Pil kredit © di sudut kiri bawah foto — hanya seluler. ─────────────── */
+.lk-kredit {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  max-width: calc(100% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 9999px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 12px;
+  pointer-events: none;
+}
+
+@media (min-width: 1100px) and (min-height: 640px) {
+  .lk-kredit {
+    display: none;
+  }
+}
+
+/* ── Bilah tab seluler ────────────────────────────────────────────────────
+   Hanya di aliran: navigasi bawah ala X (Beranda, Cari, Tulis, Lapor,
+   profil). Di panggung disembunyikan total. */
+.lk-tabbar,
+.lk-tabbar-ruang {
+  display: none;
+}
+
+@media not all and (min-width: 1100px) and (min-height: 640px) {
+  .lk-tabbar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    /* 56, di atas tampilan Postingan (55) supaya bilah ini tetap terlihat di
+       sana, tapi tetap di bawah lembar "..." (60) dan rincian/peta selayar
+       (70) yang memang harus menutup penuh. */
+    z-index: 56;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0.6rem 0.5rem max(0.75rem, env(safe-area-inset-bottom));
+    /* Pekat (bukan translusens): area gesture bar sistem di bawahnya
+       menampilkan warna yang sama sehingga tak ada garis celah. */
+    background: #0a0a0a;
+    border-top: 1px solid rgb(255 255 255 / 0.08);
+  }
+
+  /* Ruang pengimbang supaya ujung umpan tak tertutup bilah. */
+  .lk-tabbar-ruang {
+    display: block;
+    height: 76px;
+  }
+
+  /* Tinggi yang dimakan bilah tab, diumumkan ke seluruh isi halaman. Yang
+     membacanya sejauh ini .rincian__kirim — baris kirim komentar yang sticky
+     di dasar lembar rincian, dan tanpa ini ia tertimbun bilah sampai tak
+     terlihat. Angkanya sengaja sama dengan .lk-tabbar-ruang di atas supaya
+     tinggi bilah hanya hidup di satu tempat. */
+  .lk-bingkai {
+    --sela-bawah: 76px;
+  }
+}
+
+/* Gagang lembar hanya hidup di halaman panel seluler; di tempat lain tombolnya
+   tetap ada di DOM tapi tak ditampilkan. */
+.lk-lembar-gagang {
+  display: none;
+}
+
+.lk-tombol-peta,
+.lk-tombol-peta * {
+  pointer-events: auto !important;
+}
+
+.lk-tombol-peta {
+  /* `absolute`, bukan `relative`. Tombol ini dipasang `absolute top-2 right-9`
+     di dalam bingkai peta, dan `relative !important` mengalahkan utilitas itu:
+     offset `right: 36px` lalu diartikan sebagai geseran 36px ke KIRI dari
+     posisi statisnya, sehingga tombolnya terlempar ke luar layar. Terukur
+     x=-36..0 di panel ponsel dan x=-20..9 di desktop — pada halaman umpan
+     maupun panel.
+
+     Maksud aturan ini (bisa diklik, berada di atas) tetap utuh: `absolute`
+     juga membentuk konteks penumpukan, jadi z-index di bawah ini tetap
+     bekerja. Diuji di peramban sebelum diubah: dengan `absolute` tombolnya
+     mendarat di x=342..378 dalam bingkai 0..414 — tepat sudut kanan atas. */
+  position: absolute !important;
+  z-index: 9999 !important;
+}
+
+.lk-peta-penuh,
+.lk-peta-penuh * {
+  pointer-events: auto !important;
+}
+
+.lk-peta-penuh button {
+  position: relative !important;
+  z-index: 10000 !important;
+}
+
+/* KECUALI silang penutupnya. Aturan di atas menyasar SEMUA tombol di dalam
+   overlay demi menjaga klikabilitasnya, tapi silang ini dipasang
+   `absolute top-4 right-4` — dan `relative !important` mengalahkan utilitas
+   itu, sehingga `right: 16px` berubah makna jadi geseran 16px ke KIRI dari
+   posisi statisnya. Karena ia anak terakhir dalam aliran, hasilnya mendarat di
+   tepi kiri layar dan terpotong, berhimpit dengan chip legenda peta.
+
+   Mekanisme yang sama persis sudah tercatat untuk .lk-tombol-peta di atas;
+   ini kambuhnya pada overlay selayar. Aturan ini hanya mengembalikan
+   `position` — z-index 10000 dari aturan di atas tetap berlaku, jadi
+   klikabilitas yang dijaganya tidak berubah. */
+.lk-peta-penuh .lk-tutup-peta {
+  position: absolute !important;
+}
+
