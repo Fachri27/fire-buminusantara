@@ -435,6 +435,18 @@
   gap: 1.5rem;
 }
 
+/* ── Ritme berjenjang ala Pinterest ─────────────────────────────────────
+   Media TIDAK boleh dipotong (ukuran asli dipertahankan), jadi variasi
+   tinggi hanya datang dari rasio alami tiap berkas — dan saat datanya
+   seragam (mis. semua video portrait), kolom-kolom jatuh sama rata dan
+   terbaca seperti grid kaku. Kolom genap diturunkan sehingga barisnya tak
+   pernah sejajar penuh: berjenjang selalu, tanpa ukur gambar, tanpa crop,
+   dan stabil SSR (murni CSS, tanpa JS). Satu kolom (layar tersempit) tak
+   tersentuh — nth-child(even) tak cocok apa pun. */
+.lk-masonry-kolom:nth-child(even) {
+  margin-top: 2.5rem;
+}
+
 @media (min-width: 1100px) and (min-height: 640px) {
   .lk-kartu-teks {
     order: 1;
@@ -621,6 +633,11 @@
 
   .lk-masonry-kolom {
     gap: 1rem;
+  }
+
+  /* Berjenjang juga di seluler — lebih ramping menyesuaikan kartu kecil. */
+  .lk-masonry-kolom:nth-child(even) {
+    margin-top: 1.5rem;
   }
 
   /* Dasbor penuh di seluler hanya menampilkan daftar (halaman utama) —
