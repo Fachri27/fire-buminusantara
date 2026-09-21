@@ -172,7 +172,25 @@ export async function getZarrMetadata(forceRefresh: boolean = false): Promise<Za
     const meta = await res.json();
     const omaodArray = meta.metadata["omaod550/.zarray"];
     const totalTimeRuns = omaodArray.shape[0]; // e.g. 233
-    const latestTimeIndex = totalTimeRuns - 1; // e.g. 232
+    let latestTimeIndex = totalTimeRuns - 1; // e.g. 232
+
+    // Metadata terkonsolidasi bisa mendahului objek chunk-nya (ingest lag):
+    // shape mengiklankan run terbaru, tapi `omaod550/{chunk}.0.0.0`-nya belum
+    // tertulis sehingga seluruh frame 404 → 500 di API. Mundurkan ke run
+    // terbaru yang chunk-nya benar-benar ada supaya metadata dan frame selalu
+    // konsisten. Gagal probed = fail-open (perilaku lama).
+    try {
+      for (let susut = 0; susut < 8 && latestTimeIndex > 0; susut++) {
+        const chunkUji = Math.floor(latestTimeIndex / 2);
+        const uji = await fetch(`${ZARR_BASE_URL}/omaod550/${chunkUji}.0.0.0?_fet=${ZARR_TOKEN}`, {
+          method: "HEAD",
+        });
+        if (uji.ok) break;
+        latestTimeIndex--;
+      }
+    } catch {
+      // Abaikan — memakai latestTimeIndex dari shape seperti sebelumnya.
+    }
 
     // 7 hari analisis historis (14 model runs ke belakang: 2 run per hari, 28 Agu - 4 Sep)
     const startRunIdx = Math.max(0, latestTimeIndex - 14);

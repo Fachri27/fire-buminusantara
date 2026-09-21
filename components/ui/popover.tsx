@@ -19,6 +19,8 @@ export type PopoverContentProps = {
   sideOffset?: number;
   className?: string;
   children: React.ReactNode;
+  /** true = panel gelap dasbor /peta. Bawaan false (putih). */
+  gelap?: boolean;
 };
 
 type PopoverContextType = {
@@ -104,6 +106,7 @@ export function PopoverContent({
   sideOffset = 6,
   className = "",
   children,
+  gelap = false,
 }: PopoverContentProps) {
   const ctx = React.useContext(PopoverContext);
   if (!ctx) throw new Error("PopoverContent must be used within Popover");
@@ -120,7 +123,7 @@ export function PopoverContent({
   return (
     <div
       style={{ marginTop: sideOffset }}
-      className={`absolute z-50 rounded-lg border border-black/10 bg-white p-3 shadow-xl ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95 ${alignClass} ${className}`}
+      className={`absolute z-50 rounded-lg border p-3 shadow-xl animate-in fade-in-0 zoom-in-95 ${gelap ? "border-white/10 bg-pantau-malam ring-1 ring-white/10" : "border-black/10 bg-white ring-1 ring-black/5"} ${alignClass} ${className}`}
     >
       {children}
     </div>

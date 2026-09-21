@@ -23,12 +23,16 @@
 *.pem
 *.tsbuildinfo
 next-env.d.ts
+.*.mjs
+*.pdf
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+test-results/
+playwright-report/
 
 # vercel
 .vercel

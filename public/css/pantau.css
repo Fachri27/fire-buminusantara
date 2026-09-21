@@ -1,0 +1,77 @@
+/* ── Dasbor pantau (/peta) ──────────────────────────────────────────────
+   Gaya khusus konsol tiga kolom. Kelas-kelas di sini SELALU diawali
+   `pantau-`, `titik-pantau`, atau `font-papan` supaya tak bertabrakan
+   dengan gaya beranda/CMS yang tinggal serumah di globals.css. */
+
+/* Pola titik bara kolom tengah /peta — kisi titik merah redup yang memudar
+   dari satu pojok, dibuat dari gradien radial murni (tanpa gambar).
+   Warnanya bara yang digelapkan: terbaca sebagai tekstur di atas hitam,
+   tak pernah bersaing dengan peta. */
+.pantau-titik {
+  position: absolute;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgb(150 26 22 / 0.78) 1px, transparent 1.4px);
+  background-size: 7px 7px;
+}
+
+.pantau-titik--kanan {
+  top: 0;
+  right: 0;
+  width: 62%;
+  height: 46%;
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 100% 0%, #000 0%, rgb(0 0 0 / 0.6) 45%, transparent 88%);
+  mask-image: radial-gradient(ellipse 100% 100% at 100% 0%, #000 0%, rgb(0 0 0 / 0.6) 45%, transparent 88%);
+}
+
+.pantau-titik--kiri {
+  bottom: 0;
+  left: 0;
+  width: 46%;
+  height: 40%;
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 100%, #000 0%, rgb(0 0 0 / 0.6) 45%, transparent 88%);
+  mask-image: radial-gradient(ellipse 100% 100% at 0% 100%, #000 0%, rgb(0 0 0 / 0.6) 45%, transparent 88%);
+}
+
+/* Titik "langsung" di strip readout — denyut bara yang memudar keluar,
+   bukan kedip on/off (lebih tenang untuk dipandang lama). */
+.titik-pantau {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--color-pantau-bara);
+  animation: titik-pantau 2.2s ease-out infinite;
+}
+
+@keyframes titik-pantau {
+  0% { box-shadow: 0 0 0 0 rgb(255 90 38 / 0.5); }
+  70% { box-shadow: 0 0 0 9px rgb(255 90 38 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(255 90 38 / 0); }
+}
+
+/* Rel-rel dasbor menggulir sendiri-sendiri; bilah gulirnya ramping dan
+   gelap supaya tak mencuri perhatian dari isi. */
+.pantau-rel {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+
+.pantau-rel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.pantau-rel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pantau-rel::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.14);
+  border-radius: 8px;
+}
+
+/* Gerak yang diminta dikurangi: denyutnya mati, titiknya tetap menyala. */
+@media (prefers-reduced-motion: reduce) {
+  .titik-pantau {
+    animation: none;
+  }
+}

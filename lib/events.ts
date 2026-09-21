@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { bagiRelKanan } from "./rel-kanan";
 import { inferPulau, inferProvinsi, rapikanLokasi, PROVINSI_PETA_NAMA } from "./wilayah";
 import { urlMedia, itemMedia, type ItemMedia } from "./media";
 
@@ -151,6 +152,58 @@ export async function ambilBerita(limit = 10): Promise<Berita[]> {
 }
 
 /**
+ * Isi rel kanan konsol /peta: 5 laporan terbaru + 5 laporan terpopuler
+ * (komentar terbanyak, di luar lima terbaru supaya tidak ganda).
+ */
+export async function ambilRelKanan(
+  baru = 5,
+  ramai = 5,
+): Promise<{ terbaru: Berita[]; populer: Berita[]; komentar: Record<string, number> }> {
+  // Mode contoh (PETA_DUMMY=1, mis. pratinjau Vercel tanpa basis data):
+  // kembalikan data statis supaya halaman tetap tampil penuh.
+  if (process.env.PETA_DUMMY === "1") {
+    const { TERBARU_CONTOH, POPULER_CONTOH } = await import("./contoh-peta");
+    // Tanpa basis data tak ada komentar: peringkat kosong berarti filter
+    // "populer" jatuh ke urutan bawaan (terbaru dulu), bukan daftar kosong.
+    return { terbaru: TERBARU_CONTOH.slice(0, baru), populer: POPULER_CONTOH.slice(0, ramai), komentar: {} };
+  }
+
+  const [semua, hitung] = await Promise.all([
+    // event_date bisa seri — id menaik dipakai pemecah seri supaya "paling
+    // baru" benar-benar yang terakhir dibuat.
+    prisma.events.findMany({
+      where: TAYANG,
+      take: Math.max((baru + ramai) * 2, 100),
+      orderBy: [{ event_date: "desc" }, { id: "desc" }],
+      select: PILIH,
+    }),
+    // Komentar polimorfik ala Laravel, bukan relasi Prisma — dihitung terpisah.
+    prisma.comments.groupBy({
+      by: ["commentable_id"],
+      where: { commentable_type: "App\\Models\\Event", is_approved: true, commentable_id: { not: null } },
+      _count: true,
+    }),
+  ]);
+
+  const jumlahKomentar = new Map<number, number>();
+  for (const h of hitung) {
+    if (h.commentable_id != null) jumlahKomentar.set(Number(h.commentable_id), h._count);
+  }
+
+  const { terbaru, populer } = bagiRelKanan(semua, jumlahKomentar, baru, ramai);
+
+  return {
+    terbaru: terbaru.map((b) => keBerita(b as Baris)),
+    populer: populer.map((b) => keBerita(b as Baris)),
+    /* Peringkatnya, bukan laporannya: rel kanan mode arsip penuh mengurutkan
+       `berita` yang sudah ada di klien dengan angka ini. Mengirim daftar
+       laporan populer yang panjang berarti objek yang sama dikirim dua kali
+       dalam satu muatan halaman. Hanya laporan berkomentar yang terdaftar. */
+    komentar: Object.fromEntries(jumlahKomentar),
+  };
+}
+
+/**
  * SELURUH kejadian tayang untuk peta + pop-up wilayah — TANPA batas 10.
  *
  * `ambilBerita` di atas memang hanya 10 (kurasi korsel), dan pop-up peta
@@ -160,6 +213,12 @@ export async function ambilBerita(limit = 10): Promise<Berita[]> {
  * pop-up adalah arsip lengkap, bukan etalase.
  */
 export async function ambilSemuaBerita(): Promise<Berita[]> {
+  // Mode contoh — lihat ambilRelKanan di atas.
+  if (process.env.PETA_DUMMY === "1") {
+    const { BERITA_CONTOH } = await import("./contoh-peta");
+    return BERITA_CONTOH;
+  }
+
   const semua = await prisma.events.findMany({
     where: TAYANG,
     orderBy: [{ event_date: "desc" }, { id: "desc" }],
@@ -187,6 +246,12 @@ export async function ambilBeritaSlug(slug: string): Promise<Berita | null> {
  * masuk.
  */
 export async function hitungLaporanProvinsi(): Promise<Record<string, number>> {
+  // Mode contoh — lihat ambilRelKanan di atas.
+  if (process.env.PETA_DUMMY === "1") {
+    const { JUMLAH_CONTOH } = await import("./contoh-peta");
+    return { ...JUMLAH_CONTOH };
+  }
+
   const jumlah: Record<string, number> = Object.fromEntries(
     PROVINSI_PETA_NAMA.map((n) => [n, 0]),
   );

@@ -133,7 +133,65 @@ async function tigaTeratasTercache(): Promise<ProvinsiTeratas[]> {
   );
 }
 
+/** Satu baris daftar kabupaten rel kiri /peta. */
+export type KabupatenTerluas = {
+  nama: string;
+  /** Nama provinsi seperti tertulis di layer (level_3) — dinormalkan ke nama
+   *  peta oleh komponennya lewat namaProvinsiLokal. */
+  provinsi: string;
+  /** Sudah diformat id-ID; satuannya hektare. */
+  luas: string;
+};
+
+/** Layer kabupaten memakai atribut berbeda dari provinsi — lihat kepala berkas. */
+const LAYER_KABUPATEN = "proteus:KABUPATEN_STADI_2025";
+
+/** Semua kabupaten berluas kebakaran, terluas dulu. Sama seperti
+ *  tigaTeratasTercache: tanpa try/catch supaya galat tidak ikut tersimpan. */
+async function kabupatenTercache(): Promise<KabupatenTerluas[]> {
+  "use cache";
+  cacheLife("hours");
+
+  const params = new URLSearchParams({
+    service: "WFS", version: "1.1.0", request: "GetFeature",
+    typeName: LAYER_KABUPATEN,
+    propertyName: "level_3,level_4,luas",
+    sortBy: "luas D",
+    outputFormat: "application/json",
+    CQL_FILTER: "luas IS NOT NULL",
+  });
+
+  const r = await fetch(`${WFS_URL}?${params}`, {
+    signal: AbortSignal.timeout(6000),
+  });
+  const data = await r.json();
+  return (data?.features ?? []).map(
+    (f: { properties: Record<string, string | number> }) => ({
+      nama: String(f.properties.level_4),
+      provinsi: String(f.properties.level_3),
+      luas: Math.round(Number(f.properties.luas)).toLocaleString("id-ID"),
+    }),
+  );
+}
+
+export async function ambilKabupaten(): Promise<KabupatenTerluas[]> {
+  if (process.env.PETA_DUMMY === "1") {
+    const { KABUPATEN_CONTOH } = await import("./contoh-peta");
+    return KABUPATEN_CONTOH;
+  }
+  try {
+    return await kabupatenTercache();
+  } catch {
+    return [];
+  }
+}
+
 export async function ambilTigaTeratas(): Promise<ProvinsiTeratas[]> {
+  // Mode contoh (PETA_DUMMY=1): jangan panggil GeoServer, langsung statis.
+  if (process.env.PETA_DUMMY === "1") {
+    const { TERATAS_CONTOH } = await import("./contoh-peta");
+    return TERATAS_CONTOH;
+  }
   try {
     return await tigaTeratasTercache();
   } catch {

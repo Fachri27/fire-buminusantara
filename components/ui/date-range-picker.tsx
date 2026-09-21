@@ -11,6 +11,8 @@ export type DateRangePickerProps = {
   onClear?: () => void;
   placeholder?: string;
   className?: string;
+  /** true = tombol + kalender gelap dasbor /peta. Bawaan false (putih). */
+  gelap?: boolean;
 };
 
 function formatIso(d: Date): string {
@@ -50,6 +52,7 @@ export function DateRangePicker({
   onClear,
   placeholder = "Pilih rentang tanggal",
   className = "",
+  gelap = false,
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -92,13 +95,13 @@ export function DateRangePicker({
         <PopoverTrigger>
           <button
             type="button"
-            className="flex cursor-pointer items-center gap-2.5 rounded-[8px] border border-black/10 bg-white px-3 py-1.5 text-[length:var(--ukuran-catatan)] font-medium text-tinta shadow-2xs transition-colors hover:border-black/20 hover:bg-black/[0.02] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"
+            className={`flex cursor-pointer items-center gap-2.5 rounded-[8px] border px-3 py-1.5 text-[length:var(--ukuran-catatan)] font-medium shadow-2xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${gelap ? "border-white/15 bg-pantau-malam text-white hover:border-white/30 focus-visible:outline-white/60" : "border-black/10 bg-white text-tinta hover:border-black/20 hover:bg-black/[0.02] focus-visible:outline-api"}`}
           >
             <svg
               viewBox="0 0 20 20"
               fill="currentColor"
               aria-hidden="true"
-              className="size-3.5 shrink-0 text-black/50"
+              className={`size-3.5 shrink-0 ${gelap ? "text-white/50" : "text-black/50"}`}
             >
               <path
                 fillRule="evenodd"
@@ -106,18 +109,19 @@ export function DateRangePicker({
                 clipRule="evenodd"
               />
             </svg>
-            <span className={`whitespace-nowrap ${!adaPilihan ? "text-black/45" : "text-tinta font-semibold"}`}>
+            <span className={`whitespace-nowrap ${!adaPilihan ? (gelap ? "text-white/45" : "text-black/45") : (gelap ? "font-semibold text-white" : "font-semibold text-tinta")}`}>
               {teksTampilan()}
             </span>
           </button>
         </PopoverTrigger>
 
-        <PopoverContent align="start" className="p-3">
+        <PopoverContent align="start" className="p-3" gelap={gelap}>
           <Calendar
             mode="range"
             selected={dateRange}
             onSelect={handleSelect}
             initialMonth={dateRange.from}
+            gelap={gelap}
           />
         </PopoverContent>
       </Popover>

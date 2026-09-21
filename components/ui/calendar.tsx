@@ -13,6 +13,7 @@ type CalendarSingleProps = {
   onSelect?: (date: Date | undefined) => void;
   className?: string;
   initialMonth?: Date;
+  gelap?: boolean;
 };
 
 type CalendarRangeProps = {
@@ -21,6 +22,7 @@ type CalendarRangeProps = {
   onSelect?: (range: DateRange | undefined) => void;
   className?: string;
   initialMonth?: Date;
+  gelap?: boolean;
 };
 
 export type CalendarProps = CalendarSingleProps | CalendarRangeProps;
@@ -53,7 +55,7 @@ function isAfterDay(d1: Date, d2: Date) {
 }
 
 export function Calendar(props: CalendarProps) {
-  const { mode, className = "", initialMonth } = props;
+  const { mode, className = "", initialMonth, gelap = false } = props;
 
   const defaultMonth = () => {
     if (initialMonth) return initialMonth;
