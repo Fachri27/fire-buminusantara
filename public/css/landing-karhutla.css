@@ -271,7 +271,7 @@
      memang lebih kecil daripada lantai ponselnya sendiri sehingga satu clamp
      tunggal mustahil melayani keduanya. */
   .lk-kartu-judulbar h2 {
-    font-size: clamp(13px, 0.990vw, 19px);
+    font-size: clamp(15px, 0.990vw, 19px);
   }
 
   .lk-kanan .lk-kartu-tanggal {
@@ -371,6 +371,13 @@
   .lk-avatar {
     width: clamp(35px, 2.292vw, 44px);
     height: clamp(35px, 2.292vw, 44px);
+  }
+
+  /* Indentasi form = lebar avatar + gap-3, dari rumus yang sama dengan
+     avatarnya. pl-14 (56px) tetap hanya pas di 1920; di bawahnya avatar
+     menyusut dan area cerita bergeser ke kanan dari kolom judul di atasnya. */
+  #lk-form {
+    padding-left: calc(clamp(35px, 2.292vw, 44px) + 0.75rem);
   }
 
   .lk-avatar svg {
@@ -737,8 +744,15 @@
   }
 
   .lk-kartu-judulbar h2 {
-    font-size: 12px;
+    font-size: 13px;
+    line-height: 1.3;
     margin-top: 0;
+  }
+
+  /* Potongan dua baris dipasang di TOMBOL judul, bukan di h2: h2 itu item
+     flex, dan Chrome mem-blokifikasi -webkit-box-nya jadi flow-root — potongan
+     di sana tak pernah berlaku, judul panjang turun sampai empat baris. */
+  .lk-kartu-judulbar h2 button {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -1427,11 +1441,14 @@ html.dark .lk-bingkai-peta {
 }
 
 /* Kartu umpan (.lk-kartu) */
+/* Tanggal satu tingkat di bawah judul: redup, bukan nyaris putih — dengan
+   0.85 di tema gelap tanggal dan judul bersaing dan kartu terbaca ramai.
+   Kedua nilai tetap di atas AA 4.5 terhadap alas panelnya. */
 html:not(.dark) .lk-kartu-tanggal {
-  color: #555555 !important;
+  color: #6b6b6b !important;
 }
 html.dark .lk-kartu-tanggal {
-  color: rgba(255, 255, 255, 0.85) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
 }
 
 html:not(.dark) .lk-kartu-judulbar h2,
@@ -1441,6 +1458,14 @@ html:not(.dark) .lk-kartu-judulbar h2 button {
 html.dark .lk-kartu-judulbar h2,
 html.dark .lk-kartu-judulbar h2 button {
   color: #f5f5f5 !important;
+}
+
+/* Warna judul di atas dipaksa !important, jadi hover:text-* di TSX tak
+   pernah menang. Kartu yang disentuh menyalakan judulnya di sini — satu
+   selektor lebih spesifik, berlaku untuk kedua tema. */
+html .lk-kartu:hover .lk-kartu-judulbar h2 button,
+html .lk-kartu-judulbar h2 button:focus-visible {
+  color: #ff5a26 !important;
 }
 
 html:not(.dark) .lk-foto {
@@ -1462,10 +1487,12 @@ html.dark .lk-kanan p.bg-black {
 }
 
 /* Komposer laporan inline */
+/* Ajakan menciut berupa kolom berpil samar: tanpa alas, teksnya terbaca
+   sebagai judul, bukan sesuatu yang bisa diketuk. */
 html:not(.dark) #lk-tulis {
   border: none !important;
-  background-color: transparent !important;
-  border-radius: 8px !important;
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  border-radius: 999px !important;
   padding: 10px 16px !important;
   color: #444444 !important;
   font-size: 15px !important;
@@ -1474,12 +1501,13 @@ html:not(.dark) #lk-tulis {
 }
 html:not(.dark) #lk-tulis:hover {
   border: none !important;
+  background-color: rgba(0, 0, 0, 0.07) !important;
   color: #1a1919 !important;
 }
 html.dark #lk-tulis {
   border: none !important;
-  background-color: transparent !important;
-  border-radius: 8px !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border-radius: 999px !important;
   padding: 10px 16px !important;
   color: #d1d5db !important;
   font-size: 15px !important;
@@ -1488,19 +1516,24 @@ html.dark #lk-tulis {
 }
 html.dark #lk-tulis:hover {
   border: none !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
   color: #f5f5f5 !important;
 }
 
+/* Isian komposer berupa alas, bukan garis: tepi transparan yang baru
+   berwarna saat fokus (ukurannya tetap, jadi fokus tak menggeser apa pun),
+   dan alasnya menerang/menggelap supaya kolom aktif terbaca. */
 html:not(.dark) .lk-tulis-isi {
   color: #1a1919 !important;
-  border: 1px solid rgba(0, 0, 0, 0.12) !important;
-  background-color: #ffffff !important;
+  border: 1px solid transparent !important;
+  background-color: rgba(0, 0, 0, 0.045) !important;
   border-radius: 8px !important;
   padding: 10px 16px !important;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease !important;
 }
 html:not(.dark) .lk-tulis-isi:focus {
   border-color: #ff5a26 !important;
+  background-color: #ffffff !important;
   box-shadow: 0 0 0 1px #ff5a26 !important;
   outline: none !important;
 }
@@ -1510,14 +1543,15 @@ html:not(.dark) .lk-tulis-isi::placeholder {
 
 html.dark .lk-tulis-isi {
   color: #f5f5f5 !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  background-color: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid transparent !important;
+  background-color: rgba(255, 255, 255, 0.07) !important;
   border-radius: 8px !important;
   padding: 10px 16px !important;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease !important;
 }
 html.dark .lk-tulis-isi:focus {
   border-color: #ff5a26 !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
   box-shadow: 0 0 0 1px #ff5a26 !important;
   outline: none !important;
 }
@@ -1529,30 +1563,36 @@ html:not(.dark) #lk-form .border-white\/10 {
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
-html:not(.dark) .lk-isian {
-  background-color: #ffffff !important;
+/* Rupa kotak isian hanya untuk <input>. `.lk-isian` juga menempel di pil
+   "Tandai lokasi" dan keterangan "Foto/video wajib" — di sana ia cuma kait
+   ukuran huruf cair, dan rupa kotak ini dulu menyulap pil jingga itu jadi
+   kotak isian serta membingkai keterangannya seperti tombol. */
+html:not(.dark) input.lk-isian {
+  background-color: rgba(0, 0, 0, 0.045) !important;
   color: #1a1919 !important;
-  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid transparent !important;
   border-radius: 8px !important;
 }
-html:not(.dark) .lk-isian:focus {
+html:not(.dark) input.lk-isian:focus {
   border-color: #ff5a26 !important;
+  background-color: #ffffff !important;
   outline: none !important;
 }
-html:not(.dark) .lk-isian::placeholder {
+html:not(.dark) input.lk-isian::placeholder {
   color: #888888 !important;
 }
-html.dark .lk-isian {
-  background-color: rgba(255, 255, 255, 0.04) !important;
+html.dark input.lk-isian {
+  background-color: rgba(255, 255, 255, 0.07) !important;
   color: #f5f5f5 !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid transparent !important;
   border-radius: 8px !important;
 }
-html.dark .lk-isian:focus {
+html.dark input.lk-isian:focus {
   border-color: #ff5a26 !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
   outline: none !important;
 }
-html.dark .lk-isian::placeholder {
+html.dark input.lk-isian::placeholder {
   color: rgba(160, 160, 160, 0.6) !important;
 }
 

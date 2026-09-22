@@ -1,12 +1,6 @@
 @import "tailwindcss";
-@import "../public/css/rincian-laporan.css";
-@import "../public/css/kartu-kursor.css";
-@import "../public/css/kartu-video.css";
-@import "../public/css/pantauan-kosong.css";
-@import "../public/css/pantau.css";
-@import "../public/css/peta-angka.css";
-@import "../public/css/peta-popup.css";
-@import "../public/css/landing-karhutla.css";
+/* CSS halaman publik (landing, rincian, peta) diimpor di app/[locale]/layout.tsx,
+   bukan di sini — supaya /admin tidak ikut mengunduh ~150 KB gaya yang tak dipakainya. */
 
 /* ── Mode tampilan ────────────────────────────────────────────────────────
    Dua tata letak, bukan sekadar breakpoint responsif biasa:

@@ -4,12 +4,10 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useS
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Peta } from "@/components/peta";
 import { Nav } from "@/components/nav";
-import { RincianLaporan } from "@/components/rincian-laporan";
-import { PopupPeta } from "@/components/popup-peta";
-import { UlasanKomentar, FormulirKomentar } from "@/components/kolom-komentar";
 import { Switch } from "@/components/ui/switch";
 import { gunakanKomentar } from "@/hooks/gunakan-komentar";
 import { gunakanKolomUmpan } from "@/hooks/gunakan-kolom-umpan";
@@ -24,6 +22,19 @@ import { useTheme } from "next-themes";
 import { useMounted } from "@/hooks/use-mounted";
 import { kirimLaporan, type KeadaanLapor } from "@/app/[locale]/lapor/aksi";
 import { bacaDraf, simpanDraf } from "@/lib/draf-lapor";
+import { mediaLokal } from "@/lib/media";
+
+/* Dimuat terpisah: semuanya baru tampil sesudah interaksi (buka rincian,
+   tekan provinsi, buka komentar), jadi tak perlu ikut bundel awal. Rincian
+   tetap di-SSR karena rute /fire/<slug> merendernya terbuka sejak awal. */
+const RincianLaporan = dynamic(() => import("@/components/rincian-laporan").then((m) => m.RincianLaporan));
+const PopupPeta = dynamic(() => import("@/components/popup-peta").then((m) => m.PopupPeta), { ssr: false });
+const UlasanKomentar = dynamic(() => import("@/components/kolom-komentar").then((m) => m.UlasanKomentar), { ssr: false });
+const FormulirKomentar = dynamic(() => import("@/components/kolom-komentar").then((m) => m.FormulirKomentar), { ssr: false });
+
+/* Lebar kartu umpan untuk srcset next/image: 2 kolom di bawah 1100px (1 kolom
+   di layar sangat sempit), 3-4 kolom di panggung — 33vw batas atasnya. */
+const UKURAN_FOTO_UMPAN = "(max-width: 359px) 100vw, (max-width: 1099px) 50vw, 33vw";
 
 /** Site key Turnstile — sama seperti form /lapor. */
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
@@ -674,12 +685,23 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
         >
           {poster && !posterGagal ? (
             <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={poster} alt="" aria-hidden="true" loading="lazy"
-                onError={() => setPosterGagal(true)}
-                className="lk-foto h-auto w-full"
-              />
+              {mediaLokal(poster) ? (
+                /* Poster unggahan lokal lewat optimizer (AVIF/WebP, srcset
+                   selebar kartu); rasio alaminya tetap dari CSS h-auto. */
+                <Image
+                  src={poster} alt="" aria-hidden="true" loading="lazy"
+                  width={0} height={0} sizes={tanpaMt ? "100vw" : UKURAN_FOTO_UMPAN}
+                  onError={() => setPosterGagal(true)}
+                  className="lk-foto h-auto w-full"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
+                <img
+                  src={poster} alt="" aria-hidden="true" loading="lazy"
+                  onError={() => setPosterGagal(true)}
+                  className="lk-foto h-auto w-full"
+                />
+              )}
               <video
                 ref={ref}
                 src={url}
@@ -891,8 +913,12 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
           <VideoOtomatis url={aktif.url} poster={aktif.poster ?? l.gambar} label={l.judul} onBuka={onBuka} tanpaMt kredit={aktif.keterangan ?? "anonim"} bahasa={bahasa} />
         ) : aktif.url ? (
           <span className="lk-media-statis">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={aktif.url} alt={l.alt} className="lk-postingan-foto" />
+            {mediaLokal(aktif.url) ? (
+              <Image src={aktif.url} alt={l.alt} width={0} height={0} sizes="100vw" className="lk-postingan-foto" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
+              <img src={aktif.url} alt={l.alt} className="lk-postingan-foto" />
+            )}
             <span aria-hidden="true" className="lk-kredit">
               ©&nbsp;{aktif.keterangan ?? "anonim"}
             </span>
@@ -1484,7 +1510,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               placeholder={t.judulPh}
               maxLength={255}
               autoComplete="off"
-              className="lk-tulis-isi min-w-0 flex-1 rounded-lg border border-black/[0.12] bg-white px-4 py-2.5 text-[15px] font-bold text-tinta placeholder:font-normal placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:border-white/15 dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:placeholder:text-[#a0a0a0]/70 dark:focus:border-[#ff5a26]"
+              className="lk-tulis-isi min-w-0 flex-1 rounded-lg border border-black/[0.12] bg-white px-4 py-2.5 text-[15px] font-semibold text-tinta placeholder:font-normal placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:border-white/15 dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:placeholder:text-[#a0a0a0]/70 dark:focus:border-[#ff5a26]"
             />
           </>
         )}
@@ -1609,19 +1635,19 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               mengetik dua bilangan desimal; keadaan "ditandai" dibaca dari pil
               itu sendiri, jadi tak perlu baris keterangan di bawahnya. Nama
               memanjang mengisi sisa baris supaya tak ada rongga. */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={adaLokasi ? hapusLokasi : lokasiSaya}
               disabled={mencariLokasi}
               title={adaLokasi ? t.lokasiHapus : t.tandaiLokasi}
               aria-label={adaLokasi ? t.lokasiHapus : t.tandaiLokasi}
-              className={`lk-isian flex cursor-pointer items-center gap-1.5 rounded-full py-1.5 pr-3 pl-2.5 text-[13px]
+              className={`lk-isian flex h-9 cursor-pointer items-center gap-1.5 rounded-full pr-3 pl-2.5 text-[13px]
                           whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-50
                           focus-visible:outline-2 focus-visible:outline-[#ff5a26] ${
                 adaLokasi
-                  ? "bg-[#ff5a26]/15 text-[#ff5a26] ring-1 ring-[#ff5a26]/30 hover:bg-[#ff5a26]/25"
-                  : "text-[#ff5a26] ring-1 ring-black/10 hover:bg-[#ff5a26]/10 dark:ring-white/10"
+                  ? "bg-[#ff5a26]/20 text-[#ff5a26] hover:bg-[#ff5a26]/25"
+                  : "bg-[#ff5a26]/10 text-[#ff5a26] hover:bg-[#ff5a26]/15"
               }`}
             >
               <IkonPin className="size-[18px]" />
@@ -1637,25 +1663,29 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
                 Ia bukan kontrol yang perlu dibuka: begitu titiknya ditandai
                 GPS, dua bilangan itulah buktinya — dan pelapor berhak melihat
                 serta membetulkannya. Sekaligus jalan masuk lat/lng custom. */}
-            <span className="flex items-center gap-2">
+            <span className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
               <label className="sr-only" htmlFor="lk-lat">{t.latPh}</label>
               <input id="lk-lat" name="lat" inputMode="decimal" placeholder={t.latPh}
                      value={lat} onChange={(e) => setLat(e.target.value)}
-                     className="lk-isian lk-koord w-[86px] rounded-lg bg-white px-3 py-2 font-mono text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
+                     className="lk-isian lk-koord h-9 w-0 min-w-0 flex-1 sm:w-[86px] sm:flex-none rounded-lg bg-white px-3 font-mono placeholder:font-sans text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
               <label className="sr-only" htmlFor="lk-lng">{t.lngPh}</label>
               <input id="lk-lng" name="lng" inputMode="decimal" placeholder={t.lngPh}
                      value={lng} onChange={(e) => setLng(e.target.value)}
-                     className="lk-isian lk-koord w-[86px] rounded-lg bg-white px-3 py-2 font-mono text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
+                     className="lk-isian lk-koord h-9 w-0 min-w-0 flex-1 sm:w-[86px] sm:flex-none rounded-lg bg-white px-3 font-mono placeholder:font-sans text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
             </span>
 
             {/* Anonim menyembunyikan kolom nama, bukan meredupkannya: kolom mati
                 yang tetap terpampang cuma mengundang orang mengetik ke dalamnya. */}
+            {/* Nama + anonim satu kelompok: di ponsel mereka turun ke baris
+                kedua bersama-sama, bukan nama terpotong di ujung baris lokasi
+                dan saklarnya terdampar sendirian di baris ketiga. */}
+            <span className="flex basis-full items-center gap-3 sm:basis-0 sm:flex-1">
             {!anonim && (
               <>
                 <label className="sr-only" htmlFor="lk-nama">{t.namaPh}</label>
                 <input id="lk-nama" name="nama" maxLength={100} autoComplete="name"
                        value={nama} onChange={(e) => setNama(e.target.value)} placeholder={t.namaPh}
-                       className="lk-isian min-w-[120px] flex-1 rounded-lg bg-white px-3.5 py-2 text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
+                       className="lk-isian h-9 min-w-0 flex-1 rounded-lg bg-white px-3.5 text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
               </>
             )}
 
@@ -1670,6 +1700,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               />
               <span>{t.anonim}</span>
             </label>
+            </span>
           </div>
 
 
@@ -1710,7 +1741,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
             </ul>
           )}
 
-          <div className="mt-2 flex items-center gap-1 border-t border-black/[0.08] dark:border-white/10 pt-2">
+          <div className="mt-3 flex items-center gap-1 border-t border-black/[0.08] dark:border-white/10 pt-2">
             <button type="button" title={t.lampirFoto} aria-label={t.lampirFoto}
                     onClick={() => berkasRef.current?.click()} className={ikonAksi}>
               <IkonFoto />
@@ -1727,7 +1758,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               {berkas.length > 0 ? `${berkas.length}/${BATAS_BERKAS}` : t.wajibMedia}
             </span>
             <button type="button" onClick={() => setBuka(false)}
-                    className="lk-batal cursor-pointer ml-auto px-3 py-1.5 text-[14px] text-black/60 transition hover:text-black dark:text-[#a0a0a0] dark:hover:text-white
+                    className="lk-batal ml-auto h-9 cursor-pointer rounded-full px-3.5 text-[14px] text-black/60 transition hover:bg-black/[0.05] hover:text-black dark:text-[#a0a0a0] dark:hover:bg-white/10 dark:hover:text-white
                                focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
               {t.batal}
             </button>
@@ -1735,9 +1766,14 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               type="submit"
               disabled={mengirim || menungguToken}
               aria-busy={mengirim || menungguToken}
-              className="lk-kirim cursor-pointer rounded-full bg-black text-white dark:bg-[#e7e9ea] dark:text-black px-5 py-1.5 text-[15px] font-bold transition
+              /* Redup selama syaratnya belum lengkap — isyarat, bukan kunci:
+                 tombolnya tetap bisa ditekan supaya galat di atas bisa
+                 menyebut apa yang kurang. */
+              className={`lk-kirim h-9 cursor-pointer rounded-full bg-black text-white dark:bg-[#e7e9ea] dark:text-black px-5 text-[15px] font-semibold transition
                          hover:opacity-90 dark:hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]
-                         disabled:opacity-60 disabled:cursor-not-allowed"
+                         disabled:opacity-60 disabled:cursor-not-allowed ${
+                           judul.trim() && deskripsi.trim() && berkas.length > 0 ? "" : "opacity-45"
+                         }`}
             >
               {mengirim ? t.mengirim : menungguToken ? t.memverifikasi : t.kirim}
             </button>
@@ -1901,7 +1937,8 @@ export function LandingKarhutla(
   {
     bahasa,
     jumlahLaporan,
-    berita = [],
+    berita: beritaAwal = [],
+    totalBerita = 0,
     tampil = "semua",
     statistik,
     kejadianAwal = null,
@@ -1910,7 +1947,10 @@ export function LandingKarhutla(
     bahasa: Bahasa;
     /** Peta butuh angka provinsi — halaman umpan tak memakainya. */
     jumlahLaporan?: Record<string, number>;
+    /** Potongan awal umpan (24 teratas) — sisanya diambil dari /api/umpan. */
     berita?: Berita[];
+    /** Banyak kejadian seluruhnya; lebih besar dari `berita` = masih ada sisa. */
+    totalBerita?: number;
     /** "semua" = dasbor (desktop dua rel; seluler hanya daftar laporan);
         "panel" = halaman panel situasi saja (peta+cuaca+statistik). */
     tampil?: "semua" | "panel";
@@ -1926,6 +1966,39 @@ export function LandingKarhutla(
 ) {
   const t = TEKS[bahasa];
   const daftarStatistik = statistik ?? ambilStatistik(bahasa);
+  /* Umpan penuh: server hanya mengirim potongan awal supaya payload RSC tetap
+     kecil; daftar lengkap diambil saat peramban senggang, atau seketika saat
+     pengunjung butuh (saringan, urutan, cari, pop-up provinsi, rincian).
+     Gagal = tetap memakai potongan awal. Prop baru (router.refresh sesudah
+     melapor) mengulang dari potongan barunya. */
+  const [berita, setBerita] = useState(beritaAwal);
+  const [beritaAwalLama, setBeritaAwalLama] = useState(beritaAwal);
+  if (beritaAwal !== beritaAwalLama) {
+    setBeritaAwalLama(beritaAwal);
+    setBerita(beritaAwal);
+  }
+  const dimuatUntuk = useRef<Berita[] | null>(null);
+  const muatPenuh = useCallback(() => {
+    if (totalBerita <= beritaAwal.length || dimuatUntuk.current === beritaAwal) return;
+    dimuatUntuk.current = beritaAwal;
+    fetch("/api/umpan")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: unknown) => {
+        if (dimuatUntuk.current === beritaAwal && Array.isArray(d)) setBerita(d as Berita[]);
+      })
+      .catch(() => {
+        // Boleh dicoba lagi pada interaksi berikutnya.
+        if (dimuatUntuk.current === beritaAwal) dimuatUntuk.current = null;
+      });
+  }, [beritaAwal, totalBerita]);
+  useEffect(() => {
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(muatPenuh, { timeout: 4000 });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(muatPenuh, 1500);
+    return () => clearTimeout(id);
+  }, [muatPenuh]);
   // Lokasi + suhu otomatis dari IP (tanpa izin geolokasi); sebelum tiba,
   // lokasi memakai teks statis dan suhu memakai garis jeda.
   const cuaca = useCuacaLokal(bahasa, t.lokasi);
@@ -2224,12 +2297,13 @@ export function LandingKarhutla(
           setSorot(ketemu);
           return;
         }
+        muatPenuh();
       }
       setSorot(null);
     };
     window.addEventListener("popstate", saatPopState);
     return () => window.removeEventListener("popstate", saatPopState);
-  }, [berita]);
+  }, [berita, muatPenuh]);
   const bukaDariId = useCallback(
     (id: number) => {
       const asli = berita.find((b) => b.id === id);
@@ -2496,6 +2570,11 @@ export function LandingKarhutla(
       ? (a, b) => (b.komentar ?? 0) - (a.komentar ?? 0) || baru(a, b)
       : baru);
   }, [sebelumWilayah, wilayahUmpan, urutanUmpan]);
+  // Interaksi yang butuh daftar lengkap tak menunggu waktu senggang.
+  const butuhPenuh = Boolean(kata || adaSaringanUmpan || urutanUmpan !== "terbaru" || wilayah || sorot);
+  useEffect(() => {
+    if (butuhPenuh) muatPenuh();
+  }, [butuhPenuh, muatPenuh]);
 
   /* Geser/panah antar-laporan di rincian mengikuti umpan YANG TERLIHAT —
      urutan dan saringannya — jadi "berikutnya" selalu kartu berikutnya di
@@ -3020,8 +3099,9 @@ export function LandingKarhutla(
           </div>
 
           {hasil.length === 0 ? (
-            <div className="mt-5 px-4 py-12 text-center text-[13px] text-black/60 dark:text-[#a0a0a0]">
-              <p>{adaSaringanUmpan && !kata ? t.saringanKosong : t.hasilKosong}</p>
+            <div className="mt-5 flex flex-col items-center rounded-xl border border-dashed border-black/15 px-4 py-12 text-center text-[14px] text-black/60 dark:border-white/15 dark:text-[#a0a0a0]">
+              <IkonCari className="mb-3 size-7 opacity-50" />
+              <p className="max-w-[40ch] text-balance">{adaSaringanUmpan && !kata ? t.saringanKosong : t.hasilKosong}</p>
               {adaSaringanUmpan && (
                 <button
                   type="button"
@@ -3036,12 +3116,12 @@ export function LandingKarhutla(
             <UmpanMasonry
               daftar={hasil}
               kolom={kolom}
-              kartu={(l) => (
-                <article key={l.id} className="lk-kartu text-tinta dark:text-[#f5f5f5]">
+              kartu={(l, i) => (
+                <article key={l.id} className="lk-kartu group text-tinta dark:text-[#f5f5f5]">
                   <div className="lk-kartu-teks">
                     <p className="lk-kartu-tanggal text-[13px] text-black/60 dark:text-white/85 sm:text-[14px]">{l.tanggal}</p>
                     <div className="lk-kartu-judulbar">
-                      <h2 className="mt-1.5 min-w-0 flex-1 text-[16px] leading-[1.25] font-bold tracking-tight sm:text-[19px]">
+                      <h2 className="mt-1 min-w-0 flex-1 text-[16px] leading-[1.3] font-semibold text-pretty sm:text-[19px]">
                         <button
                           type="button"
                           onClick={() => bukaMedia(l.id)}
@@ -3081,10 +3161,18 @@ export function LandingKarhutla(
                       type="button"
                       onClick={() => bukaMedia(l.id)}
                       aria-label={l.judul}
-                      className="lk-foto cursor-pointer relative mt-3 block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+                      className="lk-foto cursor-pointer relative mt-3 block w-full overflow-hidden transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false} className="lk-foto h-auto w-full" />
+                      {mediaLokal(l.gambar) ? (
+                        /* Baris pertama (j === 0 tiap kolom) kandidat LCP: jangan ditunda. */
+                        <Image src={l.gambar} alt={l.alt} loading={i % 100 === 0 ? "eager" : "lazy"} draggable={false}
+                               width={0} height={0} sizes={UKURAN_FOTO_UMPAN}
+                               className="lk-foto h-auto w-full transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
+                        <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false}
+                             className="lk-foto h-auto w-full transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+                      )}
                       {l.galeri.length > 1 && (
                         <span aria-hidden="true" className="lk-galeri-lencana">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"

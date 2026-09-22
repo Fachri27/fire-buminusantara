@@ -159,7 +159,7 @@ const nextConfig: NextConfig = {
       // membawa header cache tersendiri.
       {
         source:
-          "/((?!_next/static|_next/image|assets/|css/|favicon\\.ico|icon\\.png|apple-icon\\.png|robots\\.txt|sitemap\\.xml|media/|api/forecasting|api/sebaran-asap|data/).*)",
+          "/((?!_next/static|_next/image|assets/|css/|favicon\\.ico|icon\\.png|apple-icon\\.png|robots\\.txt|sitemap\\.xml|media/|api/forecasting|api/sebaran-asap|api/umpan|data/).*)",
         headers: [
           {
             key: "Cache-Control",

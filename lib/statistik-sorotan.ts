@@ -1,3 +1,4 @@
+import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "./prisma";
 import {
   BAWAN_SOROTAN, KUNCI_SOROTAN, LABEL_SOROTAN,
@@ -10,13 +11,16 @@ export { BAWAN_SOROTAN, KUNCI_SOROTAN, LABEL_SOROTAN, type KunciSorotan };
  *  melempar: galat basis data (pool habis, tabel belum migrasi, dsb) hanya
  *  berarti angka bawaan — halaman publik tidak boleh 500 karenanya.
  *
- *  SENGAJA tanpa cache dalam-memori: satu baris kecil berindeks ini murah
- *  dibaca tiap request, sedangkan cache per-instans membuat angka baru
- *  hasil simpan CMS tak kunjung tampil di instans lain (serverless) —
- *  kurator mengira simpanannya gagal. */
+ *  Di-cache dengan tag "sorotan", bukan cache dalam-memori per-instans
+ *  (yang membuat simpanan CMS tak kunjung tampil di instans lain): aksi
+ *  simpan CMS memanggil updateTag("sorotan"), jadi angka baru langsung
+ *  tampil. Galat hanya di-cache sebentar supaya bawaan tidak tertahan. */
 export async function ambilSorotan(): Promise<Record<KunciSorotan, number>> {
+  "use cache";
+  cacheTag("sorotan");
   try {
     const baris = await prisma.sorotan_statistik.findFirst({ orderBy: { id: "asc" } });
+    cacheLife("hours");
     if (!baris) return { ...BAWAN_SOROTAN };
     return {
       hotspot: Number(baris.hotspot),
@@ -27,6 +31,7 @@ export async function ambilSorotan(): Promise<Record<KunciSorotan, number>> {
       korban_satwa: Number(baris.korban_satwa),
     };
   } catch {
+    cacheLife("seconds");
     return { ...BAWAN_SOROTAN };
   }
 }

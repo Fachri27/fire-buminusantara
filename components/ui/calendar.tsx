@@ -136,51 +136,66 @@ export function Calendar(props: CalendarProps) {
     }
   };
 
+  /* Satu bahasa rupa untuk kedua mode: ujung pilihan berupa lingkaran penuh
+     bertinta, rentang di antaranya pita tipis yang menyambung, dan "hari ini"
+     cukup titik kecil di bawah angkanya — cincin kotak dulu terbaca seperti
+     pilihan kedua. */
+  const tombolHari = "relative flex size-9 cursor-pointer items-center justify-center rounded-full text-[13px] tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#ff5a26]";
+  const ujung = "bg-neutral-900 font-semibold text-white dark:bg-white dark:text-neutral-900";
+  const biasa = (bulanIni: boolean) =>
+    bulanIni
+      ? "text-neutral-800 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-white/10"
+      : "text-neutral-300 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-white/5";
+  const titikHariIni = (terpilih: boolean) => (
+    <span aria-hidden="true"
+          className={`absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full ${
+            terpilih ? "bg-white dark:bg-neutral-900" : "bg-[#ff5a26]"
+          }`} />
+  );
+  const pita = "bg-[var(--pita)]";
+
   return (
-    <div className={`w-[260px] select-none text-neutral-900 dark:text-white ${gelap ? "dark" : ""} ${className}`}>
+    <div className={`w-[252px] select-none text-neutral-900 dark:text-white ${gelap ? "dark" : ""} ${className}`}>
       {/* Header navigasi bulan & tahun */}
-      <div className="flex items-center justify-between pb-3">
+      <div className="flex items-center justify-between pb-2">
         <button
           type="button"
           onClick={prevMonth}
           aria-label="Bulan sebelumnya"
-          className="cursor-pointer flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white transition-colors"
+          className="flex size-8 cursor-pointer items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/10 dark:hover:text-white"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="size-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
           </svg>
         </button>
 
-        <span className="text-xs font-bold tracking-tight text-neutral-900 dark:text-white">
-          {NAMA_BULAN[bulan]} {tahun}
+        <span aria-live="polite" className="text-[14px] font-semibold text-neutral-900 dark:text-white">
+          {NAMA_BULAN[bulan]} <span className="font-normal text-neutral-500 dark:text-neutral-400">{tahun}</span>
         </span>
 
         <button
           type="button"
           onClick={nextMonth}
           aria-label="Bulan berikutnya"
-          className="cursor-pointer flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white transition-colors"
+          className="flex size-8 cursor-pointer items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/10 dark:hover:text-white"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className="size-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
           </svg>
         </button>
       </div>
 
       {/* Baris nama hari */}
-      <div className="grid grid-cols-7 text-center pb-1">
-        {NAMA_HARI.map((h, i) => (
-          <span
-            key={h}
-            className={`text-[10px] font-medium ${i === 0 ? "text-red-500 dark:text-red-400" : "text-neutral-400 dark:text-neutral-400"}`}
-          >
+      <div className="grid grid-cols-7 pb-1 text-center">
+        {NAMA_HARI.map((h) => (
+          <span key={h} className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
             {h}
           </span>
         ))}
       </div>
 
       {/* Grid tanggal */}
-      <div className="grid grid-cols-7 gap-y-0.5 pt-1">
+      <div className="grid grid-cols-7 gap-y-1" onMouseLeave={() => setHoverDate(null)}>
         {hariArray.map(({ date, isCurrentMonth }, idx) => {
           const isToday = isSameDay(date, today);
 
@@ -188,48 +203,48 @@ export function Calendar(props: CalendarProps) {
             const isSelected = isSameDay(props.selected, date);
 
             return (
-              <div key={idx} className="flex items-center justify-center p-0.5">
+              <div key={idx} className="flex items-center justify-center">
                 <button
                   type="button"
                   onClick={() => handleDayClick(date)}
-                  className={`cursor-pointer size-8 rounded-md text-xs transition-all flex items-center justify-center relative ${
-                    isSelected
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-xs"
-                      : isCurrentMonth
-                      ? "text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-white/10 font-medium"
-                      : "text-neutral-300 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-white/5"
-                  } ${isToday && !isSelected ? "ring-1 ring-neutral-400 dark:ring-neutral-500 font-bold" : ""}`}
+                  aria-pressed={isSelected}
+                  className={`${tombolHari} ${isSelected ? ujung : biasa(isCurrentMonth)}`}
                 >
                   {date.getDate()}
+                  {isToday && titikHariIni(isSelected)}
                 </button>
               </div>
             );
           }
 
-          // Mode Range
+          // Mode Range — pratinjau mengikuti penunjuk selama ujung akhir belum dipilih.
           const selected = props.selected;
+          const pratinjauAkhir =
+            !selected?.to && hoverDate && selected?.from && isAfterDay(hoverDate, selected.from) ? hoverDate : undefined;
+          const effectiveTo = selected?.to ?? pratinjauAkhir;
+
           const isFrom = isSameDay(selected?.from, date);
-          const isTo = isSameDay(selected?.to, date);
+          const isTo = isSameDay(effectiveTo, date);
+          const isEnd = isFrom || isTo;
 
-          const effectiveTo = selected?.to ?? (hoverDate && selected?.from && isAfterDay(hoverDate, selected.from) ? hoverDate : undefined);
+          const inRange = Boolean(
+            selected?.from && effectiveTo && isAfterDay(date, selected.from) && isBeforeDay(date, effectiveTo),
+          );
+          const adaRentang = Boolean(selected?.from && effectiveTo && !isSameDay(selected.from, effectiveTo));
 
-          const inRange =
-            selected?.from &&
-            effectiveTo &&
-            isAfterDay(date, selected.from) &&
-            isBeforeDay(date, effectiveTo);
-
-          const isRangeStart = isFrom && Boolean(effectiveTo);
-          const isRangeEnd = (isTo || (Boolean(hoverDate) && !selected?.to && isSameDay(hoverDate ?? undefined, date))) && Boolean(selected?.from);
+          // Pita menyambung dari tengah lingkaran ujung ke tetangganya.
+          const latar = inRange
+            ? pita
+            : adaRentang && isFrom
+            ? "bg-[linear-gradient(to_right,transparent_50%,var(--pita)_50%)]"
+            : adaRentang && isTo
+            ? "bg-[linear-gradient(to_left,transparent_50%,var(--pita)_50%)]"
+            : "";
 
           return (
             <div
               key={idx}
-              className={`flex items-center justify-center p-0 ${
-                inRange ? "bg-neutral-100 dark:bg-white/10" : ""
-              } ${isRangeStart ? "bg-gradient-to-r from-transparent to-neutral-100 dark:to-white/10" : ""} ${
-                isRangeEnd ? "bg-gradient-to-l from-transparent to-neutral-100 dark:to-white/10" : ""
-              }`}
+              className={`flex items-center justify-center [--pita:#f5f5f5] dark:[--pita:rgb(255_255_255/0.08)] ${latar}`}
               onMouseEnter={() => {
                 if (selected?.from && !selected?.to) {
                   setHoverDate(date);
@@ -239,17 +254,17 @@ export function Calendar(props: CalendarProps) {
               <button
                 type="button"
                 onClick={() => handleDayClick(date)}
-                className={`cursor-pointer size-8 text-xs transition-all flex items-center justify-center relative ${
-                  isFrom || isTo
-                    ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-xs rounded-md"
+                aria-pressed={isEnd}
+                className={`${tombolHari} ${
+                  isEnd
+                    ? `${ujung} ${pratinjauAkhir && isTo ? "opacity-70" : ""}`
                     : inRange
-                    ? "bg-neutral-100 text-neutral-900 hover:bg-neutral-200 dark:bg-transparent dark:text-white dark:hover:bg-white/20 font-medium rounded-none"
-                    : isCurrentMonth
-                    ? "text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-white/10 font-medium rounded-md"
-                    : "text-neutral-300 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-white/5 rounded-md"
-                } ${isToday && !isFrom && !isTo ? "ring-1 ring-neutral-400 dark:ring-neutral-500 font-bold" : ""}`}
+                    ? "text-neutral-900 hover:bg-neutral-200 dark:text-white dark:hover:bg-white/15"
+                    : biasa(isCurrentMonth)
+                }`}
               >
                 {date.getDate()}
+                {isToday && titikHariIni(isEnd)}
               </button>
             </div>
           );

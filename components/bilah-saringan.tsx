@@ -22,7 +22,9 @@ export type OpsiWilayah = { kunci: string; label: string; jumlah?: number };
  *   setinggi h-9 — dulu tanggal duduk sendirian di baris pertama selebar
  *   isinya, dan tinggi ketiga kontrol berbeda-beda. Placeholder tanggalnya
  *   dipendekkan jadi "Tanggal" supaya tak terpotong di kolom yang sempit.
- * - Layar lebar: satu baris, tanggal di kiri, wilayah + saklar di kanan.
+ * - Layar lebar: satu baris — saringan (tanggal + wilayah) berkelompok di
+ *   kiri, saklar di kanan. Dulu wilayah ikut ke kanan dan menyisakan rongga
+ *   lebar di antara dua saringan yang sejenis.
  */
 export function BilahSaringan({
   dari,
@@ -57,12 +59,12 @@ export function BilahSaringan({
     <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 sm:flex sm:gap-2.5">
       {/* Kolom tanggal selebar isinya (maks. 9rem — rentang terpilih yang
           panjang terpotong elipsis), sisanya untuk wilayah. */}
-      <div className="min-w-0 max-w-[9rem] sm:max-w-none sm:mr-auto">
+      <div className="min-w-0 max-w-[9rem] sm:max-w-none">
         <DateRangePicker dari={dari} sampai={sampai} gelap={gelap} onChange={onTanggal} penuh
                          placeholder={sempit ? placeholderTanggalPendek : placeholderTanggal} />
       </div>
 
-      <div className="relative min-w-0 sm:w-[280px]">
+      <div className="relative min-w-0 sm:w-[240px]">
         <select
           value={wilayah}
           onChange={(e) => onWilayah(e.target.value)}
@@ -89,7 +91,7 @@ export function BilahSaringan({
         </div>
       </div>
 
-      <div className="col-span-2 sm:col-span-1 sm:shrink-0">{saklar}</div>
+      <div className="col-span-2 sm:col-span-1 sm:ml-auto sm:shrink-0">{saklar}</div>
     </div>
   );
 }

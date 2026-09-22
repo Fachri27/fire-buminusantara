@@ -36,8 +36,6 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@next/playwright": "^16.3.4",
-    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22",

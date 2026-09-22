@@ -20,6 +20,8 @@ export async function aksiSetujui(id: number, disetujui: boolean) {
   // cache 15 detik + satu muat ulang basi (stale-while-revalidate).
   try {
     updateTag("tunggakan");
+    // Jumlah komentar tersetujui di umpan publik (ambilUmpan) di-cache.
+    updateTag("komentar");
   } catch {}
   umumkanTunggakan();
 }
@@ -31,6 +33,8 @@ export async function aksiHapus(id: number) {
   await hapusKomentarModerasi(id);
   try {
     updateTag("tunggakan");
+    // Jumlah komentar tersetujui di umpan publik (ambilUmpan) di-cache.
+    updateTag("komentar");
   } catch {}
   umumkanTunggakan();
 }

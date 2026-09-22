@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { cacheLife, cacheTag } from "next/cache";
-import { ambilBeritaSlug, ambilUmpan, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
+import { ambilBeritaSlug, ambilUmpan, hitungLaporanProvinsi, TAYANG, UMPAN_AWAL } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { JsonLd } from "@/components/json-ld";
 import { LandingKarhutla } from "@/components/landing-karhutla";
@@ -185,26 +185,29 @@ async function IsiHalaman({
   bahasa,
   slug,
   kejadianAwal,
+  seo,
 }: {
   bahasa: Bahasa;
   slug: string;
   kejadianAwal: NonNullable<Awaited<ReturnType<typeof ambilBeritaSlug>>>;
+  seo: Awaited<ReturnType<typeof ambilRincianSeo>>;
 }) {
   await connection();
-  const [jumlahLaporan, semuaBerita, sorotan, seo, kolomAwal] = await Promise.all([
+  const [jumlahLaporan, semuaBerita, sorotan, kolomAwal] = await Promise.all([
     hitungLaporanProvinsi(),
     ambilUmpan(),
     ambilSorotan(),
-    ambilRincianSeo(slug),
     ambilKolomUmpanAwal(),
   ]);
 
   const kejadian = kejadianAwal;
 
-  // Pastikan kejadian selalu ada di daftar berita meskipun di luar kurasi awal
-  const daftarBerita = semuaBerita.some((b) => b.id === kejadian.id)
-    ? semuaBerita
-    : [kejadian, ...semuaBerita];
+  // HTML hanya membawa UMPAN_AWAL kartu; kejadian permalink di luar itu
+  // ditambahkan di belakang supaya rinciannya bisa langsung dibuka.
+  const awal = semuaBerita.slice(0, UMPAN_AWAL);
+  const daftarBerita = awal.some((b) => b.id === kejadian.id)
+    ? awal
+    : [...awal, semuaBerita.find((b) => b.id === kejadian.id) ?? kejadian];
 
   // Data terstruktur untuk crawler — URL/gambar absolut karena JSON-LD tidak
   // ikut di-resolve metadataBase; nama organisasi mengikuti siteName layout.
@@ -219,6 +222,7 @@ async function IsiHalaman({
         bahasa={bahasa}
         jumlahLaporan={jumlahLaporan}
         berita={daftarBerita}
+        totalBerita={semuaBerita.length}
         sorotan={sorotan}
         kejadianAwal={kejadian}
         kolomAwal={kolomAwal}
@@ -234,10 +238,10 @@ export default async function HalamanKejadian({ params }: Props) {
 
   // Validasi slug sebelum memasuki Suspense boundary agar Next.js mengirimkan
   // HTTP status 404 yang benar alih-alih HTTP 200 soft 404.
-  const kejadian = await ambilBeritaSlug(slug);
+  const { kejadian, seo } = await ambilMetaKejadian(slug);
   if (!kejadian) notFound();
 
   // Tampilkan LandingKarhutla dengan rincian kejadian terbuka secara konsisten
   // di semua perangkat (seluler menggunakan rincian seluler baru, desktop modal 2-rel).
-  return <IsiHalaman bahasa={locale as Bahasa} slug={slug} kejadianAwal={kejadian} />;
+  return <IsiHalaman bahasa={locale as Bahasa} slug={slug} kejadianAwal={kejadian} seo={seo} />;
 }

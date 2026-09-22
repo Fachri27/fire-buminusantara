@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { daftarKomentar, simpanKomentar } from "@/lib/komentar";
 import { ipDari, turnstileSah } from "@/lib/turnstile";
 import { prisma } from "@/lib/prisma";
@@ -112,5 +113,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ message: pesan }, { status: 422 });
   }
 
+  // Komentar publik langsung tersetujui — segarkan jumlah komentar di umpan (ambilUmpan).
+  revalidateTag("komentar", "max");
   return NextResponse.json({ komentar: await daftarKomentar(id) }, { status: 201 });
 }

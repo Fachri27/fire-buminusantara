@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { gunakanTumbuh, type TitikAsal } from "@/hooks/gunakan-tumbuh";
 import { PULAU_TAB, tabDariPulau, waktuIso, waktuTeks } from "@/lib/tanggal";
 import { PROVINSI_KE_PULAU } from "@/lib/wilayah";
@@ -8,7 +9,7 @@ import { BilahSaringan, SaklarTampilan, type ModeTampilan } from "@/components/b
 import { useTheme } from "next-themes";
 import { useMounted } from "@/hooks/use-mounted";
 import type { Berita } from "@/lib/events";
-import type { ItemMedia } from "@/lib/media";
+import { mediaLokal, type ItemMedia } from "@/lib/media";
 
 type Props = {
   nama: string;
@@ -290,6 +291,7 @@ export function PopupPeta({
                                          active:translate-y-0">
                         <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-black/5 dark:bg-white/10">
                           <PratinjauMedia awal={awal} pulau={b.pulau}
+                                          sizes="(max-width: 429px) 95vw, (max-width: 767px) 48vw, 33vw"
                                           kelas="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         </div>
                         <div className="flex flex-1 flex-col justify-between p-3 sm:p-3.5">
@@ -347,7 +349,7 @@ export function PopupPeta({
                                      dark:hover:bg-white/10 dark:active:bg-white/15
                                      panggung:gap-[48px] panggung:py-[24px]">
                     <div className="relative shrink-0 overflow-hidden rounded-[10px] bg-black/5 ring-1 ring-black/10 dark:bg-white/10 dark:ring-white/15">
-                      <PratinjauMedia awal={awal} pulau={b.pulau}
+                      <PratinjauMedia awal={awal} pulau={b.pulau} sizes="210px"
                                       kelas="h-[76px] w-[104px] sm:h-[clamp(80px,18vw,120px)] sm:w-[clamp(120px,27vw,190px)] object-cover
                                              transition-transform duration-300 group-hover:scale-105
                                              panggung:h-[130px] panggung:w-[210px]" />
@@ -469,10 +471,12 @@ function NavigasiHalaman({ halaman, totalHalaman, awal, akhir, total, onPilih }:
  *  poster/bingkai #t=0.5), foto, atau petunjuk lokasi saat kejadian tak punya
  *  media sama sekali — bukan foto dummy. `kelas` menentukan kotaknya agar
  *  baris daftar (kotak tetap) dan kartu (kotak 16:10) bisa berbagi logika. */
-function PratinjauMedia({ awal, pulau, kelas }: {
+function PratinjauMedia({ awal, pulau, kelas, sizes }: {
   awal: ItemMedia | undefined;
   pulau: string | null;
   kelas: string;
+  /** Lebar kotak untuk srcset next/image (hanya unggahan lokal). */
+  sizes: string;
 }) {
   if (awal?.jenis === "video") {
     /* #t=0.5 meminta peramban melompat ke detik itu; tanpa itu <video> tanpa
@@ -487,6 +491,12 @@ function PratinjauMedia({ awal, pulau, kelas }: {
     /* loading+decoding: berkasnya media asli pengunggah (tanpa turunan kecil),
        jadi satu halaman = sepuluh bitmap penuh. `lazy` menyisakan yang di
        bawah lipatan rel gulir, `async` menjauhkan dekodenya dari jalur utama. */
+    if (mediaLokal(awal.url)) {
+      // Unggahan lokal: optimizer memotong bitmap penuh itu seukuran kotaknya.
+      return <Image src={awal.url} alt="" aria-hidden="true" loading="lazy" width={0} height={0}
+                    sizes={sizes} className={kelas} />;
+    }
+    // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
     return <img src={awal.url} alt="" aria-hidden="true" loading="lazy" decoding="async" className={kelas} />;
   }
   return (

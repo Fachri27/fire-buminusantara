@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { ambilUmpan, hitungLaporanProvinsi } from "@/lib/events";
+import { ambilUmpan, hitungLaporanProvinsi, UMPAN_AWAL } from "@/lib/events";
 import { ambilSorotan } from "@/lib/statistik-sorotan";
 import { ambilKolomUmpanAwal } from "@/lib/perangkat";
 import { LandingKarhutla } from "@/components/landing-karhutla";
@@ -78,7 +78,8 @@ export default async function Halaman({ params }: Props) {
     <LandingKarhutla
       bahasa={locale}
       jumlahLaporan={jumlahLaporan}
-      berita={berita}
+      berita={berita.slice(0, UMPAN_AWAL)}
+      totalBerita={berita.length}
       sorotan={sorotan}
       kolomAwal={kolomAwal}
     />

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { bacaSesi, bolehKelola } from "@/lib/sesi";
 import { simpanSorotan } from "@/lib/statistik-sorotan";
@@ -11,6 +11,8 @@ export async function aksiSimpanSorotan(data: FormData) {
   if (!sesi || !bolehKelola(sesi.peran)) redirect("/admin/login");
   const hasil = await simpanSorotan(data);
   if (hasil.ok) {
+    // ambilSorotan di-cache dengan tag ini.
+    updateTag("sorotan");
     // Kartu angka tampil di landing /[locale] (bukan cuma halaman karhutla)
     // — pola revalidate ganda mengikuti simpan-kejadian.ts.
     revalidatePath("/[locale]", "page");

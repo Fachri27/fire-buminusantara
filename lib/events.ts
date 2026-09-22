@@ -1,3 +1,4 @@
+import { cacheLife, cacheTag } from "next/cache";
 import { prisma } from "./prisma";
 import { bagiRelKanan } from "./rel-kanan";
 import { inferPulau, inferProvinsi, rapikanLokasi, PROVINSI_PETA_NAMA } from "./wilayah";
@@ -107,6 +108,10 @@ function keBerita(e: Baris): Berita {
  * Kueri CMS SENGAJA tidak memakainya — kurator justru harus melihat draft.
  */
 export const TAYANG = { status: "published" } as const;
+
+/** Jumlah kartu umpan yang ikut di HTML halaman; sisanya diambil klien dari
+ *  /api/umpan supaya muatan awal tidak membengkak seiring arsip. */
+export const UMPAN_AWAL = 24;
 
 /**
  * Kejadian untuk korsel beranda, urutan CAMPURAN "terbaru + komentar terbanyak":
@@ -235,8 +240,15 @@ export async function ambilSemuaBerita(): Promise<Berita[]> {
  * kejadian, lalu id) — masing-masing membawa jumlah komentarnya. Pengurutan
  * "komentar terbanyak" terjadi di klien lewat saklar urutan umpan, jadi
  * angkanya ikut dikirim alih-alih mengurutkan di sini.
+ *
+ * Di-cache: CMS membatalkan "kejadian" (simpan/tayang/hapus/promosi) dan
+ * "komentar" (moderasi). Komentar publik baru tidak membatalkan tag apa pun,
+ * jadi umur "minutes" yang menjaga angkanya paling lama basi ~1 menit.
  */
 export async function ambilUmpan(): Promise<Berita[]> {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("kejadian", "komentar");
   // Mode contoh — lihat ambilRelKanan di atas. Tanpa basis data tak ada
   // komentar; semua laporan dianggap 0.
   if (process.env.PETA_DUMMY === "1") {
@@ -270,6 +282,9 @@ export async function ambilUmpan(): Promise<Berita[]> {
 
 /** Satu kejadian lewat permalink /fire/<slug>. */
 export async function ambilBeritaSlug(slug: string): Promise<Berita | null> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("kejadian");
   // findFirst, bukan findUnique: slug tetap unik, tapi saringan tayang harus
   // ikut masuk where — draft yang di-permalink-kan langsung harus 404.
   const baris = await prisma.events.findFirst({ where: { slug, ...TAYANG }, select: PILIH });
@@ -284,7 +299,8 @@ export async function ambilBeritaSlug(slug: string): Promise<Berita | null> {
  *
  * Dihitung dari SELURUH kejadian, bukan dari sepuluh terbaru di atas — kalau
  * memakai koleksi itu, angka provinsi menyusut sendiri begitu laporan ke-11
- * masuk.
+ * masuk. Diturunkan dari daftar ambilUmpan yang sudah di-cache (provinsi-nya
+ * sudah disimpulkan di keBerita), bukan pindai tabel kedua.
  */
 export async function hitungLaporanProvinsi(): Promise<Record<string, number>> {
   // Mode contoh — lihat ambilRelKanan di atas.
@@ -297,9 +313,7 @@ export async function hitungLaporanProvinsi(): Promise<Record<string, number>> {
     PROVINSI_PETA_NAMA.map((n) => [n, 0]),
   );
 
-  const baris = await prisma.events.findMany({ where: TAYANG, select: { location: true } });
-  for (const { location } of baris) {
-    const provinsi = inferProvinsi(location);
+  for (const { provinsi } of await ambilUmpan()) {
     // Lokasi yang tidak menyebut provinsi mana pun sengaja tidak dihitung —
     // lebih baik tidak terhitung daripada masuk kolom yang salah.
     if (provinsi) jumlah[provinsi]++;

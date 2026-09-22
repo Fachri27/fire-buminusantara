@@ -1,4 +1,13 @@
 import Script from "next/script";
+// Gaya khusus rute publik — sengaja tidak di globals.css (lihat catatannya).
+import "../../public/css/rincian-laporan.css";
+import "../../public/css/kartu-kursor.css";
+import "../../public/css/kartu-video.css";
+import "../../public/css/pantauan-kosong.css";
+import "../../public/css/pantau.css";
+import "../../public/css/peta-angka.css";
+import "../../public/css/peta-popup.css";
+import "../../public/css/landing-karhutla.css";
 
 export default function LocaleLayout({
   children,

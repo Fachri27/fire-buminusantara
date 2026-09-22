@@ -81,12 +81,22 @@ export function DateRangePicker({
     onClear?.();
   };
 
+  /* Rentang diringkas dari kanan: bagian yang sama di kedua ujung (tahun,
+     lalu bulan) cukup ditulis sekali. "3–12 Sep 2026" muat di kolom tanggal
+     ponsel yang cuma 9rem; "3 Sep 2026 – 12 Sep 2026" terpotong elipsis. */
   const teksTampilan = () => {
-    if (dateRange.from && dateRange.to) {
-      return `${formatTampilan(dateRange.from)} – ${formatTampilan(dateRange.to)}`;
+    const { from: a, to: b } = dateRange;
+    if (a && b) {
+      if (a.getFullYear() !== b.getFullYear()) return `${formatTampilan(a)} – ${formatTampilan(b)}`;
+      const thn = b.getFullYear();
+      if (a.getMonth() !== b.getMonth()) {
+        return `${a.getDate()} ${NAMA_BULAN_PENDEK[a.getMonth()]} – ${b.getDate()} ${NAMA_BULAN_PENDEK[b.getMonth()]} ${thn}`;
+      }
+      if (a.getDate() === b.getDate()) return formatTampilan(a);
+      return `${a.getDate()}–${b.getDate()} ${NAMA_BULAN_PENDEK[b.getMonth()]} ${thn}`;
     }
     if (dateRange.from) {
-      return `${formatTampilan(dateRange.from)} – …`;
+      return `${dateRange.from.getDate()} ${NAMA_BULAN_PENDEK[dateRange.from.getMonth()]} – …`;
     }
     return placeholder;
   };
@@ -99,7 +109,7 @@ export function DateRangePicker({
         <PopoverTrigger className={penuh ? "w-full" : ""}>
           <button
             type="button"
-            className={`${penuh ? "h-9 w-full min-w-0 " : ""}flex cursor-pointer items-center gap-2 rounded-[8px] border px-2.5 py-1.5 text-[11px] sm:text-xs font-medium shadow-2xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
+            className={`${penuh ? "h-9 w-full min-w-0 " : ""}${adaPilihan ? "pr-8 " : ""}flex cursor-pointer items-center gap-2 rounded-[8px] border px-2.5 py-1.5 text-[11px] sm:text-xs font-medium shadow-2xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
               gelap
                 ? "border-white/15 bg-pantau-malam text-white hover:border-white/30 focus-visible:outline-white/60"
                 : "border-black/10 bg-white text-tinta hover:border-black/20 hover:bg-black/[0.02] focus-visible:outline-api dark:border-white/15 dark:bg-pantau-konsol dark:text-white dark:hover:border-white/30 dark:hover:bg-white/[0.04] dark:focus-visible:outline-white/60"
@@ -133,7 +143,29 @@ export function DateRangePicker({
           </button>
         </PopoverTrigger>
 
-        <PopoverContent align="start" className="p-3" gelap={gelap}>
+        {/* Hapus duduk DI DALAM kolom, di atas pemicu — bukan tautan merah di
+            sebelahnya yang menggeser tata letak begitu rentang terpilih. Ia
+            saudara pemicu, bukan anaknya: tombol di dalam tombol tidak sah,
+            dan klik di sini tak boleh ikut membuka kalender. */}
+        {adaPilihan && (
+          <button
+            type="button"
+            onClick={handleClear}
+            aria-label="Hapus rentang tanggal"
+            title="Hapus rentang tanggal"
+            className={`absolute top-1/2 right-1.5 grid size-6 -translate-y-1/2 cursor-pointer place-items-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-[#ff5a26] ${
+              gelap
+                ? "text-white/60 hover:bg-white/10 hover:text-white"
+                : "text-black/45 hover:bg-black/[0.06] hover:text-tinta dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
+            }`}
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor" className="size-3.5">
+              <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+            </svg>
+          </button>
+        )}
+
+        <PopoverContent align="start" className="rounded-xl p-3 shadow-[0_12px_32px_rgb(0_0_0/0.12)] dark:shadow-[0_12px_32px_rgb(0_0_0/0.5)]" gelap={gelap}>
           <Calendar
             mode="range"
             selected={dateRange}
@@ -144,15 +176,6 @@ export function DateRangePicker({
         </PopoverContent>
       </Popover>
 
-      {adaPilihan && (
-        <button
-          type="button"
-          onClick={handleClear}
-          className="cursor-pointer text-xs font-medium text-bara dark:text-red-400 underline underline-offset-2 transition-colors hover:text-api dark:hover:text-red-300"
-        >
-          Hapus
-        </button>
-      )}
     </div>
   );
 }

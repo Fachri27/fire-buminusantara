@@ -270,18 +270,6 @@ export function FormulirKomentar({
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
-
-      {/* Pilihan anonim, sama polanya dengan form laporan: isian identitas
-          dimatikan dan kiriman tampil sebagai "Anonim". */}
-      <label className="rincian__anonim cursor-pointer">
-        <input
-          type="checkbox"
-          className="cursor-pointer"
-          checked={anonim}
-          onChange={(e) => setAnonim(e.target.checked)}
-        />
-        Kirim sebagai anonim
-      </label>
     </>
   );
 
@@ -309,6 +297,26 @@ export function FormulirKomentar({
             }
           }}
         />
+      </label>
+    </div>
+  );
+
+  /* Anonim dan Kirim sebaris di kaki formulir: pilihan identitas di kiri,
+     keputusan mengirim di kanan. Dulu Kirim menempel di ujung kotak ketik dan
+     anonim terdampar sendirian di barisnya — dua keputusan akhir yang
+     terpencar di dua baris. Kotak ketik kini mendapat lebar penuh. */
+  const barisAksi = (
+    <div className="rincian__aksi-kirim">
+      {/* Pilihan anonim, sama polanya dengan form laporan: isian identitas
+          dimatikan dan kiriman tampil sebagai "Anonim". */}
+      <label className="rincian__anonim cursor-pointer">
+        <input
+          type="checkbox"
+          className="cursor-pointer"
+          checked={anonim}
+          onChange={(e) => setAnonim(e.target.checked)}
+        />
+        Kirim sebagai anonim
       </label>
 
       {tutup && (
@@ -344,6 +352,7 @@ export function FormulirKomentar({
       >
         {bidang}
         {barisKetik}
+        {barisAksi}
       </form>
     );
   }
@@ -400,6 +409,7 @@ export function FormulirKomentar({
 
             {bidang}
             {barisKetik}
+            {barisAksi}
           </form>
         </div>
       )}

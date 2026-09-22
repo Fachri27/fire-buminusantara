@@ -1219,8 +1219,7 @@ html.dark .rincian .rincian__kerangka::before,
   font-size: 13px;
 }
 
-.rincian__sheet-panel--komentar .rincian__baris > .rincian__batal,
-.rincian__baris > .rincian__batal {
+.rincian__aksi-kirim > .rincian__batal {
   flex-shrink: 0;
   padding: 4px 10px;
   border-radius: 9999px;
@@ -1233,7 +1232,7 @@ html.dark .rincian .rincian__kerangka::before,
   transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-.rincian__baris > .rincian__batal:hover {
+.rincian__aksi-kirim > .rincian__batal:hover {
   color: var(--r-teks);
   background: var(--r-sorot-hover);
 }
@@ -1330,10 +1329,12 @@ html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
   opacity: 0.45;
 }
 
+/* Isian berisi alas, bukan bergaris: garisnya transparan dan baru berwarna
+   saat fokus — ukurannya tetap sama, jadi fokus tak menggeser apa pun. */
 .rincian__input {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--r-garis);
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 5px 8px;
   background: var(--r-sorot);
@@ -1368,6 +1369,17 @@ html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
   margin-top: 0;
 }
 
+/* Kaki formulir komentar: anonim di kiri, Batal + Kirim di kanan. */
+.rincian__aksi-kirim {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rincian__aksi-kirim > .rincian__anonim {
+  margin-right: auto;
+}
+
 .rincian__jebakan {
   position: absolute;
   width: 1px;
@@ -1381,7 +1393,7 @@ html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
   flex: 1;
   min-width: 0;
   background: var(--r-sorot);
-  border: 1px solid var(--r-garis);
+  border: 1px solid transparent;
   border-radius: 14px;
   padding: 2px 10px;
 }
