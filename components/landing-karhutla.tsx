@@ -1776,6 +1776,96 @@ function TabRelKiri({ terbuka, onUbah, label }: {
   );
 }
 
+/** Satu saran lokasi dari pencarian wilayah BMKG/Kemendagri. */
+export type SaranLokasi = {
+  id: string;
+  nama: string;
+  provinsi: string;
+  lat: number;
+  lng: number;
+  adm4?: string;
+  tipe?: string;
+};
+
+/* Isi daftar saran lokasi — dipakai di dua tempat: dropdown Select2 di sumur
+   lokasi (panggung) dan panel pencarian di bilah atas (panel seluler).
+   Wadah listbox-nya milik masing-masing pemanggil (posisinya beda), isinya
+   sama persis supaya perilakunya tak perlu dijaga sinkron di dua tempat. */
+export function IsiSaranLokasi({ daftar, indeks, memuat, bahasa, onSorot, onPilih }: {
+  daftar: SaranLokasi[];
+  indeks: number;
+  memuat: boolean;
+  bahasa: Bahasa;
+  onSorot: (i: number) => void;
+  onPilih: (s: SaranLokasi) => void;
+}) {
+  if (memuat && daftar.length === 0) {
+    return (
+      <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] text-[#a0a0a0]">
+        <svg
+          className="size-4 shrink-0 animate-spin text-white"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="3"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+          />
+        </svg>
+        <span>{bahasa === "en" ? "Searching locations..." : "Mencari lokasi..."}</span>
+      </div>
+    );
+  }
+  if (daftar.length > 0) {
+    return (
+      <>
+        {daftar.map((item, idx) => {
+          const dipilih = idx === indeks;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="option"
+              aria-selected={dipilih}
+              onMouseEnter={() => onSorot(idx)}
+              onClick={() => onPilih(item)}
+              className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] transition-colors ${
+                dipilih
+                  ? "bg-white/15 text-white"
+                  : "text-[#d0d0d0] hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              <IkonPin
+                className={`size-4 shrink-0 ${
+                  dipilih ? "text-orange-400" : "text-[#888888] group-hover:text-orange-400"
+                }`}
+              />
+              <span className="truncate font-medium">{item.nama}</span>
+              <span className="ml-auto shrink-0 rounded bg-white/5 px-2 py-0.5 text-[11px] text-[#909090]">
+                {item.provinsi}
+              </span>
+            </button>
+          );
+        })}
+      </>
+    );
+  }
+  return (
+    <div className="px-3 py-3 text-center text-[13px] text-[#888888]">
+      {bahasa === "en" ? "No locations found" : "Tidak ada lokasi yang cocok"}
+    </div>
+  );
+}
+
 export function LandingKarhutla(
   {
     bahasa,
@@ -1825,6 +1915,46 @@ export function LandingKarhutla(
   >([]);
   const [memuatSaran, setMemuatSaran] = useState(false);
   const [indeksPilihan, setIndeksPilihan] = useState(-1);
+
+  /* Memilih satu saran lokasi: peta + cuaca pindah ke sana, modenya tutup.
+     Satu jalur untuk dropdown sumur lokasi dan panel bilah atas. */
+  const pilihLokasi = useCallback(async (item: SaranLokasi) => {
+    await cuaca.pilihSaran(item);
+    setModeCariCuaca(false);
+    setKueriCuaca("");
+    setDaftarSaran([]);
+  }, [cuaca]);
+
+  /* Papan ketik kolom saran lokasi — panah memilih, Enter mencari/memilih,
+     Escape menutup. Dipakai kolom sumur lokasi dan kolom bilah atas. */
+  const tombolSaranLokasi = useCallback(async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setModeCariCuaca(false);
+      setKueriCuaca("");
+      setDaftarSaran([]);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (daftarSaran.length > 0) {
+        setIndeksPilihan((idx) => (idx + 1) % daftarSaran.length);
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (daftarSaran.length > 0) {
+        setIndeksPilihan((idx) => (idx - 1 + daftarSaran.length) % daftarSaran.length);
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (indeksPilihan >= 0 && indeksPilihan < daftarSaran.length) {
+        await pilihLokasi(daftarSaran[indeksPilihan]);
+      } else if (kueriCuaca.trim()) {
+        await cuaca.cari(kueriCuaca);
+        setModeCariCuaca(false);
+        setKueriCuaca("");
+        setDaftarSaran([]);
+      }
+    }
+  }, [cuaca, daftarSaran, indeksPilihan, kueriCuaca, pilihLokasi]);
 
   useEffect(() => {
     let aktif = true;
@@ -1880,9 +2010,21 @@ export function LandingKarhutla(
     };
   }, [modeCariCuaca, kueriCuaca]);
 
+  /* Cap waktu mode cari dibuka — masa tenggang klik-luar di bawah. */
+  const bukaCariCuacaRef = useRef(0);
   useEffect(() => {
     if (!modeCariCuaca) return;
+    bukaCariCuacaRef.current = Date.now();
     const tanganiKlikLuar = (e: MouseEvent) => {
+      /* Masa tenggang: ketukan pembukanya sendiri tak boleh langsung
+         menutupnya. Sentuhan di sebagian peramban/harness otomasi tiba
+         sebagai mousedown ganda yang mengapit pemasangan pendengar ini —
+         tanpa ini ketukan pertama membuka lalu langsung menutup lagi. */
+      if (Date.now() - bukaCariCuacaRef.current < 350) return;
+      const sasaran = e.target as HTMLElement | null;
+      /* Panel pencarian bilah atas adalah rumah kedua mode ini di seluler —
+         ketukan di dalamnya (kolom maupun saran) bukan klik luar. */
+      if (sasaran?.closest?.("#nav-panel-cari")) return;
       if (wadahSelectRef.current && !wadahSelectRef.current.contains(e.target as Node)) {
         setModeCariCuaca(false);
         setKueriCuaca("");
@@ -2304,23 +2446,39 @@ export function LandingKarhutla(
               }
             : {
                 /* Panel seluler: umpannya tidak dirender di halaman ini, jadi
-                   kolom pencarian di sini hanya akan menyaring nol kartu.
-                   Tombolnya tetap ada supaya bilahnya sama di kedua halaman,
-                   tapi ia MENGANTAR ke daftar laporan — laporannya memang
-                   tinggal di sana. Karena itu `terbuka` selalu false: tak
-                   pernah ada kolom yang dibuka di halaman ini.
-
-                   Penanda ?cari=1 yang dibawa itulah yang membuka kolomnya
-                   begitu sampai — pembacanya ada di effect dekat deklarasi
-                   cariBuka, dan penandanya langsung dihapus dari URL di sana
-                   supaya tidak ikut terbagikan. */
-                nilai: "",
-                ubah: () => undefined,
-                terbuka: false,
+                   kolom di bilah atas ini MENCARI LOKASI (kota/provinsi) —
+                   satu-satunya pencarian yang bisa bekerja tanpa pindah
+                   halaman — lengkap dengan dropdown sarannya, di letak yang
+                   sama dengan kolom cari laporan di halaman daftar. */
+                nilai: kueriCuaca,
+                ubah: setKueriCuaca,
+                terbuka: modeCariCuaca,
                 setTerbuka: (buka: boolean) => {
-                  if (buka) router.push(`/${bahasa}/karhutla?cari=1`);
+                  setModeCariCuaca(buka);
+                  if (!buka) {
+                    setKueriCuaca("");
+                    setDaftarSaran([]);
+                  }
                 },
-                placeholder: t.cariLaporan,
+                placeholder: t.cariLokasiCuaca,
+                tombol: tombolSaranLokasi,
+                saran:
+                  kueriCuaca.trim() !== "" || memuatSaran || daftarSaran.length > 0 ? (
+                    <div
+                      role="listbox"
+                      aria-label={bahasa === "en" ? "Location suggestions" : "Saran lokasi"}
+                      className="mt-2 max-h-60 overflow-y-auto rounded-xl border border-white/15 bg-[#1a1a1a]/95 p-1.5 shadow-2xl backdrop-blur-xl"
+                    >
+                      <IsiSaranLokasi
+                        daftar={daftarSaran}
+                        indeks={indeksPilihan}
+                        memuat={memuatSaran}
+                        bahasa={bahasa}
+                        onSorot={setIndeksPilihan}
+                        onPilih={pilihLokasi}
+                      />
+                    </div>
+                  ) : undefined,
               }
         }
       />
@@ -2583,37 +2741,7 @@ export function LandingKarhutla(
                     type="text"
                     value={kueriCuaca}
                     onChange={(e) => setKueriCuaca(e.target.value)}
-                    onKeyDown={async (e) => {
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        setModeCariCuaca(false);
-                        setKueriCuaca("");
-                        setDaftarSaran([]);
-                      } else if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        if (daftarSaran.length > 0) {
-                          setIndeksPilihan((idx) => (idx + 1) % daftarSaran.length);
-                        }
-                      } else if (e.key === "ArrowUp") {
-                        e.preventDefault();
-                        if (daftarSaran.length > 0) {
-                          setIndeksPilihan((idx) => (idx - 1 + daftarSaran.length) % daftarSaran.length);
-                        }
-                      } else if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (indeksPilihan >= 0 && indeksPilihan < daftarSaran.length) {
-                          await cuaca.pilihSaran(daftarSaran[indeksPilihan]);
-                          setModeCariCuaca(false);
-                          setKueriCuaca("");
-                          setDaftarSaran([]);
-                        } else if (kueriCuaca.trim()) {
-                          await cuaca.cari(kueriCuaca);
-                          setModeCariCuaca(false);
-                          setKueriCuaca("");
-                          setDaftarSaran([]);
-                        }
-                      }
-                    }}
+                    onKeyDown={tombolSaranLokasi}
                     placeholder={t.cariLokasiCuaca}
                     className="min-w-0 flex-1 bg-transparent text-[13px] text-[#f5f5f5] placeholder:text-[#707070] focus:outline-none sm:text-[15px]"
                     autoFocus
@@ -2683,68 +2811,14 @@ export function LandingKarhutla(
                   aria-label={bahasa === "en" ? "Location suggestions" : "Saran lokasi"}
                   className="absolute top-full left-0 right-0 mt-2 z-50 max-h-60 overflow-y-auto rounded-xl border border-white/15 bg-[#1a1a1a]/95 p-1.5 shadow-2xl backdrop-blur-xl"
                 >
-                  {memuatSaran && daftarSaran.length === 0 ? (
-                    <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] text-[#a0a0a0]">
-                      <svg
-                        className="size-4 shrink-0 animate-spin text-white"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                        />
-                      </svg>
-                      <span>{bahasa === "en" ? "Searching locations..." : "Mencari lokasi..."}</span>
-                    </div>
-                  ) : daftarSaran.length > 0 ? (
-                    daftarSaran.map((item, idx) => {
-                      const dipilih = idx === indeksPilihan;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          role="option"
-                          aria-selected={dipilih}
-                          onMouseEnter={() => setIndeksPilihan(idx)}
-                          onClick={async () => {
-                            await cuaca.pilihSaran(item);
-                            setModeCariCuaca(false);
-                            setKueriCuaca("");
-                            setDaftarSaran([]);
-                          }}
-                          className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] transition-colors ${
-                            dipilih
-                              ? "bg-white/15 text-white"
-                              : "text-[#d0d0d0] hover:bg-white/10 hover:text-white"
-                          }`}
-                        >
-                          <IkonPin
-                            className={`size-4 shrink-0 ${
-                              dipilih ? "text-orange-400" : "text-[#888888] group-hover:text-orange-400"
-                            }`}
-                          />
-                          <span className="truncate font-medium">{item.nama}</span>
-                          <span className="ml-auto shrink-0 rounded bg-white/5 px-2 py-0.5 text-[11px] text-[#909090]">
-                            {item.provinsi}
-                          </span>
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="px-3 py-3 text-center text-[13px] text-[#888888]">
-                      {bahasa === "en" ? "No locations found" : "Tidak ada lokasi yang cocok"}
-                    </div>
-                  )}
+                  <IsiSaranLokasi
+                    daftar={daftarSaran}
+                    indeks={indeksPilihan}
+                    memuat={memuatSaran}
+                    bahasa={bahasa}
+                    onSorot={setIndeksPilihan}
+                    onPilih={pilihLokasi}
+                  />
                 </div>
               )}
             </div>
@@ -2903,13 +2977,6 @@ export function LandingKarhutla(
           adalah penyeberang halaman: di halaman utama (daftar) membuka panel,
           di halaman panel kembali ke daftar. */}
       <nav aria-label={t.umpan} className="lk-tabbar">
-        <Link
-          href={`/${bahasa}`}
-          aria-label={t.tabBeranda}
-          className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
-        >
-          <IkonBeranda />
-        </Link>
         {tampil === "panel" ? (
           <Link
             href={`/${bahasa}`}
@@ -2927,11 +2994,10 @@ export function LandingKarhutla(
             <IkonPanel />
           </Link>
         )}
-        {/* Cari & Tulis: dua slot yang SAMA di kedua halaman. Di panel
-            keduanya tidak punya sasaran lokal — umpannya memang tidak dirender
-            di sana — jadi mereka mengantar ke daftar laporan sambil membawa
-            penanda sekali pakai (?cari=1 / ?tulis=1) yang membuka kolom atau
-            komposernya begitu sampai. Pembacanya ada dekat deklarasi cariBuka. */}
+        {/* Cari di panel membuka kolom pencarian lokasi di bilah ATAS halaman
+            INI — di letak yang sama dengan kolom cari laporan di halaman
+            daftar — tidak mengantar ke mana-mana. Fokusnya diurus Nav
+            (nav-cari) begitu kolomnya terbuka. */}
         {tampil === "semua" ? (
           <button
             type="button"
@@ -2942,9 +3008,14 @@ export function LandingKarhutla(
             <IkonCari className="size-7" />
           </button>
         ) : (
-          <Link href={`/${bahasa}/karhutla?cari=1`} aria-label={t.tabCari} className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
+          <button
+            type="button"
+            aria-label={t.tabCari}
+            onClick={() => setModeCariCuaca(true)}
+            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+          >
             <IkonCari className="size-7" />
-          </Link>
+          </button>
         )}
         {tampil === "semua" ? (
           <button

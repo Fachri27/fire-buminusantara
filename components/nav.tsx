@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { mintaTutupOverlay } from "@/lib/peristiwa-popup";
@@ -24,6 +25,12 @@ type PropsCari = {
   terbuka: boolean;
   setTerbuka: (terbuka: boolean) => void;
   placeholder: string;
+  /** Tekan tombol keyboard (Enter/panah) di kolom — pemanggil yang mengelola
+      daftar saran (mis. pencarian lokasi) memakainya untuk memilih saran. */
+  tombol?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  /** Isi tambahan di bawah kolom — daftar saran pemanggil. Hanya dirender
+      bila ada; halaman tanpa saran tidak terpengaruh. */
+  saran?: ReactNode;
 };
 
 type Props = { bahasa: Bahasa; gelap?: boolean; cari?: PropsCari };
@@ -306,6 +313,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 type="search"
                 value={cari.nilai}
                 onChange={(e) => cari.ubah(e.target.value)}
+                onKeyDown={cari.tombol}
                 placeholder={cari.placeholder}
                 className={`w-full bg-transparent text-[15px] focus:outline-none ${
                   gelap
@@ -326,6 +334,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 <IkonSilang className="size-[22px]" />
               </button>
             </div>
+            {cari.saran}
           </form>
         )}
 
