@@ -1436,7 +1436,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
             type="button"
             id="lk-tulis"
             onClick={() => setBuka(true)}
-            className="flex-1 cursor-pointer truncate rounded-lg border border-black/[0.12] bg-white px-4 py-2.5 text-left text-[15px] text-black/55 transition-all hover:border-black/25 hover:text-black dark:border-white/15 dark:bg-white/[0.04] dark:text-[#a0a0a0]/70 dark:hover:border-white/25 dark:hover:text-[#a0a0a0]
+            className="flex-1 cursor-pointer truncate rounded-lg bg-transparent px-4 py-2.5 text-left text-[15px] text-black/55 transition-all hover:text-black dark:bg-transparent dark:text-[#a0a0a0]/70 dark:hover:text-[#f5f5f5]
                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
           >
             {t.tulis}

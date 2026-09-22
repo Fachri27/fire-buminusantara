@@ -138,7 +138,7 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className 
         controls={kurangiGerak}
         muted
         playsInline
-        preload={poster ? "none" : "metadata"}
+        preload="none"
         onMouseEnter={mulaiHover}
         onMouseLeave={hentiHover}
         onPlay={() => { setUsai(false); setJalan(true); }}

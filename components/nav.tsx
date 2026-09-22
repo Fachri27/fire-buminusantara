@@ -394,9 +394,12 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
               aria-expanded={cari.terbuka}
               aria-controls="nav-panel-cari"
               aria-label={cari.terbuka ? teks.tutupCari : teks.cari}
-              className={`${temaGelap
-                ? "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-md p-1 text-xs font-bold sm:p-1.5 sm:text-sm bg-white/[0.05] text-white ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
-                : "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-full p-1 text-xs font-bold sm:p-1.5 sm:text-sm text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"} aliran:hidden${
+              title={cari.terbuka ? teks.tutupCari : teks.cari}
+              className={`inline-flex cursor-pointer shrink-0 items-center justify-center rounded-full p-1.5 text-xs font-bold transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api ${
+                temaGelap
+                  ? "bg-white/[0.05] text-white/80 ring-1 ring-white/10 hover:bg-white/10 hover:text-white"
+                  : "bg-black/[0.04] text-tinta/70 border border-black/[0.06] hover:bg-black/[0.08] hover:text-tinta"
+              } aliran:hidden${
                 /* Selagi kolomnya terbuka, sakelar ini menyingkir di KEDUA
                    ukuran: kolomnya sudah membawa kaca pembesarnya sendiri di
                    ujung kiri dan silang penutup di ujung kanan, jadi tombol ini
@@ -405,11 +408,9 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 cari.terbuka ? " hidden" : ""
               }`}
             >
-              {/* 1lh = satu kotak baris. Itu persis tinggi isi pil ID/EN, jadi
-                  dengan padding yang sama pula tinggi keduanya identik di
-                  setiap lebar — bukan disamakan lewat satu angka yang cuma
-                  benar di satu layar. */}
-              <IkonCari className="size-[1lh]" />
+              <span className="size-4 sm:size-[18px] flex items-center justify-center">
+                <IkonCari className="size-3.5 sm:size-4" />
+              </span>
             </button>
           )}
 
@@ -435,9 +436,11 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
           <div
             role="group"
             aria-label={teks.ganti}
-            className={temaGelap
-              ? "flex items-center gap-1 text-xs font-bold sm:text-sm"
-              : "flex items-center rounded-full bg-black/[0.04] p-0.5 border border-black/[0.06] text-xs font-bold"}
+            className={`flex items-center rounded-full p-0.5 text-xs font-bold transition-colors ${
+              temaGelap
+                ? "bg-white/[0.05] ring-1 ring-white/10"
+                : "bg-black/[0.04] border border-black/[0.06]"
+            }`}
           >
             {BAHASA.map((kode) => {
               const terpilih = kode === bahasa;
@@ -445,9 +448,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 <span
                   key={kode}
                   aria-current="true"
-                  className={temaGelap
-                    ? "rounded-md bg-[#ff5a26] px-2 py-1 uppercase text-white sm:px-3 sm:py-1.5"
-                    : "rounded-full bg-[#ff5a26] px-2.5 py-0.5 uppercase text-white shadow-xs"}
+                  className="rounded-full bg-[#ff5a26] px-2.5 py-0.5 uppercase text-white shadow-xs"
                 >
                   {kode}
                 </span>
@@ -457,9 +458,11 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                   href={tautanBahasa(kode)}
                   prefetch={false}
                   aria-label={`${teks.ganti} (${kode.toUpperCase()})`}
-                  className={temaGelap
-                    ? "cursor-pointer rounded-md bg-white/[0.04] px-2 py-1 uppercase text-white/60 ring-1 ring-white/[0.07] transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api sm:px-3 sm:py-1.5"
-                    : "cursor-pointer rounded-full px-2.5 py-0.5 uppercase text-tinta/50 transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"}
+                  className={`cursor-pointer rounded-full px-2.5 py-0.5 uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api ${
+                    temaGelap
+                      ? "text-white/60 hover:text-white"
+                      : "text-tinta/50 hover:text-tinta"
+                  }`}
                 >
                   {kode}
                 </Link>
