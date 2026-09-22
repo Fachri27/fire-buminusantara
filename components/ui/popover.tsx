@@ -123,7 +123,9 @@ export function PopoverContent({
   return (
     <div
       style={{ marginTop: sideOffset }}
-      className={`absolute z-50 rounded-lg border p-3 shadow-xl animate-in fade-in-0 zoom-in-95 ${gelap ? "border-white/10 bg-pantau-malam ring-1 ring-white/10" : "border-black/10 bg-white ring-1 ring-black/5"} ${alignClass} ${className}`}
+      className={`absolute z-50 rounded-lg border p-3 shadow-md animate-in fade-in-0 zoom-in-95 bg-white border-black/[0.08] text-tinta dark:bg-pantau-konsol dark:border-white/10 dark:text-white ring-1 ring-black/5 dark:ring-white/10 ${
+        gelap ? "dark bg-pantau-konsol border-white/10 text-white ring-1 ring-white/10" : ""
+      } ${alignClass} ${className}`}
     >
       {children}
     </div>

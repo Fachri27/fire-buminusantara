@@ -137,21 +137,21 @@ export function Calendar(props: CalendarProps) {
   };
 
   return (
-    <div className={`w-[260px] select-none text-neutral-900 ${className}`}>
+    <div className={`w-[260px] select-none text-neutral-900 dark:text-white ${gelap ? "dark" : ""} ${className}`}>
       {/* Header navigasi bulan & tahun */}
       <div className="flex items-center justify-between pb-3">
         <button
           type="button"
           onClick={prevMonth}
           aria-label="Bulan sebelumnya"
-          className="cursor-pointer flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          className="cursor-pointer flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white transition-colors"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
           </svg>
         </button>
 
-        <span className="text-xs font-bold tracking-tight">
+        <span className="text-xs font-bold tracking-tight text-neutral-900 dark:text-white">
           {NAMA_BULAN[bulan]} {tahun}
         </span>
 
@@ -159,7 +159,7 @@ export function Calendar(props: CalendarProps) {
           type="button"
           onClick={nextMonth}
           aria-label="Bulan berikutnya"
-          className="cursor-pointer flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          className="cursor-pointer flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white transition-colors"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -172,7 +172,7 @@ export function Calendar(props: CalendarProps) {
         {NAMA_HARI.map((h, i) => (
           <span
             key={h}
-            className={`text-[10px] font-medium ${i === 0 ? "text-red-500" : "text-neutral-400"}`}
+            className={`text-[10px] font-medium ${i === 0 ? "text-red-500 dark:text-red-400" : "text-neutral-400 dark:text-neutral-400"}`}
           >
             {h}
           </span>
@@ -194,11 +194,11 @@ export function Calendar(props: CalendarProps) {
                   onClick={() => handleDayClick(date)}
                   className={`cursor-pointer size-8 rounded-md text-xs transition-all flex items-center justify-center relative ${
                     isSelected
-                      ? "bg-neutral-900 text-white font-semibold shadow-xs"
+                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-xs"
                       : isCurrentMonth
-                      ? "text-neutral-900 hover:bg-neutral-100 font-medium"
-                      : "text-neutral-300 hover:bg-neutral-50"
-                  } ${isToday && !isSelected ? "ring-1 ring-neutral-400 font-bold" : ""}`}
+                      ? "text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-white/10 font-medium"
+                      : "text-neutral-300 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-white/5"
+                  } ${isToday && !isSelected ? "ring-1 ring-neutral-400 dark:ring-neutral-500 font-bold" : ""}`}
                 >
                   {date.getDate()}
                 </button>
@@ -226,9 +226,9 @@ export function Calendar(props: CalendarProps) {
             <div
               key={idx}
               className={`flex items-center justify-center p-0 ${
-                inRange ? "bg-neutral-100" : ""
-              } ${isRangeStart ? "bg-gradient-to-r from-transparent to-neutral-100" : ""} ${
-                isRangeEnd ? "bg-gradient-to-l from-transparent to-neutral-100" : ""
+                inRange ? "bg-neutral-100 dark:bg-white/10" : ""
+              } ${isRangeStart ? "bg-gradient-to-r from-transparent to-neutral-100 dark:to-white/10" : ""} ${
+                isRangeEnd ? "bg-gradient-to-l from-transparent to-neutral-100 dark:to-white/10" : ""
               }`}
               onMouseEnter={() => {
                 if (selected?.from && !selected?.to) {
@@ -241,13 +241,13 @@ export function Calendar(props: CalendarProps) {
                 onClick={() => handleDayClick(date)}
                 className={`cursor-pointer size-8 text-xs transition-all flex items-center justify-center relative ${
                   isFrom || isTo
-                    ? "bg-neutral-900 text-white font-semibold shadow-xs rounded-md"
+                    ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-semibold shadow-xs rounded-md"
                     : inRange
-                    ? "bg-neutral-100 text-neutral-900 font-medium rounded-none hover:bg-neutral-200"
+                    ? "bg-neutral-100 text-neutral-900 hover:bg-neutral-200 dark:bg-transparent dark:text-white dark:hover:bg-white/20 font-medium rounded-none"
                     : isCurrentMonth
-                    ? "text-neutral-900 hover:bg-neutral-100 font-medium rounded-md"
-                    : "text-neutral-300 hover:bg-neutral-50 rounded-md"
-                } ${isToday && !isFrom && !isTo ? "ring-1 ring-neutral-300 font-bold" : ""}`}
+                    ? "text-neutral-900 hover:bg-neutral-100 dark:text-neutral-100 dark:hover:bg-white/10 font-medium rounded-md"
+                    : "text-neutral-300 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:bg-white/5 rounded-md"
+                } ${isToday && !isFrom && !isTo ? "ring-1 ring-neutral-400 dark:ring-neutral-500 font-bold" : ""}`}
               >
                 {date.getDate()}
               </button>

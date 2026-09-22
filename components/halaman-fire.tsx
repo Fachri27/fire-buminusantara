@@ -125,7 +125,7 @@ export function HalamanFire({
   }, [tutupRincian]);
 
   return (
-    <>
+    <div className="relative w-full bg-white dark:bg-panggung text-tinta dark:text-[#f5f5f5] transition-colors duration-300">
       <Korsel berita={berita} statistik={statistik} bahasa={bahasa} onBuka={(i) => berita[i] && bukaRincian(berita[i])} />
 
       {/* Layar 2 — peta sebaran & forecasting. Menggulir naik menutupi hero. */}
@@ -133,7 +133,7 @@ export function HalamanFire({
         id="peta"
         aria-label="Peta sebaran"
         data-kabur-tepi
-        className="tepi-lunak relative z-[2] flex h-[100svh] min-h-[100svh] w-full flex-col justify-center overflow-hidden"
+        className="tepi-lunak relative z-[2] flex h-[100svh] min-h-[100svh] w-full flex-col justify-center overflow-hidden bg-white dark:bg-pantau-konsol text-tinta dark:text-[#f5f5f5]"
       >
         {/* Peta forecasting Windy AQI + poligon administratif fullscreen */}
         <div className="kabur-tepi pointer-events-none" aria-hidden="true" />
@@ -186,6 +186,6 @@ export function HalamanFire({
           onTutup={() => setWilayah(null)}
         />
       )}
-    </>
+    </div>
   );
 }

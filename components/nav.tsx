@@ -5,7 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { mintaTutupOverlay } from "@/lib/peristiwa-popup";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { BAHASA, TEKS_NAV, type Bahasa } from "@/lib/bahasa";
+import { SakelarTema } from "@/components/sakelar-tema";
 
 /** Bagian halaman yang bisa dituju dari bilah ini — dua layar utama. */
 const BAGIAN = ["beranda", "peta"] as const;
@@ -66,11 +68,19 @@ function IkonSilang({ className = "size-5" }: { className?: string }) {
  */
 export function Nav({ bahasa, gelap = false, cari }: Props) {
   const teks = TEKS_NAV[bahasa];
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [aktif, setAktif] = useState<string>(BAGIAN[0]);
   const [tergulir, setTergulir] = useState(false);
   /** Menu hamburger di layar kecil — tautan bagian pindah ke sini. */
   const [menuTerbuka, setMenuTerbuka] = useState(false);
   const lokasi = usePathname();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const temaGelap = mounted ? resolvedTheme === "dark" : gelap;
 
   // Sinkronisasi <html lang> dengan bahasa aktif
   useEffect(() => {
@@ -218,8 +228,8 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
     <header
       aria-label={teks.navigasi}
       className={`fixed top-0 left-0 z-50 h-16 w-full transition-[background-color,border-color,box-shadow] duration-200 motion-reduce:transition-none ${
-        gelap
-          ? "border-b border-white/10 bg-pantau-konsol"
+        temaGelap
+          ? "border-b border-white/10 bg-pantau-konsol/90 backdrop-blur-md"
           : tergulir
             ? "bg-white/80 border-b border-black/[0.08] shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] backdrop-blur-md"
             : "bg-white/80 border-b border-black/[0.03] backdrop-blur-md"
@@ -254,15 +264,15 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
             <>
               {/* Merek penuh tak muat di 360px berdampingan Lapor + ID/EN —
                   di ponsel cukup nama pendeknya yang dikenal publik. */}
-              <span className="font-bold leading-none tracking-tight text-white text-xl sm:hidden">
+              <span className={`font-bold leading-none tracking-tight text-xl sm:hidden ${temaGelap ? "text-white" : "text-tinta"}`}>
                 {bahasa === "en" ? "Wildfire" : "Karhutla"}
               </span>
-              <span className="hidden font-bold leading-none tracking-tight text-white sm:inline sm:text-2xl">
+              <span className={`hidden font-bold leading-none tracking-tight sm:inline sm:text-2xl ${temaGelap ? "text-white" : "text-tinta"}`}>
                 {teks.merek}
               </span>
             </>
           ) : (
-          <span className="font-bold leading-none tracking-tight text-tinta text-[16px] sm:text-[22px]">
+          <span className={`font-bold leading-none tracking-tight text-[16px] sm:text-[22px] ${temaGelap ? "text-white" : "text-tinta"}`}>
             Fire
           </span>
           )}
@@ -295,12 +305,12 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
             <label htmlFor="nav-cari" className="sr-only">{cari.placeholder}</label>
             <div
               className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${
-                gelap
+                temaGelap
                   ? "bg-black ring-1 ring-white/5 focus-within:ring-2 focus-within:ring-[#ff5a26]"
                   : "bg-black/[0.04] ring-1 ring-black/[0.06] focus-within:ring-2 focus-within:ring-api"
               }`}
             >
-              <IkonCari className={`size-[22px] shrink-0 ${gelap ? "text-[#a0a0a0]" : "text-tinta/50"}`} />
+              <IkonCari className={`size-[22px] shrink-0 ${temaGelap ? "text-[#a0a0a0]" : "text-tinta/50"}`} />
               <input
                 id="nav-cari"
                 type="search"
@@ -308,7 +318,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 onChange={(e) => cari.ubah(e.target.value)}
                 placeholder={cari.placeholder}
                 className={`w-full bg-transparent text-[15px] focus:outline-none ${
-                  gelap
+                  temaGelap
                     ? "text-[#f5f5f5] placeholder:text-[#a0a0a0]/70"
                     : "text-tinta placeholder:text-tinta/40"
                 }`}
@@ -318,7 +328,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 onClick={() => cari.setTerbuka(false)}
                 aria-label={teks.tutupCari}
                 className={`shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
-                  gelap
+                  temaGelap
                     ? "text-[#a0a0a0] hover:text-[#f5f5f5] focus-visible:outline-[#ff5a26]"
                     : "text-tinta/50 hover:text-tinta focus-visible:outline-api"
                 }`}
@@ -330,7 +340,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
         )}
 
         {/* Menu Navigasi & Penukar Bahasa */}
-        <div className="flex items-center gap-2 sm:gap-5">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Tautan bagian hanya milik beranda — dasbor gelap tidak pakai. */}
           {!gelap && (
           <nav aria-label={teks.navigasi} className="hidden sm:flex items-center gap-1 sm:gap-2">
@@ -345,7 +355,9 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                   className={`relative cursor-pointer rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api ${
                     sedang
                       ? "text-api"
-                      : "text-tinta/60 hover:text-tinta hover:bg-black/[0.04]"
+                      : temaGelap
+                        ? "text-white/70 hover:text-white hover:bg-white/[0.06]"
+                        : "text-tinta/60 hover:text-tinta hover:bg-black/[0.04]"
                   }`}
                 >
                   {teks.bagian[id]}
@@ -376,7 +388,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
               aria-expanded={cari.terbuka}
               aria-controls="nav-panel-cari"
               aria-label={cari.terbuka ? teks.tutupCari : teks.cari}
-              className={`${gelap
+              className={`${temaGelap
                 ? "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-md p-1 text-xs font-bold sm:p-1.5 sm:text-sm bg-white/[0.05] text-white ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
                 : "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-full p-1 text-xs font-bold sm:p-1.5 sm:text-sm text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"} aliran:hidden${
                 /* Selagi kolomnya terbuka, sakelar ini menyingkir di KEDUA
@@ -410,14 +422,14 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
 
           {/* Garis Pemisah Tipis — hanya varian terang. */}
           {!gelap && (
-            <div className="hidden h-4 w-[1px] bg-black/10 sm:block" aria-hidden="true" />
+            <div className={`hidden h-4 w-[1px] ${temaGelap ? "bg-white/10" : "bg-black/10"} sm:block`} aria-hidden="true" />
           )}
 
           {/* Penukar Bahasa Minimalis */}
           <div
             role="group"
             aria-label={teks.ganti}
-            className={gelap
+            className={temaGelap
               ? "flex items-center gap-1 text-xs font-bold sm:text-sm"
               : "flex items-center rounded-full bg-black/[0.04] p-0.5 border border-black/[0.06] text-xs font-bold"}
           >
@@ -427,7 +439,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 <span
                   key={kode}
                   aria-current="true"
-                  className={gelap
+                  className={temaGelap
                     ? "rounded-md bg-[#ff5a26] px-2 py-1 uppercase text-white sm:px-3 sm:py-1.5"
                     : "rounded-full bg-[#ff5a26] px-2.5 py-0.5 uppercase text-white shadow-xs"}
                 >
@@ -439,7 +451,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                   href={tautanBahasa(kode)}
                   prefetch={false}
                   aria-label={`${teks.ganti} (${kode.toUpperCase()})`}
-                  className={gelap
+                  className={temaGelap
                     ? "cursor-pointer rounded-md bg-white/[0.04] px-2 py-1 uppercase text-white/60 ring-1 ring-white/[0.07] transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api sm:px-3 sm:py-1.5"
                     : "cursor-pointer rounded-full px-2.5 py-0.5 uppercase text-tinta/50 transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"}
                 >
@@ -448,6 +460,9 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
               );
             })}
           </div>
+
+          {/* Sakelar Tema (Dark & Light) berdampingan langsung dengan penukar bahasa */}
+          <SakelarTema bahasa={bahasa} gelap={temaGelap} />
 
           {/* Hamburger — hanya varian terang (varian gelap tak punya tautan
               bagian untuk disembunyikan). */}
@@ -458,7 +473,11 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
             aria-expanded={menuTerbuka}
             aria-controls="menu-ponsel"
             aria-label={menuTerbuka ? teks.tutupNavigasi : teks.bukaNavigasi}
-            className="flex cursor-pointer h-9 w-9 items-center justify-center rounded-full text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta sm:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+            className={`flex cursor-pointer h-9 w-9 items-center justify-center rounded-full transition-colors sm:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api ${
+              temaGelap
+                ? "text-white/70 hover:bg-white/10 hover:text-white"
+                : "text-tinta/70 hover:bg-black/[0.04] hover:text-tinta"
+            }`}
           >
             {/* Garis-garisnya menukar bentuk jadi tanda silang saat terbuka. */}
             <span aria-hidden="true" className="relative block h-[14px] w-[18px]">
@@ -478,7 +497,11 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
         <nav
           id="menu-ponsel"
           aria-label={teks.navigasi}
-          className="sm:hidden absolute top-full left-0 w-full border-b border-black/[0.08] bg-white/95 backdrop-blur-md shadow-[0_8px_20px_-8px_rgba(0,0,0,0.12)]"
+          className={`sm:hidden absolute top-full left-0 w-full border-b backdrop-blur-md shadow-[0_8px_20px_-8px_rgba(0,0,0,0.12)] ${
+            temaGelap
+              ? "border-white/10 bg-pantau-konsol/95 text-white"
+              : "border-black/[0.08] bg-white/95 text-tinta"
+          }`}
         >
           <ul className="flex flex-col px-[var(--pias)] py-2">
             {BAGIAN.map((id) => {

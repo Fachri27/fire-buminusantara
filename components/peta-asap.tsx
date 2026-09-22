@@ -1711,7 +1711,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             onClick={onExpand}
             aria-label={expandLabel}
             title={expandLabel}
-            className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white"
+            className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-xl bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-transform active:scale-90"
           >
             <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
               <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
@@ -1723,7 +1723,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           type="button"
           onClick={() => mapRef.current?.zoomIn()}
           aria-label="Perbesar peta"
-          className={`cursor-pointer flex items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
+          className={`cursor-pointer flex items-center justify-center rounded-xl bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-transform active:scale-90 ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
         >
           <svg viewBox="0 0 24 24" width={ikonNav} height={ikonNav} fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19" />
@@ -1736,7 +1736,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           type="button"
           onClick={() => mapRef.current?.zoomOut()}
           aria-label="Perkecil peta"
-          className={`cursor-pointer flex items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
+          className={`cursor-pointer flex items-center justify-center rounded-xl bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-transform active:scale-90 ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
         >
           <svg viewBox="0 0 24 24" width={ikonNav} height={ikonNav} fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="5" y1="12" x2="19" y2="12" />
@@ -1764,7 +1764,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           }}
           aria-label="Fokus seluruh Nusantara"
           title="Fokus seluruh Nusantara"
-          className={`cursor-pointer flex items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-transform active:scale-90 hover:bg-black hover:text-white ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
+          className={`cursor-pointer flex items-center justify-center rounded-xl bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-transform active:scale-90 ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
         >
           <svg viewBox="0 0 24 24" width={ikonNav} height={ikonNav} fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -1779,7 +1779,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           disabled={sedangSync}
           aria-label="Sinkronkan sebaran asap terbaru"
           title="Sinkronkan sebaran asap terbaru"
-          className={`cursor-pointer flex items-center justify-center rounded-xl bg-black/75 text-white/90 shadow-lg ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-90 hover:bg-black hover:text-white disabled:opacity-40 disabled:cursor-not-allowed ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
+          className={`cursor-pointer flex items-center justify-center rounded-xl bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
         >
           <svg
             viewBox="0 0 24 24"
@@ -1806,19 +1806,19 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       <button
         type="button"
         onClick={() => setLegendaTerbuka(true)}
-        className={`cursor-pointer pointer-events-auto absolute bottom-[calc(var(--sela-bawah,0px)+6rem)] right-3 z-[400] items-center gap-1.5 rounded-full bg-black/85 px-3 py-1.5 text-xs font-semibold text-white/90 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-all active:scale-95 hover:bg-black hover:text-white ${
+        className={`cursor-pointer pointer-events-auto absolute bottom-[calc(var(--sela-bawah,0px)+6rem)] right-3 z-[400] items-center gap-1.5 rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:shadow-2xl dark:ring-1 dark:ring-white/15 px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition-all active:scale-95 ${
           legendaTerbuka ? "hidden" : legendaRingkas ? (bingkaiSempit ? "flex sm:bottom-[calc(var(--sela-bawah,0px)+7rem)]" : "flex sm:hidden") : "flex xl:hidden"
         }`}
       >
-        <span className={`text-sm leading-none ${gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}`}>🔥</span>
+        <span className={`text-sm leading-none ${gayaVisual === "copernicus" ? "text-fuchsia-600 dark:text-fuchsia-400" : "text-amber-600 dark:text-amber-400"}`}>🔥</span>
         <span>Aerosol Karhutla</span>
-        <span className="text-white/40">·</span>
+        <span className="text-tinta/40 dark:text-white/40">·</span>
         <span className={`text-[11px] font-medium ${
           gayaVisual === "copernicus"
-            ? "text-fuchsia-400"
+            ? "text-fuchsia-600 dark:text-fuchsia-400"
             : gayaVisual === "sh_Oranges_aod"
-            ? "text-amber-400"
-            : "text-sky-400"
+            ? "text-amber-600 dark:text-amber-400"
+            : "text-sky-600 dark:text-sky-400"
         }`}>
           {gayaVisual === "copernicus"
             ? "Fire Watch"
@@ -1836,7 +1836,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           stroke="currentColor"
           strokeWidth="2.5"
           aria-hidden="true"
-          className="ml-0.5 text-white/60"
+          className="ml-0.5 text-tinta/60 dark:text-white/60"
         >
           <path d="m6 9 6 6 6-6" />
         </svg>
@@ -1853,7 +1853,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           saat ganti mode) tetap meluncur mulus. */}
       <div
         style={gayaHamparan}
-        className={`pantau-legenda pointer-events-auto absolute right-3 z-[400] rounded-2xl bg-black/85 text-white/85 shadow-2xl ring-1 ring-white/15 backdrop-blur-md transition-[bottom,top,max-height] ${
+        className={`pantau-legenda pointer-events-auto absolute right-3 z-[400] rounded-2xl bg-white/95 border border-black/[0.08] text-tinta shadow-xl dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white/85 dark:shadow-2xl dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-[bottom,top,max-height] ${
           legendaRingkas
             ? /* --sela-bawah: tinggi laci konsol ponsel yang menutup dasar
                  bingkai (0 di panggung) — hamparan bawah naik di atasnya. */
@@ -1867,9 +1867,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
               : "hidden xl:block"
         }`}
       >
-        <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/10">
-          <div className="flex items-center gap-1.5 font-semibold text-white">
-            <span className={`text-sm leading-none shrink-0 ${gayaVisual === "copernicus" ? "text-fuchsia-400" : "text-amber-400"}`}>🔥</span>
+        <div className="flex items-center justify-between gap-2 pb-2 border-b border-black/[0.08] dark:border-white/10">
+          <div className="flex items-center gap-1.5 font-semibold text-tinta dark:text-white">
+            <span className={`text-sm leading-none shrink-0 ${gayaVisual === "copernicus" ? "text-fuchsia-600 dark:text-fuchsia-400" : "text-amber-600 dark:text-amber-400"}`}>🔥</span>
             <span className="text-xs">Aerosol Karhutla</span>
           </div>
           {/* Tombol tutup — di konsol dasbor panel tak bisa ditutup (selalu
@@ -1878,7 +1878,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           <button
             type="button"
             onClick={() => setLegendaTerbuka(false)}
-            className={`cursor-pointer shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors flex h-5 w-5 ${legendaRingkas ? (bingkaiSempit ? "" : "sm:hidden") : "xl:hidden"}`}
+            className={`cursor-pointer shrink-0 items-center justify-center rounded-full bg-black/[0.06] text-tinta/70 hover:bg-black/[0.12] hover:text-tinta dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/20 dark:hover:text-white transition-colors flex h-5 w-5 ${legendaRingkas ? (bingkaiSempit ? "" : "sm:hidden") : "xl:hidden"}`}
             aria-label="Tutup legenda"
           >
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1887,13 +1887,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           </button>
         </div>
 
-        <p className="mt-2 text-[11px] leading-relaxed text-white/70">
+        <p className="mt-2 text-[11px] leading-relaxed text-tinta/70 dark:text-white/70">
           Aerosol asap kebakaran hutan dan lahan <span className="italic font-normal">(wildfire)</span> OMAOD 550nm . Organic Matter AOD
         </p>
 
         {/* Pita Gradien Warna */}
         <div className="mt-2.5 flex flex-col gap-1.5">
-          <div className="flex items-center justify-between text-[10px] text-white/50 font-medium">
+          <div className="flex items-center justify-between text-[10px] text-tinta/60 dark:text-white/50 font-medium">
             <span>Tingkat Kepekatan</span>
             <button
               type="button"
@@ -1908,10 +1908,10 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
               }
               className={`cursor-pointer font-medium transition-colors ${
                 gayaVisual === "copernicus"
-                  ? "text-fuchsia-400 hover:text-fuchsia-300"
+                  ? "text-fuchsia-600 hover:text-fuchsia-700 dark:text-fuchsia-400 dark:hover:text-fuchsia-300"
                   : gayaVisual === "sh_Oranges_aod"
-                  ? "text-amber-400 hover:text-amber-300"
-                  : "text-sky-400 hover:text-sky-300"
+                  ? "text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                  : "text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
               }`}
             >
               {gayaVisual === "copernicus"
@@ -1923,7 +1923,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           </div>
 
           <div
-            className="h-2.5 w-full rounded-full shadow-inner ring-1 ring-white/10"
+            className="h-2.5 w-full rounded-full shadow-inner ring-1 ring-black/[0.08] dark:ring-white/10"
             style={{
               background:
                 gayaVisual === "copernicus"
@@ -1934,7 +1934,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             }}
           />
 
-          <div className="flex justify-between text-[10px] text-white/50">
+          <div className="flex justify-between text-[10px] text-tinta/60 dark:text-white/50">
             <span>Bersih</span>
             <span>Sedang</span>
             <span>Pekat</span>
@@ -1942,11 +1942,11 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         </div>
 
         {/* Atribusi Resmi & Lisensi Data */}
-        <div className="mt-3 pt-2.5 border-t border-white/10 text-[10px] leading-relaxed text-white/50 space-y-1.5">
+        <div className="mt-3 pt-2.5 border-t border-black/[0.08] dark:border-white/10 text-[10px] leading-relaxed text-tinta/60 dark:text-white/50 space-y-1.5">
           {modelRunWib && (
-            <div className="flex items-center justify-between pb-1 border-b border-white/[0.06] text-white/70">
-              <span className="text-[10px] text-zinc-400">Siklus Model CAMS:</span>
-              <span className="font-mono text-[10px] text-amber-300 font-medium">{modelRunWib}</span>
+            <div className="flex items-center justify-between pb-1 border-b border-black/[0.05] dark:border-white/[0.06] text-tinta/80 dark:text-white/70">
+              <span className="text-[10px] text-neutral-500 dark:text-zinc-400">Siklus Model CAMS:</span>
+              <span className="font-mono text-[10px] text-amber-600 dark:text-amber-300 font-medium">{modelRunWib}</span>
             </div>
           )}
           <p>
@@ -1955,19 +1955,19 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
               href="https://atmosphere.copernicus.eu/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-white/70 hover:text-white underline underline-offset-2 transition-colors"
+              className="text-tinta/80 hover:text-tinta dark:text-white/70 dark:hover:text-white underline underline-offset-2 transition-colors"
             >
               Copernicus Atmosphere Monitoring Service
             </a>{" "}
             information 2026.
           </p>
-          <p className="text-white/40 text-[9.5px]">
+          <p className="text-tinta/45 dark:text-white/40 text-[9.5px]">
             Peta dasar: &copy;{" "}
             <a
               href="https://s2maps.eu"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-white/60 hover:text-white underline underline-offset-2 transition-colors"
+              className="text-tinta/60 hover:text-tinta dark:text-white/60 dark:hover:text-white underline underline-offset-2 transition-colors"
             >
               EOX IT Services GmbH
             </a>{" "}
@@ -1988,14 +1988,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           rel="noopener noreferrer"
           title="Copernicus Atmosphere Monitoring Service"
           aria-label="Copernicus Atmosphere Monitoring Service"
-          className="group flex items-center gap-2 rounded-xl bg-black/75 px-2.5 py-1.5 shadow-xl ring-1 ring-white/15 backdrop-blur-md transition-all hover:bg-black hover:ring-white/30 active:scale-95"
+          className="group flex items-center gap-2 rounded-xl bg-white/90 border border-black/[0.08] px-2.5 py-1.5 shadow-sm hover:bg-white dark:bg-black/75 dark:border-white/10 dark:ring-1 dark:ring-white/15 dark:shadow-xl backdrop-blur-md transition-all dark:hover:bg-black dark:hover:ring-white/30 active:scale-95"
         >
           <Image
             src="/assets/img/copernicus-white.svg"
             alt="Copernicus Atmosphere Monitoring Service"
             width={120}
             height={44}
-            className={`h-5 sm:h-6 w-auto opacity-90 transition-opacity group-hover:opacity-100 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]${logoSelulerSrc ? " aliran:hidden" : ""}`}
+            className={`h-5 sm:h-6 w-auto opacity-90 transition-opacity group-hover:opacity-100 invert dark:invert-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)] dark:drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]${logoSelulerSrc ? " aliran:hidden" : ""}`}
           />
           {logoSelulerSrc && (
             <Image
@@ -2003,7 +2003,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
               alt={logoSelulerAlt}
               width={120}
               height={44}
-              className="hidden h-5 w-auto opacity-90 transition-opacity group-hover:opacity-100 drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)] aliran:inline"
+              className="hidden h-5 w-auto opacity-90 transition-opacity group-hover:opacity-100 drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)] dark:drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)] aliran:inline"
             />
           )}
         </a>
@@ -2012,7 +2012,10 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       {/* Kontrol Linimasa Animasi — di tengah bawah bingkai.
           Ukurannya dipusatkan dan responsif selebar bingkai tanpa zoom artifisial
           supaya interaksi klik/sentuh selalu akurat dan tombol mudah ditekan. */}
-      <div className={`pointer-events-auto absolute bottom-[calc(var(--sela-bawah,0px)+1rem)] z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-white/[0.1] bg-pantau-konsol/90 shadow-2xl backdrop-blur-xl ${
+      {/* Kontrol Linimasa Animasi — di tengah bawah bingkai.
+          Ukurannya dipusatkan dan responsif selebar bingkai tanpa zoom artifisial
+          supaya interaksi klik/sentuh selalu akurat dan tombol mudah ditekan. */}
+      <div className={`pointer-events-auto absolute bottom-[calc(var(--sela-bawah,0px)+1rem)] z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-black/[0.08] bg-white/95 text-tinta shadow-xl dark:border-white/[0.1] dark:bg-pantau-konsol/90 dark:text-white dark:shadow-2xl backdrop-blur-xl ${
         legendaRingkas
           ? /* Dasbor/ringkas: sangat ramping dan terpusat supaya proporsional dan tidak mendominasi peta */
           "inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[330px] sm:max-w-[calc(100%-1.5rem)] p-1.5 sm:px-2.5 sm:py-1.5"
@@ -2067,7 +2070,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 }}
                 aria-label="Titik waktu sebelumnya"
                 title="Waktu sebelumnya"
-                className={`cursor-pointer flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all ${
+                className={`cursor-pointer flex items-center justify-center rounded-lg text-neutral-600 hover:text-tinta hover:bg-black/[0.06] dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.08] active:scale-95 transition-all ${
                   legendaRingkas
                     ? "h-6 w-6 min-w-[24px]"
                     : "h-7 w-7 min-w-[28px] sm:h-8 sm:w-8 sm:min-w-[32px]"
@@ -2100,7 +2103,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 }}
                 aria-label="Titik waktu berikutnya"
                 title="Waktu berikutnya"
-                className={`cursor-pointer flex items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.08] active:scale-95 transition-all ${
+                className={`cursor-pointer flex items-center justify-center rounded-lg text-neutral-600 hover:text-tinta hover:bg-black/[0.06] dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.08] active:scale-95 transition-all ${
                   legendaRingkas
                     ? "h-6 w-6 min-w-[24px]"
                     : "h-7 w-7 min-w-[28px] sm:h-8 sm:w-8 sm:min-w-[32px]"
@@ -2116,7 +2119,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 type="button"
                 onClick={() => setKecepatan(kecepatan === 1 ? 2 : 1)}
                 title="Kecepatan putar"
-                className={`cursor-pointer flex items-center justify-center rounded-md font-mono font-medium text-zinc-400 hover:text-zinc-200 bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] transition-all ${
+                className={`cursor-pointer flex items-center justify-center rounded-md font-mono font-medium text-neutral-700 hover:text-neutral-900 bg-black/[0.04] hover:bg-black/[0.08] border border-black/[0.08] dark:text-zinc-400 dark:hover:text-zinc-200 dark:bg-white/[0.05] dark:hover:bg-white/[0.1] dark:border-white/[0.08] transition-all ${
                   legendaRingkas
                     ? "h-6 min-w-[24px] px-1 text-[10px]"
                     : "h-7 min-w-[28px] px-1.5 text-[11px] sm:h-8 sm:min-w-[32px] sm:px-2"
@@ -2130,11 +2133,11 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             <div className="flex flex-col items-end justify-center min-w-0">
               <div className="flex items-center gap-1.5 text-right min-w-0 justify-end">
                 {jumlahFrameTerunduh < linimasa.length && !legendaRingkas && (
-                  <span className="hidden sm:inline-block rounded bg-white/[0.06] px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-zinc-400 border border-white/[0.06]">
+                  <span className="hidden sm:inline-block rounded bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-neutral-600 border border-black/[0.08] dark:bg-white/[0.06] dark:text-zinc-400 dark:border-white/[0.06]">
                     {persentaseCache}%
                   </span>
                 )}
-                <span className={`font-semibold tracking-tight text-white tabular-nums truncate ${
+                <span className={`font-semibold tracking-tight text-tinta dark:text-white tabular-nums truncate ${
                   legendaRingkas ? "text-[11px]" : "text-xs sm:text-sm"
                 }`}>
                   {langkahSekarang?.labelWib || "Memuat..."}
@@ -2151,13 +2154,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                     legendaRingkas ? "px-1.5 py-0.2 text-[8.5px]" : "px-1.5 sm:px-2 py-0.5 text-[10px]"
                   } ${
                     langkahSekarang?.adalahPrediksi
-                      ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                      : "bg-sky-500/15 text-sky-300 border-sky-500/30"
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                      : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30"
                   }`}
                 >
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
-                      langkahSekarang?.adalahPrediksi ? "bg-amber-400 animate-pulse" : "bg-sky-400"
+                      langkahSekarang?.adalahPrediksi ? "bg-amber-500 animate-pulse dark:bg-amber-400" : "bg-sky-500 dark:bg-sky-400"
                     }`}
                   />
                   <span>{langkahSekarang?.adalahPrediksi ? "Prediksi" : "Analisis"}</span>
@@ -2166,7 +2169,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
               {/* Sub-keterangan: Siklus Basis Model saat Prediksi / Analisis Teramati.
                   Di pola ringkas disembunyikan agar bilah tetap ramping dan tidak menutupi peta. */}
-              <div className={`text-[9.5px] leading-tight text-zinc-400/90 font-mono tracking-tight mt-0.5 truncate max-w-[210px] sm:max-w-[320px] ${
+              <div className={`text-[9.5px] leading-tight text-neutral-500 dark:text-zinc-400/90 font-mono tracking-tight mt-0.5 truncate max-w-[210px] sm:max-w-[320px] ${
                 legendaRingkas ? "hidden" : "hidden sm:block"
               }`}>
                 {langkahSekarang?.adalahPrediksi ? (
@@ -2174,11 +2177,11 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                     title={modelRunWib ? `Hasil prakiraan numerik dari siklus model CAMS ${modelRunWib}` : undefined}
                     className="flex items-center gap-1 justify-end cursor-help"
                   >
-                    <span className="text-amber-400/80 font-sans font-medium text-[9px]">Basis Model:</span>
-                    <span className="text-zinc-300">{modelRunWib || "ECMWF CAMS"}</span>
+                    <span className="text-amber-600 dark:text-amber-400/80 font-sans font-medium text-[9px]">Basis Model:</span>
+                    <span className="text-neutral-700 dark:text-zinc-300">{modelRunWib || "ECMWF CAMS"}</span>
                   </span>
                 ) : (
-                  <span className="text-zinc-500 font-sans text-[9px]">Analisis Teramati Satelit</span>
+                  <span className="text-neutral-500 dark:text-zinc-500 font-sans text-[9px]">Analisis Teramati Satelit</span>
                 )}
               </div>
             </div>
@@ -2186,7 +2189,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
           {/* Baris Bawah: Slider Linimasa */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <span className={`font-medium text-zinc-400/80 tabular-nums select-none shrink-0 ${
+            <span className={`font-medium text-neutral-500 dark:text-zinc-400/80 tabular-nums select-none shrink-0 ${
               legendaRingkas ? "text-[9px] min-w-[26px]" : "text-[10px] min-w-[32px] sm:min-w-[34px]"
             }`}>
               {linimasa[0]?.labelWib?.split(",")[0] || ""}
@@ -2207,7 +2210,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 style={{ ["--progress-percent" as string]: "0%" }}
               />
             </div>
-            <span className={`font-medium text-zinc-400/80 tabular-nums select-none shrink-0 text-right ${
+            <span className={`font-medium text-neutral-500 dark:text-zinc-400/80 tabular-nums select-none shrink-0 text-right ${
               legendaRingkas ? "text-[9px] min-w-[26px]" : "text-[10px] min-w-[32px] sm:min-w-[34px]"
             }`}>
               {linimasa[linimasa.length - 1]?.labelWib?.split(",")[0] || ""}
@@ -2220,13 +2223,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       <div
         className={`absolute inset-0 z-[500] flex items-center justify-center p-4 transition-opacity duration-300 ${
           sedangSync
-            ? "pointer-events-auto opacity-100 backdrop-blur-sm bg-black/60"
+            ? "pointer-events-auto opacity-100 backdrop-blur-sm bg-black/40 dark:bg-black/60"
             : "pointer-events-none opacity-0 backdrop-blur-none bg-transparent"
         }`}
         aria-live="polite"
         aria-busy={sedangSync}
       >
-        <div className="flex flex-col items-center gap-4 text-center">
+        <div className="flex flex-col items-center gap-4 text-center rounded-2xl bg-white/95 border border-black/[0.08] p-5 shadow-2xl text-tinta dark:bg-pantau-konsol dark:border-white/10 dark:text-white">
           {galatSync ? (
             <>
               <svg
@@ -2237,14 +2240,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
-                className="text-rose-400"
+                className="text-rose-500 dark:text-rose-400"
               >
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 8v4M12 16h.01" />
               </svg>
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-white">Gagal memuat sebaran asap</p>
-                <p className="max-w-[280px] text-xs text-white/60">{galatSync}</p>
+                <p className="text-sm font-semibold text-tinta dark:text-white">Gagal memuat sebaran asap</p>
+                <p className="max-w-[280px] text-xs text-tinta/60 dark:text-white/60">{galatSync}</p>
               </div>
               <div className="flex items-center gap-4">
                 <button
@@ -2260,7 +2263,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                     setGalatSync(null);
                     setSedangSync(false);
                   }}
-                  className="cursor-pointer text-xs font-medium text-white/60 underline underline-offset-2 transition-colors hover:text-white"
+                  className="cursor-pointer text-xs font-medium text-tinta/60 hover:text-tinta dark:text-white/60 underline underline-offset-2 transition-colors dark:hover:text-white"
                 >
                   Tutup
                 </button>
@@ -2276,15 +2279,15 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                 stroke="currentColor"
                 strokeWidth="2.5"
                 strokeLinecap="round"
-                className="animate-spin text-fuchsia-400"
+                className="animate-spin text-fuchsia-600 dark:text-fuchsia-400"
               >
                 <circle cx="12" cy="12" r="9" className="opacity-20" />
                 <path d="M12 3a9 9 0 0 1 9 9" />
               </svg>
-              <p className="text-sm font-medium text-white/90 tabular-nums">
+              <p className="text-sm font-medium text-tinta/90 dark:text-white/90 tabular-nums">
                 Menyinkronkan sebaran asap… {progresSync}%
               </p>
-              <div className="h-1 w-52 overflow-hidden rounded-full bg-white/15">
+              <div className="h-1 w-52 overflow-hidden rounded-full bg-black/10 dark:bg-white/15">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-[#86198f] to-[#b90d84] transition-all duration-200 ease-out"
                   style={{ width: `${progresSync}%` }}
@@ -2297,7 +2300,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
                     setSedangSync(false);
                     setWaktuTungguLama(false);
                   }}
-                  className="cursor-pointer text-xs font-medium text-white/50 underline underline-offset-2 transition-colors hover:text-white"
+                  className="cursor-pointer text-xs font-medium text-tinta/50 hover:text-tinta dark:text-white/50 underline underline-offset-2 transition-colors dark:hover:text-white"
                 >
                   Lewati
                 </button>
@@ -2323,11 +2326,21 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             to right,
             #86198f 0%,
             #b90d84 var(--progress-percent, 0%),
-            rgba(255, 255, 255, 0.15) var(--progress-percent, 0%),
-            rgba(255, 255, 255, 0.15) 100%
+            rgba(0, 0, 0, 0.12) var(--progress-percent, 0%),
+            rgba(0, 0, 0, 0.12) 100%
           );
           outline: none;
           cursor: pointer;
+        }
+        :where(.dark) .timeline-slider,
+        .dark .timeline-slider {
+          background-image: linear-gradient(
+            to right,
+            #86198f 0%,
+            #b90d84 var(--progress-percent, 0%),
+            rgba(255, 255, 255, 0.15) var(--progress-percent, 0%),
+            rgba(255, 255, 255, 0.15) 100%
+          );
         }
         .timeline-slider::-webkit-slider-runnable-track {
           height: 5px;
@@ -2341,7 +2354,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           border-radius: 50%;
           background: #ffffff;
           border: 2px solid #b90d84;
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
           cursor: grab;
           margin-top: -4.5px;
           transition: transform 0.12s ease, box-shadow 0.12s ease;
@@ -2366,12 +2379,16 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           border-radius: 50%;
           background: #ffffff;
           border: 2px solid #b90d84;
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
           cursor: grab;
         }
         .timeline-slider::-moz-range-track {
           height: 5px;
           border-radius: 9999px;
+          background: rgba(0, 0, 0, 0.12);
+        }
+        :where(.dark) .timeline-slider::-moz-range-track,
+        .dark .timeline-slider::-moz-range-track {
           background: rgba(255, 255, 255, 0.15);
         }
         .timeline-slider::-moz-range-progress {
@@ -2403,6 +2420,15 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             1px -1px 0 rgb(26 25 25 / 0.7),
             -1px -1px 0 rgb(26 25 25 / 0.7);
           pointer-events: none;
+        }
+        :where(.dark) .peta-angka__nilai,
+        .dark .peta-angka__nilai {
+          text-shadow:
+            0 0 3px rgb(0 0 0 / 0.95),
+            1px 1px 0 rgb(0 0 0 / 0.85),
+            -1px 1px 0 rgb(0 0 0 / 0.85),
+            1px -1px 0 rgb(0 0 0 / 0.85),
+            -1px -1px 0 rgb(0 0 0 / 0.85);
         }
         .peta-angka--bertumpuk {
           display: none;

@@ -52,6 +52,17 @@
   pointer-events: none;
 }
 
+:where(.dark) .peta-angka__nilai,
+.dark .peta-angka__nilai {
+  color: #fff;
+  text-shadow:
+    0 0 3px rgb(0 0 0 / 0.95),
+    1px 1px 0 rgb(0 0 0 / 0.85),
+    -1px 1px 0 rgb(0 0 0 / 0.85),
+    1px -1px 0 rgb(0 0 0 / 0.85),
+    -1px -1px 0 rgb(0 0 0 / 0.85);
+}
+
 /* Angka ini bertumpuk dengan angka provinsi lain yang lebih luas (lihat
    perbaruiAngka di js/peta.js). Disembunyikan, bukan dikecilkan: dua angka yang
    saling menutupi membuat KEDUANYA tak terbaca, sedangkan satu yang hilang
@@ -59,3 +70,26 @@
 .peta-angka--bertumpuk {
   display: none;
 }
+
+/* Tooltip wilayah pada peta (dukungan tema terang dan gelap) */
+.leaflet-tooltip.provinsi-tooltip,
+#asap-provinsi-tooltip,
+#provinsi-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1a1919;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+:where(.dark) .leaflet-tooltip.provinsi-tooltip,
+:where(.dark) #asap-provinsi-tooltip,
+:where(.dark) #provinsi-tooltip,
+.dark .leaflet-tooltip.provinsi-tooltip,
+.dark #asap-provinsi-tooltip,
+.dark #provinsi-tooltip {
+  background: rgba(20, 16, 15, 0.94);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+

@@ -101,9 +101,14 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
           type="button"
           onClick={() => { setTerbuka(false); setCari(""); }}
           aria-label="Tutup panel provinsi"
-          className="cursor-pointer flex items-center gap-1.5 rounded-full bg-white/95 px-[clamp(12px,3.4vw,16px)]
-                     py-[clamp(7px,2vw,10px)] text-[length:var(--ukuran-catatan)] font-semibold text-tinta
-                     shadow-[0_3px_14px_rgb(0_0_0/0.22)] transition-transform active:scale-95"
+          className="cursor-pointer flex items-center gap-1.5 rounded-full
+                     border border-black/[0.08] bg-white/95 text-tinta shadow-sm
+                     hover:bg-black/[0.04]
+                     dark:border-white/15 dark:bg-pantau-konsol/95 dark:text-[#f5f5f5]
+                     dark:hover:bg-white/10
+                     px-[clamp(12px,3.4vw,16px)] py-[clamp(7px,2vw,10px)]
+                     text-[length:var(--ukuran-catatan)] font-semibold
+                     transition-transform active:scale-95"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
                strokeLinecap="round" className="size-[clamp(15px,4.2vw,18px)]">
@@ -117,7 +122,7 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
              strokeLinecap="round"
              className="pointer-events-none absolute top-1/2 left-[clamp(14px,4vw,20px)] size-[clamp(18px,5vw,22px)]
-                        -translate-y-1/2 text-black/35">
+                        -translate-y-1/2 text-black/40 dark:text-white/40">
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-3.6-3.6" />
         </svg>
@@ -125,33 +130,38 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
         <input
           type="search" value={cari} onChange={(e) => setCari(e.target.value)}
           placeholder="Cari provinsi…" aria-label="Cari provinsi"
-          className="w-full rounded-[16px] bg-[#fdf3f2] py-[clamp(12px,3.4vw,16px)] pr-[clamp(14px,4vw,20px)]
-                     pl-[clamp(40px,11vw,52px)] text-[length:var(--ukuran-nama)] leading-[1.2] text-tinta
-                     shadow-[0_3px_16px_rgb(0_0_0/0.16)] outline-none placeholder:text-black/35
-                     focus-visible:ring-2 focus-visible:ring-white/70 [&::-webkit-search-cancel-button]:hidden"
+          className="w-full rounded-[16px] border border-black/[0.08] bg-[#fdf3f2] text-tinta shadow-sm
+                     placeholder:text-black/40
+                     dark:border-white/15 dark:bg-pantau-malam dark:text-[#f5f5f5]
+                     dark:placeholder:text-white/40
+                     py-[clamp(12px,3.4vw,16px)] pr-[clamp(14px,4vw,20px)]
+                     pl-[clamp(40px,11vw,52px)] text-[length:var(--ukuran-nama)] leading-[1.2]
+                     outline-none focus-visible:ring-2 focus-visible:ring-api/50 dark:focus-visible:ring-white/30
+                     [&::-webkit-search-cancel-button]:hidden"
         />
 
         {cari.trim() && (
           <ul className="absolute inset-x-0 top-[calc(100%+6px)] max-h-[min(52svh,320px)] overflow-y-auto
-                         rounded-[14px] bg-white py-1 shadow-[0_14px_34px_rgb(0_0_0/0.3)]">
+                         rounded-[14px] border border-black/[0.08] bg-white text-tinta shadow-md
+                         dark:border-white/10 dark:bg-pantau-konsol dark:text-[#f5f5f5] py-1">
             {hasil.length > 0 ? (
               hasil.map((nama) => (
                 <li key={nama}>
                   <button type="button" onClick={(e) => pilih(nama, e)}
                           className="cursor-pointer flex w-full items-center gap-3 px-[clamp(12px,3.4vw,16px)] py-[10px] text-left
-                                     transition-colors hover:bg-black/5">
+                                     transition-colors hover:bg-black/5 dark:hover:bg-white/10 text-tinta dark:text-[#f5f5f5]">
                     <Siluet jalur={siluet[nama]} className="size-[clamp(24px,7vw,32px)] shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-[length:var(--ukuran-nama)] font-semibold">
+                    <span className="min-w-0 flex-1 truncate text-[length:var(--ukuran-nama)] font-semibold text-tinta dark:text-[#f5f5f5]">
                       {nama}
                     </span>
-                    <span className="shrink-0 text-[length:var(--ukuran-catatan)] text-black/45">
+                    <span className="shrink-0 text-[length:var(--ukuran-catatan)] text-black/55 dark:text-white/60">
                       {inferPulau(nama)}
                     </span>
                   </button>
                 </li>
               ))
             ) : (
-              <li className="px-[clamp(12px,3.4vw,16px)] py-[12px] text-[length:var(--ukuran-catatan)] text-black/55">
+              <li className="px-[clamp(12px,3.4vw,16px)] py-[12px] text-[length:var(--ukuran-catatan)] text-black/60 dark:text-white/60">
                 Provinsi tidak ditemukan.
               </li>
             )}
@@ -162,31 +172,74 @@ export function PanelProvinsi({ teratas, onPilihWilayah }: Props) {
       {/* Layanan luar yang sama dengan warna peta. Kalau tak terjangkau,
           daftarnya tidak ada isinya — kolom pencarian tetap berguna sendiri. */}
       {teratas.length > 0 && (
-        <div className="panggung:hidden">
-          <p className="mt-[clamp(16px,4.6vw,26px)] text-[length:var(--ukuran-eyebrow)] leading-[1.2] font-bold
-                        tracking-[0.16em] uppercase text-white">
-            3 provinsi dengan kebakaran terluas
-          </p>
+        <div className="panggung:hidden mt-[clamp(16px,4.6vw,26px)] rounded-[14px] bg-white border border-black/[0.08] text-tinta shadow-sm dark:bg-pantau-konsol dark:border-white/10 dark:text-[#f5f5f5] p-3 sm:p-4">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-black/[0.06] dark:border-white/10">
+            <p className="text-[length:var(--ukuran-eyebrow)] leading-[1.2] font-bold
+                          tracking-[0.16em] uppercase text-black/70 dark:text-white/70">
+              3 provinsi dengan kebakaran terluas
+            </p>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-api">
+              <span className="size-2 rounded-full bg-api animate-pulse" />
+              Hotspot & Karhutla
+            </span>
+          </div>
 
-          <ul className="mt-[clamp(8px,2.6vw,14px)] grid gap-[clamp(10px,3vw,16px)]">
-            {teratas.map((p) => {
+          <ul className="grid gap-[clamp(8px,2.5vw,12px)]">
+            {teratas.map((p, idx) => {
               const nama = namaProvinsiLokal(p.nama);
+              const maxLuas = Math.max(
+                ...teratas.map((t) => {
+                  const val = parseFloat(t.luas.replace(/\./g, "").replace(/,/g, "."));
+                  return isNaN(val) ? 0 : val;
+                }),
+                1
+              );
+              const luasNum = parseFloat(p.luas.replace(/\./g, "").replace(/,/g, "."));
+              const persentase = isNaN(luasNum)
+                ? 100 - idx * 25
+                : Math.min(100, Math.max(15, Math.round((luasNum / maxLuas) * 100)));
+
               return (
                 <li key={p.nama}>
                   <button type="button" onClick={(e) => pilih(nama, e)}
-                          className="cursor-pointer flex w-full items-center gap-[clamp(10px,3vw,18px)] rounded-[10px] bg-white
-                                     p-[clamp(12px,3.6vw,18px)] text-left shadow-[0_4px_18px_rgb(0_0_0/0.16)]
-                                     transition hover:-translate-y-[1px] hover:shadow-[0_8px_24px_rgb(0_0_0/0.22)]">
-                    <Siluet jalur={siluet[nama]}
-                            className="h-[clamp(44px,13vw,70px)] w-[clamp(52px,16vw,88px)] shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[length:var(--ukuran-label)] leading-[1.15] font-bold">
-                        {nama}
-                      </span>
-                      <span className="block text-[length:var(--ukuran-catatan)] leading-[1.4] text-black/45">
-                        {p.pulau}
-                      </span>
-                    </span>
+                          className="group cursor-pointer flex w-full flex-col gap-2 rounded-[10px]
+                                     bg-black/[0.02] border border-black/[0.06] text-tinta
+                                     hover:bg-black/[0.05] hover:border-black/15
+                                     dark:bg-white/[0.04] dark:border-white/10 dark:text-[#f5f5f5]
+                                     dark:hover:bg-white/[0.08] dark:hover:border-white/20
+                                     p-[clamp(10px,3vw,14px)] text-left
+                                     transition-all duration-200">
+                    <div className="flex w-full items-center gap-[clamp(10px,3vw,16px)]">
+                      <Siluet jalur={siluet[nama]}
+                              className="h-[clamp(36px,11vw,56px)] w-[clamp(44px,13vw,70px)] shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-[length:var(--ukuran-label)] leading-[1.15] font-bold text-tinta dark:text-[#f5f5f5] group-hover:text-api transition-colors">
+                          {nama}
+                        </span>
+                        <span className="block text-[length:var(--ukuran-catatan)] leading-[1.4] text-black/55 dark:text-white/60">
+                          {p.pulau}
+                        </span>
+                      </div>
+                      {p.luas && (
+                        <div className="shrink-0 text-right">
+                          <span className="block text-xs sm:text-sm font-bold text-api">
+                            {p.luas} ha
+                          </span>
+                          <span className="block text-[11px] text-black/45 dark:text-white/45">
+                            terbakar
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Indikator progress bar kebakaran */}
+                    <div className="w-full pt-1">
+                      <div className="h-1.5 w-full rounded-full bg-black/[0.08] dark:bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-api transition-all duration-300"
+                          style={{ width: `${persentase}%` }}
+                        />
+                      </div>
+                    </div>
                   </button>
                 </li>
               );

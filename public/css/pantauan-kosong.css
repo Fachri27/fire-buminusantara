@@ -15,9 +15,29 @@
  */
 
 .pantauan-kosong {
-  /* Kabut: warna teks di atas kaca gelap. Sekomponen dengan --color-laut. */
-  --kosong-asap: 232 230 225;
-  --kosong-garis: rgb(232 230 225 / 0.16);
+  /* ── Mode Terang (Default) ──────────────────────────────────────────────── */
+  --kosong-asap: 26 25 25;
+  --kosong-bg-utama: linear-gradient(180deg, rgb(255 255 255 / 0.94) 0%, rgb(248 249 250 / 0.88) 100%);
+  --kosong-bg-sisi: rgb(255 255 255 / 0.4);
+  --kosong-border-sisi: rgb(0 0 0 / 0.08);
+  --kosong-border-utama: rgb(0 0 0 / 0.1);
+  --kosong-bayangan: 0 18px 44px rgb(0 0 0 / 0.08), 0 2px 12px rgb(0 0 0 / 0.04);
+  --kosong-teks-judul: #1a1919;
+  --kosong-teks-catatan: #4a4a4a;
+  --kosong-teks-rel: #666666;
+  --kosong-teks-stempel: #888888;
+  --kosong-garis: rgb(0 0 0 / 0.08);
+  --kosong-bingkai-border: rgb(0 0 0 / 0.14);
+  --kosong-bingkai-bg: rgb(0 0 0 / 0.02);
+  --kosong-sapuan: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 0.7) 45%,
+    rgb(255 255 255 / 0.45) 62%,
+    transparent 100%
+  );
+  --kosong-aksi-warna: var(--color-api, #e60012);
+  --kosong-aksi-garis: rgb(230 0 18 / 0.4);
   --kosong-mono: clamp(10px, 2.6vw, 11px);
 
   position: relative;
@@ -26,6 +46,32 @@
      dan blok korsel identik — statistik di bawahnya tidak ikut bergeser. */
   padding-top: 10px;
   padding-bottom: 18px;
+}
+
+:is(.dark, :root.dark, html.dark) .pantauan-kosong {
+  /* ── Mode Gelap (Dark) ─────────────────────────────────────────────────── */
+  --kosong-asap: 232 230 225;
+  --kosong-bg-utama: linear-gradient(180deg, rgb(24 18 16 / 0.84) 0%, rgb(20 16 15 / 0.58) 100%);
+  --kosong-bg-sisi: rgb(20 16 15 / 0.26);
+  --kosong-border-sisi: rgb(232 230 225 / 0.26);
+  --kosong-border-utama: rgb(232 230 225 / 0.24);
+  --kosong-bayangan: 0 18px 44px rgb(0 0 0 / 0.38);
+  --kosong-teks-judul: rgb(232 230 225);
+  --kosong-teks-catatan: rgb(232 230 225 / 0.68);
+  --kosong-teks-rel: rgb(232 230 225 / 0.62);
+  --kosong-teks-stempel: rgb(232 230 225 / 0.4);
+  --kosong-garis: rgb(232 230 225 / 0.16);
+  --kosong-bingkai-border: rgb(232 230 225 / 0.18);
+  --kosong-bingkai-bg: rgb(232 230 225 / 0.03);
+  --kosong-sapuan: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 240 226 / 0.11) 45%,
+    rgb(255 236 216 / 0.07) 62%,
+    transparent 100%
+  );
+  --kosong-aksi-warna: #ffffff;
+  --kosong-aksi-garis: rgb(230 0 18 / 0.5);
 }
 
 /* Jendela: memotong slot samping persis seperti jendela korsel. */
@@ -56,8 +102,8 @@
    kartu non-aktif di korsel (opacity .45). Cukup untuk membuat bentuk rak
    terbaca, tanpa menambah apa pun yang harus dibaca. */
 .pantauan-kosong__slot--sisi {
-  border-color: rgb(232 230 225 / 0.26);
-  background: rgb(20 16 15 / 0.26);
+  border-color: var(--kosong-border-sisi);
+  background: var(--kosong-bg-sisi);
   opacity: 0.45;
 }
 
@@ -69,12 +115,12 @@
   display: flex;
   flex-direction: column;
   padding: var(--kartu-pias);
-  border-color: rgb(232 230 225 / 0.24);
-  background: linear-gradient(180deg, rgb(24 18 16 / 0.84) 0%, rgb(20 16 15 / 0.58) 100%);
-  box-shadow: 0 18px 44px rgb(0 0 0 / 0.38);
-  color: rgb(var(--kosong-asap));
-  -webkit-backdrop-filter: blur(5px) saturate(1.1);
-  backdrop-filter: blur(5px) saturate(1.1);
+  border-color: var(--kosong-border-utama);
+  background: var(--kosong-bg-utama);
+  box-shadow: var(--kosong-bayangan);
+  color: var(--kosong-teks-judul);
+  -webkit-backdrop-filter: blur(8px) saturate(1.1);
+  backdrop-filter: blur(8px) saturate(1.1);
 }
 
 .pantauan-kosong__isi {
@@ -94,9 +140,9 @@
   align-self: center;
   width: var(--gambar-lebar);
   margin-top: var(--gambar-jarak);
-  border: 1px solid rgb(232 230 225 / 0.18);
+  border: 1px solid var(--kosong-bingkai-border);
   border-radius: 10px;
-  background: rgb(232 230 225 / 0.03);
+  background: var(--kosong-bingkai-bg);
   overflow: hidden;
 }
 
@@ -105,6 +151,7 @@
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.01em;
+  color: var(--kosong-teks-judul);
 }
 
 .pantauan-kosong__catatan {
@@ -113,7 +160,7 @@
   font-size: var(--ukuran-catatan);
   font-weight: 400;
   line-height: 1.55;
-  color: rgb(var(--kosong-asap) / 0.68);
+  color: var(--kosong-teks-catatan);
 }
 
 /* Hanya tampil bagi yang memang bisa menambah kejadian (admin/editor);
@@ -124,15 +171,16 @@
   gap: 8px;
   margin-top: clamp(14px, 3vw, 22px);
   padding-bottom: 4px;
-  border-bottom: 1px solid rgb(230 0 18 / 0.5);
+  border-bottom: 1px solid var(--kosong-aksi-garis);
   font-size: var(--ukuran-catatan);
   font-weight: 600;
-  color: #fff;
-  transition: border-color 0.2s ease;
+  color: var(--kosong-aksi-warna);
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
 .pantauan-kosong__aksi:hover {
   border-bottom-color: var(--color-api, #e60012);
+  color: var(--color-api, #e60012);
 }
 
 .pantauan-kosong__aksi svg {
@@ -160,11 +208,11 @@
   letter-spacing: 0.16em;
   line-height: 1.4;
   text-transform: uppercase;
-  color: rgb(var(--kosong-asap) / 0.62);
+  color: var(--kosong-teks-rel);
 }
 
 .pantauan-kosong__stempel {
-  color: rgb(var(--kosong-asap) / 0.4);
+  color: var(--kosong-teks-stempel);
 }
 
 /* Sapuan: satu berkas cahaya melintas pelan di dalam bingkai foto yang masih
@@ -178,13 +226,7 @@
   bottom: -20%;
   left: 0;
   width: 46%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgb(255 240 226 / 0.11) 45%,
-    rgb(255 236 216 / 0.07) 62%,
-    transparent 100%
-  );
+  background: var(--kosong-sapuan);
   filter: blur(30px);
   pointer-events: none;
   animation: pantauan-sapuan 9s cubic-bezier(0.45, 0, 0.55, 1) infinite;

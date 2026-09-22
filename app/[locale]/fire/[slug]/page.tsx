@@ -211,7 +211,7 @@ async function IsiHalaman({
   const { judulSeo, beritaLd, remahLd } = bangunDataLd(seo, kejadian, bahasa, slug);
 
   return (
-    <>
+    <div className="min-h-dvh bg-white text-tinta dark:bg-[#0a0a0a] dark:text-[#f5f5f5] transition-colors duration-200">
       <h1 className="sr-only">{judulSeo}</h1>
       <JsonLd data={beritaLd} />
       <JsonLd data={remahLd} />
@@ -223,7 +223,7 @@ async function IsiHalaman({
         kejadianAwal={kejadian}
         kolomAwal={kolomAwal}
       />
-    </>
+    </div>
   );
 }
 

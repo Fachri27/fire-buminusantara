@@ -205,9 +205,18 @@
      kartu-kartunya bervariasi seperti rujukan. */
   max-height: 620px;
   object-fit: cover;
-  /* Rujukan memakai foto dan video kotak tanpa sudut membulat. */
-  border-radius: 0;
+  /* Sudut yang sama dengan blok kartu lain di halaman ini (rounded-xl =
+     0.75rem): membulat secukupnya supaya satu keluarga dengan panel dan
+     bingkai peta, tidak sampai selembut pil. Di aliran turun ke 0.5rem
+     karena kartunya jauh lebih kecil. */
+  border-radius: 0.75rem;
   background: #000;
+}
+
+/* Video hamparan (VideoOtomatis) tak bisa mewarisi radius induknya — induk
+   langsungnya span tanpa radius — jadi ia membawa radius sendiri yang sama. */
+.lk-video {
+  border-radius: 0.75rem;
 }
 
 /* ── Gulir terkunci ───────────────────────────────────────────────────────
@@ -432,7 +441,8 @@
        seluler — padahal di sana kartunya harus berdiri langsung di atas latar
        halaman. Paddingnya juga dulu `p-4 sm:p-5`, dan `sm` itu ambang 640px
        milik Tailwind, bukan ambang panggung halaman ini. */
-    background: #1e1e1e;
+    background: var(--tema-bg-panel, #1e1e1e);
+    border: 1px solid var(--tema-border, transparent);
     border-radius: 1rem;
     padding: 1.25rem;
   }
@@ -794,8 +804,8 @@
   z-index: 55;
   overflow-y: auto;
   padding-bottom: var(--sela-bawah, 76px);
-  background: #000;
-  color: #f5f5f5;
+  background: var(--tema-bg, #000);
+  color: var(--tema-teks-primer, #f5f5f5);
   animation: lk-lembar-gelap 200ms ease-out;
 }
 
@@ -846,7 +856,7 @@ button.lk-postingan-ikon:hover {
    tengah setelah video habis. GLOBAL (bukan di dalam media query): VideoOtomatis
    dipakai di kartu, postingan full-bleed, DAN kepala lembar — semuanya perlu.
 
-   Menang atas aturan radius kartu (.lk-foto 0.5rem, postingan 0) TANPA
+   Menang atas aturan radius kartu (.lk-foto 0.75rem, postingan 0) TANPA
    !important: selektor .lk-video-bisu ganda bobotnya (0,2,0) vs satu kelas
    (0,1,0); specificity selalu menang tanpa peduli urutan berkas. z-index 2:
    di atas <video> yang tak ber-lapis, di bawah lencana galeri (z 3). Tanpa
@@ -1202,7 +1212,7 @@ button.lk-postingan-komentar {
   max-height: 75dvh;
   display: flex;
   flex-direction: column;
-  background: #1e1e1e;
+  background: var(--tema-bg-panel, #1e1e1e);
   border-radius: 1.25rem 1.25rem 0 0;
   padding: 0.4rem 0.85rem calc(0.75rem + env(safe-area-inset-bottom));
   animation: lk-lembar-naik 240ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -1294,8 +1304,8 @@ button.lk-postingan-komentar {
     padding: 0.6rem 0.5rem max(0.75rem, env(safe-area-inset-bottom));
     /* Pekat (bukan translusens): area gesture bar sistem di bawahnya
        menampilkan warna yang sama sehingga tak ada garis celah. */
-    background: #0a0a0a;
-    border-top: 1px solid rgb(255 255 255 / 0.08);
+    background: var(--tema-bg, #0a0a0a);
+    border-top: 1px solid var(--tema-border, rgb(255 255 255 / 0.08));
   }
 
   /* Ruang pengimbang supaya ujung umpan tak tertutup bilah. */
@@ -1362,5 +1372,409 @@ button.lk-postingan-komentar {
    ia tak punya aturan ini. Jadi obatnya bukan pengecualian keempat, melainkan
    membuang resepnya: z-index bawaan komponen peta sudah benar, dan silang
    penutup di atasnya memakai z-[1100] yang lebih tinggi dari semuanya. */
+
+/* ── Dukungan Tema Terang & Gelap untuk Landing Karhutla (.lk-) ───────────
+   Memastikan seluruh komponen landing karhutla (.lk-*) beradaptasi secara
+   mulus dan kontras baik dalam Mode Terang (Light) maupun Mode Gelap (Dark). */
+
+/* Overlay peta selayar (.lk-peta-penuh) */
+html:not(.dark) .lk-peta-penuh {
+  background-color: #ffffff !important;
+}
+html.dark .lk-peta-penuh {
+  background-color: #0a0a0a !important;
+}
+
+html:not(.dark) .lk-tutup-peta {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  color: #1a1919 !important;
+  --tw-ring-color: rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+html.dark .lk-tutup-peta {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  color: #ffffff !important;
+  --tw-ring-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Bingkai peta (.lk-bingkai-peta) */
+html:not(.dark) .lk-bingkai-peta {
+  --tw-ring-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+html.dark .lk-bingkai-peta {
+  --tw-ring-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Rel kanan panggung (.lk-kanan) */
+html:not(.dark) .lk-kanan {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+}
+html.dark .lk-kanan {
+  background-color: #1e1e1e !important;
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Kartu umpan (.lk-kartu) */
+html:not(.dark) .lk-kartu-tanggal {
+  color: #555555 !important;
+}
+html.dark .lk-kartu-tanggal {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+html:not(.dark) .lk-kartu-judulbar h2,
+html:not(.dark) .lk-kartu-judulbar h2 button {
+  color: #1a1919 !important;
+}
+html.dark .lk-kartu-judulbar h2,
+html.dark .lk-kartu-judulbar h2 button {
+  color: #f5f5f5 !important;
+}
+
+html:not(.dark) .lk-foto {
+  background: #ffffff;
+}
+html.dark .lk-foto {
+  background: #000000;
+}
+
+/* Keadaan kosong umpan */
+html:not(.dark) .lk-kanan p.bg-black {
+  background-color: #ffffff !important;
+  color: #555555 !important;
+  border: 1px dashed rgba(0, 0, 0, 0.12) !important;
+}
+html.dark .lk-kanan p.bg-black {
+  background-color: #000000 !important;
+  color: #a0a0a0 !important;
+}
+
+/* Komposer laporan inline */
+html:not(.dark) #lk-tulis {
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  background-color: #ffffff !important;
+  border-radius: 8px !important;
+  padding: 10px 16px !important;
+  color: #555555 !important;
+  font-size: 15px !important;
+  line-height: 1.4 !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease !important;
+}
+html:not(.dark) #lk-tulis:hover {
+  border-color: rgba(0, 0, 0, 0.25) !important;
+  color: #1a1919 !important;
+}
+html.dark #lk-tulis {
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-radius: 8px !important;
+  padding: 10px 16px !important;
+  color: rgba(160, 160, 160, 0.7) !important;
+  font-size: 15px !important;
+  line-height: 1.4 !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease !important;
+}
+html.dark #lk-tulis:hover {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  color: #f5f5f5 !important;
+}
+
+html:not(.dark) .lk-tulis-isi {
+  color: #1a1919 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  background-color: #ffffff !important;
+  border-radius: 8px !important;
+  padding: 10px 16px !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease !important;
+}
+html:not(.dark) .lk-tulis-isi:focus {
+  border-color: #ff5a26 !important;
+  box-shadow: 0 0 0 1px #ff5a26 !important;
+  outline: none !important;
+}
+html:not(.dark) .lk-tulis-isi::placeholder {
+  color: #777777 !important;
+}
+
+html.dark .lk-tulis-isi {
+  color: #f5f5f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-radius: 8px !important;
+  padding: 10px 16px !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease !important;
+}
+html.dark .lk-tulis-isi:focus {
+  border-color: #ff5a26 !important;
+  box-shadow: 0 0 0 1px #ff5a26 !important;
+  outline: none !important;
+}
+html.dark .lk-tulis-isi::placeholder {
+  color: rgba(160, 160, 160, 0.7) !important;
+}
+
+html:not(.dark) #lk-form .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html:not(.dark) .lk-isian {
+  background-color: #ffffff !important;
+  color: #1a1919 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border-radius: 8px !important;
+}
+html:not(.dark) .lk-isian:focus {
+  border-color: #ff5a26 !important;
+  outline: none !important;
+}
+html:not(.dark) .lk-isian::placeholder {
+  color: #888888 !important;
+}
+html.dark .lk-isian {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  color: #f5f5f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 8px !important;
+}
+html.dark .lk-isian:focus {
+  border-color: #ff5a26 !important;
+  outline: none !important;
+}
+html.dark .lk-isian::placeholder {
+  color: rgba(160, 160, 160, 0.6) !important;
+}
+
+html:not(.dark) .lk-anonim {
+  color: #555555 !important;
+}
+
+.lk-avatar {
+  background-color: #ff5a26 !important;
+  color: #ffffff !important;
+}
+
+.lk-avatar svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+html:not(.dark) .lk-batal {
+  color: #666666 !important;
+}
+html:not(.dark) .lk-batal:hover {
+  color: #1a1919 !important;
+}
+
+html:not(.dark) .lk-kirim {
+  background-color: #1a1919 !important;
+  color: #ffffff !important;
+}
+html.dark .lk-kirim {
+  background-color: #e7e9ea !important;
+  color: #000000 !important;
+}
+
+/* Rel kiri: panel cuaca dan statistik situasi (.lk-kiri, .lk-lembar-panel) */
+html:not(.dark) .lk-kiri .bg-\[\#1e1e1e\],
+html:not(.dark) .lk-lembar-panel .bg-\[\#1e1e1e\] {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+html.dark .lk-kiri .bg-\[\#1e1e1e\],
+html.dark .lk-lembar-panel .bg-\[\#1e1e1e\] {
+  background-color: #1e1e1e !important;
+}
+
+html:not(.dark) .lk-kiri .text-\[\#f5f5f5\],
+html:not(.dark) .lk-lembar-panel .text-\[\#f5f5f5\],
+html:not(.dark) .lk-kiri .lk-angka,
+html:not(.dark) .lk-lembar-panel .lk-angka {
+  color: #1a1919 !important;
+}
+
+html:not(.dark) .lk-kiri .text-\[\#a0a0a0\],
+html:not(.dark) .lk-lembar-panel .text-\[\#a0a0a0\],
+html:not(.dark) .lk-kiri dt,
+html:not(.dark) .lk-lembar-panel dt,
+html:not(.dark) .lk-sumber,
+html:not(.dark) .lk-kaki {
+  color: #666666 !important;
+}
+
+html:not(.dark) .lk-kaki strong {
+  color: #1a1919 !important;
+}
+
+/* Lokasi cuaca dan saran autocomplete */
+html:not(.dark) .lk-lokasi {
+  background-color: #ffffff !important;
+  color: #1a1919 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+html:not(.dark) .lk-lokasi button {
+  color: #1a1919 !important;
+}
+html:not(.dark) .lk-lokasi input {
+  color: #1a1919 !important;
+}
+
+html:not(.dark) div[role="listbox"].bg-\[\#1a1a1a\]\/95 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.14) !important;
+}
+html:not(.dark) div[role="listbox"] button {
+  color: #333333 !important;
+}
+html:not(.dark) div[role="listbox"] button:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  color: #000000 !important;
+}
+html:not(.dark) div[role="listbox"] .text-white {
+  color: #1a1919 !important;
+}
+html:not(.dark) div[role="listbox"] .text-\[\#d0d0d0\] {
+  color: #444444 !important;
+}
+html:not(.dark) div[role="listbox"] .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: #666666 !important;
+}
+
+/* Lembar bawah seluler (.lk-lembar-panel) */
+html:not(.dark) .lk-mode-panel .lk-lembar-panel {
+  background: #ffffff;
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.12);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+html.dark .lk-mode-panel .lk-lembar-panel {
+  background: #101010;
+  box-shadow: 0 -12px 32px rgb(0 0 0 / 0.5);
+}
+
+html:not(.dark) .lk-mode-panel .lk-lembar-gagang span {
+  background: rgba(0, 0, 0, 0.2);
+}
+html.dark .lk-mode-panel .lk-lembar-gagang span {
+  background: rgb(255 255 255 / 0.3);
+}
+
+/* Postingan seluler (.lk-postingan) */
+html:not(.dark) .lk-postingan {
+  background: #ffffff;
+  color: #1a1919;
+}
+html.dark .lk-postingan {
+  background: #000000;
+  color: #f5f5f5;
+}
+
+html:not(.dark) .lk-postingan-kepala {
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  color: #1a1919;
+}
+html.dark .lk-postingan-kepala {
+  background: rgb(0 0 0 / 0.92);
+}
+
+html:not(.dark) .lk-postingan-kembali {
+  color: #1a1919 !important;
+}
+html:not(.dark) .lk-postingan-kembali:hover {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+html:not(.dark) .lk-postingan-ikon {
+  color: #1a1919;
+}
+html:not(.dark) button.lk-postingan-ikon:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+html:not(.dark) .lk-postingan-avatar {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+html.dark .lk-postingan-avatar {
+  background: #1e1e1e;
+}
+
+html:not(.dark) .lk-postingan-nama {
+  color: #1a1919;
+}
+
+html:not(.dark) .lk-postingan-lokasi {
+  color: #666666;
+}
+
+html:not(.dark) .lk-postingan-media,
+html:not(.dark) .lk-postingan-media img.lk-postingan-foto {
+  background: #ffffff;
+}
+html.dark .lk-postingan-media,
+html.dark .lk-postingan-media img.lk-postingan-foto {
+  background: #000000;
+}
+
+html:not(.dark) .lk-postingan-caption-judul {
+  color: #1a1919;
+}
+html:not(.dark) .lk-postingan-caption-isi {
+  color: #333333;
+}
+html:not(.dark) .lk-postingan-selengkapnya {
+  color: #666666;
+}
+html:not(.dark) .lk-postingan-tanggal {
+  color: #777777;
+}
+
+/* Lembar komentar seluler (.lk-komentar) */
+html:not(.dark) .lk-komentar {
+  background: #ffffff;
+  color: #1a1919;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.15);
+}
+html.dark .lk-komentar {
+  background: #1e1e1e;
+  color: #f5f5f5;
+}
+
+html:not(.dark) .lk-komentar-gagang {
+  background: rgba(0, 0, 0, 0.2);
+}
+html.dark .lk-komentar-gagang {
+  background: rgb(255 255 255 / 0.3);
+}
+
+/* Bilah tab seluler (.lk-tabbar) */
+html:not(.dark) .lk-tabbar {
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
+}
+html.dark .lk-tabbar {
+  background: #0a0a0a;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+}
+
+html:not(.dark) .lk-tabbar a,
+html:not(.dark) .lk-tabbar button {
+  color: #1a1919 !important;
+}
+html:not(.dark) .lk-tabbar a:hover,
+html:not(.dark) .lk-tabbar button:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+html.dark .lk-tabbar a,
+html.dark .lk-tabbar button {
+  color: #f5f5f5 !important;
+}
 
 

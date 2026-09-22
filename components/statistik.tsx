@@ -48,7 +48,7 @@ export function Statistik({ daftar }: { daftar: Data[] }) {
   return (
     <div className="relative mt-[clamp(14px,3.6vw,20px)] panggung:absolute panggung:top-[836px] panggung:right-[95px] panggung:left-[95px] panggung:mt-0">
       <p className="mb-[6px] text-[length:var(--ukuran-eyebrow)] font-medium tracking-[0.14em] uppercase
-                    text-[rgb(26_25_25/0.72)] [text-shadow:0_1px_10px_rgb(255_255_255/0.75)] panggung:hidden">
+                    text-[rgb(26_25_25/0.72)] dark:text-white/75 [text-shadow:0_1px_10px_rgb(255_255_255/0.75)] dark:[text-shadow:0_1px_10px_rgb(0_0_0/0.75)] panggung:hidden">
         Angka hari ini
       </p>
 
@@ -61,15 +61,16 @@ export function Statistik({ daftar }: { daftar: Data[] }) {
         {daftar.map((item, i) => (
           <article key={item.nilai || i}
                    className="flex w-[var(--statistik-lebar)] shrink-0 snap-start flex-col items-center
-                              justify-center rounded-lg border-2 border-api bg-white p-[var(--statistik-pias)] text-center
+                              justify-center rounded-lg border border-black/[0.06] bg-white p-[var(--statistik-pias)] text-center text-tinta shadow-sm
+                              dark:bg-white/[0.04] dark:border-white/10 dark:text-white
                               panggung:h-[208px] panggung:w-[307px]">
             {item.tanggal && (
-              <p className="text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal whitespace-nowrap">
+              <p className="text-[length:var(--ukuran-tanggal)] leading-[1.2] font-normal whitespace-nowrap text-black/60 dark:text-white/60">
                 • {item.tanggal} •
               </p>
             )}
             {item.label && (
-              <h3 className="mt-[var(--statistik-jarak-label)] text-[length:var(--ukuran-label)] leading-[1.2] font-bold">
+              <h3 className="mt-[var(--statistik-jarak-label)] text-[length:var(--ukuran-label)] leading-[1.2] font-bold text-tinta dark:text-white">
                 {item.label}
               </h3>
             )}
@@ -77,7 +78,7 @@ export function Statistik({ daftar }: { daftar: Data[] }) {
               <p className="text-[length:var(--ukuran-nilai)] leading-[1.1] font-bold text-api">{item.nilai}</p>
             )}
             {item.keterangan && (
-              <p className="mt-1 text-[length:var(--ukuran-catatan)] leading-[1.3] font-normal text-[rgb(26_25_25/0.6)]">
+              <p className="mt-1 text-[length:var(--ukuran-catatan)] leading-[1.3] font-normal text-black/60 dark:text-white/70">
                 {item.keterangan}
               </p>
             )}
@@ -101,8 +102,10 @@ function TombolStrip({ arah, onClick }: { arah: -1 | 1; onClick: () => void }) {
     <button type="button" onClick={onClick}
             aria-label={arah === -1 ? "Statistik sebelumnya" : "Statistik berikutnya"}
             className={`cursor-pointer absolute top-1/2 ${arah === -1 ? "left-0 -translate-x-1/2" : "right-0 translate-x-1/2"}
-                        z-10 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-white
-                        shadow-[0_2px_10px_rgb(0_0_0/0.25)] text-tinta`}>
+                        z-10 grid size-9 -translate-y-1/2 place-items-center rounded-full
+                        border border-black/[0.08] bg-white text-tinta shadow-md hover:bg-black/[0.04]
+                        dark:border-white/15 dark:bg-pantau-konsol dark:text-white dark:hover:bg-white/10
+                        transition-colors`}>
       <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
            strokeLinecap="round" strokeLinejoin="round" className="size-4">
         <path d={arah === -1 ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />

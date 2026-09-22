@@ -174,7 +174,7 @@ async function KepalaLokal({ params }: Pick<PageProps<'/[locale]/beranda'>, 'par
 // rute ini tetap bisa diprerender sekali dan dipakai ulang oleh /id dan /en.
 export default function Halaman({ params }: PageProps<'/[locale]/beranda'>) {
   return (
-    <>
+    <div className="min-h-screen bg-white text-tinta dark:bg-[#0a0a0a] dark:text-[#f5f5f5] transition-colors duration-200">
       <Suspense fallback={null}>
         <KepalaLokal params={params} />
       </Suspense>
@@ -185,6 +185,6 @@ export default function Halaman({ params }: PageProps<'/[locale]/beranda'>) {
       <Suspense fallback={<KerangkaBeranda />}>
         <IsiHalaman params={params} />
       </Suspense>
-    </>
+    </div>
   );
 }

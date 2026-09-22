@@ -53,19 +53,19 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
                 {/* Kartu tengah: kaca putih varian lanskap — bilah judul,
                     bilah tanggal, lalu kotak media yang berdenyut. */}
                 <article className="kerangka-beranda__kartu relative z-[1] flex w-[var(--kartu-lebar)]
-                                    shrink-0 flex-col rounded-[12px] bg-white/[0.88] p-[var(--kartu-pias)]
+                                    shrink-0 flex-col rounded-[12px] bg-white/[0.88] dark:bg-pantau-konsol/90 p-[var(--kartu-pias)]
                                     text-center shadow-[10px_12px_28px_rgb(0_0_0/0.32)] ring-1
-                                    ring-white/60">
+                                    ring-white/60 dark:ring-white/10">
                   <div className="mx-auto h-[calc(var(--ukuran-label)*1.15)] w-3/4 animate-pulse
-                                  rounded-full bg-black/10" />
+                                  rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
                   <div className="mx-auto mt-4 h-[calc(var(--ukuran-tanggal)*1.2)] w-1/3 animate-pulse
-                                  rounded-full bg-black/10" />
+                                  rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
                   <div className="flex-1" />
                   <div className="kerangka-beranda__media mt-[var(--gambar-jarak)] aspect-[3/2] h-auto
                                   max-h-[var(--gambar-tinggi-maks)] w-[var(--gambar-lebar)] shrink-0
                                   self-center animate-pulse rounded-[10px]
-                                  bg-[linear-gradient(150deg,#eef1f4,#d7dee4)]
-                                  ring-1 ring-black/[0.08] shadow-[0_8px_20px_rgb(0_0_0/0.2)]" />
+                                  bg-black/[0.06] dark:bg-white/[0.08]
+                                  ring-1 ring-black/[0.08] dark:ring-white/10 shadow-[0_8px_20px_rgb(0_0_0/0.2)]" />
                 </article>
 
                 <SlotSamping />
@@ -76,16 +76,16 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
             <div className="kerangka-beranda__statistik relative mt-[clamp(14px,3.6vw,20px)]">
               <div className="kerangka-beranda__statistik-label mb-[6px]
                               h-[calc(var(--ukuran-eyebrow)*1.2)] w-32 animate-pulse
-                              rounded-full bg-[rgb(26_25_25/0.72)]" />
+                              rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
               <div className="kerangka-beranda__jalur-statistik tanpa-bilah-gulir flex
                               gap-[var(--sela)] overflow-hidden">
                 {[0, 1, 2, 3, 4].map((i) => (
                   <div key={i} className="kerangka-beranda__kartu-statistik w-[var(--statistik-lebar)]
-                                          shrink-0 animate-pulse bg-white p-[var(--statistik-pias)] text-left">
-                    <div className="h-[calc(var(--ukuran-tanggal)*1.2)] w-2/3 rounded-full bg-black/10" />
+                                          shrink-0 animate-pulse bg-white dark:bg-pantau-konsol dark:ring-1 dark:ring-white/10 p-[var(--statistik-pias)] text-left">
+                    <div className="h-[calc(var(--ukuran-tanggal)*1.2)] w-2/3 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
                     <div className="mt-[calc(var(--statistik-jarak-label)/2)] h-[calc(var(--ukuran-label)*1.2)]
-                                    w-11/12 rounded-full bg-black/15" />
-                    <div className="mt-2 h-[calc(var(--ukuran-nilai)*1.1)] w-1/2 rounded-full bg-black/10" />
+                                    w-11/12 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+                    <div className="mt-2 h-[calc(var(--ukuran-nilai)*1.1)] w-1/2 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
                   </div>
                 ))}
               </div>
@@ -108,7 +108,7 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
           <div className="pointer-events-none absolute inset-x-0 top-[clamp(64px,11vh,92px)] z-[20] flex justify-center px-4 md:hidden panggung:hidden">
             <div className="w-full max-w-[580px]">
               <div className="h-[calc(clamp(12px,3.4vw,16px)*2+var(--ukuran-nama)*1.2)]
-                              rounded-[16px] bg-[#fdf3f2] shadow-[0_3px_16px_rgb(0_0_0/0.16)]" />
+                              rounded-[16px] bg-black/[0.06] dark:bg-white/[0.08] shadow-[0_3px_16px_rgb(0_0_0/0.16)] dark:border dark:border-white/10" />
             </div>
           </div>
         </section>
@@ -121,7 +121,7 @@ export function KerangkaBeranda({ bahasa = "id" }: { bahasa?: Bahasa }) {
 function SlotSamping() {
   return (
     <div className="kerangka-beranda__slot w-[var(--kartu-lebar)] shrink-0 rounded-[12px]
-                    bg-white/90 opacity-45 shadow-[6px_6px_14px_rgb(0_0_0/0.22)] ring-1
-                    ring-white/60" />
+                    bg-white/90 dark:bg-pantau-konsol/80 opacity-45 shadow-[6px_6px_14px_rgb(0_0_0/0.22)] ring-1
+                    ring-white/60 dark:ring-white/10" />
   );
 }

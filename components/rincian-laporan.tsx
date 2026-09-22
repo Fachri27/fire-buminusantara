@@ -150,13 +150,18 @@ export function RincianLaporan({
        menelan roda dengan preventDefault; satu atribut di akar ini
        mengecualikan seluruh panel — rel kanan dan badan komentarnya — dari
        penangkapan itu, jadi keduanya bisa menggulir secara native. */
-    <div className={`${gelap ? "rincian rincian--gelap" : "rincian"}${keluar ? " rincian--keluar" : ""} cursor-pointer`} data-lenis-prevent
+    <div className={`${gelap ? "rincian rincian--gelap dark" : "rincian"}${keluar ? " rincian--keluar" : ""} cursor-pointer`} data-lenis-prevent
          onClick={(e) => { if (e.target === e.currentTarget) mintaTutup(); }}
          /* animationend menggelembung dari anak (slider, lembar komentar);
             currentTarget menyaring supaya hanya animasi overlay ini yang
             menutup. Animasi masuk lolos karena `keluar` masih false. */
          onAnimationEnd={(e) => { if (keluar && e.target === e.currentTarget) onTutup(); }}>
-      <div role="dialog" aria-modal="true" aria-label="Rincian laporan karhutla" className="rincian__panel cursor-default">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Rincian laporan karhutla"
+        className="rincian__panel bg-white text-tinta border-black/[0.08] dark:bg-[#14100f] dark:text-[#f5f5f5] dark:border-white/10 cursor-default"
+      >
         {toastTersalin && (
           <div role="status" className="rincian__toast">
             {bahasa === "en" ? "Link copied to clipboard" : "Tautan disalin ke papan klip"}
@@ -174,8 +179,8 @@ export function RincianLaporan({
           ) : (
             // Tanpa media apa pun: tidak menampilkan foto dummy — kotak
             // medianya memuat petunjuk lokasi saja.
-            <div className={`flex h-full min-h-[140px] items-center justify-center ${gelap ? "bg-[linear-gradient(150deg,#18181b,#27272a)]" : "bg-[linear-gradient(150deg,#eef1f4,#d7dee4)]"}`}>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${gelap ? "bg-white/10 text-white/60" : "bg-white/70 text-black/45"}`}>
+            <div className="flex h-full min-h-[140px] items-center justify-center bg-black/[0.04] dark:bg-[linear-gradient(150deg,#18181b,#27272a)]">
+              <span className="rounded-full px-3.5 py-1 text-xs font-semibold uppercase tracking-wider bg-white/80 text-black/75 border border-black/[0.08] shadow-xs dark:bg-white/10 dark:text-white/80 dark:border-white/10">
                 {berita.lokasi || "Belum ada foto"}
               </span>
             </div>
@@ -272,10 +277,11 @@ export function RincianLaporan({
                         href={`https://www.google.com/maps?q=${berita.lat},${berita.lng}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="rincian__koordinat"
+                        className="rincian__koordinat group cursor-pointer"
                         title="Buka titik di Google Maps"
                       >
-                        {berita.lat.toFixed(6)}, {berita.lng.toFixed(6)} ↗
+                        <span>{berita.lat.toFixed(6)}, {berita.lng.toFixed(6)}</span>
+                        <span aria-hidden="true" className="transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">↗</span>
                       </a>
                     </div>
                   </div>
@@ -358,7 +364,7 @@ export function RincianLaporan({
           aria-label="Komentar laporan"
           onClick={(e) => { if (e.target === e.currentTarget) setSheetKomentar(false); }}
         >
-          <div className="rincian__sheet-panel rincian__sheet-panel--komentar cursor-default">
+          <div className="rincian__sheet-panel rincian__sheet-panel--komentar bg-white text-tinta border-black/[0.08] dark:bg-[#14100f] dark:text-[#f5f5f5] dark:border-white/10 cursor-default">
             <div className="rincian__sheet-kepala">
               <p className="rincian__sheet-judul">
                 {bahasa === "en" ? "Comments" : "Komentar"}

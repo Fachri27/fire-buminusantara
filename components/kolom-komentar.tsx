@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { usePonsel } from "@/hooks/use-media-query";
 import type { gunakanKomentar } from "@/hooks/gunakan-komentar";
-import { Switch } from "@/components/ui/switch";
 
 type Kendali = ReturnType<typeof gunakanKomentar>;
 
@@ -56,7 +55,7 @@ function TeksKomentar({ nama, sebutan, isi }: { nama: string; sebutan?: string |
             dan teksnya menempel. */}
         <span className="rincian__komen-nama">{nama}</span>
         {sebutan && <> <span className="rincian__sebutan">{sebutan}</span></>}{" "}
-        <span>{isi}</span>
+        {isi}
       </p>
 
       {adaSisa && (
@@ -89,7 +88,9 @@ export function UlasanKomentar({
       <ul className="rincian__utas">
         {daftar.map((k) => (
           <li key={k.id} className="rincian__komen">
-            <span className="rincian__inisial" aria-hidden="true">{(k.nama || "?").charAt(0)}</span>
+            <span className="rincian__inisial" aria-hidden="true">
+              {k.nama ? k.nama.charAt(0).toUpperCase() : "?"}
+            </span>
 
             <div className="rincian__komen-isi">
               <TeksKomentar nama={k.nama} isi={k.isi} />
@@ -102,7 +103,7 @@ export function UlasanKomentar({
               </p>
 
               {k.balasan && k.balasan.length > 0 && (
-                <div>
+                <>
                   {/* Garis pendek sebelum labelnya menandai cabang yang sedang
                       dilipat, seperti pada rujukan. */}
                   <button
@@ -112,43 +113,43 @@ export function UlasanKomentar({
                     onClick={() => alihkanBalasan(k.id)}
                   >
                     <span className="rincian__lihat-garis" aria-hidden="true" />
-                    <span>
-                      {tampilkanBalasan(k.id)
-                        ? "Sembunyikan balasan"
-                        : `Lihat balasan (${k.balasan.length})`}
-                    </span>
+                    {tampilkanBalasan(k.id)
+                      ? "Sembunyikan balasan"
+                      : `Lihat ${k.balasan.length} balasan`}
                   </button>
 
-                  <ul className={`rincian__balasan${!tampilkanBalasan(k.id) ? " rincian__balasan--tutup" : ""}`}>
-                    {k.balasan.map((b) => (
-                      <li key={b.id} className="rincian__komen">
-                        <span className="rincian__inisial" aria-hidden="true">{(b.nama || "?").charAt(0)}</span>
+                  {tampilkanBalasan(k.id) && (
+                    <ul className="rincian__utas rincian__utas--balasan">
+                      {k.balasan.map((b) => (
+                        <li key={b.id} className="rincian__komen rincian__komen--balasan">
+                          <span className="rincian__inisial rincian__inisial--kecil" aria-hidden="true">
+                            {b.nama ? b.nama.charAt(0).toUpperCase() : "?"}
+                          </span>
 
-                        <div className="rincian__komen-isi">
-                          <TeksKomentar
-                            nama={b.nama}
-                            sebutan={sebutanDari(b)}
-                            isi={isiTanpaSebutan(b)}
-                          />
+                          <div className="rincian__komen-isi">
+                            <TeksKomentar
+                              nama={b.nama}
+                              sebutan={sebutanDari(b)}
+                              isi={isiTanpaSebutan(b)}
+                            />
 
-                          <p className="rincian__komen-kaki">
-                            <span>{b.waktu}</span>
-                            <button type="button" className="rincian__balas cursor-pointer" onClick={() => mulaiBalas(b)}>
-                              Balas
-                            </button>
-                          </p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                            <p className="rincian__komen-kaki">
+                              <span>{b.waktu}</span>
+                              <button type="button" className="rincian__balas cursor-pointer" onClick={() => mulaiBalas(b)}>
+                                Balas
+                              </button>
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               )}
             </div>
           </li>
         ))}
       </ul>
-
-      <p className="rincian__galat" hidden={!galat}>{galat}</p>
     </section>
   );
 }
@@ -175,8 +176,6 @@ type FormProps = {
   /** true = selalu inline ringkas (tanpa baris pemicu + sheet), untuk
    *  dipasang di dalam lembar bawah lain yang ruangnya sudah sempit. */
   tanpaSheet?: boolean;
-  /** Dipanggil setelah kiriman selesai — dipakai induk lembar untuk
-   *  melipat formulir ini kembali menjadi baris pemicunya. */
   tutup?: () => void;
 };
 
@@ -205,26 +204,20 @@ export function FormulirKomentar({
   const tutupSheet = () => {
     setSheetBukaManual(false);
     if (balasKe !== null) batalBalas();
+    if (tutup) tutup();
   };
 
   const tanganiKirim = async () => {
     if (!belumLengkap && !mengirim) {
       await kirim();
       setSheetBukaManual(false);
-      tutup?.();
     }
   };
 
-  // Pemasangan widget captcha TIDAK lagi diurus di sini: wadahnya kini
-  // callback ref milik hook (lihat gunakanKomentar), jadi widget mengikuti
-  // hidup-matinya <div> itu sendiri — desktop, sheet ponsel, maupun tanpaSheet
-  // sama saja, tanpa cabang yang bisa lupa salah satunya.
-
-  // Fokus ke kotak ketik begitu sheet (miliknya) atau lembar induk
-  // (tanpaSheet) terbuka.
+  // Fokus ke kotak ketik begitu sheet terbuka.
   useEffect(() => {
-    if (ponsel && (sheet || tanpaSheet)) ketikRef.current?.focus();
-  }, [ponsel, sheet, tanpaSheet, ketikRef]);
+    if (ponsel && sheet) ketikRef.current?.focus();
+  }, [ponsel, sheet, ketikRef]);
 
   // Isian yang sama untuk versi inline dan versi sheet — satu sumber markup.
   const bidang = (
@@ -249,20 +242,7 @@ export function FormulirKomentar({
         </p>
       )}
 
-      {SITE_KEY && <div className="rincian__captcha" ref={captchaRef} />}
-
-      {/* Pilihan anonim DI ATAS isian identitas: ia yang menentukan apakah
-          dua isian di bawahnya perlu diisi, jadi dibaca lebih dulu. */}
-      <label className="rincian__anonim cursor-pointer">
-        <Switch
-          id="komentar-anonim"
-          checked={anonim}
-          onCheckedChange={setAnonim}
-          size="sm"
-          aksen="bara"
-        />
-        <span>Kirim sebagai anonim</span>
-      </label>
+      {SITE_KEY && <div className="rincian__captcha empty:hidden" ref={captchaRef} />}
 
       <div className="rincian__identitas">
         <label className="sr-only" htmlFor="komentar-nama">Nama</label>
@@ -290,6 +270,18 @@ export function FormulirKomentar({
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
+
+      {/* Pilihan anonim, sama polanya dengan form laporan: isian identitas
+          dimatikan dan kiriman tampil sebagai "Anonim". */}
+      <label className="rincian__anonim cursor-pointer">
+        <input
+          type="checkbox"
+          className="cursor-pointer"
+          checked={anonim}
+          onChange={(e) => setAnonim(e.target.checked)}
+        />
+        Kirim sebagai anonim
+      </label>
     </>
   );
 
@@ -304,14 +296,14 @@ export function FormulirKomentar({
         <textarea
           ref={ketikRef}
           className="rincian__ketik"
-          rows={1}
+          rows={sheet ? 3 : 1}
           maxLength={2000}
           placeholder="Tambahkan komentar…"
           value={isi}
           onChange={(e) => setIsi(e.target.value)}
           onKeyDown={(e) => {
-            // Shift+Enter membuat baris baru; Enter langsung mengirim
-            if (e.key === "Enter" && !e.shiftKey) {
+            // Shift+Enter diperbolehkan membuat baris baru di sheet.
+            if (e.key === "Enter" && (!sheet || !e.shiftKey)) {
               e.preventDefault();
               tanganiKirim();
             }

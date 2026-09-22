@@ -821,13 +821,13 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
   }
 
   return (
-    <div className={`lk-postingan${statis ? " lk-postingan--statis" : ""}`} role="dialog" aria-modal="true" aria-label={l.judul}>
-      <div className="lk-postingan-penulis">
+    <div className={`lk-postingan${statis ? " lk-postingan--statis" : ""} bg-white text-tinta dark:bg-black dark:text-[#f5f5f5]`} role="dialog" aria-modal="true" aria-label={l.judul}>
+      <div className="lk-postingan-penulis bg-white/95 text-tinta border-b border-black/[0.06] dark:bg-black/90 dark:text-[#f5f5f5] dark:border-white/10">
         <button
           type="button"
           onClick={onTutup}
           aria-label={bahasa === "en" ? "Back" : "Kembali"}
-          className="lk-postingan-kembali cursor-pointer -ml-1 mr-0.5 rounded-full p-1.5 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+          className="lk-postingan-kembali cursor-pointer -ml-1 mr-0.5 rounded-full p-1.5 text-tinta transition hover:bg-black/10 dark:text-[#f5f5f5] dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="size-5">
             <path d="m15 18-6-6 6-6" />
@@ -835,8 +835,8 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
         </button>
         <Image src="/assets/img/logo-fire.png" alt="" aria-hidden="true" width={99} height={160} className="lk-postingan-avatar" />
         <div className="min-w-0 flex-1">
-          <p className="lk-postingan-nama">Lapor Karhutla</p>
-          {l.lokasi && <p className="lk-postingan-lokasi">{l.lokasi}</p>}
+          <p className="lk-postingan-nama text-tinta dark:text-[#f5f5f5]">Lapor Karhutla</p>
+          {l.lokasi && <p className="lk-postingan-lokasi text-black/55 dark:text-[#a0a0a0]">{l.lokasi}</p>}
         </div>
       </div>
 
@@ -914,7 +914,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
       </div>
 
       <div className="lk-postingan-aksi">
-        <button type="button" onClick={onKomentar} aria-label={t.komentar} className="lk-postingan-ikon lk-postingan-komentar cursor-pointer">
+        <button type="button" onClick={onKomentar} aria-label={t.komentar} className="lk-postingan-ikon lk-postingan-komentar cursor-pointer text-tinta transition hover:bg-black/10 dark:text-[#f5f5f5] dark:hover:bg-white/10">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
                strokeLinecap="round" strokeLinejoin="round" className="size-7">
             <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
@@ -923,24 +923,24 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
             <span aria-hidden="true">{jumlahKomentar.toLocaleString("id-ID")}</span>
           )}
         </button>
-        <button type="button" onClick={bagikan} aria-label={tersalin ? t.lembarTersalin : t.lembarBagikan} className="lk-postingan-ikon cursor-pointer">
+        <button type="button" onClick={bagikan} aria-label={tersalin ? t.lembarTersalin : t.lembarBagikan} className="lk-postingan-ikon cursor-pointer text-tinta transition hover:bg-black/10 dark:text-[#f5f5f5] dark:hover:bg-white/10">
           <IkonBagikan />
         </button>
       </div>
 
       <div className="lk-postingan-caption">
-        <p className="lk-postingan-caption-judul">{l.judul}</p>
+        <p className="lk-postingan-caption-judul text-tinta dark:text-[#f5f5f5]">{l.judul}</p>
         {l.deskripsi && (
-          <p className="lk-postingan-caption-isi">
+          <p className="lk-postingan-caption-isi text-tinta dark:text-[#f5f5f5]">
             <span ref={descRef} className={descPenuh ? "" : "lk-postingan-caption-pendek"}>{l.deskripsi}</span>{" "}
             {descTerpotong && (
-              <button type="button" onClick={() => setDescPenuh((v) => !v)} className="lk-postingan-selengkapnya cursor-pointer">
+              <button type="button" onClick={() => setDescPenuh((v) => !v)} className="lk-postingan-selengkapnya cursor-pointer text-black/60 dark:text-[#a0a0a0]">
                 {descPenuh ? t.lebihSedikit : t.selengkapnya}
               </button>
             )}
           </p>
         )}
-        <p className="lk-postingan-tanggal">{l.tanggal}</p>
+        <p className="lk-postingan-tanggal text-black/50 dark:text-[#a0a0a0]">{l.tanggal}</p>
       </div>
     </div>
   );
@@ -975,10 +975,10 @@ export function LembarKomentar({ id, bahasa, onTutup }: {
         aria-modal="true"
         aria-label={t.komentar}
         onClick={(e) => e.stopPropagation()}
-        className="lk-komentar rincian--gelap"
+        className="lk-komentar bg-white text-tinta border-t border-black/[0.08] shadow-2xl dark:bg-[#1e1e1e] dark:text-[#f5f5f5] dark:border-white/10"
       >
-        <span aria-hidden="true" className="lk-komentar-gagang" />
-        <h2>{t.komentar}</h2>
+        <span aria-hidden="true" className="lk-komentar-gagang bg-black/20 dark:bg-white/30" />
+        <h2 className="text-tinta dark:text-[#f5f5f5]">{t.komentar}</h2>
         <div className="lk-komentar-daftar">
           <UlasanKomentar
             daftar={k.daftar}
@@ -1400,16 +1400,16 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
 
   if (terkirim) {
     return (
-      <div role="status" className="rounded-xl bg-black p-5 text-center ring-1 ring-white/5">
-        <p className="text-[15px] font-bold text-[#f5f5f5]">{t.terkirim}</p>
-        <p className="mx-auto mt-1 max-w-[46ch] text-[13px] leading-relaxed text-[#a0a0a0]">
+      <div role="status" className="rounded-xl bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-black dark:border-white/5 dark:text-[#f5f5f5] p-5 text-center">
+        <p className="text-[15px] font-bold text-tinta dark:text-[#f5f5f5]">{t.terkirim}</p>
+        <p className="mx-auto mt-1 max-w-[46ch] text-[13px] leading-relaxed text-black/60 dark:text-[#a0a0a0]">
           {t.terkirimIsi}
         </p>
         <button
           type="button"
           onClick={() => setTerkirim(false)}
-          className="mt-3 cursor-pointer rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[14px] font-bold text-black transition
-                     hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          className="mt-3 cursor-pointer rounded-full bg-black text-white dark:bg-[#e7e9ea] dark:text-black px-5 py-1.5 text-[14px] font-bold transition
+                     hover:opacity-90 dark:hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
         >
           {t.tulisLagi}
         </button>
@@ -1426,17 +1426,17 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
   const ikonAksi = "lk-ikon-aksi cursor-pointer rounded-full p-2 text-[#ff5a26] transition hover:bg-[#ff5a26]/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]";
 
   return (
-    <div className="rounded-xl bg-black p-4 ring-1 ring-white/5">
+    <div className="rounded-xl bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-black dark:border-white/5 dark:text-[#f5f5f5] p-4">
       <div className="flex items-center gap-3">
-        <span aria-hidden="true" className="lk-avatar flex size-11 shrink-0 items-center justify-center rounded-full bg-[#ff5a26]">
-          <IkonOrang className="size-6 text-white" />
+        <span aria-hidden="true" className="lk-avatar flex size-11 shrink-0 items-center justify-center rounded-full bg-[#ff5a26] text-white">
+          <IkonOrang className="size-6 text-white stroke-white" />
         </span>
         {!buka ? (
           <button
             type="button"
             id="lk-tulis"
             onClick={() => setBuka(true)}
-            className="flex-1 cursor-pointer truncate py-2 text-left text-[17px] text-[#a0a0a0]/70 transition-colors hover:text-[#a0a0a0]
+            className="flex-1 cursor-pointer truncate rounded-lg border border-black/[0.12] bg-white px-4 py-2.5 text-left text-[15px] text-black/55 transition-all hover:border-black/25 hover:text-black dark:border-white/15 dark:bg-white/[0.04] dark:text-[#a0a0a0]/70 dark:hover:border-white/25 dark:hover:text-[#a0a0a0]
                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
           >
             {t.tulis}
@@ -1455,7 +1455,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               placeholder={t.judulPh}
               maxLength={255}
               autoComplete="off"
-              className="lk-tulis-isi min-w-0 flex-1 bg-transparent py-2 text-[15px] font-bold text-[#f5f5f5] placeholder:font-normal placeholder:text-[#a0a0a0]/70 focus:outline-none"
+              className="lk-tulis-isi min-w-0 flex-1 rounded-lg border border-black/[0.12] bg-white px-4 py-2.5 text-[15px] font-bold text-tinta placeholder:font-normal placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:border-white/15 dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:placeholder:text-[#a0a0a0]/70 dark:focus:border-[#ff5a26]"
             />
           </>
         )}
@@ -1478,8 +1478,8 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
           <button
             type="button"
             onClick={() => setBuka(true)}
-            className="lk-kirim ml-auto cursor-pointer rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[15px] font-bold text-black transition
-                       hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="lk-kirim ml-auto cursor-pointer rounded-full bg-black text-white dark:bg-[#e7e9ea] dark:text-black px-5 py-1.5 text-[15px] font-bold transition
+                       hover:opacity-90 dark:hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
           >
             {t.kirim}
           </button>
@@ -1539,7 +1539,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
              (56px) ditambah p-4 panel membuat kiri tersisip 72px sementara
              kanan cuma 16px — asimetris, dan sisa lebarnya tinggal ~286px
              sehingga baris Lat/Lng/Nama/Anonim mentok ke tepi. */
-          className="mt-1 panggung:pl-14"
+          className="mt-2.5 panggung:pl-14"
         >
           {/* Tumbuh mengikuti isi. Dengan rows tetap, kotak yang baru berisi
               placeholder menyisakan rongga menganga di atas baris berikutnya —
@@ -1559,11 +1559,11 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
             placeholder={t.ceritaPh}
             maxLength={5000}
             rows={2}
-            className="lk-tulis-isi w-full resize-none bg-transparent py-1 text-[15px] leading-relaxed text-[#f5f5f5] placeholder:text-[#a0a0a0]/70 focus:outline-none"
+            className="lk-tulis-isi w-full resize-none rounded-lg border border-black/[0.12] bg-white p-3.5 text-[15px] leading-relaxed text-tinta placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:border-white/15 dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:placeholder:text-[#a0a0a0]/70 dark:focus:border-[#ff5a26]"
           />
 
           {galat && (
-            <p role="alert" className="mt-2 text-[13px] leading-relaxed text-[#ff7a59]">
+            <p role="alert" className="mt-2 text-[13px] leading-relaxed text-[#e60012] dark:text-[#ff7a59]">
               {galat}
             </p>
           )}
@@ -1591,7 +1591,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
                           focus-visible:outline-2 focus-visible:outline-[#ff5a26] ${
                 adaLokasi
                   ? "bg-[#ff5a26]/15 text-[#ff5a26] ring-1 ring-[#ff5a26]/30 hover:bg-[#ff5a26]/25"
-                  : "text-[#ff5a26] ring-1 ring-white/10 hover:bg-[#ff5a26]/10"
+                  : "text-[#ff5a26] ring-1 ring-black/10 hover:bg-[#ff5a26]/10 dark:ring-white/10"
               }`}
             >
               <IkonPin className="size-[18px]" />
@@ -1611,11 +1611,11 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               <label className="sr-only" htmlFor="lk-lat">{t.latPh}</label>
               <input id="lk-lat" name="lat" inputMode="decimal" placeholder={t.latPh}
                      value={lat} onChange={(e) => setLat(e.target.value)}
-                     className="lk-isian lk-koord w-[86px] rounded-md bg-white/5 px-2 py-1.5 font-mono text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-white/30" />
+                     className="lk-isian lk-koord w-[86px] rounded-lg bg-white px-3 py-2 font-mono text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
               <label className="sr-only" htmlFor="lk-lng">{t.lngPh}</label>
               <input id="lk-lng" name="lng" inputMode="decimal" placeholder={t.lngPh}
                      value={lng} onChange={(e) => setLng(e.target.value)}
-                     className="lk-isian lk-koord w-[86px] rounded-md bg-white/5 px-2 py-1.5 font-mono text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-white/30" />
+                     className="lk-isian lk-koord w-[86px] rounded-lg bg-white px-3 py-2 font-mono text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
             </span>
 
             {/* Anonim menyembunyikan kolom nama, bukan meredupkannya: kolom mati
@@ -1625,11 +1625,11 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
                 <label className="sr-only" htmlFor="lk-nama">{t.namaPh}</label>
                 <input id="lk-nama" name="nama" maxLength={100} autoComplete="name"
                        value={nama} onChange={(e) => setNama(e.target.value)} placeholder={t.namaPh}
-                       className="lk-isian min-w-[120px] flex-1 rounded-md bg-white/5 px-2.5 py-1.5 text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-white/30" />
+                       className="lk-isian min-w-[120px] flex-1 rounded-lg bg-white px-3.5 py-2 text-[13px] text-tinta border border-black/[0.12] placeholder:text-black/40 transition-all focus:border-[#ff5a26] focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:border-white/15 dark:placeholder:text-[#a0a0a0]/60 dark:focus:border-[#ff5a26]" />
               </>
             )}
 
-            <label className="lk-anonim ml-auto flex cursor-pointer items-center gap-2 text-[13px] whitespace-nowrap text-[#a0a0a0]">
+            <label className="lk-anonim ml-auto flex cursor-pointer items-center gap-2 text-[13px] whitespace-nowrap text-black/60 dark:text-[#a0a0a0]">
               <Switch
                 name="anonim"
                 value="1"
@@ -1657,19 +1657,19 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
                               onClick={() => hapusBerkas(kunci, url)}
                               aria-label={`${b.name}`}
                               className="absolute -top-2.5 -right-2.5 z-[3] grid size-7 cursor-pointer place-items-center rounded-full
-                                         bg-[#1e1e1e] text-white ring-1 ring-white/20 transition-colors hover:bg-[#e60012]">
+                                         bg-neutral-800 text-white ring-1 ring-black/20 dark:bg-[#1e1e1e] dark:ring-white/20 transition-colors hover:bg-[#e60012]">
                         <svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor" className="size-3.5">
                           <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
                         </svg>
                       </button>
                       {url && b.type.startsWith("video/") ? (
                         <video src={`${url}#t=0.5`} preload="metadata" muted playsInline
-                               className="h-14 w-auto min-w-14 max-w-full rounded-2xl bg-black object-contain ring-1 ring-white/15" />
+                               className="h-14 w-auto min-w-14 max-w-full rounded-xl bg-black/5 object-contain ring-1 ring-black/10 dark:bg-black dark:ring-white/15" />
                       ) : url ? (
                         /* eslint-disable-next-line @next/next/no-img-element -- pratinjau blob lokal */
-                        <img src={url} alt="" className="h-14 w-auto max-w-full rounded-2xl bg-black object-contain ring-1 ring-white/15" />
+                        <img src={url} alt="" className="h-14 w-auto max-w-full rounded-xl bg-black/5 object-contain ring-1 ring-black/10 dark:bg-black dark:ring-white/15" />
                       ) : (
-                        <span className="flex h-14 items-center justify-center rounded-2xl bg-white/5 px-3 text-[11px] text-[#a0a0a0] ring-1 ring-white/15">
+                        <span className="flex h-14 items-center justify-center rounded-xl bg-black/[0.04] px-3 text-[11px] text-black/60 ring-1 ring-black/10 dark:bg-white/5 dark:text-[#a0a0a0] dark:ring-white/15">
                           {b.type.startsWith("video/") ? "Video" : "Foto"}
                         </span>
                       )}
@@ -1680,7 +1680,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
             </ul>
           )}
 
-          <div className="mt-2 flex items-center gap-1 border-t border-white/10 pt-2">
+          <div className="mt-2 flex items-center gap-1 border-t border-black/[0.08] dark:border-white/10 pt-2">
             <button type="button" title={t.lampirFoto} aria-label={t.lampirFoto}
                     onClick={() => berkasRef.current?.click()} className={ikonAksi}>
               <IkonFoto />
@@ -1693,11 +1693,11 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
                 sebagai galat setelah tombol Kirim ditekan. Di ponsel ia
                 disembunyikan, bukan dipotong: baris ini sudah penuh oleh dua
                 ikon + Batal + Kirim, dan "Foto/vid…" bukan keterangan. */}
-            <span className="lk-isian hidden min-w-0 truncate pl-1 text-[12px] whitespace-nowrap text-[#a0a0a0] sm:inline">
+            <span className="lk-isian hidden min-w-0 truncate pl-1 text-[12px] whitespace-nowrap text-black/60 dark:text-[#a0a0a0] sm:inline">
               {berkas.length > 0 ? `${berkas.length}/${BATAS_BERKAS}` : t.wajibMedia}
             </span>
             <button type="button" onClick={() => setBuka(false)}
-                    className="lk-batal cursor-pointer ml-auto px-3 py-1.5 text-[14px] text-[#a0a0a0] transition hover:text-white
+                    className="lk-batal cursor-pointer ml-auto px-3 py-1.5 text-[14px] text-black/60 transition hover:text-black dark:text-[#a0a0a0] dark:hover:text-white
                                focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
               {t.batal}
             </button>
@@ -1705,8 +1705,8 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
               type="submit"
               disabled={mengirim || menungguToken}
               aria-busy={mengirim || menungguToken}
-              className="lk-kirim cursor-pointer rounded-full bg-[#e7e9ea] px-5 py-1.5 text-[15px] font-bold text-black transition
-                         hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+              className="lk-kirim cursor-pointer rounded-full bg-black text-white dark:bg-[#e7e9ea] dark:text-black px-5 py-1.5 text-[15px] font-bold transition
+                         hover:opacity-90 dark:hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]
                          disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {mengirim ? t.mengirim : menungguToken ? t.memverifikasi : t.kirim}
@@ -1731,8 +1731,8 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
  *  sendiri. Keyframe apungnya dipakai bersama — sudah ada di app/globals.css.
  *
  *  Posisi `left` sengaja dua nilai panjang yang konkret, bukan calc berisi
-   var: custom property tidak diinterpolasi, jadi tombolnya akan melompat
-   sementara kolomnya beranimasi. */
+    var: custom property tidak diinterpolasi, jadi tombolnya akan melompat
+    sementara kolomnya beranimasi. */
 function TabRelKiri({ terbuka, onUbah, label }: {
   terbuka: boolean;
   onUbah: () => void;
@@ -1753,11 +1753,11 @@ function TabRelKiri({ terbuka, onUbah, label }: {
         aria-controls="lk-rel-kiri"
         aria-label={label}
         title={label}
-        className="lk-tab-rel cursor-pointer group flex size-9 items-center justify-center rounded-full bg-[#ff5a26] text-black
-                   ring-1 ring-inset ring-white/25 shadow-[0_6px_20px_rgb(255_90_38/0.45)]
+        className="lk-tab-rel cursor-pointer group flex size-9 items-center justify-center rounded-full bg-[#ff5a26] text-white dark:text-black
+                   ring-1 ring-inset ring-black/10 dark:ring-white/25 shadow-[0_6px_20px_rgb(255_90_38/0.45)]
                    transition-[scale,box-shadow,background-color] duration-300 ease-out
                    hover:scale-110 hover:shadow-[0_10px_28px_rgb(255_90_38/0.6)] active:scale-90
-                   focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+                   focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]
                    motion-safe:animate-[tab-rel-apung_3.2s_ease-in-out_infinite] hover:[animation-play-state:paused]"
       >
         {/* Satu panah yang berputar 180°: arahnya menunjuk ke mana relnya akan
@@ -2286,7 +2286,7 @@ export function LandingKarhutla(
   const [komentarId, setKomentarId] = useState<number | null>(null);
 
   return (
-    <div className={`lk-bingkai${tampil === "panel" ? " lk-mode-panel" : ""} min-h-dvh bg-[#0a0a0a] pt-16 text-[#f5f5f5] antialiased`}>
+    <div className={`lk-bingkai${tampil === "panel" ? " lk-mode-panel" : ""} min-h-dvh bg-white text-tinta dark:bg-[#0a0a0a] dark:text-[#f5f5f5] pt-16 antialiased`}>
       {/* Bilah kepala SAMA dengan halaman index — <Nav gelap>: fixed h-16,
           logo Fire + merek + tombol Lapor + pemilih bahasa. pt-16 pada bingkai
           memberi ruang di bawah bilah yang fixed (pola halaman-peta.tsx). */}
@@ -2414,7 +2414,7 @@ export function LandingKarhutla(
               guliran halaman begitu kursor melintasi bingkai. */}
           <div
             ref={bingkaiPetaRef}
-            className="lk-bingkai-peta relative isolate aspect-[1080/544] min-h-[280px] w-full overflow-hidden rounded-md ring-1 ring-white/10"
+            className="lk-bingkai-peta relative isolate aspect-[1080/544] min-h-[280px] w-full overflow-hidden rounded-xl ring-1 ring-black/[0.08] dark:ring-white/10"
           >
             {/* Slot bingkai kecil — isinya hostPeta, ditempelkan lewat effect. */}
             <div ref={isiPetaRef} className="lk-peta-isi" />
@@ -2452,7 +2452,7 @@ export function LandingKarhutla(
                   role="dialog"
                   aria-modal="true"
                   aria-label={t.bukaPetaSelayar}
-                  className={`lk-peta-penuh fixed inset-0 z-[70] bg-[#0a0a0a]${menutupPenuh ? " lk-peta-penuh--tutup" : ""}`}
+                  className={`lk-peta-penuh fixed inset-0 z-[70] bg-white text-tinta dark:bg-[#0a0a0a] dark:text-[#f5f5f5]${menutupPenuh ? " lk-peta-penuh--tutup" : ""}`}
                 >
                   <div ref={slotPenuhRef} className="absolute inset-0" />
                   <button
@@ -2461,10 +2461,10 @@ export function LandingKarhutla(
                     title={t.tutupPetaSelayar}
                     aria-label={t.tutupPetaSelayar}
                     className="lk-tutup-peta cursor-pointer pointer-events-auto absolute right-4 top-4 z-[1100] flex size-9 items-center justify-center rounded-full
-                               bg-black/70 text-white ring-1 ring-white/15 backdrop-blur-sm
-                               transition hover:scale-105 hover:ring-[#ff5a26]/70 active:scale-95
+                               bg-white/90 text-tinta border border-black/10 shadow-md dark:border-white/15 dark:bg-black/70 dark:text-white backdrop-blur-sm
+                               transition hover:scale-105 hover:ring-2 hover:ring-[#ff5a26]/70 active:scale-95
                                motion-reduce:transition-none motion-reduce:hover:scale-100
-                               focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+                               focus-visible:ring-2 focus-visible:ring-black/50 dark:focus-visible:ring-white/70 focus-visible:outline-none"
                   >
                     <IkonTutup className="size-4" />
                   </button>
@@ -2491,7 +2491,6 @@ export function LandingKarhutla(
                         bukaRincian(ketemu);
                       }}
                       onTutup={() => setWilayah(null)}
-                      gelap
                     />
                   )}
                 </div>,
@@ -2514,7 +2513,7 @@ export function LandingKarhutla(
             />
           )}
 
-          <div className={`lk-lembar-panel${lembarTutup ? " lk-panel-katup" : ""}`}>
+          <div className={`lk-lembar-panel${lembarTutup ? " lk-panel-katup" : ""} bg-white text-tinta border-t border-black/[0.08] shadow-lg dark:bg-[#101010] dark:text-[#f5f5f5] dark:border-white/10 panggung:bg-transparent panggung:text-inherit panggung:border-0 panggung:shadow-none`}>
             <button
               type="button"
               className="lk-lembar-gagang cursor-pointer"
@@ -2543,19 +2542,19 @@ export function LandingKarhutla(
                 ? (bahasa === "en" ? "Open situation panel" : "Buka panel situasi")
                 : (bahasa === "en" ? "Collapse situation panel" : "Tutup panel situasi")}
             >
-              <span aria-hidden="true" />
+              <span aria-hidden="true" className="block w-9 h-1 mx-auto my-1 rounded-full bg-black/20 dark:bg-white/30" />
             </button>
 
           {/* Sumur lokasi + cuaca: panel abu di atas latar hitam, pil lokasi
               yang lebih gelap di dalamnya — sesuai rujukan. mx-4: blok ini
               sengaja lebih sempit dan menengah dibanding peta di atasnya. */}
-          <div className="mx-4 mt-3 rounded-2xl bg-[#1e1e1e] p-5">
+          <div className="mx-4 mt-3 rounded-xl bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-[#1e1e1e] dark:border-white/10 dark:text-[#f5f5f5] p-5">
             <div
               ref={wadahSelectRef}
               className={`lk-lokasi relative hidden panggung:flex items-center gap-3 rounded-xl px-5 py-4 text-[13px] sm:text-[15px] transition-all ${
                 modeCariCuaca
-                  ? "bg-[#161616] border border-white/20 shadow-xl ring-1 ring-white/10"
-                  : "bg-black/50 border border-white/5 hover:bg-black/70"
+                  ? "bg-white border border-black/20 shadow-md ring-1 ring-black/10 dark:bg-[#161616] dark:border-white/20 dark:shadow-xl dark:ring-white/10"
+                  : "bg-white border border-black/[0.08] text-tinta hover:border-black/20 dark:bg-black/50 dark:border-white/5 dark:text-[#f5f5f5] dark:hover:bg-black/70"
               }`}
             >
               {modeCariCuaca ? (
@@ -2574,7 +2573,7 @@ export function LandingKarhutla(
                     }}
                     disabled={cuaca.memuat}
                     aria-label={t.cariLokasiCuacaAria}
-                    className="text-[#a0a0a0] transition-colors hover:text-white"
+                    className="text-black/50 transition-colors hover:text-black dark:text-[#a0a0a0] dark:hover:text-white"
                   >
                     <IkonCari className="size-[18px] shrink-0" />
                   </button>
@@ -2615,7 +2614,7 @@ export function LandingKarhutla(
                       }
                     }}
                     placeholder={t.cariLokasiCuaca}
-                    className="min-w-0 flex-1 bg-transparent text-[13px] text-[#f5f5f5] placeholder:text-[#707070] focus:outline-none sm:text-[15px]"
+                    className="min-w-0 flex-1 bg-transparent text-[13px] text-tinta placeholder:text-black/40 focus:outline-none dark:text-[#f5f5f5] dark:placeholder:text-[#707070] sm:text-[15px]"
                     autoFocus
                   />
                   <button
@@ -2626,7 +2625,7 @@ export function LandingKarhutla(
                       setDaftarSaran([]);
                     }}
                     aria-label={t.batalCariCuaca}
-                    className="text-[#a0a0a0] transition-colors hover:text-white"
+                    className="text-black/50 transition-colors hover:text-black dark:text-[#a0a0a0] dark:hover:text-white"
                   >
                     <IkonTutup className="size-4 shrink-0" />
                   </button>
@@ -2640,7 +2639,7 @@ export function LandingKarhutla(
                       setTimeout(() => inputCuacaRef.current?.focus(), 50);
                     }}
                     aria-label={t.cariLokasiCuacaAria}
-                    className="text-[#a0a0a0] transition-colors hover:text-white"
+                    className="text-black/50 transition-colors hover:text-black dark:text-[#a0a0a0] dark:hover:text-white"
                   >
                     <IkonCari className="size-[18px] shrink-0" />
                   </button>
@@ -2650,12 +2649,12 @@ export function LandingKarhutla(
                       setModeCariCuaca(true);
                       setTimeout(() => inputCuacaRef.current?.focus(), 50);
                     }}
-                    className="min-w-0 flex-1 truncate text-left transition-colors hover:text-white focus:outline-none"
+                    className="min-w-0 flex-1 truncate text-left text-tinta transition-colors hover:text-black dark:text-[#f5f5f5] dark:hover:text-white focus:outline-none"
                     title={cuaca.lokasi}
                   >
                     <span className="truncate" aria-live="polite">
                       {cuaca.lokasi}
-                      <span className="text-[#a0a0a0]">
+                      <span className="text-black/50 dark:text-[#a0a0a0]">
                         /{cuaca.sumberLokasi === "gps"
                           ? t.lokasiTerdeteksi
                           : cuaca.sumberLokasi === "cari"
@@ -2669,7 +2668,7 @@ export function LandingKarhutla(
                     onClick={() => cuaca.deteksiGps()}
                     disabled={cuaca.memuat}
                     aria-label={t.deteksiGpsCuacaAria}
-                    className="ml-auto text-[#a0a0a0] transition-colors hover:text-white disabled:opacity-50"
+                    className="ml-auto text-black/50 transition-colors hover:text-black dark:text-[#a0a0a0] dark:hover:text-white disabled:opacity-50"
                   >
                     <IkonLokasi className={`size-[22px] shrink-0 ${cuaca.memuat ? "animate-spin" : ""}`} />
                   </button>
@@ -2681,12 +2680,12 @@ export function LandingKarhutla(
                 <div
                   role="listbox"
                   aria-label={bahasa === "en" ? "Location suggestions" : "Saran lokasi"}
-                  className="absolute top-full left-0 right-0 mt-2 z-50 max-h-60 overflow-y-auto rounded-xl border border-white/15 bg-[#1a1a1a]/95 p-1.5 shadow-2xl backdrop-blur-xl"
+                  className="absolute top-full left-0 right-0 mt-2 z-50 max-h-60 overflow-y-auto rounded-xl border border-black/10 bg-white/95 p-1.5 shadow-2xl backdrop-blur-xl text-tinta dark:border-white/15 dark:bg-[#1a1a1a]/95 dark:text-[#f5f5f5]"
                 >
                   {memuatSaran && daftarSaran.length === 0 ? (
-                    <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] text-[#a0a0a0]">
+                    <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] text-black/60 dark:text-[#a0a0a0]">
                       <svg
-                        className="size-4 shrink-0 animate-spin text-white"
+                        className="size-4 shrink-0 animate-spin text-tinta dark:text-white"
                         viewBox="0 0 24 24"
                         fill="none"
                       >
@@ -2724,8 +2723,8 @@ export function LandingKarhutla(
                           }}
                           className={`group flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] transition-colors ${
                             dipilih
-                              ? "bg-white/15 text-white"
-                              : "text-[#d0d0d0] hover:bg-white/10 hover:text-white"
+                              ? "bg-black/10 text-tinta font-medium dark:bg-white/15 dark:text-white"
+                              : "text-black/80 hover:bg-black/5 hover:text-black dark:text-[#d0d0d0] dark:hover:bg-white/10 dark:hover:text-white"
                           }`}
                         >
                           <IkonPin
@@ -2734,30 +2733,30 @@ export function LandingKarhutla(
                             }`}
                           />
                           <span className="truncate font-medium">{item.nama}</span>
-                          <span className="ml-auto shrink-0 rounded bg-white/5 px-2 py-0.5 text-[11px] text-[#909090]">
+                          <span className="ml-auto shrink-0 rounded bg-black/5 px-2 py-0.5 text-[11px] text-black/60 dark:bg-white/5 dark:text-[#909090]">
                             {item.provinsi}
                           </span>
                         </button>
                       );
                     })
                   ) : (
-                    <div className="px-3 py-3 text-center text-[13px] text-[#888888]">
+                    <div className="px-3 py-3 text-center text-[13px] text-black/50 dark:text-[#888888]">
                       {bahasa === "en" ? "No locations found" : "Tidak ada lokasi yang cocok"}
                     </div>
                   )}
                 </div>
               )}
             </div>
-            <p className="lk-angka mt-0 panggung:mt-4 flex items-center gap-4 px-3 pb-1 text-[clamp(44px,3.8vw,68px)] leading-none font-semibold"
+            <p className="lk-angka mt-0 panggung:mt-4 flex items-center gap-4 px-3 pb-1 text-[clamp(44px,3.8vw,68px)] leading-none font-semibold text-tinta dark:text-[#f5f5f5]"
                aria-live="polite"
                aria-label={cuaca.suhu === null ? t.suhuMenunggu : `${cuaca.suhu} derajat celcius di ${cuaca.lokasi}`}>
               {cuaca.suhu === null ? "–" : `${cuaca.suhu}°`}
-              <IkonCuaca kode={cuaca.kodeCuaca} siang={cuaca.siang} className="size-[clamp(34px,3vw,56px)] shrink-0 text-[#f5f5f5]" />
+              <IkonCuaca kode={cuaca.kodeCuaca} siang={cuaca.siang} className="size-[clamp(34px,3vw,56px)] shrink-0 text-tinta dark:text-[#f5f5f5]" />
             </p>
             {/* Atribusi sumber cuaca — wajib tampil bila datanya BMKG (syarat
                 portal data terbuka mereka), dan jujur bila jatuh ke model. */}
             {cuaca.sumber !== null && (
-              <p className="lk-sumber px-3 text-[11px] text-[#a0a0a0]">
+              <p className="lk-sumber px-3 text-[11px] text-black/50 dark:text-[#a0a0a0]">
                 {cuaca.sumber === "bmkg"
                   ? (bahasa === "en" ? "Source: BMKG" : "Sumber: BMKG")
                   : (bahasa === "en" ? "Source: weather model" : "Sumber: model cuaca")}
@@ -2775,19 +2774,19 @@ export function LandingKarhutla(
                 meluber 31px di 1440x900 dan kaki halaman terpotong — rel boleh
                 menggulir di layar pendek, tapi di ukuran desain tak perlu. */}
             {daftarStatistik.map((s, idx) => (
-              <div key={s.keterangan || idx} className="flex min-w-0 flex-col justify-center rounded-2xl bg-[#1e1e1e] px-3 py-5 text-center">
-                <dd className="lk-angka order-1 text-[clamp(18px,1.5vw,28px)] leading-tight font-medium text-[#f5f5f5]">
+              <div key={s.keterangan || idx} className="flex min-w-0 flex-col justify-center rounded-xl bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-[#1e1e1e] dark:border-white/10 dark:text-[#f5f5f5] px-3 py-5 text-center">
+                <dd className="lk-angka order-1 text-[clamp(18px,1.5vw,28px)] leading-tight font-medium text-tinta dark:text-[#f5f5f5]">
                   {s.nilai}
                 </dd>
-                <dt className="order-2 mt-1.5 text-[11px] leading-tight font-medium text-balance sm:text-[12px] text-[#a0a0a0]">
+                <dt className="order-2 mt-1.5 text-[11px] leading-tight font-medium text-balance sm:text-[12px] text-black/60 dark:text-[#a0a0a0]">
                   {s.keterangan}
                 </dt>
               </div>
             ))}
           </dl>
 
-          <p className="lk-kaki mx-auto mt-4 max-w-[46ch] px-2 text-center text-[11px] leading-relaxed text-[#a0a0a0]">
-            <strong className="font-bold text-[#f5f5f5]">{t.merek}</strong> — {t.kaki}
+          <p className="lk-kaki mx-auto mt-4 max-w-[46ch] px-2 text-center text-[11px] leading-relaxed text-black/55 dark:text-[#a0a0a0]">
+            <strong className="font-bold text-tinta dark:text-[#f5f5f5]">{t.merek}</strong> — {t.kaki}
           </p>
           </div>
           <div aria-hidden="true" className="lk-titik lk-titik--bawah mt-3 h-9" />
@@ -2819,7 +2818,7 @@ export function LandingKarhutla(
           <KomposerLapor bahasa={bahasa} />
 
           {hasil.length === 0 ? (
-            <p className="mt-5 rounded-xl bg-black px-4 py-12 text-center text-[13px] text-[#a0a0a0]">
+            <p className="mt-5 rounded-xl bg-white border border-black/[0.06] text-black/60 shadow-sm dark:bg-black dark:border-white/5 dark:text-[#a0a0a0] px-4 py-12 text-center text-[13px]">
               {t.hasilKosong}
             </p>
           ) : (
@@ -2827,9 +2826,9 @@ export function LandingKarhutla(
               daftar={hasil}
               kolom={kolom}
               kartu={(l) => (
-                <article key={l.id} className="lk-kartu">
+                <article key={l.id} className="lk-kartu rounded-xl p-3.5 bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-white/[0.04] dark:border-white/10 dark:text-[#f5f5f5]">
                   <div className="lk-kartu-teks">
-                    <p className="lk-kartu-tanggal text-[13px] text-white/85 sm:text-[14px]">{l.tanggal}</p>
+                    <p className="lk-kartu-tanggal text-[13px] text-black/60 dark:text-white/85 sm:text-[14px]">{l.tanggal}</p>
                     <div className="lk-kartu-judulbar">
                       <h2 className="mt-1.5 min-w-0 flex-1 text-[16px] leading-[1.25] font-bold tracking-tight sm:text-[19px]">
                         <button
@@ -2886,7 +2885,7 @@ export function LandingKarhutla(
                       )}
                     </button>
                   ) : (
-                    <span className="lk-foto mt-3 flex aspect-[16/10] items-center justify-center" role="img" aria-label={l.alt}>
+                    <span className="lk-foto mt-3 flex aspect-[16/10] items-center justify-center rounded-lg bg-black/[0.04] dark:bg-white/5" role="img" aria-label={l.alt}>
                       <Image src="/assets/img/logo-fire.png" alt="" aria-hidden="true" width={99} height={160} className="h-16 w-auto opacity-60" />
                     </span>
                   )}
@@ -2902,11 +2901,11 @@ export function LandingKarhutla(
       {/* Bilah tab seluler ala X — hanya tampil di aliran (CSS). Slot kedua
           adalah penyeberang halaman: di halaman utama (daftar) membuka panel,
           di halaman panel kembali ke daftar. */}
-      <nav aria-label={t.umpan} className="lk-tabbar">
+      <nav aria-label={t.umpan} className="lk-tabbar bg-white/95 border-t border-black/[0.08] text-tinta backdrop-blur-md dark:bg-[#14100f]/95 dark:border-white/10 dark:text-[#f5f5f5]">
         <Link
           href={`/${bahasa}`}
           aria-label={t.tabBeranda}
-          className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+          className="cursor-pointer rounded-full p-2 text-tinta transition hover:bg-black/5 dark:text-[#f5f5f5] dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
         >
           <IkonBeranda />
         </Link>
@@ -2914,7 +2913,7 @@ export function LandingKarhutla(
           <Link
             href={`/${bahasa}`}
             aria-label={t.tabUmpan}
-            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+            className="cursor-pointer rounded-full p-2 text-tinta transition hover:bg-black/5 dark:text-[#f5f5f5] dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
           >
             <IkonUmpan />
           </Link>
@@ -2922,7 +2921,7 @@ export function LandingKarhutla(
           <Link
             href={`/${bahasa}/karhutla/panel`}
             aria-label={t.tabPanel}
-            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+            className="cursor-pointer rounded-full p-2 text-tinta transition hover:bg-black/5 dark:text-[#f5f5f5] dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
           >
             <IkonPanel />
           </Link>
@@ -2937,12 +2936,12 @@ export function LandingKarhutla(
             type="button"
             aria-label={t.tabCari}
             onClick={() => ubahCariBuka(!cariBuka)}
-            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+            className="cursor-pointer rounded-full p-2 text-tinta transition hover:bg-black/5 dark:text-[#f5f5f5] dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
           >
             <IkonCari className="size-7" />
           </button>
         ) : (
-          <Link href={`/${bahasa}/karhutla?cari=1`} aria-label={t.tabCari} className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
+          <Link href={`/${bahasa}/karhutla?cari=1`} aria-label={t.tabCari} className="cursor-pointer rounded-full p-2 text-tinta transition hover:bg-black/5 dark:text-[#f5f5f5] dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
             <IkonCari className="size-7" />
           </Link>
         )}
@@ -2954,12 +2953,12 @@ export function LandingKarhutla(
               (document.getElementById("lk-tulis") as HTMLButtonElement | null)?.click();
               window.setTimeout(() => document.getElementById("lk-judul")?.focus({ preventScroll: true }), 150);
             }}
-            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+            className="cursor-pointer rounded-full p-2 text-tinta transition hover:bg-black/5 dark:text-[#f5f5f5] dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
           >
             <IkonPlus />
           </button>
         ) : (
-          <Link href={`/${bahasa}/karhutla?tulis=1`} aria-label={t.tabTulis} className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
+          <Link href={`/${bahasa}/karhutla?tulis=1`} aria-label={t.tabTulis} className="cursor-pointer rounded-full p-2 text-tinta transition hover:bg-black/5 dark:text-[#f5f5f5] dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
             <IkonPlus />
           </Link>
         )}
@@ -2973,7 +2972,6 @@ export function LandingKarhutla(
           berita={sorot}
           bahasa={bahasa}
           onTutup={tutupRincian}
-          gelap
           onSebelumnya={keSebelumnya}
           onBerikutnya={keBerikutnya}
           adaSebelumnya={adaSebelumnya}
@@ -3001,7 +2999,6 @@ export function LandingKarhutla(
             bukaRincian(ketemu);
           }}
           onTutup={() => setWilayah(null)}
-          gelap
         />
       )}
 

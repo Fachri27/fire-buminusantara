@@ -15,16 +15,22 @@
  */
 
 .rincian {
-  /* Alas media tetap hitam — foto dan rekaman butuh alas gelap. Rel-nya
-     putih, memakai tinta dan garis rambut yang sama dengan dialog peta di
-     halaman ini. */
-  --r-hitam: #000;
-  --r-rel: #fff;
-  --r-garis: rgb(26 25 25 / 0.1);
+  /* Di mode terang, latar media bernuansa netral terang (#f4f5f7). Di mode gelap,
+     latar media konsol hitam (#000000). Panel/rel putih bersih di mode terang,
+     dan konsol gelap di mode gelap. */
+  --r-hitam: #ffffff;
+  --r-panel: #ffffff;
+  --r-rel: #ffffff;
+  --r-garis: rgba(0, 0, 0, 0.08);
   --r-teks: var(--color-tinta, #1a1919);
-  --r-redup: rgb(26 25 25 / 0.55);
-  --r-sorot: rgb(26 25 25 / 0.06);
-  --r-tautan: #0095f6;
+  --r-redup: rgba(26, 25, 25, 0.65);
+  --r-sorot: rgba(0, 0, 0, 0.04);
+  --r-sorot-hover: rgba(0, 0, 0, 0.08);
+  --r-tautan: #0284c7;
+  --r-tombol-bg: rgba(0, 0, 0, 0.05);
+  --r-tombol-bg-hover: rgba(0, 0, 0, 0.1);
+  --r-tombol-border: rgba(0, 0, 0, 0.08);
+  --r-tombol-teks: var(--color-tinta, #1a1919);
 
   /* Selama pop-up terbuka, bilah tab di dasar layar ikut disembunyikan (lihat
      `body:has(.rincian) .lk-tabbar` di bawah) — jadi ruang yang diumumkan
@@ -50,7 +56,9 @@
      Bawaannya 0px: halaman tanpa penghuni dasar layar tak berubah. */
   padding: calc(4rem + clamp(8px, 2vw, 20px)) clamp(8px, 3vw, 36px)
            calc(clamp(8px, 2vw, 20px) + var(--sela-bawah, 0px));
-  background: rgb(0 0 0 / 0.82);
+  background: rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 /* Saat popup rincian terbuka, iframe peta Windy di belakangnya masih bisa
@@ -59,25 +67,40 @@
    daftar komentar jadi "butuh 3 jari". Selama popup terbuka: matikan sentuhan
    iframe peta dan kunci gulir halaman di belakang. Keduanya pulih sendiri saat
    popup ditutup karena .rincian lepas dari DOM (:has berhenti cocok). */
-/* Varian gelap untuk konsol /peta — cukup menimpa token warna; semua aturan
-   di bawah membaca token ini. Dua nilai yang ditulis mati (garis balasan,
-   teks toast) ditimpa lewat pemilih bertingkat supaya menang tanpa
-   bergantung urutan berkas. */
-.rincian--gelap {
-  --r-rel: #1e1e1e;
-  --r-garis: rgb(255 255 255 / 0.1);
+/* Varian gelap untuk konsol /peta dan mode gelap global — menimpa token warna;
+   semua aturan di bawah membaca token ini. */
+.rincian--gelap,
+.dark .rincian,
+html.dark .rincian,
+[data-theme="dark"] .rincian {
+  --r-hitam: #000000;
+  --r-panel: #14100f;
+  --r-rel: #14100f;
+  --r-garis: rgba(255, 255, 255, 0.1);
   --r-teks: #f5f5f5;
-  --r-redup: rgb(255 255 255 / 0.55);
-  --r-sorot: rgb(255 255 255 / 0.08);
-  --r-tautan: #4db5ff;
+  --r-redup: rgba(245, 245, 245, 0.62);
+  --r-sorot: rgba(255, 255, 255, 0.06);
+  --r-sorot-hover: rgba(255, 255, 255, 0.12);
+  --r-tautan: #38bdf8;
+  --r-tombol-bg: rgba(255, 255, 255, 0.08);
+  --r-tombol-bg-hover: rgba(255, 255, 255, 0.16);
+  --r-tombol-border: rgba(255, 255, 255, 0.12);
+  --r-tombol-teks: #f5f5f5;
+  background: rgba(0, 0, 0, 0.82);
 }
 
-.rincian--gelap .rincian__lihat-garis {
-  background: rgb(255 255 255 / 0.28);
+.rincian--gelap .rincian__lihat-garis,
+.dark .rincian .rincian__lihat-garis,
+html.dark .rincian .rincian__lihat-garis {
+  background: rgba(255, 255, 255, 0.28);
 }
 
-.rincian--gelap .rincian__toast {
-  color: #000;
+.rincian--gelap .rincian__toast,
+.dark .rincian .rincian__toast,
+html.dark .rincian .rincian__toast {
+  color: #14100f;
+  background: #f5f5f5;
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 html:has(.rincian),
@@ -116,8 +139,9 @@ body:has(.rincian) .lk-tabbar {
   gap: clamp(8px, 1vw, 14px);
   overflow: hidden;
   border: 1px solid var(--r-garis);
-  border-radius: 8px;
-  background: var(--r-hitam);
+  border-radius: 12px;
+  background: var(--r-panel);
+  color: var(--r-teks);
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6);
   outline: none;
 }
@@ -203,6 +227,7 @@ body:has(.rincian) .lk-tabbar {
   justify-content: center;
   overflow: hidden;
   background: var(--r-hitam);
+  border-radius: 8px;
 }
 
 .rincian__slider-wadah {
@@ -279,10 +304,17 @@ body:has(.rincian) .lk-tabbar {
   width: 100%;
   height: 100%;
   z-index: 2;
-  background: linear-gradient(150deg, #18181b, #27272a);
+  background: linear-gradient(150deg, #e4e4e7, #f4f5f7);
   animation: denyut-rincian 1.5s ease-in-out infinite;
   transition: opacity 300ms ease, visibility 300ms ease;
   pointer-events: none;
+}
+
+.rincian--gelap .rincian__kerangka,
+.dark .rincian .rincian__kerangka,
+html.dark .rincian .rincian__kerangka,
+[data-theme="dark"] .rincian .rincian__kerangka {
+  background: linear-gradient(150deg, #18181b, #27272a);
 }
 
 /* Siap: memudar halus tanpa menyentak (tidak memakai animation:none agar
@@ -312,28 +344,37 @@ body:has(.rincian) .lk-tabbar {
 .rincian__slider-tombol {
   position: absolute;
   top: 50%;
-  z-index: 2;
+  z-index: 3;
   display: grid;
   width: 38px;
   height: 38px;
   transform: translateY(-50%);
   cursor: pointer;
   place-items: center;
-  border-radius: 999px;
-  border: 0;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  backdrop-filter: blur(8px);
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .rincian__slider-tombol:hover {
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.88);
+  border-color: rgba(255, 255, 255, 0.45);
   transform: translateY(-50%) scale(1.08);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
 }
 
 .rincian__slider-tombol:active {
   transform: translateY(-50%) scale(0.95);
+}
+
+.rincian__slider-tombol:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
 }
 
 .rincian__slider-tombol svg {
@@ -357,11 +398,35 @@ body:has(.rincian) .lk-tabbar {
   transform: translateX(1px);
 }
 
+/* Pil indikator jumlah media (misal: 1 / 3) di pojok kanan atas slider */
+.rincian__slider-penghitung {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+
 .rincian__dots {
   position: absolute;
   bottom: 16px;
   left: 50%;
-  z-index: 2;
+  z-index: 3;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -370,9 +435,12 @@ body:has(.rincian) .lk-tabbar {
      kembali ke 6px seperti semula. */
   gap: 2px;
   padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
 @media (min-width: 640px) {
@@ -492,7 +560,8 @@ body:has(.rincian) .lk-tabbar {
   gap: 6px;
   padding: 12px 14px;
   background: var(--r-sorot);
-  border-radius: 6px;
+  border: 1px solid var(--r-garis);
+  border-radius: 8px;
 }
 
 .rincian__label {
@@ -504,27 +573,37 @@ body:has(.rincian) .lk-tabbar {
 }
 
 .rincian__nilai {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
   line-height: 1.5;
   color: var(--r-teks);
 }
 
-/* Titik koordinat di bawah nama lokasi — kecil dan redup, tautan ke peta.
-   Angkanya tabular agar mudah dibandingkan digit per digit. */
+/* Titik koordinat di bawah nama lokasi — tautan ke peta. */
 .rincian__koordinat {
-  display: inline-block;
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
   font-size: 11.5px;
+  font-weight: 500;
   line-height: 1.5;
-  color: var(--r-redup);
+  color: var(--r-tautan);
   font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  transition: opacity 0.15s ease, text-decoration 0.15s ease;
+}
+
+.rincian__koordinat:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  opacity: 0.85;
 }
-.rincian__koordinat:hover {
-  color: var(--r-teks);
+
+.rincian__koordinat:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* --- Daftar komentar ----------------------------------------------------- */
@@ -823,9 +902,11 @@ body:has(.rincian) .lk-tabbar {
   max-height: calc(85svh - var(--sela-bawah, 0px));
   overflow-y: auto;
   padding: 14px 20px calc(16px + env(safe-area-inset-bottom));
-  border-radius: 14px 14px 0 0;
+  border-radius: 16px 16px 0 0;
+  border-top: 1px solid var(--r-garis);
   background: var(--r-rel);
-  box-shadow: 0 -12px 40px -12px rgb(0 0 0 / 0.45);
+  color: var(--r-teks);
+  box-shadow: 0 -12px 40px -12px rgba(0, 0, 0, 0.45);
   animation: rincian-sheet-naik 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -874,15 +955,32 @@ body:has(.rincian) .lk-tabbar {
   height: 28px;
   place-items: center;
   cursor: pointer;
-  border: 0;
-  border-radius: 999px;
-  background: var(--r-sorot);
+  border: 1px solid var(--r-tombol-border);
+  border-radius: 9999px;
+  background: var(--r-tombol-bg);
+  color: var(--r-tombol-teks);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.rincian__sheet-tutup:hover {
+  background: var(--r-tombol-bg-hover);
   color: var(--r-teks);
+  transform: scale(1.04);
+}
+
+.rincian__sheet-tutup:active {
+  transform: scale(0.96);
+}
+
+.rincian__sheet-tutup:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
 }
 
 .rincian__sheet-tutup svg {
   width: 13px;
   height: auto;
+  stroke: currentColor;
 }
 
 /* Varian lembar KOMENTAR (ponsel): tinggi ±70% layar — daftar komentar
@@ -1127,7 +1225,7 @@ body:has(.rincian) .lk-tabbar {
 
 .rincian__baris > .rincian__batal:hover {
   color: var(--r-teks);
-  background: rgb(255 255 255 / 0.08);
+  background: var(--r-sorot-hover);
 }
 
 /* Baris ketik di lembar komentar */
@@ -1154,6 +1252,10 @@ body:has(.rincian) .lk-tabbar {
   justify-content: center;
   overflow: hidden;
   max-width: 100%;
+}
+
+.rincian__captcha:empty {
+  display: none !important;
 }
 
 .rincian__sheet-panel--komentar .rincian__captcha,
@@ -1195,7 +1297,10 @@ body:has(.rincian) .lk-tabbar {
   border: 1px solid rgb(0 0 0 / 0.1);
 }
 
-.rincian--gelap .rincian__anonim .rincian__saklar-jalur {
+.rincian--gelap .rincian__anonim .rincian__saklar-jalur,
+.dark .rincian .rincian__anonim .rincian__saklar-jalur,
+html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
+[data-theme="dark"] .rincian .rincian__anonim .rincian__saklar-jalur {
   background-color: rgb(255 255 255 / 0.18);
   border-color: rgb(255 255 255 / 0.12);
 }
@@ -1314,16 +1419,17 @@ body:has(.rincian) .lk-tabbar {
   cursor: pointer;
   border: 0;
   border-radius: 9999px;
-  background: #e7e9ea;
-  color: #000;
+  background: var(--r-teks);
+  color: var(--r-rel);
   font-size: 12px;
   font-weight: 600;
   padding: 5px 14px;
-  transition: opacity 0.2s ease, filter 0.2s ease;
+  transition: opacity 0.2s ease, filter 0.2s ease, transform 0.15s ease;
 }
 
-.rincian__tombol-kirim:hover {
-  filter: brightness(1.08);
+.rincian__tombol-kirim:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: scale(1.02);
 }
 
 .rincian__tombol-kirim:disabled {
@@ -1331,8 +1437,7 @@ body:has(.rincian) .lk-tabbar {
   opacity: 0.35;
 }
 
-.rincian__tombol-kirim:focus-visible,
-.rincian__tutup:focus-visible {
+.rincian__tombol-kirim:focus-visible {
   outline: 2px solid var(--r-tautan);
   outline-offset: 2px;
 }
@@ -1356,33 +1461,40 @@ body:has(.rincian) .lk-tabbar {
 }
 
 /* --- Tombol tutup --------------------------------------------------------
-   Pil kaca gelap dengan ikon putih — sama perlakuannya dengan kapsul kredit
-   di bawah. Warnanya tidak bergantung pada apa yang ada di belakangnya, jadi
-   tetap terbaca di baris tanggal (rel terang maupun gelap). */
+   Tombol aksi adaptif terhadap latar belakang rel mode terang dan gelap. */
 .rincian__tutup {
   position: relative;
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.5);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  color: rgb(255 255 255 / 0.95);
-  transition: background-color 0.2s ease;
+  border: 1px solid var(--r-tombol-border);
+  border-radius: 9999px;
+  background: var(--r-tombol-bg);
+  color: var(--r-tombol-teks);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .rincian__tutup:hover {
-  background: rgb(0 0 0 / 0.75);
+  background: var(--r-tombol-bg-hover);
+  color: var(--r-teks);
+  transform: scale(1.04);
+}
+
+.rincian__tutup:active {
+  transform: scale(0.96);
+}
+
+.rincian__tutup:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
 }
 
 .rincian__tutup svg {
   width: 15px;
-  height: auto;
-  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4));
+  height: 15px;
+  stroke: currentColor;
 }
 
 /* --- Tombol bagikan & tombol komentar --------------------------------------
@@ -1392,29 +1504,34 @@ body:has(.rincian) .lk-tabbar {
 .rincian__komentar-tombol {
   position: relative;
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   cursor: pointer;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.5);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  color: rgb(255 255 255 / 0.95);
-  transition: background-color 0.2s ease;
+  border: 1px solid var(--r-tombol-border);
+  border-radius: 9999px;
+  background: var(--r-tombol-bg);
+  color: var(--r-tombol-teks);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .rincian__bagikan:hover,
 .rincian__komentar-tombol:hover {
-  background: rgb(0 0 0 / 0.75);
+  background: var(--r-tombol-bg-hover);
+  color: var(--r-teks);
+  transform: scale(1.04);
+}
+
+.rincian__bagikan:active,
+.rincian__komentar-tombol:active {
+  transform: scale(0.96);
 }
 
 .rincian__bagikan svg,
 .rincian__komentar-tombol svg {
   width: 15px;
-  height: auto;
-  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4));
+  height: 15px;
+  stroke: currentColor;
 }
 
 .rincian__bagikan:focus-visible,
@@ -1486,6 +1603,7 @@ body:has(.rincian) .lk-tabbar {
 
   .rincian__media {
     max-height: 48svh;
+    border-radius: 0;
   }
 
   /* Gerak masuknya ikut jadi gerak lembar: panelnya memang lembar penuh di

@@ -80,6 +80,8 @@ export async function GET(req: NextRequest) {
   const bentang = searchParams.get("bentang") === "1";
   // ringkas: legendaRingkas aktif (bingkai sempit / panggung dasbor)
   const ringkas = searchParams.get("ringkas") === "1";
+  // Tema terang / gelap (disinkronkan dengan tema aktif situs)
+  const temaAwal = searchParams.get("tema") === "light" ? "light" : "dark";
   // Kontrol zoom ditaruh di top 16px bila ada tombol bentang selayar di atasnya
   // atau saat mode ringkas aktif tanpa modal selayar. Saat di modal selayar (!bentang && !ringkas),
   // tombol tutup selayar (X) menempati top 16px, sehingga tumpukan zoom mulai di top 80px (sama persis dengan PetaAsap).
@@ -843,6 +845,15 @@ export async function GET(req: NextRequest) {
         .leaflet-tooltip.provinsi-tooltip::before {
           border-top-color: rgba(20, 16, 15, 0.88) !important;
         }
+        html.light .leaflet-tooltip.provinsi-tooltip {
+          background: rgba(255, 255, 255, 0.95) !important;
+          border: 1px solid rgba(0, 0, 0, 0.1) !important;
+          color: #1a1919 !important;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+        }
+        html.light .leaflet-tooltip.provinsi-tooltip::before {
+          border-top-color: rgba(255, 255, 255, 0.95) !important;
+        }
 
         /* Tombol kontrol zoom kustom (Posisi, ukuran, dan glassmorphism seragam dengan PetaAsap) */
         #custom-zoom-controls {
@@ -867,24 +878,44 @@ export async function GET(req: NextRequest) {
           align-items: center;
           justify-content: center;
           border-radius: 12px;
-          background: rgba(0, 0, 0, 0.75);
-          border: 0;
-          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+          user-select: none;
           backdrop-filter: blur(12px);
           -webkit-backdrop-filter: blur(12px);
-          color: rgba(255, 255, 255, 0.9);
-          user-select: none;
-          transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
-        }
-        #custom-zoom-controls button:hover {
-          background: #000000;
-          color: #ffffff;
+          transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
         #custom-zoom-controls button:active {
           transform: scale(0.9);
         }
         #custom-zoom-controls button svg {
           pointer-events: none;
+        }
+
+        /* Default / Tema Gelap */
+        #custom-zoom-controls button,
+        #custom-zoom-controls.tema-dark button {
+          background: rgba(20, 16, 15, 0.9);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+          color: rgba(255, 255, 255, 0.9);
+        }
+        #custom-zoom-controls button:hover,
+        #custom-zoom-controls.tema-dark button:hover {
+          background: rgba(255, 255, 255, 0.18);
+          color: #ffffff;
+        }
+
+        /* Tema Terang (Light Mode) */
+        #custom-zoom-controls.tema-light button,
+        html.light #custom-zoom-controls button {
+          background: rgba(255, 255, 255, 0.92) !important;
+          border: 1px solid rgba(0, 0, 0, 0.08) !important;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+          color: #1a1919 !important;
+        }
+        #custom-zoom-controls.tema-light button:hover,
+        html.light #custom-zoom-controls button:hover {
+          background: #ffffff !important;
+          color: #000000 !important;
         }
 
         /* Tombol bentang selayar — selalu 36px (h-9 w-9) */
@@ -932,6 +963,7 @@ export async function GET(req: NextRequest) {
     const customScript = `
       <script>
         (function() {
+          document.documentElement.classList.add('${temaAwal}');
           const GEO_DATA = ${geoDataJson};
           const CENTROIDS = ${centroidsJson};
           const PROVINSI_PULAU = ${pulauJson};
@@ -1212,6 +1244,7 @@ export async function GET(req: NextRequest) {
             if (!document.getElementById('custom-zoom-controls')) {
               const zoomBox = document.createElement('div');
               zoomBox.id = 'custom-zoom-controls';
+              zoomBox.className = '${temaAwal === "light" ? "tema-light" : "tema-dark"}';
               zoomBox.innerHTML = '${tombolBentang}' +
                 '<button id="btn-zoom-in" type="button" aria-label="Perbesar peta" title="Perbesar peta"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button>' +
                 '<button id="btn-zoom-out" type="button" aria-label="Perkecil peta" title="Perkecil peta"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12" /></svg></button>' +
@@ -1514,6 +1547,19 @@ export async function GET(req: NextRequest) {
                 try {
                   window.W.map.map.invalidateSize();
                 } catch(e) {}
+              }
+            } else if (data.type === 'SET_TEMA') {
+              const zb = document.getElementById('custom-zoom-controls');
+              if (zb) {
+                zb.classList.remove('tema-light', 'tema-dark');
+                zb.classList.add(data.tema === 'light' ? 'tema-light' : 'tema-dark');
+              }
+              if (data.tema === 'light') {
+                document.documentElement.classList.add('light');
+                document.documentElement.classList.remove('dark');
+              } else {
+                document.documentElement.classList.add('dark');
+                document.documentElement.classList.remove('light');
               }
             }
           });

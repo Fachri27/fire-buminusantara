@@ -12,7 +12,7 @@ import type { Bahasa } from "@/lib/bahasa";
  */
 export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
   return (
-    <div role="status" aria-busy="true" className="h-[100svh] overflow-hidden bg-pantau-malam pt-16">
+    <div role="status" aria-busy="true" className="h-[100svh] overflow-hidden bg-white dark:bg-pantau-malam pt-16">
       <p className="sr-only">
         {bahasa === "en" ? "Loading smoke spread map…" : "Memuat peta sebaran asap…"}
       </p>
@@ -24,39 +24,39 @@ export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
                    panggung:grid-cols-[clamp(248px,16.67vw,320px)_minmax(0,1fr)_clamp(272px,18.75vw,360px)]"
       >
         {/* Rel kiri — hanya panggung */}
-        <div className="bg-pantau-konsol px-3 py-3.5 aliran:hidden panggung:rounded-xl">
-          <div className="h-9 rounded-lg bg-[#141414]" />
+        <div className="bg-white border border-black/[0.08] dark:border-transparent dark:bg-pantau-konsol px-3 py-3.5 aliran:hidden panggung:rounded-xl">
+          <div className="h-9 rounded-lg bg-black/[0.06] dark:bg-white/[0.08]" />
           <div className="mt-4 mr-6 grid gap-2.5 px-3">
-            <div className="h-4 w-32 rounded bg-white/[0.07]" />
-            <div className="h-4 w-20 rounded bg-white/[0.07]" />
+            <div className="h-4 w-32 rounded bg-black/[0.06] dark:bg-white/[0.08]" />
+            <div className="h-4 w-20 rounded bg-black/[0.06] dark:bg-white/[0.08]" />
             <div className="grid gap-2 pl-1.5">
               {Array.from({ length: 7 }, (_, i) => (
-                <div key={i} className="h-3.5 w-36 rounded bg-white/[0.05]" />
+                <div key={i} className="h-3.5 w-36 rounded bg-black/[0.06] dark:bg-white/[0.08]" />
               ))}
             </div>
-            <div className="h-4 w-24 rounded bg-white/[0.07]" />
+            <div className="h-4 w-24 rounded bg-black/[0.06] dark:bg-white/[0.08]" />
           </div>
         </div>
 
         {/* Tengah: di panggung judul, bingkai berasio desain, kaki; di aliran
             peta penuh dengan laci mengintip — geometri sama dengan HalamanPeta. */}
         <div className="relative flex min-h-0 flex-col aliran:flex-1 panggung:py-6">
-          <div className="mx-3.5 mb-3 hidden w-2/3 max-w-[380px] rounded-lg bg-white/[0.08] panggung:block panggung:h-[clamp(25px,1.9vw,38px)]" />
+          <div className="mx-3.5 mb-3 hidden w-2/3 max-w-[380px] rounded-lg bg-black/[0.06] dark:bg-white/[0.08] panggung:block panggung:h-[clamp(25px,1.9vw,38px)]" />
           <div className="min-h-0 aliran:h-full panggung:flex panggung:flex-1 panggung:items-center panggung:justify-center panggung:[container-type:size]">
-            <div className="h-full w-full bg-pantau-sumur panggung:aspect-[1080/544] panggung:h-auto panggung:w-[min(100cqw,calc(100cqh*1080/544))] panggung:rounded-2xl panggung:ring-1 panggung:ring-white/10" />
+            <div className="h-full w-full bg-black/[0.04] dark:bg-pantau-sumur panggung:aspect-[1080/544] panggung:h-auto panggung:w-[min(100cqw,calc(100cqh*1080/544))] panggung:rounded-2xl panggung:ring-1 panggung:ring-black/[0.08] dark:panggung:ring-white/10" />
           </div>
-          <div className="mx-auto mt-4 hidden h-4 w-3/4 max-w-[560px] rounded bg-white/[0.05] panggung:block" />
+          <div className="mx-auto mt-4 hidden h-4 w-3/4 max-w-[560px] rounded bg-black/[0.06] dark:bg-white/[0.08] panggung:block" />
 
           {/* Laci mengintip (TINGGI_INTIP = 272px) — hanya aliran */}
-          <div className="absolute inset-x-0 bottom-0 h-[272px] rounded-t-2xl bg-pantau-konsol px-4 pt-3 ring-1 ring-white/10 sm:mx-auto sm:max-w-xl panggung:hidden">
-            <div className="mx-auto h-1 w-10 rounded-full bg-white/20" />
-            <div className="mt-3 h-11 rounded-lg bg-[#141414]" />
+          <div className="absolute inset-x-0 bottom-0 h-[272px] rounded-t-2xl bg-white border-t border-black/[0.08] dark:border-transparent dark:bg-pantau-konsol px-4 pt-3 ring-1 ring-black/[0.05] dark:ring-white/10 sm:mx-auto sm:max-w-xl panggung:hidden">
+            <div className="mx-auto h-1 w-10 rounded-full bg-black/20 dark:bg-white/20" />
+            <div className="mt-3 h-11 rounded-lg bg-black/[0.06] dark:bg-white/[0.08]" />
             <div className="mt-3 flex gap-4">
               {Array.from({ length: 3 }, (_, i) => (
                 <div key={i} className="w-[calc((100%-1rem)/2)] shrink-0">
-                  <div className="h-[104px] rounded-lg bg-white/[0.06]" />
-                  <div className="mt-2 h-2.5 w-1/2 rounded bg-white/[0.06]" />
-                  <div className="mt-1.5 h-3 w-full rounded bg-white/[0.08]" />
+                  <div className="h-[104px] rounded-lg bg-black/[0.06] dark:bg-white/[0.08]" />
+                  <div className="mt-2 h-2.5 w-1/2 rounded bg-black/[0.06] dark:bg-white/[0.08]" />
+                  <div className="mt-1.5 h-3 w-full rounded bg-black/[0.06] dark:bg-white/[0.08]" />
                 </div>
               ))}
             </div>
@@ -64,15 +64,15 @@ export function KerangkaPeta({ bahasa = "id" }: { bahasa?: Bahasa }) {
         </div>
 
         {/* Rel kanan — hanya panggung */}
-        <div className="bg-pantau-konsol p-4 aliran:hidden panggung:rounded-xl panggung:py-5">
-          <div className="h-3 w-32 rounded bg-white/[0.07]" />
+        <div className="bg-white border border-black/[0.08] dark:border-transparent dark:bg-pantau-konsol p-4 aliran:hidden panggung:rounded-xl panggung:py-5">
+          <div className="h-3 w-32 rounded bg-black/[0.06] dark:bg-white/[0.08]" />
           <div className="mt-3 grid gap-4">
             {Array.from({ length: 3 }, (_, i) => (
-              <div key={i} className="overflow-hidden rounded-2xl ring-1 ring-white/10">
-                <div className="aspect-[16/10] bg-white/[0.05]" />
+              <div key={i} className="overflow-hidden rounded-2xl ring-1 ring-black/[0.08] dark:ring-white/10">
+                <div className="aspect-[16/10] bg-black/[0.06] dark:bg-white/[0.08]" />
                 <div className="grid gap-2 p-3.5">
-                  <div className="h-3 w-1/3 rounded bg-white/[0.07]" />
-                  <div className="h-4 w-full rounded bg-white/[0.08]" />
+                  <div className="h-3 w-1/3 rounded bg-black/[0.06] dark:bg-white/[0.08]" />
+                  <div className="h-4 w-full rounded bg-black/[0.06] dark:bg-white/[0.08]" />
                 </div>
               </div>
             ))}

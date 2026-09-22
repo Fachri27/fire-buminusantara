@@ -35,8 +35,10 @@
   z-index: 2;
   padding: 0.24em 0.62em;
   border-radius: 999px;
-  background: rgb(0 0 0 / 0.62);
-  color: #fff;
+  background: rgb(255 255 255 / 0.88);
+  border: 1px solid rgb(0 0 0 / 0.08);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.12);
+  color: #1a1919;
   font-size: calc(var(--ukuran-tanggal) * 0.85);
   font-weight: 600;
   line-height: 1.35;
@@ -44,6 +46,15 @@
   letter-spacing: 0.01em;
   /* Lencana hanya penanda; klik di atasnya tetap milik medianya. */
   pointer-events: none;
+  backdrop-filter: blur(4px);
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+
+:is(.dark, :root.dark, html.dark) .kartu-durasi {
+  background: rgb(0 0 0 / 0.65);
+  border-color: rgb(255 255 255 / 0.18);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
+  color: #f5f5f5;
 }
 
 /* --- tombol putar ulang --- */
@@ -65,21 +76,31 @@
   place-items: center;
   width: 2.9em;
   height: 2.9em;
-  border: 0;
+  border: 1px solid rgb(0 0 0 / 0.08);
   border-radius: 999px;
-  /* Cukup pekat untuk terbaca di atas bingkai terakhir video apa pun —
-     tanpa scrim yang akan ikut meredupkan judul kartu varian vertikal. */
-  background: rgb(0 0 0 / 0.62);
-  box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.75);
-  color: #fff;
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+  color: #1a1919;
   font-size: calc(var(--ukuran-tanggal) * 0.85);
   cursor: pointer;
-  transition: background-color 160ms ease, transform 160ms ease;
+  backdrop-filter: blur(6px);
+  transition: background-color 160ms ease, transform 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
 .kartu-ulang:hover {
-  background: rgb(0 0 0 / 0.8);
+  background: #ffffff;
   transform: scale(1.06);
+}
+
+:is(.dark, :root.dark, html.dark) .kartu-ulang {
+  background: rgb(0 0 0 / 0.65);
+  border-color: rgb(255 255 255 / 0.2);
+  box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.75), 0 4px 16px rgb(0 0 0 / 0.5);
+  color: #fff;
+}
+
+:is(.dark, :root.dark, html.dark) .kartu-ulang:hover {
+  background: rgb(0 0 0 / 0.85);
 }
 
 .kartu-ulang:focus-visible {
@@ -124,9 +145,28 @@
   /* Palet yang sama dengan placeholder "Belum ada foto" di kartu-berita —
      kerangka yang pudar menyambung mulus ke kotak kosong apa adanya. */
   background: linear-gradient(150deg, #eef1f4, #d7dee4);
+  border: 1px solid rgb(0 0 0 / 0.06);
   animation: denyut-kerangka 1.5s ease-in-out infinite;
-  transition: opacity 300ms ease;
+  transition: opacity 300ms ease, background 300ms ease, border-color 300ms ease;
   pointer-events: none;
+}
+
+:is(.dark, :root.dark, html.dark) .kartu-kerangka {
+  background: linear-gradient(150deg, #282524, #181514);
+  border-color: rgb(255 255 255 / 0.08);
+}
+
+/* --- batas pemutar video & media --- */
+
+.kartu-bingkai video,
+.kartu-bingkai .kartu-media {
+  border: 1px solid rgb(0 0 0 / 0.06);
+  transition: border-color 200ms ease;
+}
+
+:is(.dark, :root.dark, html.dark) .kartu-bingkai video,
+:is(.dark, :root.dark, html.dark) .kartu-bingkai .kartu-media {
+  border-color: rgb(255 255 255 / 0.1);
 }
 
 /* Siap: berhenti berdenyut dulu, baru memudar — bukan lenyap seketika di

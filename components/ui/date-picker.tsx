@@ -13,6 +13,7 @@ export type DatePickerProps = {
   wajib?: boolean;
   className?: string;
   id?: string;
+  gelap?: boolean;
 };
 
 function formatIso(d: Date): string {
@@ -54,6 +55,7 @@ export function DatePicker({
   wajib,
   className = "",
   id,
+  gelap = false,
 }: DatePickerProps) {
   const [uncontrolledVal, setUncontrolledVal] = useState<string>(nilai ?? "");
   const isControlled = controlledValue !== undefined;
@@ -80,8 +82,10 @@ export function DatePicker({
           <div
             role="button"
             tabIndex={0}
-            className={`cms-isian flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-[3px] border border-[var(--garis-tegas)] bg-[var(--papan)] px-3 py-2 text-left text-[13.5px] transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--limau)] ${
-              !selectedDate ? "text-[var(--lirih)]" : "text-neutral-900 font-medium"
+            className={`cms-isian flex h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-[3px] border border-[var(--garis-tegas)] bg-[var(--papan)] dark:border-white/15 dark:bg-pantau-konsol px-3 py-2 text-left text-[13.5px] transition-colors hover:bg-white dark:hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--limau)] dark:focus-visible:outline-white/40 ${
+              gelap ? "border-white/15 bg-pantau-konsol text-white" : ""
+            } ${
+              !selectedDate ? "text-[var(--lirih)] dark:text-white/40" : "text-neutral-900 dark:text-white font-medium"
             }`}
           >
             <span className="truncate">
@@ -91,7 +95,7 @@ export function DatePicker({
               viewBox="0 0 20 20"
               fill="currentColor"
               aria-hidden="true"
-              className="size-4 shrink-0 text-[var(--lirih)]"
+              className={`size-4 shrink-0 ${gelap ? "text-white/50" : "text-[var(--lirih)] dark:text-white/40"}`}
             >
               <path
                 fillRule="evenodd"
@@ -102,12 +106,13 @@ export function DatePicker({
           </div>
         </PopoverTrigger>
 
-        <PopoverContent align="start" className="p-3">
+        <PopoverContent align="start" className="p-3" gelap={gelap}>
           <Calendar
             mode="single"
             selected={selectedDate}
             onSelect={handleSelect}
             initialMonth={selectedDate}
+            gelap={gelap}
           />
         </PopoverContent>
       </Popover>

@@ -113,14 +113,14 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
   const aksen = asapAktif
     ? {
         isi: "bg-[#49006a] hover:bg-[#5c0086]",
-        teks: "text-fuchsia-300",
+        teks: "text-fuchsia-700 dark:text-fuchsia-300",
         sentuh: "hover:bg-fuchsia-500/15",
         tipis: "bg-fuchsia-500/15 ring-fuchsia-400/30",
         kotak: "accent-fuchsia-500",
       }
     : {
         isi: "bg-emerald-700 hover:bg-emerald-600",
-        teks: "text-emerald-300",
+        teks: "text-emerald-600 dark:text-emerald-300",
         sentuh: "hover:bg-emerald-500/15",
         tipis: "bg-emerald-500/15 ring-emerald-400/30",
         kotak: "accent-emerald-500",
@@ -445,8 +445,8 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
 
   /* ── Baris ajakan: satu-satunya bagian yang menempati pita di atas peta ── */
   const baris = (
-    <div className="mx-auto flex w-full max-w-[720px] items-center gap-3 rounded-2xl bg-pantau-konsol
-                    px-4 py-3 ring-1 ring-white/10 [zoom:var(--skala-rel)]">
+    <div className="mx-auto flex w-full max-w-[720px] items-center gap-3 rounded-2xl bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-white/[0.04] dark:border-white/10 dark:text-[#f5f5f5]
+                    px-4 py-3 [zoom:var(--skala-rel)]">
       {/* Logo yang sama dengan bilah navigasi. Rasionya tinggi (99x160), jadi
           tingginya yang dipatok dan lebarnya mengikuti — dipaksa masuk
           lingkaran, ia akan terpencet. */}
@@ -461,13 +461,13 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
 
       {berhasil ? (
         <>
-          <p className="min-w-0 flex-1 truncate text-[14px] text-pantau-tulang">{teks.berhasilJudul}</p>
+          <p className="min-w-0 flex-1 truncate text-[14px] text-tinta dark:text-[#f5f5f5]">{teks.berhasilJudul}</p>
           <button
             type="button"
             onClick={buka}
-            className="cursor-pointer shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-[12.5px] font-semibold
-                       text-pantau-tulang transition hover:bg-white/15
-                       focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="cursor-pointer shrink-0 rounded-full bg-black/[0.06] px-3.5 py-1.5 text-[12.5px] font-semibold
+                       text-tinta transition hover:bg-black/10 dark:bg-white/10 dark:hover:bg-white/15
+                       dark:text-pantau-tulang focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             {ajakan.lagi}
           </button>
@@ -477,17 +477,63 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
           <button
             type="button"
             onClick={buka}
-            className="cursor-pointer min-w-0 flex-1 truncate py-1 text-left text-[15px] text-pantau-abu transition
-                       hover:text-pantau-tulang focus-visible:outline-2 focus-visible:outline-offset-2
-                       focus-visible:outline-white"
+            className="cursor-pointer min-w-0 flex-1 truncate py-1 text-left text-[15px] placeholder:text-tinta/40 text-tinta/60 hover:text-tinta dark:placeholder:text-[#a0a0a0]/70 dark:text-[#a0a0a0] dark:hover:text-[#f5f5f5] transition
+                       focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             {ajakan.ajak}
           </button>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                buka();
+                setTimeout(() => berkasRef.current?.click(), 100);
+              }}
+              title={ajakan.wajibFoto}
+              aria-label={ajakan.wajibFoto}
+              className="cursor-pointer rounded-full p-2 text-tinta/70 hover:bg-black/[0.04] hover:text-tinta dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-[18px]">
+                <rect x="3" y="4" width="18" height="16" rx="2" />
+                <circle cx="8.5" cy="9.5" r="1.5" />
+                <path d="m21 16-5-5L5 20" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                buka();
+                setTimeout(() => berkasRef.current?.click(), 100);
+              }}
+              title={ajakan.wajibFoto}
+              aria-label={ajakan.wajibFoto}
+              className="cursor-pointer rounded-full p-2 text-tinta/70 hover:bg-black/[0.04] hover:text-tinta dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-[18px]">
+                <rect x="2" y="5" width="15" height="14" rx="2" />
+                <path d="m17 10 5-3v10l-5-3Z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                buka();
+                lokasiSaya();
+              }}
+              title={teks.pakaiLokasi}
+              aria-label={teks.pakaiLokasi}
+              className="cursor-pointer rounded-full p-2 text-tinta/70 hover:bg-black/[0.04] hover:text-tinta dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-[18px]">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+            </button>
+          </div>
           <button
             type="button"
             onClick={buka}
-            className={`cursor-pointer shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold text-white ring-1
-                        ring-white/15 transition ${aksen.isi}
+            className={`cursor-pointer shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold text-white transition ${aksen.isi}
                         focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
           >
             {teks.kirim}
@@ -505,7 +551,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
   const dialog = (
     <div
       className="cursor-pointer fixed inset-0 z-[80] grid place-items-start justify-center overflow-y-auto
-                 bg-black/70 px-4 py-[8vh] backdrop-blur-sm"
+                 bg-black/50 dark:bg-black/70 px-4 py-[8vh] backdrop-blur-sm"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) setTerbuka(false);
       }}
@@ -515,12 +561,12 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
         role="dialog"
         aria-modal="true"
         aria-label={ajakan.judulDialog}
-        className="cursor-default w-full max-w-[560px] rounded-2xl bg-pantau-konsol p-5 ring-1 ring-white/15
-                   shadow-[0_24px_80px_rgb(0_0_0/0.6)] [zoom:var(--skala-rel)]"
+        className="cursor-default w-full max-w-[560px] rounded-2xl bg-white border border-black/[0.06] text-tinta shadow-2xl dark:bg-[#1e1e1e] dark:border-white/10 dark:text-[#f5f5f5] p-5
+                   shadow-[0_24px_80px_rgb(0_0_0/0.15)] dark:shadow-[0_24px_80px_rgb(0_0_0/0.6)] [zoom:var(--skala-rel)]"
       >
         {/* Kepala: logo + judul yang TERLIHAT. Sebelumnya dialog ini hanya
             punya aria-label, jadi pemakai awas tak melihat penanda apa pun. */}
-        <div className="mb-3 flex items-center gap-2.5 border-b border-white/10 pb-2.5">
+        <div className="mb-3 flex items-center gap-2.5 border-b border-black/[0.06] dark:border-white/10 pb-2.5">
           <Image
             src="/assets/img/logo-fire.png"
             alt=""
@@ -529,7 +575,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
             height={160}
             className="h-7 w-auto shrink-0"
           />
-          <h2 className="text-[13.5px] font-semibold tracking-tight text-pantau-tulang">
+          <h2 className="text-[13.5px] font-semibold tracking-tight text-tinta dark:text-[#f5f5f5]">
             {ajakan.judulDialog}
           </h2>
         </div>
@@ -545,8 +591,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
               onChange={(e) => setJudul(e.target.value)}
               placeholder={teks.labelJudul}
               autoComplete="off"
-              className="w-full bg-transparent text-[16px] font-semibold text-pantau-tulang
-                         placeholder:text-pantau-abu/70 focus:outline-none"
+              className="w-full rounded-lg border border-black/[0.12] bg-black/[0.02] px-3.5 py-2 text-[15px] font-semibold text-tinta placeholder:text-tinta/40 transition-all focus:border-[#ff5a26] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:border-white/15 dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:placeholder:text-[#a0a0a0]/70 dark:focus:border-[#ff5a26] dark:focus:bg-black"
             />
             <textarea
               name="deskripsi"
@@ -566,8 +611,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
                 el.style.height = `${Math.min(el.scrollHeight, 220)}px`;
               }}
               placeholder={teks.petunjukDeskripsi}
-              className="mt-2 w-full resize-none bg-transparent text-[14px] leading-[1.6] text-pantau-tulang
-                         placeholder:text-pantau-abu/70 focus:outline-none"
+              className="mt-2.5 w-full resize-none rounded-lg border border-black/[0.12] bg-black/[0.02] p-3 text-[14px] leading-[1.6] text-tinta placeholder:text-tinta/40 transition-all focus:border-[#ff5a26] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#ff5a26] dark:border-white/15 dark:bg-white/[0.04] dark:text-[#f5f5f5] dark:placeholder:text-[#a0a0a0]/70 dark:focus:border-[#ff5a26] dark:focus:bg-black"
             />
           </div>
         </div>
@@ -581,10 +625,10 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
                 <li key={kunci} className="relative">
                   {url && b.type.startsWith("image/") ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={url} alt="" className="size-16 rounded-lg object-cover ring-1 ring-white/15" />
+                    <img src={url} alt="" className="size-16 rounded-lg object-cover ring-1 ring-black/10 dark:ring-white/15" />
                   ) : (
-                    <span className="grid size-16 place-items-center rounded-lg bg-black/40 text-[10px]
-                                     text-pantau-abu ring-1 ring-white/15">
+                    <span className="grid size-16 place-items-center rounded-lg bg-black/[0.04] text-[10px]
+                                     text-tinta/60 ring-1 ring-black/10 dark:bg-black/40 dark:text-pantau-abu dark:ring-white/15">
                       video
                     </span>
                   )}
@@ -593,8 +637,8 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
                     onClick={() => buangBerkas(b)}
                     aria-label={`${teks.hapusBerkas} ${b.name}`}
                     className="cursor-pointer absolute -top-1.5 -right-1.5 grid size-5 place-items-center rounded-full
-                               bg-black/80 text-[11px] text-white ring-1 ring-white/25 transition
-                               hover:bg-black focus-visible:outline-2 focus-visible:outline-white"
+                               bg-black/70 text-[11px] text-white ring-1 ring-black/20 transition
+                               hover:bg-black dark:bg-black/80 dark:ring-white/25 focus-visible:outline-2 focus-visible:outline-white"
                   >
                     ×
                   </button>
@@ -605,7 +649,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
         )}
 
         {galat && (
-          <p role="alert" className="mt-3 text-[12.5px] leading-relaxed text-pantau-bara">
+          <p role="alert" className="mt-3 text-[12.5px] leading-relaxed text-api dark:text-pantau-bara">
             {galat}
           </p>
         )}
@@ -623,9 +667,11 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
             }}
             placeholder={teks.lat}
             aria-label={teks.lat}
-            className="w-[136px] rounded-lg bg-black/40 px-2.5 py-1.5 font-mono text-[12px] text-pantau-tulang
-                       ring-1 ring-white/10 placeholder:text-pantau-abu/60
-                       focus:ring-white/25 focus:outline-none"
+            className="w-[136px] rounded-lg bg-black/[0.04] px-2.5 py-1.5 font-mono text-[12px] text-tinta
+                       ring-1 ring-black/10 placeholder:text-tinta/40
+                       focus:ring-black/20 focus:outline-none
+                       dark:bg-black/40 dark:text-pantau-tulang dark:ring-white/10
+                       dark:placeholder:text-pantau-abu/60 dark:focus:ring-white/25"
           />
           <input
             name="lng"
@@ -637,29 +683,37 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
             }}
             placeholder={teks.lng}
             aria-label={teks.lng}
-            className="w-[136px] rounded-lg bg-black/40 px-2.5 py-1.5 font-mono text-[12px] text-pantau-tulang
-                       ring-1 ring-white/10 placeholder:text-pantau-abu/60
-                       focus:ring-white/25 focus:outline-none"
+            className="w-[136px] rounded-lg bg-black/[0.04] px-2.5 py-1.5 font-mono text-[12px] text-tinta
+                       ring-1 ring-black/10 placeholder:text-tinta/40
+                       focus:ring-black/20 focus:outline-none
+                       dark:bg-black/40 dark:text-pantau-tulang dark:ring-white/10
+                       dark:placeholder:text-pantau-abu/60 dark:focus:ring-white/25"
           />
           <button
             type="button"
             onClick={lokasiSaya}
             disabled={mencariLokasi}
-            className={`cursor-pointer disabled:cursor-not-allowed rounded-full px-3 py-1.5 text-[12.5px] transition disabled:opacity-50
-                        ${aksen.teks} ${aksen.sentuh}
-                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
+            className="flex cursor-pointer disabled:cursor-not-allowed items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] transition disabled:opacity-50
+                       text-tinta/70 hover:bg-black/[0.04] hover:text-tinta
+                       dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white
+                       focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
-            {mencariLokasi ? teks.mencariLokasi : teks.pakaiLokasi}
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"
+                 strokeLinecap="round" strokeLinejoin="round" className="size-4 shrink-0">
+              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span>{mencariLokasi ? teks.mencariLokasi : teks.pakaiLokasi}</span>
           </button>
         </div>
 
         {sumberLokasi === "foto" && (
-          <p className="mt-1.5 text-[11.5px] text-pantau-abu/80">{teks.lokasiDariFoto}</p>
+          <p className="mt-1.5 text-[11.5px] text-tinta/60 dark:text-pantau-abu/80">{teks.lokasiDariFoto}</p>
         )}
 
-        <p className="mt-3 text-[11.5px] leading-relaxed text-pantau-abu/80">{teks.catatanMetadata}</p>
+        <p className="mt-3 text-[11.5px] leading-relaxed text-tinta/60 dark:text-pantau-abu/80">{teks.catatanMetadata}</p>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-black/[0.06] dark:border-white/10 pt-3">
           <input
             ref={berkasRef}
             type="file"
@@ -672,8 +726,9 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
           />
           <label
             htmlFor="komposer-berkas"
-            className={`flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px]
-                        transition ${aksen.teks} ${aksen.sentuh}`}
+            className="flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px]
+                       transition text-tinta/70 hover:bg-black/[0.04] hover:text-tinta
+                       dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"
                  strokeLinecap="round" strokeLinejoin="round" className="size-[18px]">
@@ -690,7 +745,8 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
           </label>
 
           <label className="flex cursor-pointer items-center gap-2 rounded-full px-2.5 py-1.5 text-[12.5px]
-                            text-pantau-abu transition hover:bg-white/5">
+                            text-tinta/70 transition hover:bg-black/[0.04] hover:text-tinta
+                            dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white">
             <Switch
               name="anonim"
               value="1"
@@ -706,7 +762,8 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
             <button
               type="button"
               onClick={() => setTerbuka(false)}
-              className="cursor-pointer rounded-full px-3 py-1.5 text-[12.5px] text-pantau-abu transition hover:text-pantau-tulang
+              className="cursor-pointer rounded-full px-3 py-1.5 text-[12.5px] text-tinta/70 transition hover:bg-black/[0.04] hover:text-tinta
+                         dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white
                          focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
               {ajakan.tutup}
