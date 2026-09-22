@@ -528,13 +528,6 @@ function IkonOrang({ className = "size-6" }: { className?: string }) {
   );
 }
 
-/* Umpan masonry berkolom tetap — pola yang sama dengan MasonryKolom di index:
-   kartu dibagi bergiliran (0,1,2,0,1,2…) ke sejumlah daftar terpisah, lalu
-   daftar-daftar itu dijajar. Sengaja BUKAN CSS `columns`: di sana peramban
-   yang memutuskan isi tiap kolom dan menghitung ulangnya setiap tinggi isi
-   berubah — gambar yang baru termuat melempar kartu ke kolom lain. Di sini
-   penempatan ditentukan indeks, jadi kekal: gambar yang telat hanya mendorong
-   kartu di bawahnya dalam kolom yang sama. */
 /* Seluler atau bukan — cerminan varian aliran/panggung di JS. Snapshot server
    sengaja panggung (kedua rel dirender) supaya markup SSR lengkap; klien
    seluler melepas rel kiri setelah hidrasi. Pola yang sama dengan
@@ -592,10 +585,13 @@ function IkonUlang({ className = "size-7" }: { className?: string }) {
    terakhir dengan tombol putar ulang di tengah — bukan loop.
    Pengurang gerak berarti diam di poster. Poster di lapisan sendiri supaya
    kegagalan putar tak berarti kotak hitam. */
-function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = null, bahasa }: {
-  url: string; poster: string | null; label: string; onBuka: () => void;
+function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, tanpaBuka = false, kredit = null, bahasa }: {
+  url: string; poster: string | null; label: string; onBuka?: () => void;
   /** true di dalam carousel — margin atas milik wadah, bukan tombol. */
   tanpaMt?: boolean;
+  /** true = media murni tampilan, tanpa tombol buka (dipakai halaman detail:
+      videonya sudah berada di tempatnya, mengklik tak boleh membuka apa pun). */
+  tanpaBuka?: boolean;
   /** Nama kredit untuk pil © — null = tanpa pil. */
   kredit?: string | null;
   bahasa: Bahasa;
@@ -669,61 +665,73 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
     el.play().catch(() => {});
   }
 
+  const isiMedia = poster && !posterGagal ? (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={poster} alt="" aria-hidden="true" loading="lazy"
+        onError={() => setPosterGagal(true)}
+        className="lk-foto h-auto w-full"
+      />
+      <video
+        ref={ref}
+        src={url}
+        muted={bisu}
+        playsInline
+        preload="metadata"
+        aria-hidden="true"
+        // SENGAJA tanpa tabIndex: video ini dekoratif di dalam tombol
+        // bernama. Dengan tabIndex={-1} Chrome memindahkan fokus ke
+        // sini saat diklik — lalu browser memblokir aria-hidden karena
+        // fokus tak boleh disembunyikan dari teknologi asistif.
+        onPlay={() => setUsai(false)}
+        onEnded={() => setUsai(true)}
+        onCanPlay={(e) => cobaPutar(e.currentTarget)}
+        onPlaying={() => setSiap(true)}
+        className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-500 ${siap ? "opacity-100" : "opacity-0"}`}
+      />
+    </>
+  ) : (
+    <video
+      ref={ref}
+      src={url}
+      muted={bisu}
+      playsInline
+      preload="metadata"
+      aria-hidden="true"
+      // Tanpa tabIndex seperti cabang berposter di atas: tabIndex={-1}
+      // membuat klik memindahkan fokus ke video aria-hidden ini.
+      onPlay={() => setUsai(false)}
+      onEnded={() => setUsai(true)}
+      onCanPlay={(e) => cobaPutar(e.currentTarget)}
+      onPlaying={() => setSiap(true)}
+      className="lk-foto h-auto w-full"
+    />
+  );
+
   return (
     // Wadah div (bukan button): tombol bisu/ulang bersarang di dalamnya dan
     // button-di-dalam-button tidak valid. Tombol buka-rincian melingkupi
-    // medianya; tombol bisu/ulang menghentikan rambatan supaya tidak ikut
-    // membuka rincian.
+    // medianya kecuali tanpaBuka; tombol bisu/ulang menghentikan rambatan
+    // supaya tidak ikut membuka rincian.
     <div
       className={`lk-foto block w-full${tanpaMt ? "" : " mt-3"}`}
     >
       <span className="relative block">
-        <button
-          type="button"
-          onClick={onBuka}
-          aria-label={label}
-          className="block w-full cursor-pointer transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
-        >
-          {poster && !posterGagal ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={poster} alt="" aria-hidden="true" loading="lazy"
-                onError={() => setPosterGagal(true)}
-                className="lk-foto h-auto w-full"
-              />
-              <video
-                ref={ref}
-                src={url}
-                muted={bisu}
-                playsInline
-                preload="metadata"
-                aria-hidden="true"
-                tabIndex={-1}
-                onPlay={() => setUsai(false)}
-                onEnded={() => setUsai(true)}
-                onCanPlay={(e) => cobaPutar(e.currentTarget)}
-                onPlaying={() => setSiap(true)}
-                className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-500 ${siap ? "opacity-100" : "opacity-0"}`}
-              />
-            </>
-          ) : (
-            <video
-              ref={ref}
-              src={url}
-              muted={bisu}
-              playsInline
-              preload="metadata"
-              aria-hidden="true"
-              tabIndex={-1}
-              onPlay={() => setUsai(false)}
-              onEnded={() => setUsai(true)}
-              onCanPlay={(e) => cobaPutar(e.currentTarget)}
-              onPlaying={() => setSiap(true)}
-              className="lk-foto h-auto w-full"
-            />
-          )}
-        </button>
+        {tanpaBuka || !onBuka ? (
+          <span className="block w-full">
+            {isiMedia}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onBuka}
+            aria-label={label}
+            className="block w-full cursor-pointer transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+          >
+            {isiMedia}
+          </button>
+        )}
         {usai ? (
           <span className="lk-video-ulang-wadah">
             <button
@@ -902,15 +910,62 @@ export function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
   );
 }
 
+/* Titik carousel: pil gelap berisi lajur titik (aktif = pil putih
+   memanjang). Satu salinan dirender di DALAM tiap slide dengan offset lajur
+   yang sama, sehingga yang terlihat selalu menempel di dasar foto aktif.
+   Salinan di slide non-aktif disembunyikan induknya via `inert` +
+   `aria-hidden`. Navigasi lewat seret jari dan ketuk titik — tanpa panah. */
+function TitikPostingan({ jumlah, idx, geser, maks, onPilih, pasangRel }: {
+  jumlah: number; idx: number; geser: number; maks: number;
+  onPilih: (i: number) => void;
+  pasangRel: (el: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div
+      className="lk-postingan-titik"
+      role="group"
+      aria-label={`${idx + 1} / ${jumlah}`}
+    >
+      <div className={`lk-postingan-titik-jendela${jumlah > maks ? " lk-postingan-titik-jendela--geser" : ""}`}>
+        <div
+          ref={pasangRel}
+          className="lk-postingan-titik-rel"
+          style={{ transform: `translateX(${-geser}px)` }}
+        >
+          {Array.from({ length: jumlah }, (_, i) => {
+            const jarak = Math.abs(i - idx);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onPilih(i)}
+                aria-label={`${i + 1} / ${jumlah}`}
+                aria-current={i === idx}
+                tabIndex={jarak > 2 && jumlah > maks ? -1 : undefined}
+                className="lk-postingan-titik-tombol cursor-pointer"
+              >
+                <span
+                  aria-hidden="true"
+                  data-aktif={i === idx}
+                  data-jarak={jarak}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* Tampilan "Postingan" seluler ala IG — dibuka dari tap gambar di umpan
    (desktop langsung ke rincian). Bilah kembali + judul, baris penulis,
    media selebar layar (dots ketuk, tanpa geser), baris aksi (suka
    perangkat-lokal, komentar, bagikan), caption + selengkapnya + tanggal. */
-export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomentar, statis = false }: {
+export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, statis = false }: {
   laporan: Laporan;
   bahasa: Bahasa;
   onTutup: () => void;
-  onBuka: () => void;
   onKomentar: () => void;
   /** true di halaman detail tersendiri: mengalir normal, bukan overlay fixed. */
   statis?: boolean;
@@ -919,7 +974,18 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
   const [idx, setIdx] = useState(0);
   const [tersalin, setTersalin] = useState(false);
   const [descPenuh, setDescPenuh] = useState(false);
-  const sentuh = useRef<{ x: number; y: number } | null>(null);
+  /* Geser ikut-jari ala IG: transform trek ditulis LANGSUNG ke DOM selama
+     jari menempel (tanpa lewat state → tanpa re-render per frame, jadi
+     60fps), dan lajur titik ikut "jalan" mengikuti kemajuan seret. State
+     `idx` hanya berubah saat jari dilepas (snap) atau titik/panah ditekan. */
+  const wadahRef = useRef<HTMLDivElement | null>(null);
+  const trekRef = useRef<HTMLDivElement | null>(null);
+  const relRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const sentuh = useRef<{
+    x: number; y: number; id: number; idxAwal: number; lebar: number;
+    dx: number; tAkhir: number; kec: number;
+  } | null>(null);
   // Jumlah komentar untuk angka di samping ikon — diambil sekali saat buka.
   const [jumlahKomentar, setJumlahKomentar] = useState<number | null>(null);
   useEffect(() => {
@@ -963,11 +1029,103 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
     ? l.galeri
     : [{ url: "", jenis: "gambar" as const }];
   const n = items.length;
-  const aktif = items[Math.min(idx, n - 1)];
+  /* Lajur titik: jendela 5 langkah (LANGKAH = lebar tombol 24 + gap 5).
+     Sengaja TIDAK menengah (bukan pos-2): offset hanya bergeser saat titik
+     aktif mau keluar jendela, sehingga titiknya terlihat BERJALAN dari slot
+     ke slot sampai ujung — bukan diam di tengah sementara latarnya yang
+     bergeser. Maju: berjalan 0→4 lalu lajur mengantar sampai titik terakhir;
+     mundur sebaliknya. Saat jari menempel, offset ditulis langsung ke DOM
+     mengikuti kemajuan seret (lihat tulisSeret) supaya lajurnya ikut gerak. */
+  const LANGKAH_TITIK = 29;
+  const MAKS_TITIK = 5;
+  const offsetTitik = useCallback((pos: number) => (
+    n <= MAKS_TITIK ? 0 : Math.min(Math.max(pos - (MAKS_TITIK - 1), 0), n - MAKS_TITIK) * LANGKAH_TITIK
+  ), [n]);
+  /* Posisi yang ditunjukkan titik — TERTINGGAL satu langkah dari foto saat
+     pindah lewat ketuk: foto meluncur dulu (380ms), titik baru berjalan
+     menyusul setelah foto tiba. Tanpa jeda ini, geseran lajur 29px tertutup
+     gerakan trek ratusan px dan tak terlihat ("tidak ada animasi geser").
+     Saat pindah lewat seret-jari, lajur sudah terlihat ikut bergerak selama
+     seret (tulisSeret), jadi keduanya diperbarui sekaligus saat dilepas. */
+  const [idxTitik, setIdxTitik] = useState(0);
+  const tundaTitik = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geserTitik = offsetTitik(idxTitik);
+
+  const pergiKe = useCallback((i: number) => {
+    const tuju = ((i % n) + n) % n;
+    setIdx(tuju);
+    if (tundaTitik.current) clearTimeout(tundaTitik.current);
+    // Samakan dengan durasi snap trek (380ms); gerak dikurangi = langsung.
+    const jeda = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 380;
+    tundaTitik.current = setTimeout(() => setIdxTitik(tuju), jeda);
+  }, [n]);
+
+  /* Bersihkan timer tunda-titik saat dibongkar. (Komponen ini selalu
+     dipasang ulang per laporan, jadi tak perlu reset idx saat l.id berubah.) */
+  useEffect(() => () => {
+    if (tundaTitik.current) clearTimeout(tundaTitik.current);
+  }, []);
+
+  /* Wadah memeluk tinggi slide AKTIF — bukan slide tertinggi. Tanpa ini,
+     galeri campur lanskap + potrait menyisakan lembah hitam sebesar selisih
+     tingginya di bawah foto pendek. ResizeObserver menangkap foto yang baru
+     selesai dimuat (tinggi 0 → penuh) dan rotasi layar; transisi height di
+     CSS menganimasikannya berbarengan dengan luncuran trek. */
+  useEffect(() => {
+    const wadah = wadahRef.current;
+    const slide = slideRefs.current[idx];
+    if (!wadah || !slide) return;
+    const terapkan = () => {
+      const tinggi = slide.offsetHeight;
+      if (tinggi > 0) wadah.style.height = `${tinggi}px`;
+    };
+    terapkan();
+    if (typeof ResizeObserver === "undefined") return;
+    const amati = new ResizeObserver(terapkan);
+    amati.observe(slide);
+    return () => amati.disconnect();
+  }, [idx, n]);
+
+  /* Tulis posisi seret langsung ke DOM (trek + semua salinan lajur titik)
+     tanpa re-render — syarat 60fps saat jari bergerak. */
+  const tulisSeret = useCallback((dx: number, idxAwal: number, lebar: number) => {
+    const trek = trekRef.current;
+    if (trek) {
+      trek.style.transition = "none";
+      trek.style.transform = `translateX(${-idxAwal * lebar + dx}px)`;
+    }
+    const dasar = offsetTitik(idxAwal - dx / lebar);
+    for (const rel of [...relRefs.current]) {
+      if (!rel) continue;
+      rel.style.transition = "none";
+      rel.style.transform = `translateX(${-dasar}px)`;
+    }
+  }, [offsetTitik]);
+
+  /* Kembalikan kendali ke React (state idx) — transisi CSS menganimasikan
+     snap dari posisi jari ke slide tujuan. */
+  const lepasSeret = useCallback(() => {
+    const trek = trekRef.current;
+    if (trek) {
+      trek.style.transition = "";
+      trek.style.transform = "";
+    }
+    for (const rel of [...relRefs.current]) {
+      if (!rel) continue;
+      rel.style.transition = "";
+      rel.style.transform = "";
+    }
+  }, []);
 
   useEffect(() => {
     const saatTombol = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onTutup();
+      if (e.key === "Escape") {
+        onTutup();
+        return;
+      }
+      if (n < 2) return;
+      if (e.key === "ArrowLeft") pergiKe(idx - 1);
+      if (e.key === "ArrowRight") pergiKe(idx + 1);
     };
     window.addEventListener("keydown", saatTombol);
     // Kunci badan hanya mode overlay — varian halaman (statis) harus bisa
@@ -981,7 +1139,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
       window.removeEventListener("keydown", saatTombol);
       document.body.style.overflow = limpahan;
     };
-  }, [onTutup, statis]);
+  }, [onTutup, statis, n, idx, pergiKe]);
 
   async function bagikan() {
     const tautan = `${window.location.origin}${l.href}`;
@@ -1014,50 +1172,130 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
       </div>
 
       <div
+        ref={wadahRef}
         className="lk-postingan-media"
         onTouchStart={(e) => {
+          if (n < 2) return;
           const s = e.touches[0];
-          sentuh.current = { x: s.clientX, y: s.clientY };
+          sentuh.current = {
+            x: s.clientX, y: s.clientY, id: s.identifier,
+            idxAwal: idx, lebar: wadahRef.current?.clientWidth || 320,
+            dx: 0, tAkhir: performance.now(), kec: 0,
+          };
         }}
-        onTouchEnd={(e) => {
+        onTouchMove={(e) => {
           const awal = sentuh.current;
-          sentuh.current = null;
           if (!awal || n < 2) return;
-          const s = e.changedTouches[0];
-          const dx = s.clientX - awal.x;
-          const dy = s.clientY - awal.y;
-          if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-            setIdx((i) => (i + (dx < 0 ? 1 : -1) + n) % n);
+          for (const s of Array.from(e.touches)) {
+            if (s.identifier !== awal.id) continue;
+            const dxMentah = s.clientX - awal.x;
+            const dy = s.clientY - awal.y;
+            // Gerak vertikal dominan = niat menggulir halaman — batalkan seret
+            // supaya scroll vertikal tetap mulus dan tidak tertahan.
+            if (Math.abs(dy) > Math.abs(dxMentah) * 1.5 && Math.abs(dy) > 12) {
+              sentuh.current = null;
+              lepasSeret();
+              return;
+            }
+            // Tahanan di tepi (bagi 3) supaya ujung trek terasa "kenyal",
+            // bukan mati — pola yang sama dengan carousel native.
+            let dx = dxMentah;
+            if ((awal.idxAwal === 0 && dx > 0) || (awal.idxAwal === n - 1 && dx < 0)) dx = dxMentah / 3;
+            dx = Math.max(-awal.lebar, Math.min(awal.lebar, dx));
+            // Kecepatan sentuh (px/ms, dihaluskan) untuk jentikan cepat.
+            const kini = performance.now();
+            const dt = Math.max(1, kini - awal.tAkhir);
+            awal.kec = 0.8 * awal.kec + 0.2 * ((dx - awal.dx) / dt);
+            awal.tAkhir = kini;
+            awal.dx = dx;
+            tulisSeret(dx, awal.idxAwal, awal.lebar);
           }
         }}
+        onTouchEnd={() => {
+          const awal = sentuh.current;
+          sentuh.current = null;
+          if (!awal || n < 2) {
+            lepasSeret();
+            return;
+          }
+          const ambang = Math.max(48, awal.lebar * 0.12);
+          // Jentikan cepat (>0.5px/ms, sejauh >24px) ikut pindah walau belum
+          // sampai ambang — seperti carousel native.
+          const jentik = Math.abs(awal.kec) > 0.5 && Math.abs(awal.dx) > 24
+            ? Math.sign(awal.kec)
+            : 0;
+          lepasSeret();
+          // Lajur sudah terlihat ikut bergerak selama seret, jadi titik
+          // diperbarui sekaligus — tanpa jeda susulan seperti jalur ketuk.
+          if (tundaTitik.current) clearTimeout(tundaTitik.current);
+          if (awal.dx <= -ambang || jentik < 0) {
+            const tuju = (awal.idxAwal + 1) % n;
+            setIdx(tuju);
+            setIdxTitik(tuju);
+          } else if (awal.dx >= ambang || jentik > 0) {
+            const tuju = ((awal.idxAwal - 1) % n + n) % n;
+            setIdx(tuju);
+            setIdxTitik(tuju);
+          }
+        }}
+        onTouchCancel={() => {
+          sentuh.current = null;
+          lepasSeret();
+        }}
       >
-        {aktif.jenis === "video" ? (
-          <VideoOtomatis url={aktif.url} poster={aktif.poster ?? l.gambar} label={l.judul} onBuka={onBuka} tanpaMt kredit={aktif.keterangan ?? "anonim"} bahasa={bahasa} />
-        ) : aktif.url ? (
-          <span className="lk-media-statis">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={aktif.url} alt={l.alt} className="lk-postingan-foto" />
-            <span aria-hidden="true" className="lk-kredit">
-              ©&nbsp;{aktif.keterangan ?? "anonim"}
-            </span>
-          </span>
-        ) : null}
-        {n > 1 && (
-          <div className="lk-postingan-titik" role="group" aria-label={`${idx + 1} / ${n}`}>
-            {items.map((m, i) => (
-              <button
-                key={`${m.url}-${i}`}
-                type="button"
-                onClick={() => setIdx(i)}
-                aria-label={`${i + 1} / ${n}`}
-                aria-current={i === idx}
-                className="lk-postingan-titik-tombol cursor-pointer"
-              >
-                <span aria-hidden="true" data-aktif={i === idx} />
-              </button>
-            ))}
-          </div>
-        )}
+        <div
+          ref={trekRef}
+          className="lk-postingan-trek"
+          style={{ transform: `translateX(${-idx * 100}%)` }}
+        >
+          {items.map((m, i) => (
+            <div
+              key={`${m.url}-${i}`}
+              ref={(el) => {
+                slideRefs.current[i] = el;
+              }}
+              className="lk-postingan-slide"
+              aria-hidden={i !== idx}
+              inert={i !== idx}
+            >
+              {m.jenis === "video" ? (
+                <VideoOtomatis url={m.url} poster={m.poster ?? l.gambar} label={l.judul} tanpaMt tanpaBuka kredit={m.keterangan ?? "anonim"} bahasa={bahasa} />
+              ) : m.url ? (
+                <span className="lk-media-statis">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={m.url}
+                    alt={l.alt}
+                    className="lk-postingan-foto"
+                    loading={Math.abs(i - idx) > 1 ? "lazy" : "eager"}
+                    draggable={false}
+                  />
+                  <span aria-hidden="true" className="lk-kredit">
+                    ©&nbsp;{m.keterangan ?? "anonim"}
+                  </span>
+                </span>
+              ) : null}
+              {/* Titik menempel di tiap slide (bukan overlay wadah): tinggi tiap
+                 foto beda-beda, dan tinggi wadah = slide tertinggi — overlay
+                 wadah jatuh di lembah hitam jauh di bawah foto aktif sehingga
+                 tak terbaca. Salinan di slide non-aktif ikut `inert` + 
+                 `aria-hidden` induknya, jadi tak bisa difokus maupun terbaca
+                 teknologi asistif. */}
+              {n > 1 && (
+                <TitikPostingan
+                  jumlah={n}
+                  idx={idxTitik}
+                  geser={geserTitik}
+                  maks={MAKS_TITIK}
+                  onPilih={pergiKe}
+                  pasangRel={(el) => {
+                    relRefs.current[i] = el;
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="lk-postingan-aksi">
@@ -1167,6 +1405,13 @@ export function LembarKomentar({ id, bahasa, onTutup }: {
   );
 }
 
+/* Umpan masonry berkolom tetap — pola yang sama dengan MasonryKolom di index:
+   kartu dibagi bergiliran (0,1,2,0,1,2…) ke sejumlah daftar terpisah, lalu
+   daftar-daftar itu dijajar. Sengaja BUKAN CSS `columns`: di sana peramban
+   yang memutuskan isi tiap kolom dan menghitung ulangnya setiap tinggi isi
+   berubah — gambar yang baru termuat melempar kartu ke kolom lain. Di sini
+   penempatan ditentukan indeks, jadi kekal: gambar yang telat hanya mendorong
+   kartu di bawahnya dalam kolom yang sama. */
 function UmpanMasonry({ daftar, kolom, kartu }: {
   daftar: Laporan[];
   kolom: number;

@@ -17,7 +17,6 @@ type Props = {
   aktif: boolean;
   kurangiGerak: boolean;
   className: string;
-  onBuka: () => void;
 };
 
 /* Poster yang pernah selesai dimuat di sesi halaman ini. Kartu di-mount ulang
@@ -34,10 +33,11 @@ const posterTermuat = new Set<string>();
  * komponen mengurus semua kartu sekaligus. Di sini tiap video memegang
  * keadaannya sendiri, jadi tidak ada kunci yang perlu dijaga tetap selaras.
  */
-export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className, onBuka }: Props) {
+export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className }: Props) {
   const ref = useRef<HTMLVideoElement | null>(null);
   const [durasi, setDurasi] = useState("");
   const [usai, setUsai] = useState(false);
+  const [jalan, setJalan] = useState(false);
   const [siap, setSiap] = useState(() => (poster ? posterTermuat.has(poster) : false));
   // timeupdate menembak ~4x/detik; tulis state hanya saat angka detik yang
   // tampil benar-benar berganti supaya tidak render ulang terus-menerus.
@@ -99,18 +99,40 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
     el.play().catch(() => {});
   }, []);
 
+  /* Klik badan video = putar/jeda di tempat — SENGAJA tidak membuka pop-up
+     rincian: korsel ini tinggal DI DALAM halaman detail (/fire/[slug]),
+     jadi membuka rincian dari sini hanya menumpuk pop-up yang sama di atas
+     halaman yang sama. Foto kartu tetap membuka rincian seperti semula.
+     Dilewati saat kurangiGerak: kendali bawaan sudah tampil dan klik badan
+     ditangani peramban sendiri — toggle ganda akan saling meniadakan. */
+  const alih = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (kurangiGerak) return;
+    const el = ref.current;
+    if (!el || !aktif) return;
+    if (el.paused || el.ended) {
+      if (el.ended) {
+        setUsai(false);
+        el.currentTime = 0;
+      }
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+    }
+  }, [aktif, kurangiGerak]);
+
   return (
     <>
       <video
         ref={ref}
         src={src}
         poster={poster ?? undefined}
-        aria-label={label}
         controls={kurangiGerak}
         muted
         playsInline
         preload={poster ? "none" : "metadata"}
-        onPlay={() => setUsai(false)}
+        onPlay={() => { setUsai(false); setJalan(true); }}
+        onPause={() => setJalan(false)}
         onLoadedMetadata={() => {
           catat();
           // Mode kurangi gerak tidak memutar otomatis — menunggu canplay
@@ -120,9 +142,10 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className,
         }}
         onCanPlay={() => setSiap(true)}
         onTimeUpdate={catat}
-        onEnded={() => { setUsai(true); catat(); }}
-        onClick={(e) => { if (aktif) { e.stopPropagation(); onBuka(); } }}
-        className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"}`}
+        onEnded={() => { setUsai(true); setJalan(false); catat(); }}
+        onClick={alih}
+        aria-label={jalan ? `Jeda video: ${label}` : `Putar video: ${label}`}
+        className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"} cursor-pointer`}
       />
 
       {/* Kerangka pemuatan: menutupi kotak selama video/poster belum siap.
