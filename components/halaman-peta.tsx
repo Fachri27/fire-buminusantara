@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import { useTerpasang } from "@/hooks/use-mounted";
 import type { Berita } from "@/lib/events";
 import type { KabupatenTerluas } from "@/lib/wms";
 import { BAHASA, TEKS_PETA, type Bahasa } from "@/lib/bahasa";
@@ -66,10 +67,7 @@ export function HalamanPeta({
 }) {
   const teks = TEKS_PETA[bahasa];
   const { resolvedTheme } = useTheme();
-  const [terpasang, setTerpasang] = useState(false);
-  useEffect(() => {
-    setTerpasang(true);
-  }, []);
+  const terpasang = useTerpasang();
   const temaGelap = terpasang ? resolvedTheme === "dark" : true;
   const [wilayah, setWilayah] = useState<WilayahDipilih | null>(null);
   // Laporan yang pop-up rinciannya terbuka, atau null — sama seperti beranda.

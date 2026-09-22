@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { BAHASA, TEKS_NAV, type Bahasa } from "@/lib/bahasa";
 import { SakelarTema } from "@/components/sakelar-tema";
+import { useMounted } from "@/hooks/use-mounted";
 
 /** Bagian halaman yang bisa dituju dari bilah ini — dua layar utama. */
 const BAGIAN = ["beranda", "peta"] as const;
@@ -69,16 +70,12 @@ function IkonSilang({ className = "size-5" }: { className?: string }) {
 export function Nav({ bahasa, gelap = false, cari }: Props) {
   const teks = TEKS_NAV[bahasa];
   const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [aktif, setAktif] = useState<string>(BAGIAN[0]);
   const [tergulir, setTergulir] = useState(false);
   /** Menu hamburger di layar kecil — tautan bagian pindah ke sini. */
   const [menuTerbuka, setMenuTerbuka] = useState(false);
   const lokasi = usePathname();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const temaGelap = mounted ? resolvedTheme === "dark" : gelap;
 

@@ -6,6 +6,7 @@ import { PULAU_TAB, tabDariPulau, waktuIso, waktuTeks } from "@/lib/tanggal";
 import { PROVINSI_KE_PULAU } from "@/lib/wilayah";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useTheme } from "next-themes";
+import { useMounted } from "@/hooks/use-mounted";
 import type { Berita } from "@/lib/events";
 import type { ItemMedia } from "@/lib/media";
 
@@ -50,10 +51,7 @@ export function PopupPeta({
   gelap: gelapProp,
 }: Props) {
   const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
   const isDark = mounted ? resolvedTheme === "dark" : Boolean(gelapProp);
 
   const panelRef = useRef<HTMLDivElement | null>(null);

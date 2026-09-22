@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { TEKS_NAV, type Bahasa } from "@/lib/bahasa";
+import { useMounted } from "@/hooks/use-mounted";
 
 type Props = {
   bahasa: Bahasa;
@@ -53,11 +53,7 @@ function IkonBulan({ className = "size-4" }: { className?: string }) {
  */
 export function SakelarTema({ bahasa, gelap = false, className = "" }: Props) {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   const teks = TEKS_NAV[bahasa];
   const isDark = mounted ? resolvedTheme === "dark" : gelap;
