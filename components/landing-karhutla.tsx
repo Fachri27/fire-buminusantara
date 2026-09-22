@@ -2763,12 +2763,17 @@ export function LandingKarhutla(
               terhadap peta. Kartu diberi min-w-0 + padding ramping supaya angka
               tidak meluap di rel sempit. */}
           <dl className="mx-4 mt-4 grid grid-cols-2 gap-3">
+            {/* Ukuran teks ditakar untuk KETERANGAN TIGA BARIS: keterangan kini
+                membawa rentang sekaligus sumbernya dalam kurung. Dengan ukuran
+                sebelumnya (angka s/d 32px, keterangan 13px, py-6) isi rel
+                meluber 31px di 1440x900 dan kaki halaman terpotong — rel boleh
+                menggulir di layar pendek, tapi di ukuran desain tak perlu. */}
             {daftarStatistik.map((s, idx) => (
-              <div key={s.keterangan || idx} className="flex min-w-0 flex-col justify-center rounded-2xl bg-[#1e1e1e] px-3 py-6 text-center">
-                <dd className="lk-angka order-1 text-[clamp(20px,1.8vw,32px)] leading-tight font-medium text-[#f5f5f5]">
+              <div key={s.keterangan || idx} className="flex min-w-0 flex-col justify-center rounded-2xl bg-[#1e1e1e] px-3 py-5 text-center">
+                <dd className="lk-angka order-1 text-[clamp(18px,1.5vw,28px)] leading-tight font-medium text-[#f5f5f5]">
                   {s.nilai}
                 </dd>
-                <dt className="order-2 mt-2 text-[12px] leading-tight font-medium text-balance sm:text-[13px] text-[#a0a0a0]">
+                <dt className="order-2 mt-1.5 text-[11px] leading-tight font-medium text-balance sm:text-[12px] text-[#a0a0a0]">
                   {s.keterangan}
                 </dt>
               </div>
