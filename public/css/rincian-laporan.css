@@ -1918,16 +1918,21 @@ html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
 /* --- Geser tegak antar-laporan (ponsel) ----------------------------------
    Panel mengikuti jari (transform ditulis dari gunakanGeserLaporan) dan
    pratinjau laporan tetangga menempel tepat di atas/bawahnya. Latar overlay
-   dipekatkan jadi hitam penuh: saat panel bergeser, celah di belakangnya
-   tidak boleh memperlihatkan halaman yang redup — rasanya harus satu gulungan
-   media yang sambung-menyambung. */
+   dipekatkan jadi warna alas media (--r-hitam: putih di tema terang, hitam di
+   tema gelap): saat panel bergeser, celah di belakangnya tidak boleh
+   memperlihatkan halaman yang redup — rasanya harus satu gulungan media yang
+   sambung-menyambung. */
 .rincian__hantu {
   display: none;
 }
 
 @media (max-width: 860px) {
+  /* !important: aturan tema gelap (`html.dark .rincian`, dst.) lebih spesifik
+     dan menulis latar semi-transparannya sendiri — di ponsel pop-up ini
+     lembar penuh, jadi latar redup itu hanya terlihat sebagai celah saat
+     panel digeser. */
   .rincian {
-    background: var(--r-hitam);
+    background: var(--r-hitam) !important;
   }
 
   .rincian__panel {
