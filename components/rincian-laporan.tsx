@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type Ref } from "react";
+import Image from "next/image";
 import { gunakanKomentar } from "@/hooks/gunakan-komentar";
+import { gunakanGeserLaporan } from "@/hooks/gunakan-geser-laporan";
 import { useKurangiGerak, usePonsel } from "@/hooks/use-media-query";
 import type { Bahasa } from "@/lib/bahasa";
 import type { Berita } from "@/lib/events";
+import { mediaLokal } from "@/lib/media";
 import { UlasanKomentar, FormulirKomentar } from "./kolom-komentar";
-import { SliderRincian } from "./slider-rincian";
+import { RASIO_MEDIA, SliderRincian, UKURAN_GAMBAR_RINCIAN } from "./slider-rincian";
 
 export type RincianNavProps = {
   onSebelumnya?: () => void;
@@ -15,6 +18,10 @@ export type RincianNavProps = {
   adaBerikutnya?: boolean;
   indeksAktif?: number;
   totalKejadian?: number;
+  /** Laporan tetangga — pratinjaunya mengintip dari tepi layar saat panel
+   *  digeser tegak di ponsel. Kosong = geseran ke arah itu hanya melar. */
+  beritaSebelumnya?: Berita;
+  beritaBerikutnya?: Berita;
 };
 
 /** Pop-up rincian laporan, dengan kolom komentar di rel kanan dan tombol bagikan. */
@@ -29,6 +36,8 @@ export function RincianLaporan({
   adaBerikutnya = false,
   indeksAktif,
   totalKejadian,
+  beritaSebelumnya,
+  beritaBerikutnya,
 }: {
   berita: Berita;
   bahasa?: Bahasa;
@@ -57,6 +66,17 @@ export function RincianLaporan({
     if (kurangiGerak) { onTutup(); return; }
     setKeluar(true);
   }, [kurangiGerak, onTutup]);
+
+  // Geser tegak antar-laporan di ponsel (seperti umpan video pendek).
+  // Dimatikan selama lembar komentar terbuka — geseran di sana milik daftar
+  // komentarnya — dan selama panel sedang ditutup.
+  const { panelRef, relRef, hantuAtasRef, hantuBawahRef } = gunakanGeserLaporan({
+    aktif: ponsel && !sheetKomentar && !keluar,
+    kunci: berita.id,
+    onSebelumnya: adaSebelumnya ? onSebelumnya : undefined,
+    onBerikutnya: adaBerikutnya ? onBerikutnya : undefined,
+    kurangiGerak,
+  });
 
   const {
     daftar, memuat, mengirim, galat,
@@ -160,6 +180,7 @@ export function RincianLaporan({
         role="dialog"
         aria-modal="true"
         aria-label="Rincian laporan karhutla"
+        ref={panelRef}
         className="rincian__panel bg-white text-tinta border-black/[0.08] dark:bg-[#14100f] dark:text-[#f5f5f5] dark:border-white/10 cursor-default"
       >
         {toastTersalin && (
@@ -187,7 +208,7 @@ export function RincianLaporan({
           )}
         </div>
 
-        <div className="rincian__rel" data-lenis-prevent>
+        <div ref={relRef} className="rincian__rel" data-lenis-prevent>
           <div className="rincian__kepala">
             <p className="rincian__tanggal">{berita.tanggal}</p>
 
@@ -317,6 +338,17 @@ export function RincianLaporan({
 
       </div>
 
+      {/* Pratinjau laporan tetangga (ponsel): menempel tepat di atas dan di
+          bawah panel, ikut bergeser bersama jari. Bentuknya meniru panel —
+          media di atas, tanggal dan judul di rel — supaya saat laporan asli
+          menggantikannya di posisi yang sama, pergantiannya tidak terlihat. */}
+      {ponsel && beritaSebelumnya && adaSebelumnya && (
+        <PratinjauTetangga ref={hantuAtasRef} berita={beritaSebelumnya} arah="atas" />
+      )}
+      {ponsel && beritaBerikutnya && adaBerikutnya && (
+        <PratinjauTetangga ref={hantuBawahRef} berita={beritaBerikutnya} arah="bawah" />
+      )}
+
       {/* Indikator nomor urut kejadian di desktop */}
       {indeksAktif !== undefined && totalKejadian && (
         <div aria-hidden="true" className="rincian__indeks-desktop">
@@ -421,6 +453,61 @@ export function RincianLaporan({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function PratinjauTetangga({
+  ref,
+  berita,
+  arah,
+}: {
+  ref: Ref<HTMLDivElement>;
+  berita: Berita;
+  arah: "atas" | "bawah";
+}) {
+  // Gambar yang ditampilkan HARUS berasal dari URL yang sama persis dengan
+  // slide pertama panel asli — foto lokal lewat optimizer next/image dengan
+  // `sizes` yang sama, video lewat posternya — supaya saat pratinjau ini
+  // digantikan, panel asli mendapati fotonya sudah di tembolok dan tak
+  // menampilkan kerangka pemuatan.
+  const pertama = berita.media[0];
+  const src = pertama
+    ? pertama.jenis === "video" ? (pertama.poster ?? berita.poster) : pertama.url
+    : (berita.gambar ?? berita.poster);
+  const lewatOptimizer = !!pertama && pertama.jenis === "gambar" && mediaLokal(pertama.url);
+  const rasioAwal = pertama ? RASIO_MEDIA.get(pertama.url) : undefined;
+  // Tinggi kotak pratinjau mengikuti rasio fotonya, persis seperti kotak
+  // media panel asli. Rasio yang terbaca dicatat ke RASIO_MEDIA atas nama
+  // media pertama laporan itu (untuk video: rasio posternya), supaya slider
+  // panel asli langsung memakai tinggi yang sama begitu menggantikan
+  // pratinjau ini. Ditulis ke gaya elemen, bukan state — rasionya baru ada
+  // setelah foto dimuat, dan render ulang hanya untuk ini tak sebanding.
+  const catatRasio = (el: HTMLImageElement | null) => {
+    if (!el || !el.naturalWidth || !el.naturalHeight) return;
+    const rasio = el.naturalWidth / el.naturalHeight;
+    if (pertama && !RASIO_MEDIA.has(pertama.url)) RASIO_MEDIA.set(pertama.url, rasio);
+    el.parentElement?.style.setProperty("--rasio-media", String(RASIO_MEDIA.get(pertama?.url ?? "") ?? rasio));
+  };
+  return (
+    <div ref={ref} aria-hidden="true" className={`rincian__hantu rincian__hantu--${arah}`}>
+      <div
+        className="rincian__hantu-media"
+        style={rasioAwal ? ({ "--rasio-media": rasioAwal } as React.CSSProperties) : undefined}
+      >
+        {src && (lewatOptimizer ? (
+          <Image src={src} alt="" fill sizes={UKURAN_GAMBAR_RINCIAN} loading="eager"
+            ref={catatRasio} onLoad={(e) => catatRasio(e.currentTarget)} />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element -- URL media remote/poster, sama dengan yang dimuat panel asli
+          <img src={src} alt="" loading="eager" decoding="async"
+            ref={catatRasio} onLoad={(e) => catatRasio(e.currentTarget)} />
+        ))}
+      </div>
+      <div className="rincian__hantu-rel">
+        <p className="rincian__tanggal">{berita.tanggal}</p>
+        <p className="rincian__judul">{berita.judul}</p>
+      </div>
     </div>
   );
 }

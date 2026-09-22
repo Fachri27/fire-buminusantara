@@ -304,34 +304,63 @@ body:has(.rincian) .lk-tabbar {
   width: 100%;
   height: 100%;
   z-index: 2;
-  background: linear-gradient(150deg, #e4e4e7, #f4f5f7);
-  animation: denyut-rincian 1.5s ease-in-out infinite;
-  transition: opacity 300ms ease, visibility 300ms ease;
+  /* Visibility baru berubah SETELAH pudar selesai (jeda 300ms), supaya
+     elemen tetap bisa ditangkap transisi opacity-nya. */
+  transition: opacity 300ms ease, visibility 0s linear 300ms;
   pointer-events: none;
 }
 
-.rincian--gelap .rincian__kerangka,
-.dark .rincian .rincian__kerangka,
-html.dark .rincian .rincian__kerangka,
-[data-theme="dark"] .rincian .rincian__kerangka {
+/* Gradasi dan denyutnya tinggal di lapisan ::before, BUKAN di elemennya.
+   Dulu denyut menganimasikan opacity elemen ini sendiri — animasi selalu
+   menang atas deklarasi biasa, jadi `.tutup { opacity: 0 }` tak pernah
+   berlaku: kerangka bertahan pekat 300ms penuh (menunggu visibility) lalu
+   hilang mendadak. Saat laporan digeser tegak, itu tampak sebagai kilasan
+   gelap di atas foto yang sebenarnya sudah siap.
+
+   Lapisannya juga baru muncul setelah 150ms. Foto yang sudah di tembolok
+   (dimuat pratinjau geser, atau dibuka ulang) siap jauh sebelum itu, jadi
+   kerangkanya tak pernah terlihat; kerangka hanya tampil untuk media yang
+   memang masih diunduh. */
+.rincian__kerangka::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(150deg, #e4e4e7, #f4f5f7);
+  animation:
+    kerangka-rincian-muncul 200ms ease-out 150ms both,
+    denyut-rincian 1.5s ease-in-out 350ms infinite;
+}
+
+.rincian--gelap .rincian__kerangka::before,
+.dark .rincian .rincian__kerangka::before,
+html.dark .rincian .rincian__kerangka::before,
+[data-theme="dark"] .rincian .rincian__kerangka::before {
   background: linear-gradient(150deg, #18181b, #27272a);
 }
 
-/* Siap: memudar halus tanpa menyentak (tidak memakai animation:none agar
-   opacity tidak mendadak meloncat ke 100% saat memudar). */
 .rincian__kerangka.tutup {
   opacity: 0;
   visibility: hidden;
 }
 
+@keyframes kerangka-rincian-muncul {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Denyut lewat kecerahan, bukan opacity — opacity lapisan ini sudah dipakai
+   animasi munculnya. Di atas alas hitam hasilnya sama: gradasinya meredup. */
 @keyframes denyut-rincian {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(0.45); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .rincian__kerangka {
     transition: none;
+  }
+
+  .rincian__kerangka::before {
     animation: none;
   }
 }
@@ -1601,9 +1630,21 @@ html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
     border-radius: 0;
   }
 
+  /* Tinggi kotak media mengikuti rasio slide aktif: lebar layar ÷ rasio,
+     dibatasi 48svh. Foto mendatar mendapat kotak yang lebih pendek dan tampil
+     utuh — tanpa bilah hitam, tanpa dipotong; foto tegak mentok di 48svh.
+     --rasio-media ditulis slider (dan diingat per URL di RASIO_MEDIA), jadi
+     tingginya sudah benar sejak bingkai pertama ketika laporan berganti.
+     Sebelum rasionya diketahui, kotak memakai tinggi penuh 48svh — tidak
+     pernah runtuh ke 0 (penyebab rel melompat saat pindah laporan). */
   .rincian__media {
+    height: auto;
     max-height: 48svh;
     border-radius: 0;
+  }
+
+  .rincian__slider-wadah {
+    height: min(48svh, calc(100vw / var(--rasio-media, 0.001)));
   }
 
   /* Gerak masuknya ikut jadi gerak lembar: panelnya memang lembar penuh di
@@ -1649,8 +1690,11 @@ html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
     max-height: none;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    /* Geseran di rel tidak meneruskan gulir ke halaman di belakangnya. */
-    overscroll-behavior: contain;
+    /* Geseran di rel tidak meneruskan gulir ke halaman di belakangnya, dan
+       tanpa pantulan di tepinya: di tepi itulah geseran tegak berpindah jadi
+       milik panel (pindah laporan) — pantulan iOS di sana ikut bergerak
+       bersama panel dan terasa tersendat. */
+    overscroll-behavior: none;
   }
 
   /* Kolom komentar versi desktop disembunyikan lewat CSS, bukan hanya lewat
@@ -1894,3 +1938,93 @@ html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
   }
 }
 
+
+/* --- Geser tegak antar-laporan (ponsel) ----------------------------------
+   Panel mengikuti jari (transform ditulis dari gunakanGeserLaporan) dan
+   pratinjau laporan tetangga menempel tepat di atas/bawahnya. Latar overlay
+   dipekatkan jadi hitam penuh: saat panel bergeser, celah di belakangnya
+   tidak boleh memperlihatkan halaman yang redup — rasanya harus satu gulungan
+   media yang sambung-menyambung. */
+.rincian__hantu {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .rincian {
+    background: var(--r-hitam);
+  }
+
+  .rincian__panel {
+    /* Browser tidak ikut menggulir/menarik-segarkan saat panel diseret tegak;
+       geseran mendatar (slider media) dan cubit-zoom tetap milik peramban. */
+    touch-action: pan-x pinch-zoom;
+    will-change: transform;
+  }
+
+  /* Rel yang panjang masih harus bisa digulir secara native. */
+  .rincian__rel {
+    touch-action: pan-y pinch-zoom;
+  }
+
+  .rincian__hantu {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    /* Sama dengan jarak media–rel pada .rincian__panel. */
+    gap: clamp(8px, 1vw, 14px);
+    background: var(--r-hitam);
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .rincian__hantu--atas {
+    transform: translate3d(0, -100%, 0);
+  }
+
+  .rincian__hantu--bawah {
+    transform: translate3d(0, 100%, 0);
+  }
+
+  /* Meniru .rincian__media ponsel: tinggi dari rasio fotonya (maks. 48svh),
+     media di-contain di tengahnya — letak fotonya sama dengan slide pertama
+     panel asli. */
+  .rincian__hantu-media {
+    position: relative;
+    height: min(48svh, calc(100vw / var(--rasio-media, 0.001)));
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .rincian__hantu-media img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .rincian__hantu-rel {
+    display: flex;
+    border-radius: 8px;
+    flex-direction: column;
+    background: var(--r-rel);
+    color: var(--r-teks);
+  }
+
+  /* Tinggi dan jarak meniru .rincian__kepala + .rincian__badan panel asli,
+     supaya tanggal dan judul jatuh di tempat yang sama saat pergantian. */
+  .rincian__hantu-rel .rincian__tanggal {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    height: var(--tinggi-kepala, 67px);
+    padding: 0 12px;
+    border-bottom: 1px solid var(--r-garis);
+  }
+
+  .rincian__hantu-rel .rincian__judul {
+    padding: 20px 20px 0;
+  }
+}

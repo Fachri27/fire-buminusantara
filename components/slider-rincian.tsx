@@ -4,6 +4,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { mediaLokal, type ItemMedia } from "@/lib/media";
 
+/** `sizes` foto lokal di slider — diekspor supaya pratinjau geser tegak di
+ *  rincian meminta berkas optimizer yang sama persis (tembolok bersama). */
+export const UKURAN_GAMBAR_RINCIAN = "(max-width: 767px) 92vw, 55vw";
+
+/** Rasio (lebar ÷ tinggi) media yang pernah terbaca, per URL. Di ponsel tinggi
+ *  kotak media mengikuti rasio slide aktif; tanpa ingatan ini slider yang
+ *  baru dipasang (pindah laporan) memulai dari tinggi penuh lalu menyusut
+ *  sebingkai kemudian. Pratinjau geser tegak ikut mengisinya dari foto yang
+ *  sudah ia muat, jadi panel asli langsung berukuran benar. */
+export const RASIO_MEDIA = new Map<string, number>();
+
 type Props = {
   media: ItemMedia[];
   poster: string | null;
@@ -25,7 +36,9 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
   // tandai siap dan simpan rasionya agar tidak berkedip kerangka 1-frame saat
   // pop-up dibuka.
   const [awalSiap, setAwalSiap] = useState(false);
-  const [rasioMedia, setRasioMedia] = useState<(number | undefined)[]>([]);
+  const [rasioMedia, setRasioMedia] = useState<(number | undefined)[]>(
+    () => media.map((m) => RASIO_MEDIA.get(m.url)),
+  );
 
   // Apakah bilah kendali video sedang tampak. Peramban tidak memberi tahu kapan
   // ia menyembunyikan kontrolnya sendiri, jadi keadaannya ditiru: kontrol
@@ -39,13 +52,15 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
   const simpanRasio = useCallback((lebar: number, tinggi: number, idx: number) => {
     if (!lebar || !tinggi) return;
     const rasio = lebar / tinggi;
+    const url = media[idx]?.url;
+    if (url) RASIO_MEDIA.set(url, rasio);
     setRasioMedia((r) => {
       if (r[idx] === rasio) return r;
       const n = [...r];
       n[idx] = rasio;
       return n;
     });
-  }, []);
+  }, [media]);
 
   const kini = Math.min(Math.max(0, indeks), media.length - 1);
 
@@ -62,6 +77,17 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
       sembunyiTimer.current = setTimeout(() => setKendaliTampak(false), 1400);
     }
   }, []);
+
+  // Foto yang sudah ada di tembolok memori (mis. baru saja ditampilkan
+  // pratinjau geser tegak) sudah `complete` begitu elemennya terpasang —
+  // tandai siap saat itu juga. Pembaruan dari callback ref diproses sebelum
+  // peramban melukis, jadi kerangka gelap tak sempat muncul sama sekali;
+  // menunggu onLoad membuatnya berkedip satu bingkai lalu memudar 300ms.
+  const gambarTerpasang = useCallback((el: HTMLImageElement | null, idx: number) => {
+    if (!el || !el.complete || !el.naturalWidth) return;
+    simpanRasio(el.naturalWidth, el.naturalHeight, idx);
+    if (idx === 0) setAwalSiap(true);
+  }, [simpanRasio]);
 
   const tunjukKendali = useCallback((el: HTMLVideoElement | null) => {
     setKendaliTampak(true);
@@ -175,6 +201,10 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
   return (
     <div
       className="rincian__slider-wadah"
+      /* Di ponsel tinggi kotak media = lebar layar ÷ rasio slide aktif
+         (dibatasi 48svh) — foto mendatar tampil utuh tanpa bilah hitam dan
+         tanpa dipotong. Lihat .rincian__slider-wadah di rincian-laporan.css. */
+      style={rasioMedia[kini] ? ({ "--rasio-media": rasioMedia[kini] } as React.CSSProperties) : undefined}
       onPointerMove={aktivitasPointer}
       onPointerDown={aktivitasPointer}
       onTouchStart={onTouchStart}
@@ -198,15 +228,18 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
             <div key={idx} className="rincian__slider-slide">
               <div
                 className="rincian__slide-bingkai"
-                /* Sebelum rasio aslinya terbaca, bingkai HARUS tetap
-                   berukuran penuh. Dengan `height` saja lebarnya runtuh ke 0
-                   (flex item tanpa isi berukuran intrinsik — medianya sendiri
-                   absolut/`fill`), jadi slide yang masuk tampak kosong lalu
-                   menyentak begitu ukurannya terbaca. */
+                /* Sebelum rasio aslinya terbaca, bingkai memakai rasio bawaan
+                   4/3 — bukan `height: 100%` yang tingginya runtuh ke 0 bila
+                   rantai induknya tak punya tinggi pasti (kasus ponsel: baris
+                   grid media mengikuti isi). Tinggi 0 itu bukan cuma
+                   membuat slide tampak kosong lalu menyentak begitu ukurannya
+                   terbaca, tapi juga memicu galat next/image ("fill" dengan
+                   tinggi 0) untuk unggahan lokal. Rasio asli menimpa bawaan
+                   ini begitu onLoad/onLoadedMetadata tiba. */
                 style={
                   rasio
                     ? { aspectRatio: `${rasio}`, width: "100%" }
-                    : { width: "100%", height: "100%" }
+                    : { width: "100%", aspectRatio: "4 / 3" }
                 }
               >
                 {/* Kredit/hak cipta pelapor di kiri-bawah medianya. Diambil dari
@@ -281,10 +314,11 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                      sudah ada rasionya dari naturalWidth/Height di bawah, dan
                      object-fit: contain datang dari kelas rincian__slide-media. */
                   <Image
+                    ref={(el) => gambarTerpasang(el, idx)}
                     src={m.url}
                     alt={m.keterangan || `${label} - gambar ${idx + 1}`}
                     fill
-                    sizes="(max-width: 767px) 92vw, 55vw"
+                    sizes={UKURAN_GAMBAR_RINCIAN}
                     className="rincian__slide-media"
                     decoding="async"
                     loading={dekat(idx) ? "eager" : "lazy"}
@@ -300,6 +334,7 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
                   <img
+                    ref={(el) => gambarTerpasang(el, idx)}
                     src={m.url}
                     alt={m.keterangan || `${label} - gambar ${idx + 1}`}
                     decoding="async"
