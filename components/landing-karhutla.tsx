@@ -2980,6 +2980,8 @@ export function LandingKarhutla(
           adaBerikutnya={adaBerikutnya}
           indeksAktif={indeksSorot >= 0 ? indeksSorot : undefined}
           totalKejadian={berita.length}
+          beritaSebelumnya={adaSebelumnya ? berita[indeksSorot - 1] : undefined}
+          beritaBerikutnya={adaBerikutnya ? berita[indeksSorot + 1] : undefined}
         />
       )}
 
