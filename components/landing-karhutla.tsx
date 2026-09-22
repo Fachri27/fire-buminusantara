@@ -575,10 +575,16 @@ function IkonUlang({ className = "size-7" }: { className?: string }) {
   );
 }
 
-function IkonPutarBadge({ className = "size-3.5" }: { className?: string }) {
+/* Segitiga yang MENITIK BERATKAN DIRI SENDIRI: titik berat (8+20+8)/3 dan
+   (4+12+20)/3 jatuh tepat di 12,12 — pusat viewBox. Bentuk lama (6 3, 20 12,
+   6 21) titik beratnya di x=10,67 sementara kotak batasnya berpusat di 13,
+   dan pemanggilnya menambal itu dengan translate-x-0.5; dua koreksi yang
+   bertumpuk membuat segitiga terukur 2,58px ke kanan dari pusat lingkaran
+   28px. Dengan bentuk ini penambal itu tak diperlukan lagi. */
+function IkonPutarBadge({ className = "size-4" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" className={className}>
-      <polygon points="6 3 20 12 6 21 6 3" />
+      <polygon points="8 4 20 12 8 20" />
     </svg>
   );
 }
@@ -680,7 +686,7 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
             aria-hidden="true"
             className={`absolute bottom-2.5 right-2.5 z-2 flex size-7 items-center justify-center rounded-full bg-black/65 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.7)] transition-all duration-200 pointer-events-none ${sedangHover && siap ? "opacity-0 scale-90" : "opacity-100 scale-100"}`}
           >
-            <IkonPutarBadge className="size-3.5 translate-x-0.5" />
+            <IkonPutarBadge className="size-4" />
           </span>
         </button>
 
