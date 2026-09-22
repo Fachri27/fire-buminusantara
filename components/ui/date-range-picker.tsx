@@ -99,7 +99,7 @@ export function DateRangePicker({
         <PopoverTrigger className={penuh ? "w-full" : ""}>
           <button
             type="button"
-            className={`${penuh ? "h-9 w-full min-w-0 " : ""}flex cursor-pointer items-center gap-2.5 rounded-[8px] border px-3 py-1.5 text-[length:var(--ukuran-catatan)] font-medium shadow-2xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
+            className={`${penuh ? "h-9 w-full min-w-0 " : ""}flex cursor-pointer items-center gap-2.5 rounded-[8px] border px-3 py-1.5 text-xs font-medium shadow-2xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
               gelap
                 ? "border-white/15 bg-pantau-malam text-white hover:border-white/30 focus-visible:outline-white/60"
                 : "border-black/10 bg-white text-tinta hover:border-black/20 hover:bg-black/[0.02] focus-visible:outline-api dark:border-white/15 dark:bg-pantau-konsol dark:text-white dark:hover:border-white/30 dark:hover:bg-white/[0.04] dark:focus-visible:outline-white/60"
@@ -121,11 +121,11 @@ export function DateRangePicker({
               className={`${penuh ? "truncate " : ""}whitespace-nowrap ${
                 !adaPilihan
                   ? gelap
-                    ? "text-white/45"
-                    : "text-black/45 dark:text-white/45"
+                    ? "text-white/70"
+                    : "text-black/45 dark:text-white/70"
                   : gelap
-                  ? "font-semibold text-white"
-                  : "font-semibold text-tinta dark:text-white"
+                  ? "font-medium text-white"
+                  : "font-medium text-tinta dark:text-white"
               }`}
             >
               {teksTampilan()}
@@ -148,7 +148,7 @@ export function DateRangePicker({
         <button
           type="button"
           onClick={handleClear}
-          className="cursor-pointer text-[length:var(--ukuran-catatan)] font-semibold text-bara dark:text-red-400 underline underline-offset-2 transition-colors hover:text-api dark:hover:text-red-300"
+          className="cursor-pointer text-xs font-medium text-bara dark:text-red-400 underline underline-offset-2 transition-colors hover:text-api dark:hover:text-red-300"
         >
           Hapus
         </button>

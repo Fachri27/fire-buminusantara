@@ -1467,7 +1467,7 @@ html:not(.dark) #lk-tulis {
   background-color: transparent !important;
   border-radius: 8px !important;
   padding: 10px 16px !important;
-  color: #555555 !important;
+  color: #444444 !important;
   font-size: 15px !important;
   line-height: 1.4 !important;
   transition: color 0.15s ease !important;
@@ -1481,7 +1481,7 @@ html.dark #lk-tulis {
   background-color: transparent !important;
   border-radius: 8px !important;
   padding: 10px 16px !important;
-  color: rgba(160, 160, 160, 0.7) !important;
+  color: #d1d5db !important;
   font-size: 15px !important;
   line-height: 1.4 !important;
   transition: color 0.15s ease !important;

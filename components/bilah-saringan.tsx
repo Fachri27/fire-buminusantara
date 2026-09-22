@@ -72,7 +72,7 @@ export function BilahSaringan({
                      hover:border-black/30 focus:border-black/40 focus:ring-1 focus:ring-black/20
                      dark:border-white/15 dark:bg-pantau-malam dark:text-white
                      dark:hover:border-white/30 dark:focus:border-white/40 dark:focus:ring-white/30
-                     pl-3 pr-8 text-xs sm:text-sm font-semibold shadow-xs outline-none transition-colors cursor-pointer"
+                     pl-3 pr-8 text-xs font-medium shadow-xs outline-none transition-colors cursor-pointer"
         >
           {opsiWilayah.map((o) => (
             <option key={o.kunci} value={o.kunci} className="bg-white text-tinta dark:bg-[#1a1919] dark:text-white">
@@ -120,7 +120,7 @@ export function SaklarSegmen<T extends string>({
           <button key={o.kunci} type="button" onClick={() => onPilih(o.kunci)}
                   aria-pressed={aktif} aria-label={o.label} title={o.label}
                   className={`flex min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[6px] px-3
-                              text-xs font-semibold whitespace-nowrap transition-colors sm:flex-none sm:text-[13px]
+                              text-xs font-medium whitespace-nowrap transition-colors sm:flex-none
                               ${aktif
                                 ? "bg-white text-tinta shadow-2xs dark:bg-white/20 dark:text-white"
                                 : "text-black/55 hover:bg-black/5 hover:text-tinta dark:text-white/55 dark:hover:bg-white/10 dark:hover:text-white"}`}>

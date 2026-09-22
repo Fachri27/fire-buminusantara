@@ -90,17 +90,22 @@ export function PopoverTrigger({ children, onClick, className = "" }: PopoverTri
   const ctx = React.useContext(PopoverContext);
   if (!ctx) throw new Error("PopoverTrigger must be used within Popover");
 
+  const triggerContent = React.isValidElement(children)
+    ? React.cloneElement(children as React.ReactElement<{ "aria-expanded"?: boolean; "aria-haspopup"?: string }>, {
+        "aria-expanded": ctx.isOpen,
+        "aria-haspopup": "dialog",
+      })
+    : children;
+
   return (
     <div
       onClick={(e) => {
         onClick?.(e);
         ctx.setIsOpen(!ctx.isOpen);
       }}
-      aria-expanded={ctx.isOpen}
-      aria-haspopup="dialog"
       className={`inline-flex cursor-pointer ${className}`}
     >
-      {children}
+      {triggerContent}
     </div>
   );
 }

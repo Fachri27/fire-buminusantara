@@ -580,6 +580,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const progressRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
   const rafIdRef = useRef<number | null>(null);
+  const startLoopRef = useRef<(() => void) | null>(null);
   const sliderInputRef = useRef<HTMLInputElement | null>(null);
 
   /* Setiap kali daftar waktu terisi (cache sesi, pemuatan awal, atau siklus
@@ -622,6 +623,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
   useEffect(() => {
     memutarRef.current = memutar;
+    if (memutar) {
+      startLoopRef.current?.();
+    }
   }, [memutar]);
 
   useEffect(() => {
@@ -638,6 +642,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       if (syncRunningRef.current) {
         setSedangSync(true);
       }
+      if (memutarRef.current) {
+        startLoopRef.current?.();
+      }
     }
   }, [aktif]);
 
@@ -650,6 +657,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
   useEffect(() => {
     linimasaRef.current = linimasa;
+    if (linimasa.length > 0 && memutarRef.current && aktifRef.current) {
+      startLoopRef.current?.();
+    }
   }, [linimasa]);
 
   useEffect(() => {
@@ -956,9 +966,21 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   // Jalankan sinkronisasi saat komponen terpasang, saat window kembali aktif (focus), dan berkala tiap 10 menit
   useEffect(() => {
     let batal = false;
-    const t = setTimeout(() => {
-      if (!batal) sinkronkanSebaranAsap(false);
-    }, 0);
+    let idleId: number | null = null;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(
+        () => {
+          if (!batal) sinkronkanSebaranAsap(false);
+        },
+        { timeout: 500 }
+      );
+    } else {
+      fallbackTimer = setTimeout(() => {
+        if (!batal) sinkronkanSebaranAsap(false);
+      }, 500);
+    }
 
     const onFocus = () => {
       if (!batal) sinkronkanSebaranAsap(false);
@@ -973,7 +995,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
     return () => {
       batal = true;
-      clearTimeout(t);
+      if (idleId !== null && typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (fallbackTimer !== null) {
+        clearTimeout(fallbackTimer);
+      }
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
@@ -1509,13 +1536,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       const texB = texBRef.current;
       const activeLinimasa = linimasaRef.current;
 
+      const isPlaying = !!(memutarRef.current && aktifRef.current && !document.hidden);
+      const isScrubbing = isScrubbingRef.current;
+
       if (map && prog && texA && texB && activeLinimasa.length > 0) {
         const prev = lastTimeRef.current || time;
         const dt = Math.min((time - prev) / 1000, 0.1);
         lastTimeRef.current = time;
 
-        const isPlaying = !!(memutarRef.current && aktifRef.current && !document.hidden);
-        const isScrubbing = isScrubbingRef.current;
         const stepDuration = kecepatanRef.current === 2 ? 0.35 : 0.75;
         const totalFrames = activeLinimasa.length;
 
@@ -1569,15 +1597,23 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         }
       }
 
+      // Hentikan loop dan jangan jadwalkan rAF jika pemutaran dijeda dan tidak sedang scrubbing
+      if (!isPlaying && !isScrubbing) {
+        rafIdRef.current = null;
+        return;
+      }
+
       rafIdRef.current = requestAnimationFrame(renderLoop);
     };
 
     const startLoop = () => {
-      if (!rafIdRef.current && !document.hidden) {
+      const shouldRun = (memutarRef.current && aktifRef.current) || isScrubbingRef.current;
+      if (shouldRun && !rafIdRef.current && !document.hidden) {
         lastTimeRef.current = 0;
         rafIdRef.current = requestAnimationFrame(renderLoop);
       }
     };
+    startLoopRef.current = startLoop;
 
     const stopLoop = () => {
       if (rafIdRef.current) {
@@ -1600,12 +1636,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       stopLoop();
+      startLoopRef.current = null;
     };
   }, [uploadTextureBuffer]);
 
   // Handler scrubbing manual pada slider linimasa (60 FPS interaktif)
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLInputElement>) => {
     isScrubbingRef.current = true;
+    startLoopRef.current?.();
     const input = e.currentTarget;
     const rect = input.getBoundingClientRect();
     if (rect.width > 0) {

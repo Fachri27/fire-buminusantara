@@ -443,7 +443,7 @@ html.dark .rincian .rincian__kerangka::before,
   /* Jarak dirapatkan di ponsel: bersama kotak sentuh 16px, dua belas media
      jatuh di ~230px sehingga pilnya ramping di layar 375px. Di layar lebar
      kembali ke 6px seperti semula. */
-  gap: 2px;
+  gap: 4px;
   padding: 3px 6px;
   border-radius: 9999px;
   background: rgba(0, 0, 0, 0.55);

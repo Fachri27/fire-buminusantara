@@ -416,14 +416,14 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                 aria-label={`Lihat media ${i + 1} dari ${media.length}`}
                 aria-current={i === kini}
                 onClick={() => setIndeks(i)}
-                className="inline-flex min-h-[16px] min-w-[16px] items-center justify-center p-0.5 bg-transparent border-0 cursor-pointer sm:min-h-[20px] sm:min-w-[20px]"
+                className="inline-flex min-h-[28px] min-w-[28px] items-center justify-center p-1 bg-transparent border-0 cursor-pointer"
               >
                 <span
                   aria-hidden="true"
                   className={`rincian__dot-item block transition-all duration-300 ${
                     i === kini
-                      ? "w-3.5 bg-white shadow-xs sm:w-3.5"
-                      : "w-[5px] bg-white/50 hover:bg-white/80 sm:w-1.5"
+                      ? "w-3.5 bg-white shadow-xs"
+                      : "w-2 bg-white/50 hover:bg-white/80"
                   }`}
                 />
               </button>

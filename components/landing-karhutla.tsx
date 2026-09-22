@@ -673,12 +673,12 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
           className="group block w-full cursor-pointer transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
         >
           {poster && !posterGagal ? (
-            <>
+            <div className="aspect-[16/10] overflow-hidden rounded-lg bg-black/[0.04] dark:bg-white/5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={poster} alt="" aria-hidden="true" loading="lazy"
                 onError={() => setPosterGagal(true)}
-                className="lk-foto h-auto w-full"
+                className="lk-foto h-full w-full object-cover"
               />
               <video
                 ref={ref}
@@ -693,7 +693,7 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
                 onPlaying={() => setSiap(true)}
                 className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-300 ${sedangHover && siap ? "opacity-100" : "opacity-0"}`}
               />
-            </>
+            </div>
           ) : (
             <video
               ref={ref}
@@ -1465,7 +1465,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
             type="button"
             id="lk-tulis"
             onClick={() => setBuka(true)}
-            className="flex-1 cursor-pointer truncate rounded-lg bg-transparent px-4 py-2.5 text-left text-[15px] text-black/55 transition-all hover:text-black dark:bg-transparent dark:text-[#a0a0a0]/70 dark:hover:text-[#f5f5f5]
+            className="flex-1 cursor-pointer truncate rounded-lg bg-black/[0.03] px-4 py-2.5 text-left text-[15px] text-black/80 transition-all hover:bg-black/[0.06] hover:text-black dark:bg-white/[0.06] dark:text-[#f0f0f0] dark:hover:bg-white/[0.1] dark:hover:text-white
                        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
           >
             {t.tulis}
@@ -1599,6 +1599,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
 
           <div ref={captchaRef} />
           <input ref={berkasRef} type="file" name="berkas" multiple accept={DITERIMA}
+                 aria-label={t.lampirFoto}
                  onChange={(e) => tambahBerkas(e.target.files)} className="sr-only" tabIndex={-1} />
           <input type="hidden" name="captcha" value={captchaToken} />
           <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
@@ -1747,6 +1748,7 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
       {/* Input berkas untuk mode menciut — tambahBerkas() membuka komposernya. */}
       {!buka && (
         <input ref={berkasRef} type="file" name="berkas" multiple accept={DITERIMA}
+               aria-label={t.lampirFoto}
                onChange={(e) => tambahBerkas(e.target.files)} className="sr-only" tabIndex={-1} />
       )}
     </div>
@@ -2450,7 +2452,7 @@ export function LandingKarhutla(
   const [dariUmpan, setDariUmpan] = useState("");
   const [sampaiUmpan, setSampaiUmpan] = useState("");
   const [wilayahUmpan, setWilayahUmpan] = useState("semua");
-  const [urutanUmpan, setUrutanUmpan] = useState<"semua" | "terbaru" | "komentar">("semua");
+  const [urutanUmpan, setUrutanUmpan] = useState<"terbaru" | "komentar">("terbaru");
   const adaSaringanUmpan = Boolean(dariUmpan || sampaiUmpan || wilayahUmpan !== "semua");
   const hapusSaringanUmpan = () => {
     setDariUmpan("");
@@ -2485,10 +2487,8 @@ export function LandingKarhutla(
     const tab = PULAU_TAB.find((x) => x.kunci === wilayahUmpan);
     const isi = tab ? (tab.isi as readonly string[]) : null;
     const tersaring = isi ? sebelumWilayah.filter((l) => !!l.pulau && isi.includes(l.pulau)) : sebelumWilayah;
-    // Terbaru: tanggal kejadian, lalu id (yang dibuat belakangan dulu).
+    // Terbaru (bawaan): tanggal kejadian, lalu id (yang dibuat belakangan dulu).
     // Komentar terbanyak: jumlah komentar, seri → yang lebih baru dulu.
-    // Bawaan ("semua", tanpa pil menyala): sama dengan Terbaru — seluruh
-    // data tampil dengan yang terbaru di atas.
     const baru = (a: Laporan, b: Laporan) => (waktuTeks(b.tanggal) ?? 0) - (waktuTeks(a.tanggal) ?? 0) || b.id - a.id;
     return [...tersaring].sort(urutanUmpan === "komentar"
       ? (a, b) => (b.komentar ?? 0) - (a.komentar ?? 0) || baru(a, b)
@@ -3004,12 +3004,9 @@ export function LandingKarhutla(
               placeholderTanggal={t.tanggalPanjang}
               placeholderTanggalPendek={t.tanggalPendek}
               saklar={
-                /* Nilai "semua" tidak cocok dengan opsi mana pun sehingga tak
-                   ada pil yang menyala — bawaan menampilkan seluruh data.
-                   Pil yang sedang menyala diklik lagi untuk kembali netral. */
                 <SaklarSegmen
                   nilai={urutanUmpan}
-                  onPilih={(kunci) => setUrutanUmpan((u) => (u === kunci ? "semua" : kunci))}
+                  onPilih={setUrutanUmpan}
                   label={t.urutan}
                   opsi={[
                     { kunci: "terbaru", label: t.urutTerbaru, isi: t.urutTerbaru },
@@ -3082,10 +3079,10 @@ export function LandingKarhutla(
                       type="button"
                       onClick={() => bukaMedia(l.id)}
                       aria-label={l.judul}
-                      className="lk-foto cursor-pointer relative mt-3 block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+                      className="lk-foto cursor-pointer relative mt-3 block w-full aspect-[16/10] overflow-hidden rounded-lg bg-black/[0.04] dark:bg-white/5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false} className="lk-foto h-auto w-full" />
+                      <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false} className="lk-foto h-full w-full object-cover" />
                       {l.galeri.length > 1 && (
                         <span aria-hidden="true" className="lk-galeri-lencana">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"

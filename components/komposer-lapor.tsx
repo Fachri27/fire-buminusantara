@@ -585,6 +585,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
             <input
               ref={judulRef}
               name="judul"
+              aria-label={teks.labelJudul}
               required
               maxLength={255}
               value={judul}
@@ -595,6 +596,7 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
             />
             <textarea
               name="deskripsi"
+              aria-label={teks.petunjukDeskripsi}
               required
               maxLength={5000}
               rows={2}

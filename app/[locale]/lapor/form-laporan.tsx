@@ -515,19 +515,19 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
           </ul>
         )}
 
-        <p className="mt-2.5 text-[12px] leading-[1.5] text-tinta/45">{teks.catatanMetadata}</p>
+        <p className="mt-2.5 text-[12px] leading-[1.5] text-tinta/45 dark:text-[#a0a0a0]">{teks.catatanMetadata}</p>
       </Bidang>
 
       <Bidang id="lapor-lat" label={teks.labelLokasi} petunjuk={teks.petunjukLokasi}>
         <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1.5">
-            <span className="text-[12px] text-tinta/50">{teks.lat}</span>
+            <span className="text-[12px] text-tinta/50 dark:text-[#a0a0a0]">{teks.lat}</span>
             <input id="lapor-lat" name="lat" inputMode="decimal" placeholder="-1.2345678"
                    value={lat} onChange={(e) => { setLat(e.target.value); setSumberLokasi(null); }}
                    className={`${ISIAN} w-40`} />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-[12px] text-tinta/50">{teks.lng}</span>
+            <span className="text-[12px] text-tinta/50 dark:text-[#a0a0a0]">{teks.lng}</span>
             <input id="lapor-lng" name="lng" inputMode="decimal" placeholder="113.4567890"
                    value={lng} onChange={(e) => { setLng(e.target.value); setSumberLokasi(null); }}
                    className={`${ISIAN} w-40`} />
@@ -538,7 +538,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
           </button>
         </div>
         {sumberLokasi === "foto" && (
-          <p className="mt-1.5 text-[12px] text-tinta/50">{teks.lokasiDariFoto}</p>
+          <p className="mt-1.5 text-[12px] text-tinta/50 dark:text-[#a0a0a0]">{teks.lokasiDariFoto}</p>
         )}
       </Bidang>
 
@@ -589,7 +589,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
             ? (bahasa === "en" ? "Verifying…" : "Memverifikasi…")
             : teks.kirim}
         </button>
-        <Link href={`/${bahasa}`} className="cursor-pointer text-[13px] text-tinta/50 underline-offset-4 hover:underline">
+        <Link href={`/${bahasa}`} className="cursor-pointer text-[13px] text-tinta/50 underline-offset-4 hover:underline dark:text-[#d1d5db]">
           {teks.kembali}
         </Link>
       </div>

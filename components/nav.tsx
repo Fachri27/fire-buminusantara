@@ -247,7 +247,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
             & sepi; dipasangkan teks "Fire" jadi kesatuan merek yang mengisi
             ruang. Di ponsel "Lapor" pindah ke cluster kanan supaya logo ini
             punya tempat. */}
-        <Link href={`/${bahasa}`} aria-label={`Fire — ${teks.bagian.peta}`}
+        <Link href={`/${bahasa}`}
            onClick={(e) => {
              // SELALU ditangani di sini, tidak pernah lewat navigasi <Link>.
              // Pop-up rincian mengubah URL jadi /xx/fire/<slug> lewat pushState
@@ -448,7 +448,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 <span
                   key={kode}
                   aria-current="true"
-                  className="rounded-full bg-[#ff5a26] px-2.5 py-0.5 uppercase text-white shadow-xs"
+                  className="rounded-full bg-[#c83800] px-2.5 py-0.5 uppercase text-white font-bold shadow-xs"
                 >
                   {kode}
                 </span>
