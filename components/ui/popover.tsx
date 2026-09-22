@@ -6,10 +6,14 @@ export type PopoverProps = {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   children: React.ReactNode;
+  /** Kelas tambahan wadah (mis. w-full untuk popover selebar induknya). */
+  className?: string;
 };
 
 export type PopoverTriggerProps = {
   asChild?: boolean;
+  /** Kelas tambahan pembungkus pemicu (mis. w-full untuk pemicu selebar wadah). */
+  className?: string;
   children: React.ReactNode;
   onClick?: (e: React.MouseEvent) => void;
 };
@@ -30,7 +34,7 @@ type PopoverContextType = {
 
 const PopoverContext = React.createContext<PopoverContextType | null>(null);
 
-export function Popover({ open: controlledOpen, onOpenChange, children }: PopoverProps) {
+export function Popover({ open: controlledOpen, onOpenChange, children, className = "" }: PopoverProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : uncontrolledOpen;
@@ -75,14 +79,14 @@ export function Popover({ open: controlledOpen, onOpenChange, children }: Popove
 
   return (
     <PopoverContext.Provider value={{ isOpen, setIsOpen }}>
-      <div ref={containerRef} className="relative inline-block text-left">
+      <div ref={containerRef} className={`relative inline-block text-left ${className}`}>
         {children}
       </div>
     </PopoverContext.Provider>
   );
 }
 
-export function PopoverTrigger({ children, onClick }: PopoverTriggerProps) {
+export function PopoverTrigger({ children, onClick, className = "" }: PopoverTriggerProps) {
   const ctx = React.useContext(PopoverContext);
   if (!ctx) throw new Error("PopoverTrigger must be used within Popover");
 
@@ -94,7 +98,7 @@ export function PopoverTrigger({ children, onClick }: PopoverTriggerProps) {
       }}
       aria-expanded={ctx.isOpen}
       aria-haspopup="dialog"
-      className="inline-flex cursor-pointer"
+      className={`inline-flex cursor-pointer ${className}`}
     >
       {children}
     </div>

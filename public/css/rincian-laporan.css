@@ -440,11 +440,11 @@ html.dark .rincian .rincian__kerangka::before,
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  /* Jarak dirapatkan di ponsel: bersama kotak sentuh 24px, dua belas media
-     jatuh di ~330px sehingga pilnya masih muat di layar 375px. Di layar lebar
+  /* Jarak dirapatkan di ponsel: bersama kotak sentuh 16px, dua belas media
+     jatuh di ~230px sehingga pilnya ramping di layar 375px. Di layar lebar
      kembali ke 6px seperti semula. */
   gap: 2px;
-  padding: 5px 10px;
+  padding: 3px 6px;
   border-radius: 9999px;
   background: rgba(0, 0, 0, 0.55);
   -webkit-backdrop-filter: blur(10px);
@@ -455,7 +455,7 @@ html.dark .rincian .rincian__kerangka::before,
 
 @media (min-width: 640px) {
   .rincian__dots {
-    gap: 6px;
+    gap: 4px;
   }
 }
 
@@ -465,7 +465,7 @@ html.dark .rincian .rincian__kerangka::before,
 }
 
 .rincian__dot-item {
-  height: 7px;
+  height: 6px;
   border-radius: 999px;
   border: 0;
   cursor: pointer;

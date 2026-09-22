@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { gunakanTumbuh, type TitikAsal } from "@/hooks/gunakan-tumbuh";
 import { PULAU_TAB, tabDariPulau, waktuIso, waktuTeks } from "@/lib/tanggal";
 import { PROVINSI_KE_PULAU } from "@/lib/wilayah";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { BilahSaringan, SaklarTampilan, type ModeTampilan } from "@/components/bilah-saringan";
 import { useTheme } from "next-themes";
 import { useMounted } from "@/hooks/use-mounted";
 import type { Berita } from "@/lib/events";
@@ -23,9 +23,6 @@ type Props = {
   /** Sisa prop lama — jika ada, dipakai sebagai fallback sebelum mounted. */
   gelap?: boolean;
 };
-
-/** Mode tampilan daftar berita: baris ringkas atau kartu bergambar. */
-type ModeTampilan = "daftar" | "kartu";
 
 /** Banyak laporan per halaman — sepuluh baris pada mode daftar, atau dua
  *  baris lima kartu pada mode kartu. Satu angka untuk keduanya supaya ganti
@@ -161,7 +158,11 @@ export function PopupPeta({
         if (awal !== null && waktu < awal) return false;
         if (akhir !== null && waktu > akhir) return false;
         return true;
-      });
+      })
+      // Pop-up ini arsip, bukan etalase: selalu terbaru dulu (lalu id), apa pun
+      // urutan `berita` yang diterimanya — umpan halaman karhutla mengirimnya
+      // dalam urutan "terbaru + komentar terbanyak". `i` tetap indeks asli.
+      .sort((x, y) => (waktuTeks(y.b.tanggal) ?? 0) - (waktuTeks(x.b.tanggal) ?? 0) || y.b.id - x.b.id);
   }, [berita, tab, dari, sampai]);
 
   // Potongan daftar untuk halaman aktif — berlaku untuk kedua mode. Indeks
@@ -238,77 +239,21 @@ export function PopupPeta({
         </div>
 
         {/* Saringan tanggal + dropdown pilih pulau */}
-        <div className="flex shrink-0 flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3
-                        border-b border-black/[0.08] dark:border-white/10
+        <div className="shrink-0 border-b border-black/[0.08] dark:border-white/10
                         p-3 sm:p-5 py-2.5 sm:py-[10px] panggung:px-[28px]">
-          <DateRangePicker
+          <BilahSaringan
             dari={dari}
             sampai={sampai}
             gelap={isDark}
-            onChange={({ dari, sampai }) => {
+            onTanggal={({ dari, sampai }) => {
               setDari(dari);
               setSampai(sampai);
             }}
+            wilayah={tabAktif}
+            opsiWilayah={PULAU_TAB.map((t) => ({ kunci: t.kunci, label: t.label, jumlah: jumlahLaporanSemuaTab[t.kunci] }))}
+            onWilayah={setTabAktif}
+            saklar={<SaklarTampilan nilai={tampilan} onPilih={setTampilan} />}
           />
-
-          {/* Dropdown Select Wilayah Pulau Tercatat (Sesuai Arahan) + saklar
-              mode tampilan daftar/kartu */}
-          <div className="flex w-full sm:w-auto items-stretch sm:items-center gap-2 sm:gap-2.5">
-            <div className="relative min-w-0 flex-1 sm:flex-none sm:min-w-[220px]">
-              <select
-                id="pilih-wilayah-pulau"
-                value={tabAktif}
-                onChange={(e) => setTabAktif(e.target.value)}
-                aria-label="Pilih wilayah pulau tercatat"
-                className="w-full appearance-none rounded-lg
-                           border border-black/15 bg-white text-tinta
-                           hover:border-black/30 focus:border-black/40 focus:ring-1 focus:ring-black/20
-                           dark:border-white/15 dark:bg-pantau-malam dark:text-white
-                           dark:hover:border-white/30 dark:focus:border-white/40 dark:focus:ring-white/30
-                           py-1.5 pl-3 pr-8 text-xs sm:text-sm font-semibold shadow-xs outline-none transition-colors cursor-pointer"
-              >
-                {PULAU_TAB.map((t) => {
-                  const jml = jumlahLaporanSemuaTab[t.kunci];
-                  return (
-                    <option key={t.kunci} value={t.kunci} className="bg-white text-tinta dark:bg-[#1a1919] dark:text-white">
-                      {t.label} {jml !== undefined ? `(${jml} laporan)` : ""}
-                    </option>
-                  );
-                })}
-              </select>
-              <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-black/50 dark:text-white/50">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Saklar mode tampilan: daftar (baris ringkas) atau kartu (kotak
-                bergambar). Segmen aktif mengikuti rupa bilah saringan lain. */}
-            <div role="group" aria-label="Mode tampilan berita"
-                 className="flex shrink-0 items-center gap-0.5 self-center rounded-lg
-                            border border-black/15 bg-black/[0.04] p-0.5 shadow-xs
-                            dark:border-white/15 dark:bg-pantau-malam">
-              <TombolTampilan aktif={tampilan === "daftar"} label="Tampilan daftar"
-                              onClick={() => setTampilan("daftar")}>
-                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" className="size-[15px]">
-                  <path d="M9 6h11M9 12h11M9 18h11" />
-                  <path d="M4 6h.01M4 12h.01M4 18h.01" strokeWidth="2.6" />
-                </svg>
-              </TombolTampilan>
-              <TombolTampilan aktif={tampilan === "kartu"} label="Tampilan kartu"
-                              onClick={() => setTampilan("kartu")}>
-                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-[15px]">
-                  <rect x="4" y="4" width="7" height="7" rx="1.5" />
-                  <rect x="13" y="4" width="7" height="7" rx="1.5" />
-                  <rect x="4" y="13" width="7" height="7" rx="1.5" />
-                  <rect x="13" y="13" width="7" height="7" rx="1.5" />
-                </svg>
-              </TombolTampilan>
-            </div>
-          </div>
         </div>
 
         {/* Daftar berita. data-lenis-prevent: saat pop-up terbuka Lenis
@@ -596,19 +541,3 @@ function RangkaDaftar({ mode }: { mode: ModeTampilan }) {
 }
 
 /** Satu segmen saklar mode tampilan (daftar/kartu). */
-function TombolTampilan({ aktif, label, onClick, children }: {
-  aktif: boolean;
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={aktif} aria-label={label} title={label}
-            className={`grid size-[26px] cursor-pointer place-items-center rounded-[6px] transition-colors sm:size-[28px]
-                        ${aktif
-                          ? "bg-white text-tinta shadow-2xs dark:bg-white/20 dark:text-white"
-                          : "text-black/50 hover:bg-black/5 hover:text-tinta dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"}`}>
-      {children}
-    </button>
-  );
-}

@@ -13,6 +13,9 @@ export type DateRangePickerProps = {
   className?: string;
   /** true = tombol + kalender gelap dasbor /peta. Bawaan false (putih). */
   gelap?: boolean;
+  /** true = tombol pemicu selebar wadahnya dan setinggi kontrol bilah
+   *  saringan (h-9), supaya sejajar dengan pilihan wilayah di sebelahnya. */
+  penuh?: boolean;
 };
 
 function formatIso(d: Date): string {
@@ -53,6 +56,7 @@ export function DateRangePicker({
   placeholder = "Pilih rentang tanggal",
   className = "",
   gelap = false,
+  penuh = false,
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
 
@@ -90,12 +94,12 @@ export function DateRangePicker({
   const adaPilihan = Boolean(dari || sampai);
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger>
+    <div className={`flex items-center gap-2 ${penuh ? "w-full min-w-0 " : ""}${className}`}>
+      <Popover open={open} onOpenChange={setOpen} className={penuh ? "w-full" : ""}>
+        <PopoverTrigger className={penuh ? "w-full" : ""}>
           <button
             type="button"
-            className={`flex cursor-pointer items-center gap-2.5 rounded-[8px] border px-3 py-1.5 text-[length:var(--ukuran-catatan)] font-medium shadow-2xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
+            className={`${penuh ? "h-9 w-full min-w-0 " : ""}flex cursor-pointer items-center gap-2.5 rounded-[8px] border px-3 py-1.5 text-[length:var(--ukuran-catatan)] font-medium shadow-2xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
               gelap
                 ? "border-white/15 bg-pantau-malam text-white hover:border-white/30 focus-visible:outline-white/60"
                 : "border-black/10 bg-white text-tinta hover:border-black/20 hover:bg-black/[0.02] focus-visible:outline-api dark:border-white/15 dark:bg-pantau-konsol dark:text-white dark:hover:border-white/30 dark:hover:bg-white/[0.04] dark:focus-visible:outline-white/60"
@@ -114,7 +118,7 @@ export function DateRangePicker({
               />
             </svg>
             <span
-              className={`whitespace-nowrap ${
+              className={`${penuh ? "truncate " : ""}whitespace-nowrap ${
                 !adaPilihan
                   ? gelap
                     ? "text-white/45"

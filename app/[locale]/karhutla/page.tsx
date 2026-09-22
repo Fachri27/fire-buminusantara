@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { ambilSemuaBerita, hitungLaporanProvinsi } from "@/lib/events";
+import { ambilUmpan, hitungLaporanProvinsi } from "@/lib/events";
 import { ambilSorotan } from "@/lib/statistik-sorotan";
 import { ambilKolomUmpanAwal } from "@/lib/perangkat";
 import { LandingKarhutla } from "@/components/landing-karhutla";
@@ -74,7 +74,7 @@ export default async function HalamanKarhutla({ params }: Props) {
   await connection();
   const [jumlahLaporan, berita, sorotan, kolomAwal] = await Promise.all([
     hitungLaporanProvinsi(),
-    ambilSemuaBerita(),
+    ambilUmpan(),
     ambilSorotan(),
     ambilKolomUmpanAwal(),
   ]);

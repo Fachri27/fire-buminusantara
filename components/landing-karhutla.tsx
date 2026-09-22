@@ -18,6 +18,10 @@ import { ambilStatistik, type Statistik as DataStatistik } from "@/lib/statistik
 import type { KunciSorotan } from "@/lib/statistik-sorotan-teks";
 import { BAHASA, type Bahasa } from "@/lib/bahasa";
 import type { Berita } from "@/lib/events";
+import { PULAU_TAB, waktuIso, waktuTeks } from "@/lib/tanggal";
+import { BilahSaringan, SaklarSegmen } from "@/components/bilah-saringan";
+import { useTheme } from "next-themes";
+import { useMounted } from "@/hooks/use-mounted";
 import { kirimLaporan, type KeadaanLapor } from "@/app/[locale]/lapor/aksi";
 import { bacaDraf, simpanDraf } from "@/lib/draf-lapor";
 
@@ -61,6 +65,11 @@ export type Laporan = {
   deskripsi: string | null;
   slug: string | null;
   href: string;
+  /** Pulau payload berita (Sumatra, Kalimantan, …) — kunci saringan wilayah
+   *  di bilah saringan umpan. Opsional: pemakai lain tipe ini tak menyaring. */
+  pulau?: string | null;
+  /** Jumlah komentar — kunci urutan "komentar terbanyak" umpan. */
+  komentar?: number;
 };
 
 
@@ -87,6 +96,16 @@ const TEKS = {
     kaki: "Laporan warga terkurasi sebelum ditampilkan. Menyaksikan kebakaran atau dampak asapnya? Ceritakan di kotak laporan.",
     merek: "©2026 Lapor Karhutla",
     hasilKosong: "Tidak ada laporan yang cocok. Coba kata lain, atau kirim laporanmu sendiri.",
+    saringanKosong: "Tidak ada laporan pada wilayah atau rentang tanggal ini.",
+    hapusSaringan: "Hapus saringan",
+    semuaWilayah: "Semua wilayah",
+    saringanPilihWilayah: "Pilih wilayah pulau",
+    saringanSatuan: "laporan",
+    urutan: "Urutan laporan",
+    tanggalPanjang: "Pilih rentang tanggal",
+    tanggalPendek: "Tanggal",
+    urutTerbaru: "Terbaru",
+    urutKomentar: "Komentar terbanyak",
     umpan: "Laporan warga",
     situasi: "Panel situasi",
     mainkan: "Mainkan rekaman sebaran",
@@ -161,6 +180,16 @@ const TEKS = {
     kaki: "Citizen reports are curated before they appear. Seeing a fire or its haze? Tell us in the report box.",
     merek: "©2026 Lapor Karhutla",
     hasilKosong: "No reports match that. Try other words, or send a report of your own.",
+    saringanKosong: "No reports in this region or date range.",
+    hapusSaringan: "Clear filters",
+    semuaWilayah: "All regions",
+    saringanPilihWilayah: "Choose an island region",
+    saringanSatuan: "reports",
+    urutan: "Report order",
+    tanggalPanjang: "Choose a date range",
+    tanggalPendek: "Dates",
+    urutTerbaru: "Newest",
+    urutKomentar: "Most commented",
     umpan: "Citizen reports",
     situasi: "Situation panel",
     mainkan: "Play the spread recording",
@@ -2207,11 +2236,6 @@ export function LandingKarhutla(
     [berita, bukaRincian],
   );
 
-  const indeksSorot = sorot ? berita.findIndex((b) => b.id === sorot.id) : -1;
-  const adaSebelumnya = indeksSorot > 0;
-  const adaBerikutnya = indeksSorot >= 0 && indeksSorot < berita.length - 1;
-  const keSebelumnya = adaSebelumnya ? () => bukaRincian(berita[indeksSorot - 1]) : undefined;
-  const keBerikutnya = adaBerikutnya ? () => bukaRincian(berita[indeksSorot + 1]) : undefined;
   // Tap media: di seluler pindah ke halaman Postingan; di desktop langsung
   // pop-up rincian. Tanpa slug (tak bisa ditautkan) langsung pop-up juga.
   // Dibaca live (bukan state aliran) supaya selalu benar.
@@ -2408,17 +2432,89 @@ export function LandingKarhutla(
           deskripsi: b.deskripsi,
           slug: b.slug,
           href: b.slug ? `/${bahasa}/fire/${b.slug}` : `/${bahasa}`,
+          pulau: b.pulau,
+          komentar: b.jumlahKomentar ?? 0,
         };
       }),
     [berita, bahasa],
   );
   const kata = cari.trim().toLowerCase();
-  const hasil = laporan.filter((l) => l.judul.toLowerCase().includes(kata));
-  // Jumlah kolom umpan stabil menurut lebar layar (3 kolom di desktop),
-  // bukan berganti 3<->4 saat rel ditutup-buka. Pergantian kolom merombak
-  // seluruh partisi kartu (isi[i % kolom]) yang membuat kartu meloncat
-  // antar-kolom dan memicu kedipan/flickering pada gambar dan layout.
-  const kolom = gunakanKolomUmpan(true, kolomAwal);
+
+  /* Bilah saringan umpan — rentang tanggal, wilayah pulau, dan mode tampilan.
+     Rupa dan perilakunya sama dengan pop-up wilayah peta (BilahSaringan
+     dipakai bersama); bedanya di sini ada "Semua wilayah" dan itu bawaannya,
+     karena umpan adalah seluruh laporan, bukan laporan satu provinsi. */
+  const { resolvedTheme } = useTheme();
+  const temaSiap = useMounted();
+  const temaGelap = temaSiap && resolvedTheme === "dark";
+  const [dariUmpan, setDariUmpan] = useState("");
+  const [sampaiUmpan, setSampaiUmpan] = useState("");
+  const [wilayahUmpan, setWilayahUmpan] = useState("semua");
+  const [urutanUmpan, setUrutanUmpan] = useState<"semua" | "terbaru" | "komentar">("semua");
+  const adaSaringanUmpan = Boolean(dariUmpan || sampaiUmpan || wilayahUmpan !== "semua");
+  const hapusSaringanUmpan = () => {
+    setDariUmpan("");
+    setSampaiUmpan("");
+    setWilayahUmpan("semua");
+  };
+
+  // Kata kunci + rentang tanggal lebih dulu, wilayah belakangan: jumlah di
+  // tiap opsi wilayah dihitung dari hasil tahap pertama, jadi "(5 laporan)"
+  // selalu sama dengan banyak kartu yang muncul saat opsi itu dipilih.
+  const sebelumWilayah = useMemo(() => {
+    const awal = waktuIso(dariUmpan);
+    const akhir = waktuIso(sampaiUmpan);
+    return laporan.filter((l) => {
+      if (!l.judul.toLowerCase().includes(kata)) return false;
+      const waktu = waktuTeks(l.tanggal);
+      if (waktu === null) return true; // tanggal tak terbaca: jangan disembunyikan
+      if (awal !== null && waktu < awal) return false;
+      if (akhir !== null && waktu > akhir) return false;
+      return true;
+    });
+  }, [laporan, kata, dariUmpan, sampaiUmpan]);
+  const opsiWilayah = useMemo(() => [
+    { kunci: "semua", label: t.semuaWilayah, jumlah: sebelumWilayah.length },
+    ...PULAU_TAB.map((tab) => ({
+      kunci: tab.kunci,
+      label: tab.label,
+      jumlah: sebelumWilayah.filter((l) => !!l.pulau && (tab.isi as readonly string[]).includes(l.pulau)).length,
+    })),
+  ], [sebelumWilayah, t.semuaWilayah]);
+  const hasil = useMemo(() => {
+    const tab = PULAU_TAB.find((x) => x.kunci === wilayahUmpan);
+    const isi = tab ? (tab.isi as readonly string[]) : null;
+    const tersaring = isi ? sebelumWilayah.filter((l) => !!l.pulau && isi.includes(l.pulau)) : sebelumWilayah;
+    // Terbaru: tanggal kejadian, lalu id (yang dibuat belakangan dulu).
+    // Komentar terbanyak: jumlah komentar, seri → yang lebih baru dulu.
+    // Bawaan ("semua", tanpa pil menyala): sama dengan Terbaru — seluruh
+    // data tampil dengan yang terbaru di atas.
+    const baru = (a: Laporan, b: Laporan) => (waktuTeks(b.tanggal) ?? 0) - (waktuTeks(a.tanggal) ?? 0) || b.id - a.id;
+    return [...tersaring].sort(urutanUmpan === "komentar"
+      ? (a, b) => (b.komentar ?? 0) - (a.komentar ?? 0) || baru(a, b)
+      : baru);
+  }, [sebelumWilayah, wilayahUmpan, urutanUmpan]);
+
+  /* Geser/panah antar-laporan di rincian mengikuti umpan YANG TERLIHAT —
+     urutan dan saringannya — jadi "berikutnya" selalu kartu berikutnya di
+     layar. Laporan yang dibuka dari luar umpan (mis. pop-up peta, atau yang
+     tersaring keluar) jatuh ke urutan seluruh `berita`. */
+  const urutanNav = useMemo(() => {
+    if (!sorot || !hasil.some((l) => l.id === sorot.id)) return berita;
+    const perId = new Map(berita.map((b) => [b.id, b]));
+    return hasil.map((l) => perId.get(l.id)).filter((b): b is Berita => !!b);
+  }, [sorot, hasil, berita]);
+  const indeksSorot = sorot ? urutanNav.findIndex((b) => b.id === sorot.id) : -1;
+  const adaSebelumnya = indeksSorot > 0;
+  const adaBerikutnya = indeksSorot >= 0 && indeksSorot < urutanNav.length - 1;
+  const keSebelumnya = adaSebelumnya ? () => bukaRincian(urutanNav[indeksSorot - 1]) : undefined;
+  const keBerikutnya = adaBerikutnya ? () => bukaRincian(urutanNav[indeksSorot + 1]) : undefined;
+  // Jumlah kolom umpan mengikuti keadaan rel kiri di desktop: rel terbuka =
+  // 3 kolom, rel dilipat = 4 kolom memakai ruang yang bebas. Pergantian kolom
+  // merombak partisi kartu (isi[i % kolom]) sehingga kartu berpindah kolom —
+  // itu memang yang diminta saat rel dilipat. Di seluler lebar layar yang
+  // menentukan (2 kolom), keadaan rel tidak berpengaruh.
+  const kolom = gunakanKolomUmpan(kiriBuka, kolomAwal);
   const bukaMedia = useCallback(
     (id: number) => {
       bukaDariId(id);
@@ -2891,10 +2987,52 @@ export function LandingKarhutla(
           >
           <KomposerLapor bahasa={bahasa} />
 
+          <div className="mt-4">
+            <BilahSaringan
+              dari={dariUmpan}
+              sampai={sampaiUmpan}
+              gelap={temaGelap}
+              onTanggal={({ dari, sampai }) => {
+                setDariUmpan(dari);
+                setSampaiUmpan(sampai);
+              }}
+              wilayah={wilayahUmpan}
+              opsiWilayah={opsiWilayah}
+              onWilayah={setWilayahUmpan}
+              labelWilayah={t.saringanPilihWilayah}
+              satuan={t.saringanSatuan}
+              placeholderTanggal={t.tanggalPanjang}
+              placeholderTanggalPendek={t.tanggalPendek}
+              saklar={
+                /* Nilai "semua" tidak cocok dengan opsi mana pun sehingga tak
+                   ada pil yang menyala — bawaan menampilkan seluruh data.
+                   Pil yang sedang menyala diklik lagi untuk kembali netral. */
+                <SaklarSegmen
+                  nilai={urutanUmpan}
+                  onPilih={(kunci) => setUrutanUmpan((u) => (u === kunci ? "semua" : kunci))}
+                  label={t.urutan}
+                  opsi={[
+                    { kunci: "terbaru", label: t.urutTerbaru, isi: t.urutTerbaru },
+                    { kunci: "komentar", label: t.urutKomentar, isi: t.urutKomentar },
+                  ]}
+                />
+              }
+            />
+          </div>
+
           {hasil.length === 0 ? (
-            <p className="mt-5 text-black/60 dark:text-[#a0a0a0] px-4 py-12 text-center text-[13px]">
-              {t.hasilKosong}
-            </p>
+            <div className="mt-5 px-4 py-12 text-center text-[13px] text-black/60 dark:text-[#a0a0a0]">
+              <p>{adaSaringanUmpan && !kata ? t.saringanKosong : t.hasilKosong}</p>
+              {adaSaringanUmpan && (
+                <button
+                  type="button"
+                  onClick={hapusSaringanUmpan}
+                  className="mt-2 cursor-pointer font-semibold text-bara underline underline-offset-2 transition-colors hover:text-api"
+                >
+                  {t.hapusSaringan}
+                </button>
+              )}
+            </div>
           ) : (
             <UmpanMasonry
               daftar={hasil}
@@ -3048,9 +3186,9 @@ export function LandingKarhutla(
           adaSebelumnya={adaSebelumnya}
           adaBerikutnya={adaBerikutnya}
           indeksAktif={indeksSorot >= 0 ? indeksSorot : undefined}
-          totalKejadian={berita.length}
-          beritaSebelumnya={adaSebelumnya ? berita[indeksSorot - 1] : undefined}
-          beritaBerikutnya={adaBerikutnya ? berita[indeksSorot + 1] : undefined}
+          totalKejadian={urutanNav.length}
+          beritaSebelumnya={adaSebelumnya ? urutanNav[indeksSorot - 1] : undefined}
+          beritaBerikutnya={adaBerikutnya ? urutanNav[indeksSorot + 1] : undefined}
         />
       )}
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { cacheLife, cacheTag } from "next/cache";
-import { ambilBeritaSlug, ambilSemuaBerita, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
+import { ambilBeritaSlug, ambilUmpan, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { JsonLd } from "@/components/json-ld";
 import { LandingKarhutla } from "@/components/landing-karhutla";
@@ -193,7 +193,7 @@ async function IsiHalaman({
   await connection();
   const [jumlahLaporan, semuaBerita, sorotan, seo, kolomAwal] = await Promise.all([
     hitungLaporanProvinsi(),
-    ambilSemuaBerita(),
+    ambilUmpan(),
     ambilSorotan(),
     ambilRincianSeo(slug),
     ambilKolomUmpanAwal(),
