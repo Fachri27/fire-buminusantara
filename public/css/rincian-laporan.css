@@ -26,6 +26,13 @@
   --r-sorot: rgb(26 25 25 / 0.06);
   --r-tautan: #0095f6;
 
+  /* Selama pop-up terbuka, bilah tab di dasar layar ikut disembunyikan (lihat
+     `body:has(.rincian) .lk-tabbar` di bawah) — jadi ruang yang diumumkan
+     halaman lewat --sela-bawah tak lagi punya penghuni dan hanya menyisakan
+     celah kosong di dasar panel maupun lembar-lembar di dalamnya. Dinolkan
+     sekali di sini, bukan di tiap tempat yang membacanya. */
+  --sela-bawah: 0px;
+
   /* Satu tingkat di atas dialog peta (z-45) karena bisa terbuka
      menumpanginya, tetap di bawah kop navigasi (z-50). */
   position: fixed;
@@ -81,6 +88,19 @@ body:has(.rincian) {
 body:has(.rincian) #peta,
 body:has(.rincian) iframe[src*="forecasting"] {
   pointer-events: none !important;
+}
+body:has(.rincian) .lk-tabbar {
+  display: none !important;
+}
+
+/* Di ponsel pop-up-nya lembar penuh (lihat query lebar 860px di bawah), jadi
+   kop navigasi yang fixed ikut menyingkir — kalau tidak, 4rem teratasnya
+   menutupi bagian atas media. Hanya kop `fixed` yang kena; kop `sticky` di
+   halaman lain tak pernah sepanggung dengan pop-up ini. */
+@media (max-width: 860px) {
+  body:has(.rincian) header.fixed {
+    display: none !important;
+  }
 }
 
 .rincian__panel {
@@ -251,56 +271,25 @@ body:has(.rincian) iframe[src*="forecasting"] {
 
 /* --- Kerangka pemuatan media ----------------------------------------------
    Menutupi kotak media sampai foto/video siap, menggunakan gradasi gelap halus
-   agar tidak menyilaukan/berkedip putih di atas latar hitam. */
+   agar tidak menyilaukan/berkedip putih di atas latar hitam. Mengisi penuh area
+   media agar tidak membentuk balok vertikal sempit yang berkedip. */
 .rincian__kerangka {
   position: absolute;
   inset: 0;
-  margin: auto;
-  z-index: 1;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
   background: linear-gradient(150deg, #18181b, #27272a);
   animation: denyut-rincian 1.5s ease-in-out infinite;
-  transition: opacity 300ms ease;
+  transition: opacity 300ms ease, visibility 300ms ease;
   pointer-events: none;
 }
 
-
-/* Lanskap: ikut lebar kolom, tingginya mengikuti rasio 16:9 — sama seperti
-   area gambar media 16:9 yang terhambat max-width di kolom yang sempit. */
-.rincian__media--lanskap .rincian__kerangka {
-  width: 100%;
-  height: auto;
-  max-height: 100%;
-  aspect-ratio: 16 / 9;
-}
-
-/* Tegak: ikut tinggi kolom, lebarnya mengikuti rasio 9/16. */
-.rincian__media--tegak .rincian__kerangka {
-  height: 100%;
-  width: auto;
-  max-width: 100%;
-  aspect-ratio: 9 / 16;
-}
-
-/* Rasio cadangan medianya sendiri, dari orientasi kejadian di basis data:
-   `auto` membuat rasio asli berkasnya menang begitu terbaca, jadi nilai ini
-   hanya memegang bentuk kotak (dan lebar panelnya) selama berkasnya
-   diunduh — tanpa itu kotaknya runtuh dan pengunjung hanya disuguhi spinner
-   bawaan peramban. */
-.rincian__media--lanskap img,
-.rincian__media--lanskap video {
-  aspect-ratio: auto 16 / 9;
-}
-
-.rincian__media--tegak img,
-.rincian__media--tegak video {
-  aspect-ratio: auto 9 / 16;
-}
-
-/* Siap: berhenti berdenyut dulu, baru memudar — bukan lenyap seketika di
-   tengah denyutan. */
+/* Siap: memudar halus tanpa menyentak (tidak memakai animation:none agar
+   opacity tidak mendadak meloncat ke 100% saat memudar). */
 .rincian__kerangka.tutup {
-  animation: none;
   opacity: 0;
+  visibility: hidden;
 }
 
 @keyframes denyut-rincian {
@@ -356,8 +345,16 @@ body:has(.rincian) iframe[src*="forecasting"] {
   left: 14px;
 }
 
+.rincian__slider-tombol--kiri svg {
+  transform: translateX(-1px);
+}
+
 .rincian__slider-tombol--kanan {
   right: 14px;
+}
+
+.rincian__slider-tombol--kanan svg {
+  transform: translateX(1px);
 }
 
 .rincian__dots {
@@ -415,15 +412,17 @@ body:has(.rincian) iframe[src*="forecasting"] {
   color: var(--r-teks);
 }
 
-/* Kepala: keping bundar + nama pulau + tanggal, tombol tutup di kanan —
-   posisi yang sama dengan baris profil pada rujukan. */
+/* Kepala: tanggal rata kiri, grup tombol (komentar–bagikan–tutup) rata kanan
+   — satu baris selebar rel, seperti baris profil pada rujukan. */
 .rincian__kepala {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 14px;
+  justify-content: space-between;
+  gap: 8px;
   border-bottom: 1px solid var(--r-garis);
-  padding: 16px 56px 16px 22px;
+  padding: 14px 12px;
+  min-height: 48px;
 }
 
 .rincian__keping {
@@ -445,6 +444,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
   font-size: 12.5px;
   line-height: 1.3;
   color: var(--r-redup);
+  margin: 0;
 }
 
 /* Badan bergulir: kapsi + daftar komentar, persis seperti rujukan yang
@@ -530,32 +530,32 @@ body:has(.rincian) iframe[src*="forecasting"] {
 /* --- Daftar komentar ----------------------------------------------------- */
 .rincian__utas {
   display: grid;
-  gap: 18px;
-  margin-top: 26px;
+  gap: 12px;
+  margin-top: 14px;
 }
 
 .rincian__komen {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
 /* Keping di baris komentar */
 .rincian__komen .rincian__keping,
 .rincian__komen .rincian__inisial {
-  width: 28px;
-  height: 28px;
-  font-size: 11.5px;
+  width: 24px;
+  height: 24px;
+  font-size: 10.5px;
 }
 
 .rincian__inisial {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   place-items: center;
   border-radius: 999px;
   background: var(--r-sorot);
-  font-size: 13.5px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--r-teks);
   text-transform: uppercase;
@@ -567,9 +567,43 @@ body:has(.rincian) iframe[src*="forecasting"] {
 }
 
 .rincian__komen-teks {
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+/* Komentar panjang dipangkas empat baris — satu komentar tak boleh menguasai
+   seluruh daftar. Selama terpangkas, tinggi gulir elemennya masih menyimpan
+   tinggi penuh, dan itulah yang dibaca komponennya untuk memutuskan apakah
+   tombol "Selengkapnya" perlu ada. */
+.rincian__komen-teks--pangkas {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+
+.rincian__selengkapnya {
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--r-redup);
+  transition: color 0.2s ease;
+}
+
+.rincian__selengkapnya:hover {
+  color: var(--r-teks);
+}
+
+.rincian__selengkapnya:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 .rincian__komen-nama {
@@ -580,9 +614,9 @@ body:has(.rincian) iframe[src*="forecasting"] {
 .rincian__komen-kaki {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-top: 6px;
-  font-size: 11.5px;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 11px;
   color: var(--r-redup);
 }
 
@@ -590,7 +624,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
   cursor: pointer;
   border: 0;
   background: transparent;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--r-redup);
   transition: color 0.2s ease;
@@ -617,12 +651,12 @@ body:has(.rincian) iframe[src*="forecasting"] {
 .rincian__lihat {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 8px;
   cursor: pointer;
   border: 0;
   background: transparent;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   color: var(--r-redup);
   transition: color 0.2s ease;
@@ -649,8 +683,8 @@ body:has(.rincian) iframe[src*="forecasting"] {
 
 .rincian__balasan {
   display: grid;
-  gap: 14px;
-  margin-top: 14px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 /* Kelas, bukan x-show: pada versi Alpine yang dipakai di sini x-show tidak
@@ -665,8 +699,8 @@ body:has(.rincian) iframe[src*="forecasting"] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 11px;
   color: var(--r-redup);
 }
 
@@ -674,7 +708,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
   cursor: pointer;
   border: 0;
   background: transparent;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--r-tautan);
 }
@@ -686,14 +720,14 @@ body:has(.rincian) iframe[src*="forecasting"] {
 }
 
 .rincian__kosong {
-  margin-top: 24px;
-  font-size: 13px;
+  margin-top: 14px;
+  font-size: 12px;
   color: var(--r-redup);
 }
 
 .rincian__galat {
-  margin-top: 8px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 11.5px;
   color: var(--color-api, #e60012);
 }
 
@@ -707,9 +741,9 @@ body:has(.rincian) iframe[src*="forecasting"] {
      Pola yang sama dengan .rincian__sheet-panel di bawah. */
   grid-template-columns: minmax(0, 1fr);
   flex-shrink: 0;
-  gap: 8px;
+  gap: 6px;
   border-top: 1px solid var(--r-garis);
-  padding: 12px 16px;
+  padding: 10px 14px;
 }
 
 /* --- Pemicu & sheet komentar (ponsel) --------------------------------------
@@ -722,21 +756,32 @@ body:has(.rincian) iframe[src*="forecasting"] {
   align-items: center;
   gap: 10px;
   width: 100%;
-  cursor: pointer;
+  padding: 10px 16px;
+  border-radius: 999px;
   border: 0;
-  background: var(--r-rel);
+  background: var(--r-sorot);
   color: var(--r-redup);
   font: inherit;
+  font-size: 14px;
   text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.rincian__pemicu:hover {
+  background: var(--r-garis);
+  color: var(--r-teks);
+}
+
+.rincian__pemicu:focus-visible {
+  outline: 2px solid var(--r-tautan);
+  outline-offset: 2px;
 }
 
 .rincian__pemicu-teks {
   flex: 1;
-  padding: 10px 16px;
-  border-radius: 999px;
-  background: var(--r-sorot);
-  font-size: 14px;
-  color: var(--r-redup);
+  font-size: inherit;
+  color: inherit;
 }
 
 .rincian__sheet {
@@ -840,40 +885,329 @@ body:has(.rincian) iframe[src*="forecasting"] {
   height: auto;
 }
 
-/* Widget Turnstile hanya wadah token — di sheet ia dipasang ulang setiap
-   kali terbuka; kotaknya sendiri interaction-only (nyaris tak terlihat). */
+/* Varian lembar KOMENTAR (ponsel): tinggi ±70% layar — daftar komentar
+   bergulir di tengah, kolom kirim dipatung di dasar. Tingginya fixed (bukan
+   max-height seperti lembar tulis komentar) supaya terasa sebagai panel
+   penuh yang meluncur naik, bukan kartu yang besar sebesar isinya. */
+.rincian__sheet-panel--komentar {
+  display: flex;
+  flex-direction: column;
+  height: calc(75svh - var(--sela-bawah, 0px));
+  max-height: calc(75svh - var(--sela-bawah, 0px));
+  padding: 10px 14px 0;
+  overflow: hidden;
+}
+
+.rincian__sheet-panel--komentar .rincian__sheet-kepala {
+  padding-bottom: 6px;
+}
+
+.rincian__sheet-panel--komentar .rincian__sheet-judul {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.rincian__sheet-panel--komentar .rincian__sheet-tutup {
+  width: 24px;
+  height: 24px;
+}
+
+.rincian__sheet-panel--komentar .rincian__sheet-tutup svg {
+  width: 11px;
+}
+
+.rincian__sheet-panel--komentar .rincian__kosong {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.rincian__sheet-panel--komentar .rincian__utas {
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.rincian__sheet-panel--komentar .rincian__komen {
+  gap: 8px;
+}
+
+.rincian__sheet-panel--komentar .rincian__komen .rincian__inisial {
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+}
+
+.rincian__sheet-panel--komentar .rincian__komen-teks {
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+/* Tiga baris saja di lembar yang sempit — empat baris 11.5px sudah sepertiga
+   area daftar. */
+.rincian__sheet-panel--komentar .rincian__komen-teks--pangkas {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.rincian__sheet-panel--komentar .rincian__selengkapnya {
+  font-size: 10.5px;
+}
+
+/* Baris pemicu ikut mengecil bersama isian di bawahnya — 14px bawaannya
+   kini jauh lebih besar dari seluruh isi formulirnya sendiri. */
+.rincian__sheet-panel--komentar .rincian__pemicu {
+  padding: 8px 14px;
+  font-size: 11.5px;
+}
+
+.rincian__sheet-panel--komentar .rincian__komen-kaki {
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 10.5px;
+}
+
+.rincian__sheet-panel--komentar .rincian__balas {
+  font-size: 10.5px;
+}
+
+.rincian__sheet-panel--komentar .rincian__lihat {
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 10.5px;
+}
+
+.rincian__sheet-panel--komentar .rincian__balasan {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Daftar komentar bergulir sendiri; kolom kirim di luar area ini. */
+.rincian__sheet-isi {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+}
+
+/* Kolom kirim di dasar lembar komentar: SERINGKAS MUNGKIN */
+.rincian__sheet-panel--komentar .rincian__kirim {
+  flex-shrink: 0;
+  gap: 3px;
+  margin: 0 -14px;
+  padding: 3px 14px calc(5px + env(safe-area-inset-bottom));
+  border-top: 0;
+}
+
+/* Baris teks di dalam formulir ikut dirampingkan bersama isiannya. */
+.rincian__sheet-panel--komentar .rincian__identitas {
+  gap: 5px;
+}
+
+.rincian__sheet-panel--komentar .rincian__membalas,
+.rincian__sheet-panel--komentar .rincian__batal {
+  font-size: 10px;
+}
+
+/* Isian formulir di lembar komentar semuanya satu tingkat lebih ramping
+   dari versi desktop/lembar tulisnya. */
+.rincian__sheet-panel--komentar .rincian__input {
+  padding: 3px 7px;
+  font-size: 10.5px;
+  border-radius: 7px;
+  height: 24px;
+}
+
+/* Saklar anonim di sini dikecilkan dari `sm` bawaan komponen (28×16): ukuran
+   itu ditulis kelas Tailwind di dalam @layer utilities, jadi aturan tanpa
+   layer ini menang tanpa perlu !important. Jalur geser tombolnya ikut
+   disesuaikan — 24 - 2·2 - 10 — supaya bundarnya berhenti tepat di ujung. */
+.rincian__sheet-panel--komentar .rincian__anonim {
+  padding: 0;
+  font-size: 10px;
+  gap: 5px;
+}
+
+.rincian__sheet-panel--komentar .rincian__anonim .rincian__saklar-jalur {
+  width: 24px;
+  height: 14px;
+}
+
+.rincian__sheet-panel--komentar .rincian__anonim .rincian__saklar-tombol {
+  width: 10px;
+  height: 10px;
+}
+
+.rincian__sheet-panel--komentar .rincian__anonim input:checked + .rincian__saklar-jalur .rincian__saklar-tombol {
+  --tw-translate-x: 10px;
+}
+
+/* Keping inisial di baris ketik dibuang: di lembar yang sempit ini barisnya
+   sendiri sudah terbaca sebagai kolom komentar, dan 28px-nya lebih berguna
+   untuk kotak ketiknya. */
+.rincian__sheet-panel--komentar .rincian__baris > .rincian__inisial--kecil {
+  display: none;
+}
+
+.rincian__sheet-panel--komentar .rincian__ketik-bungkus {
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+
+.rincian__sheet-panel--komentar .rincian__ketik {
+  padding: 3px 0;
+  font-size: 10.5px;
+  line-height: 1.3;
+  min-height: 19px;
+  /* Pendek: tiga baris saja. Kotak ketik yang tumbuh sampai 64px (bawaannya)
+     mendorong dasar lembar jadi dua kali lipat tinggi dan, karena gulirannya
+     tak terlihat sama sekali di ponsel, teks yang lewat batas cuma tampak
+     terpotong. Tinggi penuh tetap terjangkau dengan menggulir di dalamnya. */
+  max-height: 41px;
+  /* Guliran di dalam kotak tidak merembet ke daftar komentar di atasnya. */
+  overscroll-behavior: contain;
+}
+
+.rincian__sheet-panel--komentar .rincian__tombol-kirim {
+  padding: 3px 10px;
+  font-size: 10.5px;
+  height: 22px;
+  border-radius: 9999px;
+}
+
+/* Kepala formulir di dasar lembar komentar: judul halus + tombol tutup kecil */
+.rincian__form-kepala {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -14px;
+  padding: 4px 14px;
+  border-top: 1px solid var(--r-garis);
+}
+
+.rincian__form-kepala .rincian__sheet-judul {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--r-redup);
+}
+
+.rincian__form-kepala .rincian__sheet-tutup {
+  width: 20px;
+  height: 20px;
+}
+
+.rincian__form-kepala .rincian__sheet-tutup svg {
+  width: 9px;
+}
+
+/* Baris pemicu tanpa keping: pilnya memenuhi seluruh lebar lembar. */
+.rincian__sheet-panel--komentar .rincian__pemicu {
+  margin: 6px 0 2px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+.rincian__sheet-panel--komentar .rincian__baris > .rincian__batal,
+.rincian__baris > .rincian__batal {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 0;
+  background: transparent;
+  color: var(--r-redup);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.rincian__baris > .rincian__batal:hover {
+  color: var(--r-teks);
+  background: rgb(255 255 255 / 0.08);
+}
+
+/* Baris ketik di lembar komentar */
+.rincian__sheet-panel--komentar .rincian__baris {
+  margin-top: 2px;
+  align-items: center;
+  gap: 6px;
+}
+
+.rincian__sheet-panel--komentar .rincian__baris > .rincian__inisial--kecil {
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+  margin-top: 0;
+}
+
+.rincian__sheet-panel--komentar .rincian__baris > .rincian__tombol-kirim {
+  margin-top: 0;
+}
 
 /* Widget Turnstile: dibatasi lebar rel supaya tidak mendorong kolom ketik. */
 .rincian__captcha {
+  display: flex;
+  justify-content: center;
   overflow: hidden;
   max-width: 100%;
+}
+
+.rincian__sheet-panel--komentar .rincian__captcha,
+.rincian__sheet-panel .rincian__captcha,
+.lk-komentar .rincian__captcha {
+  transform: scale(0.85);
+  transform-origin: center;
+  margin: -5px 0;
 }
 
 /* Isian nama + email di atas kolom komentar: selalu sebaris (mapan di
    semua lebar; isinya menggulir di dalam bila panjang). */
 .rincian__identitas {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* Pilihan anonim: satu baris kecil di bawah isian identitas. */
 .rincian__anonim {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: fit-content;
-  padding: 6px 2px;
-  font-size: 12.5px;
+  padding: 2px 0;
+  font-size: 11.5px;
   color: var(--r-redup);
   cursor: pointer;
   user-select: none;
+  transition: color 0.15s ease;
 }
 
-.rincian__anonim input {
-  width: 15px;
-  height: 15px;
-  margin: 0;
-  accent-color: var(--r-tautan);
+.rincian__anonim:hover {
+  color: var(--r-teks);
+}
+
+/* Dukungan saklar kustom di pop-up rincian */
+.rincian__anonim .rincian__saklar-jalur {
+  background-color: rgb(0 0 0 / 0.15);
+  border: 1px solid rgb(0 0 0 / 0.1);
+}
+
+.rincian--gelap .rincian__anonim .rincian__saklar-jalur {
+  background-color: rgb(255 255 255 / 0.18);
+  border-color: rgb(255 255 255 / 0.12);
+}
+
+.rincian__anonim input:checked + .rincian__saklar-jalur {
+  background-color: var(--color-pantau-bara, #ff5a26) !important;
+  border-color: transparent !important;
+}
+
+.rincian__anonim input:focus-visible + .rincian__saklar-jalur {
+  outline: 2px solid var(--color-pantau-bara, #ff5a26);
+  outline-offset: 2px;
 }
 
 /* Isian identitas yang dimatikan karena anonim. */
@@ -885,11 +1219,11 @@ body:has(.rincian) iframe[src*="forecasting"] {
   flex: 1;
   min-width: 0;
   border: 1px solid var(--r-garis);
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 5px 8px;
   background: var(--r-sorot);
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.35;
   color: var(--r-teks);
 }
 
@@ -905,25 +1239,18 @@ body:has(.rincian) iframe[src*="forecasting"] {
 .rincian__baris {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* Di dalam SHEET komentar (ponsel) textarea-nya rows=3 sehingga kotaknya
-   tinggi; dengan align-items:center avatar & tombol "Kirim" melayang ke tengah
-   kotak sementara placeholder ada di atas — terlihat tak rata ("ga enak
-   dilihat"). Sejajarkan ke ATAS, setinggi baris pertama textarea. Hanya di
-   sheet — form desktop (textarea satu baris) tetap center seperti semula. */
 .rincian__sheet-panel .rincian__baris {
-  align-items: flex-start;
-  /* Beri sedikit ruang di atas supaya baris tak mepet dengan tepi/isian di
-     atasnya. */
-  margin-top: 10px;
-}
-.rincian__sheet-panel .rincian__baris > .rincian__inisial--kecil {
+  align-items: center;
   margin-top: 4px;
 }
+.rincian__sheet-panel .rincian__baris > .rincian__inisial--kecil {
+  margin-top: 0;
+}
 .rincian__sheet-panel .rincian__baris > .rincian__tombol-kirim {
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .rincian__jebakan {
@@ -940,8 +1267,8 @@ body:has(.rincian) iframe[src*="forecasting"] {
   min-width: 0;
   background: var(--r-sorot);
   border: 1px solid var(--r-garis);
-  border-radius: 16px;
-  padding: 2px 14px;
+  border-radius: 14px;
+  padding: 2px 10px;
 }
 
 .rincian__ketik-bungkus:focus-within {
@@ -952,16 +1279,25 @@ body:has(.rincian) iframe[src*="forecasting"] {
   /* Bukan flex: elemen ini anak <label>, bukan anak .rincian__baris. */
   display: block;
   width: 100%;
-  /* Tanpa ini textarea memakai lebar intrinsik dari atribut cols bawaan
-     (~20 karakter) sebagai min-content, memaksa barisnya melebihi layar. */
   min-width: 0;
   border: 0;
-  padding: 8px 0;
+  padding: 5px 0;
   background: transparent;
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 12.5px;
+  line-height: 1.4;
   color: var(--r-teks);
   resize: none;
+  field-sizing: content;
+  min-height: 26px;
+  max-height: 80px;
+  /* `field-sizing: content` mengukur lebar kotak dari ISI, bukan dari
+     `width: 100%` — satu tautan atau untaian tanpa spasi membuat kotak ini
+     membengkak sampai 1000px dan mendorong seluruh baris keluar layar.
+     `anywhere` (bukan `break-word`) yang menolong: hanya nilai itu yang ikut
+     mengecilkan ukuran min-content, jadi kotaknya berhenti tumbuh. max-width
+     memasang pagar terakhirnya. */
+  overflow-wrap: anywhere;
+  max-width: 100%;
 }
 
 .rincian__ketik::placeholder {
@@ -970,9 +1306,6 @@ body:has(.rincian) iframe[src*="forecasting"] {
 
 .rincian__ketik:focus-visible {
   outline: none;
-}
-
-.rincian__ketik:focus-visible {
   border-bottom: 0;
 }
 
@@ -983,9 +1316,9 @@ body:has(.rincian) iframe[src*="forecasting"] {
   border-radius: 9999px;
   background: #e7e9ea;
   color: #000;
-  font-size: 13.5px;
-  font-weight: 700;
-  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 14px;
   transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
@@ -1004,25 +1337,30 @@ body:has(.rincian) iframe[src*="forecasting"] {
   outline-offset: 2px;
 }
 
-/* Keping kecil di baris ketik — sejajar dengan tombol emoji pada rujukan,
-   tapi diisi foto akun yang sedang menulis. */
+/* Keping kecil di baris ketik */
 .rincian__keping--kecil,
 .rincian__inisial--kecil {
-  width: 26px;
-  height: 26px;
-  font-size: 11px;
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+}
+
+/* --- Grup tombol aksi ----------------------------------------------------
+   Komentar, bagikan, dan tutup duduk di ujung kanan baris tanggal; tanggalnya
+   rata kiri (kepala memakai space-between selebar rel). */
+.rincian__aksi {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 /* --- Tombol tutup --------------------------------------------------------
    Pil kaca gelap dengan ikon putih — sama perlakuannya dengan kapsul kredit
-   di bawah. Tombol-tombol ini menggantung di atas media yang bisa gelap
-   (alas hitam) ATAU terang (foto putih, rel putih di desktop), jadi warnanya
-   tidak boleh bergantung pada apa yang ada di belakangnya. */
+   di bawah. Warnanya tidak bergantung pada apa yang ada di belakangnya, jadi
+   tetap terbaca di baris tanggal (rel terang maupun gelap). */
 .rincian__tutup {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 2;
+  position: relative;
   display: grid;
   width: 30px;
   height: 30px;
@@ -1047,13 +1385,12 @@ body:has(.rincian) iframe[src*="forecasting"] {
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4));
 }
 
-/* --- Tombol bagikan -------------------------------------------------------
-   Sejajar dengan tombol tutup, diletakkan tepat di kirinya. */
-.rincian__bagikan {
-  position: absolute;
-  top: 12px;
-  right: 50px;
-  z-index: 2;
+/* --- Tombol bagikan & tombol komentar --------------------------------------
+   Urutan dalam .rincian__aksi: komentar (hanya ponsel — di desktop komentarnya
+   sudah inline di rel), bagikan, lalu tutup paling kanan. */
+.rincian__bagikan,
+.rincian__komentar-tombol {
+  position: relative;
   display: grid;
   width: 30px;
   height: 30px;
@@ -1068,19 +1405,42 @@ body:has(.rincian) iframe[src*="forecasting"] {
   transition: background-color 0.2s ease;
 }
 
-.rincian__bagikan:hover {
+.rincian__bagikan:hover,
+.rincian__komentar-tombol:hover {
   background: rgb(0 0 0 / 0.75);
 }
 
-.rincian__bagikan svg {
+.rincian__bagikan svg,
+.rincian__komentar-tombol svg {
   width: 15px;
   height: auto;
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.4));
 }
 
-.rincian__bagikan:focus-visible {
+.rincian__bagikan:focus-visible,
+.rincian__komentar-tombol:focus-visible {
   outline: 2px solid var(--r-tautan);
   outline-offset: 2px;
+}
+
+/* Lencana jumlah komentar di puncak tombolnya — memberi tahu isi lembar
+   bawah tanpa harus membukanya. Cukup di ponsel; tombolnya memang tak
+   dirender di desktop. */
+.rincian__komentar-jumlah {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 999px;
+  background: var(--color-pantau-bara, #ff5a26);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
 }
 
 /* --- Toast "Link tersalin" ------------------------------------------------
@@ -1104,26 +1464,51 @@ body:has(.rincian) iframe[src*="forecasting"] {
 
 /* --- Layar sempit: panel ditumpuk ---------------------------------------- */
 @media (max-width: 860px) {
+  /* Ponsel: pop-up jadi lembar penuh, bukan kartu di tengah layar. Sisa
+     padding overlay dihapus — bilah tab di bawah dan kop navigasi di atas
+     sama-sama disembunyikan selama pop-up terbuka (lihat dua aturan
+     `body:has(.rincian)` di atas), jadi jarak atas/bawah hanya menyisakan
+     celah kosong. Padding atas pun tak perlu: tombol tutup/bagikan/komentar
+     sudah menggantung DI DALAM panel. */
   .rincian {
-    /* Shorthand, jadi ia menimpa padding dasar seutuhnya — termasuk sisi
-       bawahnya. --sela-bawah karena itu harus diulang di sini; tanpa itu
-       justru di ponsel, satu-satunya tempat bilah tab benar-benar ada,
-       insetnya hilang. */
-    padding: calc(4rem + 6px) 6px calc(6px + var(--sela-bawah, 0px));
+    padding: 0;
   }
 
   .rincian__panel {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-    /* Kembali selebar layar: di layar lebar panelnya fit-content mengikuti
-       rasio media, tetapi saat panel menumpuk media dibatasi 40svh di atas
-       rel — panel harus memenuhi lebar, bukan menyempit mengikuti media. */
     width: 100%;
     height: 100%;
+    max-height: 100%;
+    border: none;
+    border-radius: 0;
   }
 
   .rincian__media {
-    max-height: 40svh;
+    max-height: 48svh;
+  }
+
+  /* Gerak masuknya ikut jadi gerak lembar: panelnya memang lembar penuh di
+     sini, jadi ia naik dari tepi bawah layar — bukan mengambang naik 12px
+     seperti di desktop. Durasi dan kurvanya disalin dari lembar "..." kartu
+     umpan (lk-lembar-naik) supaya membuka laporan dan membuka menu terasa
+     satu tangan yang sama.
+
+     Dikurung `prefers-reduced-motion: no-preference` karena blok reduced-motion
+     di atas berkas ini menulis `animation: none` untuk selektor yang sama, dan
+     aturan yang lebih bawah akan menang atasnya — tanpa kurungan ini, ponsel
+     yang minta gerak dikurangi justru mendapat animasi baru. */
+  @media (prefers-reduced-motion: no-preference) {
+    .rincian__panel {
+      animation: rincian-panel-naik-phone 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Keluar 200ms, BUKAN 240ms: yang menahan unmount adalah animationend
+       overlay .rincian--keluar (200ms), jadi panel yang lebih lama akan
+       terpangkas di tengah jalan. */
+    .rincian--keluar .rincian__panel {
+      animation: rincian-panel-turun-phone 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+    }
   }
 
   /* Elemennya ikut dibatasi, bukan hanya panelnya: tanpa ini video yang lebih
@@ -1131,20 +1516,35 @@ body:has(.rincian) iframe[src*="forecasting"] {
      ikut terpangkas. */
   .rincian__media img,
   .rincian__media video {
-    max-height: 40svh;
+    max-height: 48svh;
   }
 
-  /* Ponsel: media terpaku di atas, REL (bagian putih) yang menggulir
-     seluruh isinya — kapsi, daftar komentar, sampai kolom kirim. Sebelumnya
-     hanya .rincian__badan yang bergulir; kolom kirim yang tinggi (isian
-     identitas, captcha, tombol) memakan ruang tetap sehingga sisa area
-     bergulir bisa nyaris nol dan komentar di bawah tak terjangkau. */
+  /* Ponsel: media terpaku di atas, REL (bagian putih) menggulir seluruh
+     isinya. Komentar dan kolom ketik TIDAK lagi ada di sini — keduanya
+     pindah ke lembar bawah 70% yang dibuka lewat tombol komentar di bilah
+     atas; rel hanya membawa kapsi (judul, deskripsi, lokasi). */
   .rincian__rel {
     min-height: 0;
+    /* Tanpa batas tinggi sendiri: baris grid `minmax(0, 1fr)` sudah
+       menetapkan sisanya setelah media — batas manual di sini justru
+       menyisakan celah di bawah rel. */
+    max-height: none;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     /* Geseran di rel tidak meneruskan gulir ke halaman di belakangnya. */
     overscroll-behavior: contain;
+  }
+
+  /* Kolom komentar versi desktop disembunyikan lewat CSS, bukan hanya lewat
+     `{!ponsel}` di komponennya. Saat pop-up sudah terbuka sejak render
+     pertama (halaman /fire/<slug> menyerahkan kejadian awalnya ke server),
+     HTML-nya dirender dengan `ponsel` masih false — dan dua blok ini sempat
+     terlihat sekejap sebelum hidrasi membalikkannya. Aturan CSS berlaku sejak
+     cat pertama; keduanya hanya hidup di sini, versi ponselnya dirender di
+     dalam lembar bawah. */
+  .rincian__badan > section,
+  .rincian__rel > .rincian__kirim {
+    display: none;
   }
 
   /* Badan kehilangan gulirnya sendiri: ia ikut mengalir utuh di dalam rel
@@ -1153,6 +1553,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
   .rincian__badan {
     flex: none;
     overflow: visible;
+    padding: 20px 20px 24px;
   }
 
   /* Kepala dan kolom ketik ikut mengalir di dalam rel yang bergulir, tapi
@@ -1162,6 +1563,7 @@ body:has(.rincian) iframe[src*="forecasting"] {
     top: 0;
     z-index: 1;
     background: var(--r-rel);
+    padding: 14px 12px;
   }
 
   /* Tetap dipancang di dasar wadahnya, BUKAN dinaikkan sejauh --sela-bawah.
@@ -1274,3 +1676,103 @@ body:has(.rincian) iframe[src*="forecasting"] {
     bottom: 92px;
   }
 }
+
+/* --- Tombol Navigasi Kejadian Sebelumnya & Berikutnya (Desktop Floating) --- */
+.rincian__nav-tombol {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 9999px;
+  background: rgba(24, 24, 27, 0.82);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  outline: none;
+}
+
+.rincian__nav-tombol:hover:not(:disabled) {
+  background: rgba(39, 39, 42, 0.95);
+  transform: translateY(-50%) scale(1.08);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+}
+
+.rincian__nav-tombol:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.rincian__nav-tombol:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.rincian__nav-tombol--kiri {
+  left: clamp(14px, 3.5vw, 48px);
+}
+
+.rincian__nav-tombol--kiri svg {
+  transform: translateX(-1px);
+}
+
+.rincian__nav-tombol--kanan {
+  right: clamp(14px, 3.5vw, 48px);
+}
+
+.rincian__nav-tombol--kanan svg {
+  transform: translateX(1px);
+}
+
+/* Indikator nomor urut kejadian di desktop */
+.rincian__indeks-desktop {
+  position: fixed;
+  top: clamp(16px, 3vh, 32px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(18, 18, 18, 0.75);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 5px 16px;
+  border-radius: 9999px;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 860px) {
+  .rincian__nav-tombol,
+  .rincian__indeks-desktop {
+    display: none !important;
+  }
+}
+
+/* Panel ponsel: turun-naik penuh satu tinggi panel (100% = satu layar, karena
+   .rincian `inset: 0`). Nama keyframes-nya sendiri-sendiri, bukan animasi
+   desktop yang dibalik — peramban mencocokkan animasi lewat nama. */
+@keyframes rincian-panel-naik-phone {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes rincian-panel-turun-phone {
+  to {
+    transform: translateY(100%);
+  }
+}
+

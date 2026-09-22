@@ -13,17 +13,18 @@ import { useSyncExternalStore } from "react";
    Bawaannya true supaya pemanggil yang tak peduli keadaan rel tetap mendapat
    perilaku lama.
 
-   Snapshot server sengaja lebar (1920) dan rel dianggap terbuka — sama dengan
-   keadaan awal kiriBuka — jadi nilai server terhidrasi ke markup tanpa
-   kedipan. */
-export function gunakanKolomUmpan(relKiriTerbuka = true): number {
+   `kolomAwal` (opsional) disuplai dari pembacaan header di Server Component
+   agar snapshot server cocok dengan perangkat pengunjung (2 kolom untuk seluler,
+   3 untuk desktop), mencegah kedipan layout (awalnya 3 kolom lalu melompat ke 2
+   saat hidrasi di peramban ponsel). */
+export function gunakanKolomUmpan(relKiriTerbuka = true, kolomAwal?: number): number {
   const lebar = useSyncExternalStore(
     (ubah) => {
       window.addEventListener("resize", ubah);
       return () => window.removeEventListener("resize", ubah);
     },
     () => window.innerWidth,
-    () => 1920,
+    () => (kolomAwal !== undefined ? (kolomAwal <= 2 ? 390 : 1920) : 1920),
   );
   // Aliran (satu kolom menumpuk): wadah = layar - pias grid - padding rel.
   // Seluler pun 2 kolom seperti rujukan (grid foto ganda ala X) — 1 kolom

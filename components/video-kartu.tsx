@@ -74,21 +74,29 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className 
     }
   }, []);
 
-  // Kartu tengah diputar, sisanya berhenti dan mundur ke awal.
+  // Kartu tengah: tidak diputar otomatis; pratinjau hanya saat hover.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    // Sebagian peramban hanya mengizinkan putar-otomatis bila PROPERTI muted
-    // bernilai true, bukan sekadar atributnya.
     el.muted = true;
-
-    if (aktif && !kurangiGerak) {
-      el.play().catch(() => {}); // ditolak mode hemat daya: poster tetap tampil
-      return;
-    }
     el.pause();
     if (el.readyState >= 1 && el.currentTime) el.currentTime = 0;
+  }, [aktif]);
+
+  const mulaiHover = useCallback(() => {
+    if (!aktif || kurangiGerak) return;
+    const el = ref.current;
+    if (!el) return;
+    el.muted = true;
+    el.play().catch(() => {});
   }, [aktif, kurangiGerak]);
+
+  const hentiHover = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.pause();
+    if (el.readyState >= 1 && el.currentTime) el.currentTime = 0;
+  }, []);
 
   const ulang = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -131,6 +139,8 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className 
         muted
         playsInline
         preload={poster ? "none" : "metadata"}
+        onMouseEnter={mulaiHover}
+        onMouseLeave={hentiHover}
         onPlay={() => { setUsai(false); setJalan(true); }}
         onPause={() => setJalan(false)}
         onLoadedMetadata={() => {

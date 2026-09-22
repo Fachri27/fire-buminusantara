@@ -652,7 +652,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         ref={lapisWindyRef}
         // Berhenti di atas laci konsol ponsel (--sela-bawah; 0 di panggung)
         // supaya bilah skala & logo Windy tak tertutup laci.
-        className={`absolute inset-x-0 top-0 bottom-[var(--sela-bawah,0px)] w-full transition-opacity duration-300 ${
+        className={`peta-windy absolute inset-x-0 top-0 bottom-[var(--sela-bawah,0px)] w-full transition-opacity duration-300 ${
           mode === "windy" ? "opacity-100 pointer-events-auto z-[2]" : "opacity-0 pointer-events-none -z-10"
         }`}
       >

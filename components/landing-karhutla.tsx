@@ -10,14 +10,16 @@ import { Nav } from "@/components/nav";
 import { RincianLaporan } from "@/components/rincian-laporan";
 import { PopupPeta } from "@/components/popup-peta";
 import { UlasanKomentar, FormulirKomentar } from "@/components/kolom-komentar";
+import { Switch } from "@/components/ui/switch";
 import { gunakanKomentar } from "@/hooks/gunakan-komentar";
 import { gunakanKolomUmpan } from "@/hooks/gunakan-kolom-umpan";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "@/lib/batas-laporan";
 import { ambilStatistik, type Statistik as DataStatistik } from "@/lib/statistik";
 import type { KunciSorotan } from "@/lib/statistik-sorotan-teks";
-import type { Bahasa } from "@/lib/bahasa";
+import { BAHASA, type Bahasa } from "@/lib/bahasa";
 import type { Berita } from "@/lib/events";
 import { kirimLaporan, type KeadaanLapor } from "@/app/[locale]/lapor/aksi";
+import { bacaDraf, simpanDraf } from "@/lib/draf-lapor";
 
 /** Site key Turnstile — sama seperti form /lapor. */
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
@@ -115,6 +117,8 @@ const TEKS = {
     tutupPetaSelayar: "Tutup peta selayar",
     namaPh: "Nama (opsional)",
     anonim: "Anonim",
+    lokasiHapus: "Hapus lokasi",
+    wajibMedia: "Foto/video wajib",
     latPh: "Lat",
     lngPh: "Lng",
     tabBeranda: "Beranda",
@@ -123,7 +127,6 @@ const TEKS = {
     tabLapor: "Formulir lapor",
     tabPanel: "Buka panel situasi",
     tabUmpan: "Buka daftar laporan",
-    titikMenu: "Opsi laporan",
     videoBisu: "Nyalakan suara video",
     videoSenyap: "Bisukan video",
     videoUlang: "Putar ulang video",
@@ -135,11 +138,8 @@ const TEKS = {
     komentar: "Komentar",
     selengkapnya: "selengkapnya",
     lebihSedikit: "lebih sedikit",
-    lembarBuka: "Buka laporan",
     lembarBagikan: "Bagikan",
-    lembarUnduh: "Unduh gambar",
     lembarTersalin: "Tautan tersalin",
-    lembarTutup: "Tutup",
   },
   en: {
     judul: "Forest and Land Fires",
@@ -191,6 +191,8 @@ const TEKS = {
     tutupPetaSelayar: "Close fullscreen map",
     namaPh: "Name (optional)",
     anonim: "Anonymous",
+    lokasiHapus: "Clear location",
+    wajibMedia: "Photo/video required",
     latPh: "Lat",
     lngPh: "Lng",
     tabBeranda: "Home",
@@ -199,7 +201,6 @@ const TEKS = {
     tabLapor: "Report form",
     tabPanel: "Open situation panel",
     tabUmpan: "Open report list",
-    titikMenu: "Report options",
     videoBisu: "Unmute video",
     videoSenyap: "Mute video",
     videoUlang: "Replay video",
@@ -211,11 +212,8 @@ const TEKS = {
     komentar: "Comments",
     selengkapnya: "more",
     lebihSedikit: "less",
-    lembarBuka: "Open report",
     lembarBagikan: "Share",
-    lembarUnduh: "Download image",
     lembarTersalin: "Link copied",
-    lembarTutup: "Close",
   },
 } satisfies Record<Bahasa, Record<string, string>>;
 
@@ -577,185 +575,115 @@ function IkonUlang({ className = "size-7" }: { className?: string }) {
   );
 }
 
-/* Video kartu umpan — autoplay bisu saat terlihat di layar
-   (IntersectionObserver 25%), dijeda saat tidak; tanpa kontrol bawaan.
+function IkonPutarBadge({ className = "size-3.5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" className={className}>
+      <polygon points="6 3 20 12 6 21 6 3" />
+    </svg>
+  );
+}
 
-   Gaya Instagram: mulai bisu (syarat autoplay peramban), lencana bisu di kanan
-   bawah untuk menyalakan/mematikan suara, dan setelah habis berhenti di bingkai
-   terakhir dengan tombol putar ulang di tengah — bukan loop.
-   Pengurang gerak berarti diam di poster. Poster di lapisan sendiri supaya
-   kegagalan putar tak berarti kotak hitam. */
-function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, tanpaBuka = false, kredit = null, bahasa }: {
-  url: string; poster: string | null; label: string; onBuka?: () => void;
+/* Video kartu umpan — tidak autoplay otomatis; pratinjau putar bisu hanya saat kursor melayang (hover).
+   Klik membuka modal rincian yang memuat pemutar video lengkap dengan kendali.
+   preload="none" mencegah unduhan data video sebelum interaksi, demi performa PageSpeed Insights. */
+function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = null, bahasa: _bahasa }: {
+  url: string; poster: string | null; label: string; onBuka: () => void;
   /** true di dalam carousel — margin atas milik wadah, bukan tombol. */
   tanpaMt?: boolean;
-  /** true = media murni tampilan, tanpa tombol buka (dipakai halaman detail:
-      videonya sudah berada di tempatnya, mengklik tak boleh membuka apa pun). */
-  tanpaBuka?: boolean;
   /** Nama kredit untuk pil © — null = tanpa pil. */
   kredit?: string | null;
   bahasa: Bahasa;
 }) {
-  const t = TEKS[bahasa];
   const ref = useRef<HTMLVideoElement | null>(null);
-  const terlihatRef = useRef(false);
   const [siap, setSiap] = useState(false);
   const [posterGagal, setPosterGagal] = useState(false);
-  const [bisu, setBisu] = useState(true);
-  const [usai, setUsai] = useState(false);
+  const [sedangHover, setSedangHover] = useState(false);
 
-  // Sinkronkan PROPERTI muted setiap berubah — sebagian peramban hanya
-  // mengizinkan autoplay bila propertinya true, bukan sekadar atributnya.
-  useEffect(() => {
-    const el = ref.current;
-    if (el) el.muted = bisu;
-  }, [bisu]);
-
-  useEffect(() => {
+  const mulaiHover = useCallback(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const el = ref.current;
     if (!el) return;
-    // Properti muted, bukan sekadar atribut — syarat autoplay peramban.
     el.muted = true;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const amati = new IntersectionObserver(
-      (masuk) => {
-        terlihatRef.current = masuk.some((m) => m.isIntersecting);
-        // Yang sudah habis tidak ikut diputar lagi — menunggu tombol ulang.
-        if (terlihatRef.current) {
-          if (!el.ended) el.play().catch(() => {});
-        } else el.pause();
-      },
-      { threshold: 0.25 },
-    );
-    amati.observe(el);
-    return () => {
-      amati.disconnect();
-      el.pause();
-    };
-  }, [url]);
-
-  const cobaPutar = useCallback((el: HTMLVideoElement) => {
-    setSiap(true);
-    if (terlihatRef.current && !el.ended) el.play().catch(() => {});
+    setSedangHover(true);
+    el.play().catch(() => {});
   }, []);
 
-  function sakelarBisu(e: React.MouseEvent) {
-    e.stopPropagation();
+  const hentiHover = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    setBisu((v) => {
-      const jadi = !v;
-      el.muted = jadi;
-      // Menyalakan suara sekaligus memastikan videonya berjalan — ia bisa
-      // sedang dijeda di luar layar, atau sudah habis.
-      if (!jadi) {
-        if (el.ended) { setUsai(false); el.currentTime = 0; }
-        el.play().catch(() => {});
-      }
-      return jadi;
-    });
-  }
+    setSedangHover(false);
+    el.pause();
+    if (el.readyState >= 1 && el.currentTime) el.currentTime = 0;
+  }, []);
 
-  function putarUlang(e: React.MouseEvent) {
-    e.stopPropagation();
-    const el = ref.current;
-    if (!el) return;
-    setUsai(false);
-    el.currentTime = 0;
-    el.play().catch(() => {});
-  }
-
-  const isiMedia = poster && !posterGagal ? (
-    <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={poster} alt="" aria-hidden="true" loading="lazy"
-        onError={() => setPosterGagal(true)}
-        className="lk-foto h-auto w-full"
-      />
-      <video
-        ref={ref}
-        src={url}
-        muted={bisu}
-        playsInline
-        preload="metadata"
-        aria-hidden="true"
-        // SENGAJA tanpa tabIndex: video ini dekoratif di dalam tombol
-        // bernama. Dengan tabIndex={-1} Chrome memindahkan fokus ke
-        // sini saat diklik — lalu browser memblokir aria-hidden karena
-        // fokus tak boleh disembunyikan dari teknologi asistif.
-        onPlay={() => setUsai(false)}
-        onEnded={() => setUsai(true)}
-        onCanPlay={(e) => cobaPutar(e.currentTarget)}
-        onPlaying={() => setSiap(true)}
-        className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-500 ${siap ? "opacity-100" : "opacity-0"}`}
-      />
-    </>
-  ) : (
-    <video
-      ref={ref}
-      src={url}
-      muted={bisu}
-      playsInline
-      preload="metadata"
-      aria-hidden="true"
-      // Tanpa tabIndex seperti cabang berposter di atas: tabIndex={-1}
-      // membuat klik memindahkan fokus ke video aria-hidden ini.
-      onPlay={() => setUsai(false)}
-      onEnded={() => setUsai(true)}
-      onCanPlay={(e) => cobaPutar(e.currentTarget)}
-      onPlaying={() => setSiap(true)}
-      className="lk-foto h-auto w-full"
-    />
-  );
+  // Pastikan video berhenti saat unmount
+  useEffect(() => {
+    return () => {
+      const el = ref.current;
+      if (el) el.pause();
+    };
+  }, []);
 
   return (
-    // Wadah div (bukan button): tombol bisu/ulang bersarang di dalamnya dan
-    // button-di-dalam-button tidak valid. Tombol buka-rincian melingkupi
-    // medianya kecuali tanpaBuka; tombol bisu/ulang menghentikan rambatan
-    // supaya tidak ikut membuka rincian.
     <div
       className={`lk-foto block w-full${tanpaMt ? "" : " mt-3"}`}
+      onMouseEnter={mulaiHover}
+      onMouseLeave={hentiHover}
     >
       <span className="relative block">
-        {tanpaBuka || !onBuka ? (
-          <span className="block w-full">
-            {isiMedia}
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onBuka}
-            aria-label={label}
-            className="block w-full cursor-pointer transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+        <button
+          type="button"
+          onClick={onBuka}
+          aria-label={label}
+          className="group block w-full cursor-pointer transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+        >
+          {poster && !posterGagal ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={poster} alt="" aria-hidden="true" loading="lazy"
+                onError={() => setPosterGagal(true)}
+                className="lk-foto h-auto w-full"
+              />
+              <video
+                ref={ref}
+                src={url}
+                muted
+                playsInline
+                loop
+                preload="none"
+                aria-hidden="true"
+                tabIndex={-1}
+                onCanPlay={() => setSiap(true)}
+                onPlaying={() => setSiap(true)}
+                className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-300 ${sedangHover && siap ? "opacity-100" : "opacity-0"}`}
+              />
+            </>
+          ) : (
+            <video
+              ref={ref}
+              src={url}
+              muted
+              playsInline
+              loop
+              preload="none"
+              aria-hidden="true"
+              tabIndex={-1}
+              onCanPlay={() => setSiap(true)}
+              onPlaying={() => setSiap(true)}
+              className="lk-foto h-auto w-full"
+            />
+          )}
+
+          {/* Lencana indikator video: ikon putar putih di kanan bawah yang memudar saat sedang diputar */}
+          <span
+            aria-hidden="true"
+            className={`absolute bottom-2.5 right-2.5 z-2 flex size-7 items-center justify-center rounded-full bg-black/65 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.7)] transition-all duration-200 pointer-events-none ${sedangHover && siap ? "opacity-0 scale-90" : "opacity-100 scale-100"}`}
           >
-            {isiMedia}
-          </button>
-        )}
-        {usai ? (
-          <span className="lk-video-ulang-wadah">
-            <button
-              type="button"
-              onClick={putarUlang}
-              aria-label={t.videoUlang}
-              title={t.videoUlang}
-              className="lk-video-ulang cursor-pointer"
-            >
-              <IkonUlang />
-            </button>
+            <IkonPutarBadge className="size-3.5 translate-x-0.5" />
           </span>
-        ) : (
-          <button
-            type="button"
-            onClick={sakelarBisu}
-            aria-label={bisu ? t.videoBisu : t.videoSenyap}
-            title={bisu ? t.videoBisu : t.videoSenyap}
-            aria-pressed={!bisu}
-            className="lk-video-bisu cursor-pointer"
-          >
-            {bisu ? <IkonBisu /> : <IkonSuara />}
-          </button>
-        )}
+        </button>
+
         {kredit !== null && (
           <span aria-hidden="true" className="lk-kredit">
             ©&nbsp;{kredit || "anonim"}
@@ -779,194 +707,20 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, tanpaBuka 
   );
 }
 
-function IkonUnduh({ className = "size-6" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"
-         strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M12 4v11" />
-      <path d="m7 11 5 5 5-5" />
-      <path d="M4 20h16" />
-    </svg>
-  );
-}
-
-/* Lembar bawah seluler ala Pinterest: thumbnail + judul + deskripsi +
-   aksi (buka laporan, bagikan, unduh). Hanya dipakai di aliran. */
-export function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
-  berita: Berita; bahasa: Bahasa; onTutup: () => void; onBuka: () => void;
-}) {
-  const t = TEKS[bahasa];
-  const [tersalin, setTersalin] = useState(false);
-  /* Thumbnail lembar: foto dulu, lalu poster video. Tanpa cadangan poster,
-     laporan yang isinya video saja tak punya gambar apa pun di sini dan
-     lembarnya kehilangan kepalanya. */
-  const gambar =
-    b.gambar
-    ?? b.media.find((m) => m.jenis === "gambar")?.url
-    ?? b.media.find((m) => m.jenis === "video")?.poster
-    ?? b.poster
-    ?? null;
-  /* Video utama (bila ada): thumbnail lembar berupa video autoplay, bukan
-     gambar diam — sama seperti kartu umpannya. */
-  const video =
-    b.video
-    ?? b.media.find((m) => m.jenis === "video")?.url
-    ?? null;
-
-  useEffect(() => {
-    const saatTombol = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onTutup();
-    };
-    window.addEventListener("keydown", saatTombol);
-    const limpahan = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", saatTombol);
-      document.body.style.overflow = limpahan;
-    };
-  }, [onTutup]);
-
-  async function bagikan() {
-    const tautan = `${window.location.origin}/${bahasa}/fire/${b.slug ?? b.id}`;
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile && typeof navigator.share === "function") {
-      try {
-        await navigator.share({ title: b.judul, url: tautan });
-        return;
-      } catch (e: unknown) {
-        if (e instanceof Error && e.name === "AbortError") return;
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(tautan);
-      setTersalin(true);
-      window.setTimeout(() => setTersalin(false), 2000);
-    } catch {
-      /* izin clipboard diblokir */
-    }
-  }
-
-  return (
-    <div className="lk-lembar-latar cursor-pointer" onClick={onTutup}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={b.judul}
-        onClick={(e) => e.stopPropagation()}
-        className={`lk-lembar${video || gambar ? " lk-lembar-bergambar" : ""}`}
-      >
-        <button
-          type="button"
-          onClick={onTutup}
-          aria-label={t.lembarTutup}
-          className="lk-lembar-tutup cursor-pointer"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2"
-               strokeLinecap="round" className="size-7">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
-        </button>
-        {video ? (
-          <div className="lk-lembar-gambar lk-lembar-gambar--video">
-            <VideoOtomatis url={video} poster={gambar} label={b.judul} onBuka={onBuka} bahasa={bahasa} />
-          </div>
-        ) : (
-          gambar && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={gambar} alt="" aria-hidden="true" className="lk-lembar-gambar" />
-          )
-        )}
-        {/* Isi lembar dibungkus tersendiri karena DIA yang menggulir, bukan
-            lembarnya. Lembar yang menggulir akan memotong thumbnail yang
-            mencuat melewati tepi atasnya. */}
-        <div className="lk-lembar-isi">
-          <p className="lk-lembar-info">
-            {b.tanggal}{b.lokasi ? ` • ${b.lokasi}` : ""}
-          </p>
-          <h2 className="lk-lembar-judul">{b.judul}</h2>
-          {b.deskripsi && <p className="lk-lembar-deskripsi">{b.deskripsi}</p>}
-          <button type="button" onClick={onBuka} className="lk-lembar-besar cursor-pointer">
-            {t.lembarBuka}
-          </button>
-          <ul className="lk-lembar-menu">
-            <li>
-              <button type="button" onClick={bagikan} className="lk-lembar-baris cursor-pointer">
-                <IkonBagikan />
-                <span>{tersalin ? t.lembarTersalin : t.lembarBagikan}</span>
-              </button>
-            </li>
-            {gambar && (
-              <li>
-                <a href={gambar} download className="lk-lembar-baris">
-                  <IkonUnduh />
-                  <span>{t.lembarUnduh}</span>
-                </a>
-              </li>
-            )}
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* Titik carousel: pil gelap berisi lajur titik (aktif = pil putih
-   memanjang). Satu salinan dirender di DALAM tiap slide dengan offset lajur
-   yang sama, sehingga yang terlihat selalu menempel di dasar foto aktif.
-   Salinan di slide non-aktif disembunyikan induknya via `inert` +
-   `aria-hidden`. Navigasi lewat seret jari dan ketuk titik — tanpa panah. */
-function TitikPostingan({ jumlah, idx, geser, maks, onPilih, pasangRel }: {
-  jumlah: number; idx: number; geser: number; maks: number;
-  onPilih: (i: number) => void;
-  pasangRel: (el: HTMLDivElement | null) => void;
-}) {
-  return (
-    <div
-      className="lk-postingan-titik"
-      role="group"
-      aria-label={`${idx + 1} / ${jumlah}`}
-    >
-      <div className={`lk-postingan-titik-jendela${jumlah > maks ? " lk-postingan-titik-jendela--geser" : ""}`}>
-        <div
-          ref={pasangRel}
-          className="lk-postingan-titik-rel"
-          style={{ transform: `translateX(${-geser}px)` }}
-        >
-          {Array.from({ length: jumlah }, (_, i) => {
-            const jarak = Math.abs(i - idx);
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onPilih(i)}
-                aria-label={`${i + 1} / ${jumlah}`}
-                aria-current={i === idx}
-                tabIndex={jarak > 2 && jumlah > maks ? -1 : undefined}
-                className="lk-postingan-titik-tombol cursor-pointer"
-              >
-                <span
-                  aria-hidden="true"
-                  data-aktif={i === idx}
-                  data-jarak={jarak}
-                />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* Tampilan "Postingan" seluler ala IG — dibuka dari tap gambar di umpan
    (desktop langsung ke rincian). Bilah kembali + judul, baris penulis,
    media selebar layar (dots ketuk, tanpa geser), baris aksi (suka
    perangkat-lokal, komentar, bagikan), caption + selengkapnya + tanggal. */
-export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, statis = false }: {
+export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomentar, onPrev, onNext, statis = false }: {
   laporan: Laporan;
   bahasa: Bahasa;
   onTutup: () => void;
+  onBuka: () => void;
   onKomentar: () => void;
+  /** Navigasi antar postingan ala Instagram: panah pindah postingan
+      sebelumnya/berikutnya. Tak diberikan → panah disembunyikan. */
+  onPrev?: () => void;
+  onNext?: () => void;
   /** true di halaman detail tersendiri: mengalir normal, bukan overlay fixed. */
   statis?: boolean;
 }) {
@@ -974,18 +728,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
   const [idx, setIdx] = useState(0);
   const [tersalin, setTersalin] = useState(false);
   const [descPenuh, setDescPenuh] = useState(false);
-  /* Geser ikut-jari ala IG: transform trek ditulis LANGSUNG ke DOM selama
-     jari menempel (tanpa lewat state → tanpa re-render per frame, jadi
-     60fps), dan lajur titik ikut "jalan" mengikuti kemajuan seret. State
-     `idx` hanya berubah saat jari dilepas (snap) atau titik/panah ditekan. */
-  const wadahRef = useRef<HTMLDivElement | null>(null);
-  const trekRef = useRef<HTMLDivElement | null>(null);
-  const relRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const sentuh = useRef<{
-    x: number; y: number; id: number; idxAwal: number; lebar: number;
-    dx: number; tAkhir: number; kec: number;
-  } | null>(null);
+  const sentuh = useRef<{ x: number; y: number } | null>(null);
   // Jumlah komentar untuk angka di samping ikon — diambil sekali saat buka.
   const [jumlahKomentar, setJumlahKomentar] = useState<number | null>(null);
   useEffect(() => {
@@ -1029,103 +772,13 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
     ? l.galeri
     : [{ url: "", jenis: "gambar" as const }];
   const n = items.length;
-  /* Lajur titik: jendela 5 langkah (LANGKAH = lebar tombol 24 + gap 5).
-     Sengaja TIDAK menengah (bukan pos-2): offset hanya bergeser saat titik
-     aktif mau keluar jendela, sehingga titiknya terlihat BERJALAN dari slot
-     ke slot sampai ujung — bukan diam di tengah sementara latarnya yang
-     bergeser. Maju: berjalan 0→4 lalu lajur mengantar sampai titik terakhir;
-     mundur sebaliknya. Saat jari menempel, offset ditulis langsung ke DOM
-     mengikuti kemajuan seret (lihat tulisSeret) supaya lajurnya ikut gerak. */
-  const LANGKAH_TITIK = 29;
-  const MAKS_TITIK = 5;
-  const offsetTitik = useCallback((pos: number) => (
-    n <= MAKS_TITIK ? 0 : Math.min(Math.max(pos - (MAKS_TITIK - 1), 0), n - MAKS_TITIK) * LANGKAH_TITIK
-  ), [n]);
-  /* Posisi yang ditunjukkan titik — TERTINGGAL satu langkah dari foto saat
-     pindah lewat ketuk: foto meluncur dulu (380ms), titik baru berjalan
-     menyusul setelah foto tiba. Tanpa jeda ini, geseran lajur 29px tertutup
-     gerakan trek ratusan px dan tak terlihat ("tidak ada animasi geser").
-     Saat pindah lewat seret-jari, lajur sudah terlihat ikut bergerak selama
-     seret (tulisSeret), jadi keduanya diperbarui sekaligus saat dilepas. */
-  const [idxTitik, setIdxTitik] = useState(0);
-  const tundaTitik = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const geserTitik = offsetTitik(idxTitik);
-
-  const pergiKe = useCallback((i: number) => {
-    const tuju = ((i % n) + n) % n;
-    setIdx(tuju);
-    if (tundaTitik.current) clearTimeout(tundaTitik.current);
-    // Samakan dengan durasi snap trek (380ms); gerak dikurangi = langsung.
-    const jeda = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 380;
-    tundaTitik.current = setTimeout(() => setIdxTitik(tuju), jeda);
-  }, [n]);
-
-  /* Bersihkan timer tunda-titik saat dibongkar. (Komponen ini selalu
-     dipasang ulang per laporan, jadi tak perlu reset idx saat l.id berubah.) */
-  useEffect(() => () => {
-    if (tundaTitik.current) clearTimeout(tundaTitik.current);
-  }, []);
-
-  /* Wadah memeluk tinggi slide AKTIF — bukan slide tertinggi. Tanpa ini,
-     galeri campur lanskap + potrait menyisakan lembah hitam sebesar selisih
-     tingginya di bawah foto pendek. ResizeObserver menangkap foto yang baru
-     selesai dimuat (tinggi 0 → penuh) dan rotasi layar; transisi height di
-     CSS menganimasikannya berbarengan dengan luncuran trek. */
-  useEffect(() => {
-    const wadah = wadahRef.current;
-    const slide = slideRefs.current[idx];
-    if (!wadah || !slide) return;
-    const terapkan = () => {
-      const tinggi = slide.offsetHeight;
-      if (tinggi > 0) wadah.style.height = `${tinggi}px`;
-    };
-    terapkan();
-    if (typeof ResizeObserver === "undefined") return;
-    const amati = new ResizeObserver(terapkan);
-    amati.observe(slide);
-    return () => amati.disconnect();
-  }, [idx, n]);
-
-  /* Tulis posisi seret langsung ke DOM (trek + semua salinan lajur titik)
-     tanpa re-render — syarat 60fps saat jari bergerak. */
-  const tulisSeret = useCallback((dx: number, idxAwal: number, lebar: number) => {
-    const trek = trekRef.current;
-    if (trek) {
-      trek.style.transition = "none";
-      trek.style.transform = `translateX(${-idxAwal * lebar + dx}px)`;
-    }
-    const dasar = offsetTitik(idxAwal - dx / lebar);
-    for (const rel of [...relRefs.current]) {
-      if (!rel) continue;
-      rel.style.transition = "none";
-      rel.style.transform = `translateX(${-dasar}px)`;
-    }
-  }, [offsetTitik]);
-
-  /* Kembalikan kendali ke React (state idx) — transisi CSS menganimasikan
-     snap dari posisi jari ke slide tujuan. */
-  const lepasSeret = useCallback(() => {
-    const trek = trekRef.current;
-    if (trek) {
-      trek.style.transition = "";
-      trek.style.transform = "";
-    }
-    for (const rel of [...relRefs.current]) {
-      if (!rel) continue;
-      rel.style.transition = "";
-      rel.style.transform = "";
-    }
-  }, []);
+  const aktif = items[Math.min(idx, n - 1)];
 
   useEffect(() => {
     const saatTombol = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onTutup();
-        return;
-      }
-      if (n < 2) return;
-      if (e.key === "ArrowLeft") pergiKe(idx - 1);
-      if (e.key === "ArrowRight") pergiKe(idx + 1);
+      if (e.key === "Escape") onTutup();
+      if (e.key === "ArrowLeft") onPrev?.();
+      if (e.key === "ArrowRight") onNext?.();
     };
     window.addEventListener("keydown", saatTombol);
     // Kunci badan hanya mode overlay — varian halaman (statis) harus bisa
@@ -1139,7 +792,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
       window.removeEventListener("keydown", saatTombol);
       document.body.style.overflow = limpahan;
     };
-  }, [onTutup, statis, n, idx, pergiKe]);
+  }, [onTutup, statis, onPrev, onNext]);
 
   async function bagikan() {
     const tautan = `${window.location.origin}${l.href}`;
@@ -1164,6 +817,16 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
   return (
     <div className={`lk-postingan${statis ? " lk-postingan--statis" : ""}`} role="dialog" aria-modal="true" aria-label={l.judul}>
       <div className="lk-postingan-penulis">
+        <button
+          type="button"
+          onClick={onTutup}
+          aria-label={bahasa === "en" ? "Back" : "Kembali"}
+          className="lk-postingan-kembali cursor-pointer -ml-1 mr-0.5 rounded-full p-1.5 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="size-5">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
         <Image src="/assets/img/logo-fire.png" alt="" aria-hidden="true" width={99} height={160} className="lk-postingan-avatar" />
         <div className="min-w-0 flex-1">
           <p className="lk-postingan-nama">Lapor Karhutla</p>
@@ -1172,130 +835,76 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
       </div>
 
       <div
-        ref={wadahRef}
         className="lk-postingan-media"
         onTouchStart={(e) => {
-          if (n < 2) return;
           const s = e.touches[0];
-          sentuh.current = {
-            x: s.clientX, y: s.clientY, id: s.identifier,
-            idxAwal: idx, lebar: wadahRef.current?.clientWidth || 320,
-            dx: 0, tAkhir: performance.now(), kec: 0,
-          };
+          sentuh.current = { x: s.clientX, y: s.clientY };
         }}
-        onTouchMove={(e) => {
+        onTouchEnd={(e) => {
           const awal = sentuh.current;
+          sentuh.current = null;
           if (!awal || n < 2) return;
-          for (const s of Array.from(e.touches)) {
-            if (s.identifier !== awal.id) continue;
-            const dxMentah = s.clientX - awal.x;
-            const dy = s.clientY - awal.y;
-            // Gerak vertikal dominan = niat menggulir halaman — batalkan seret
-            // supaya scroll vertikal tetap mulus dan tidak tertahan.
-            if (Math.abs(dy) > Math.abs(dxMentah) * 1.5 && Math.abs(dy) > 12) {
-              sentuh.current = null;
-              lepasSeret();
-              return;
-            }
-            // Tahanan di tepi (bagi 3) supaya ujung trek terasa "kenyal",
-            // bukan mati — pola yang sama dengan carousel native.
-            let dx = dxMentah;
-            if ((awal.idxAwal === 0 && dx > 0) || (awal.idxAwal === n - 1 && dx < 0)) dx = dxMentah / 3;
-            dx = Math.max(-awal.lebar, Math.min(awal.lebar, dx));
-            // Kecepatan sentuh (px/ms, dihaluskan) untuk jentikan cepat.
-            const kini = performance.now();
-            const dt = Math.max(1, kini - awal.tAkhir);
-            awal.kec = 0.8 * awal.kec + 0.2 * ((dx - awal.dx) / dt);
-            awal.tAkhir = kini;
-            awal.dx = dx;
-            tulisSeret(dx, awal.idxAwal, awal.lebar);
+          const s = e.changedTouches[0];
+          const dx = s.clientX - awal.x;
+          const dy = s.clientY - awal.y;
+          if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            setIdx((i) => (i + (dx < 0 ? 1 : -1) + n) % n);
           }
-        }}
-        onTouchEnd={() => {
-          const awal = sentuh.current;
-          sentuh.current = null;
-          if (!awal || n < 2) {
-            lepasSeret();
-            return;
-          }
-          const ambang = Math.max(48, awal.lebar * 0.12);
-          // Jentikan cepat (>0.5px/ms, sejauh >24px) ikut pindah walau belum
-          // sampai ambang — seperti carousel native.
-          const jentik = Math.abs(awal.kec) > 0.5 && Math.abs(awal.dx) > 24
-            ? Math.sign(awal.kec)
-            : 0;
-          lepasSeret();
-          // Lajur sudah terlihat ikut bergerak selama seret, jadi titik
-          // diperbarui sekaligus — tanpa jeda susulan seperti jalur ketuk.
-          if (tundaTitik.current) clearTimeout(tundaTitik.current);
-          if (awal.dx <= -ambang || jentik < 0) {
-            const tuju = (awal.idxAwal + 1) % n;
-            setIdx(tuju);
-            setIdxTitik(tuju);
-          } else if (awal.dx >= ambang || jentik > 0) {
-            const tuju = ((awal.idxAwal - 1) % n + n) % n;
-            setIdx(tuju);
-            setIdxTitik(tuju);
-          }
-        }}
-        onTouchCancel={() => {
-          sentuh.current = null;
-          lepasSeret();
         }}
       >
-        <div
-          ref={trekRef}
-          className="lk-postingan-trek"
-          style={{ transform: `translateX(${-idx * 100}%)` }}
-        >
-          {items.map((m, i) => (
-            <div
-              key={`${m.url}-${i}`}
-              ref={(el) => {
-                slideRefs.current[i] = el;
-              }}
-              className="lk-postingan-slide"
-              aria-hidden={i !== idx}
-              inert={i !== idx}
-            >
-              {m.jenis === "video" ? (
-                <VideoOtomatis url={m.url} poster={m.poster ?? l.gambar} label={l.judul} tanpaMt tanpaBuka kredit={m.keterangan ?? "anonim"} bahasa={bahasa} />
-              ) : m.url ? (
-                <span className="lk-media-statis">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={m.url}
-                    alt={l.alt}
-                    className="lk-postingan-foto"
-                    loading={Math.abs(i - idx) > 1 ? "lazy" : "eager"}
-                    draggable={false}
-                  />
-                  <span aria-hidden="true" className="lk-kredit">
-                    ©&nbsp;{m.keterangan ?? "anonim"}
-                  </span>
-                </span>
-              ) : null}
-              {/* Titik menempel di tiap slide (bukan overlay wadah): tinggi tiap
-                 foto beda-beda, dan tinggi wadah = slide tertinggi — overlay
-                 wadah jatuh di lembah hitam jauh di bawah foto aktif sehingga
-                 tak terbaca. Salinan di slide non-aktif ikut `inert` + 
-                 `aria-hidden` induknya, jadi tak bisa difokus maupun terbaca
-                 teknologi asistif. */}
-              {n > 1 && (
-                <TitikPostingan
-                  jumlah={n}
-                  idx={idxTitik}
-                  geser={geserTitik}
-                  maks={MAKS_TITIK}
-                  onPilih={pergiKe}
-                  pasangRel={(el) => {
-                    relRefs.current[i] = el;
-                  }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
+        {aktif.jenis === "video" ? (
+          <VideoOtomatis url={aktif.url} poster={aktif.poster ?? l.gambar} label={l.judul} onBuka={onBuka} tanpaMt kredit={aktif.keterangan ?? "anonim"} bahasa={bahasa} />
+        ) : aktif.url ? (
+          <span className="lk-media-statis">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={aktif.url} alt={l.alt} className="lk-postingan-foto" />
+            <span aria-hidden="true" className="lk-kredit">
+              ©&nbsp;{aktif.keterangan ?? "anonim"}
+            </span>
+          </span>
+        ) : null}
+        {onPrev && (
+          <button
+            type="button"
+            aria-label="Postingan sebelumnya"
+            onClick={onPrev}
+            className="rincian__slider-tombol rincian__slider-tombol--kiri cursor-pointer"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18 9 12l6-6" />
+            </svg>
+          </button>
+        )}
+        {onNext && (
+          <button
+            type="button"
+            aria-label="Postingan berikutnya"
+            onClick={onNext}
+            className="rincian__slider-tombol rincian__slider-tombol--kanan cursor-pointer"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+                 strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        )}
+        {n > 1 && (
+          <div className="lk-postingan-titik" role="group" aria-label={`${idx + 1} / ${n}`}>
+            {items.map((m, i) => (
+              <button
+                key={`${m.url}-${i}`}
+                type="button"
+                onClick={() => setIdx(i)}
+                aria-label={`${i + 1} / ${n}`}
+                aria-current={i === idx}
+                className="lk-postingan-titik-tombol cursor-pointer"
+              >
+                <span aria-hidden="true" data-aktif={i === idx} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="lk-postingan-aksi">
@@ -1396,7 +1005,6 @@ export function LembarKomentar({ id, bahasa, onTutup }: {
             kirim={k.kirim}
             ketikRef={k.ketikRef}
             captchaRef={k.captchaRef}
-            pasangCaptcha={k.pasangCaptcha}
             tanpaSheet
           />
         </div>
@@ -1506,21 +1114,44 @@ export function IkonUmpan({ className = "size-7" }: { className?: string }) {
 function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
   const t = TEKS[bahasa];
   const router = useRouter();
+  /* Isian teks lahir dari draf yang tersimpan, bukan dari string kosong.
+
+     Sebabnya: tab peta seluler menunjuk ke /karhutla/panel dan tombol "+" di
+     sana menunjuk balik ke /karhutla — dua rute, jadi App Router me-mount
+     ulang komposer ini dan seluruh state di bawah lahir kosong lagi. Gejala
+     yang terlihat: mengetik di beranda, mampir ke peta, tekan "+", isian
+     sudah bersih. Komponennya memang satu dan sama; yang hilang state-nya.
+
+     Aman dari ketidakcocokan hidrasi meski inisialisasi lazy ikut berjalan di
+     klien: selama `buka` masih false — dan ia SELALU false pada render
+     pertama, di server maupun klien — tak satu pun nilai di bawah ini sampai
+     ke DOM. Barulah setelah komposer dibuka isinya dirender, dan saat itu
+     hidrasi sudah lewat.
+
+     `berkas` TIDAK ikut: objek File tak bisa ditaruh di localStorage, jadi
+     lampiran tetap harus dipilih ulang setelah pindah halaman. */
+  const [drafAwal] = useState(bacaDraf);
   const [buka, setBuka] = useState(false);
-  const [judul, setJudul] = useState("");
-  const [deskripsi, setDeskripsi] = useState("");
+  const [judul, setJudul] = useState(drafAwal.judul);
+  const [deskripsi, setDeskripsi] = useState(drafAwal.deskripsi);
   const [berkas, setBerkas] = useState<File[]>([]);
   const [pratinjau, setPratinjau] = useState<Record<string, string>>({});
-  const [lat, setLat] = useState("");
-  const [lng, setLng] = useState("");
-  const [lokasiAda, setLokasiAda] = useState(false);
-  const [nama, setNama] = useState("");
-  const [anonim, setAnonim] = useState(false);
+  const [lat, setLat] = useState(drafAwal.lat);
+  const [lng, setLng] = useState(drafAwal.lng);
+  const [nama, setNama] = useState(drafAwal.nama);
+  const [anonim, setAnonim] = useState(drafAwal.anonim);
   const [mencariLokasi, setMencariLokasi] = useState(false);
   const [captchaToken, setCaptchaToken] = useState("");
   const [galatKlien, setGalatKlien] = useState("");
   const [terkirim, setTerkirim] = useState(false);
   const [menungguToken, setMenungguToken] = useState(false);
+
+  /* Draf disimpan tiap kali isinya berubah. Kiriman yang berhasil
+     mengosongkan semua isian di atas, jadi pembersihan draf ikut lewat
+     simpanDraf — tak perlu penghapusan terpisah. */
+  useEffect(() => {
+    simpanDraf({ judul, deskripsi, nama, lat, lng, anonim });
+  }, [judul, deskripsi, nama, lat, lng, anonim]);
 
   const berkasRef = useRef<HTMLInputElement | null>(null);
   const captchaRef = useRef<HTMLDivElement | null>(null);
@@ -1564,7 +1195,6 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
           setDeskripsi("");
           setLat("");
           setLng("");
-          setLokasiAda(false);
           setNama("");
           setAnonim(false);
           setTerkirim(true);
@@ -1625,10 +1255,13 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
         window.setTimeout(pasang, 100);
         return;
       }
-      try {
-        ts.remove(widgetRef.current);
-      } catch {
-        /* belum ada widget */
+      if (widgetRef.current !== null) {
+        try {
+          ts.remove(widgetRef.current);
+        } catch {
+          /* belum ada widget */
+        }
+        widgetRef.current = null;
       }
       wadah.innerHTML = "";
       widgetRef.current = ts.render(wadah, {
@@ -1744,7 +1377,6 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
         setMencariLokasi(false);
         setLat(posisi.coords.latitude.toFixed(7));
         setLng(posisi.coords.longitude.toFixed(7));
-        setLokasiAda(true);
       },
       () => {
         if (!lokasiAktifRef.current) return;
@@ -1753,6 +1385,11 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
       },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
+  }
+
+  function hapusLokasi() {
+    setLat("");
+    setLng("");
   }
 
   if (terkirim) {
@@ -1775,6 +1412,11 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
 }
 
   const galat = galatKlien || (keadaan && !keadaan.ok ? keadaan.galat : "");
+  /* "Ada lokasi" DITURUNKAN dari isi koordinatnya, bukan bendera tersendiri:
+     dengan kotak Lat/Lng yang kini sebaris dan terlihat, bendera yang bilang
+     "belum ada titik" sementara dua kotak di sebelahnya jelas berisi angka
+     adalah pil yang berbohong. */
+  const adaLokasi = lat.trim() !== "" || lng.trim() !== "";
   const ikonAksi = "lk-ikon-aksi cursor-pointer rounded-full p-2 text-[#ff5a26] transition hover:bg-[#ff5a26]/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]";
 
   return (
@@ -1893,15 +1535,25 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
              sehingga baris Lat/Lng/Nama/Anonim mentok ke tepi. */
           className="mt-1 panggung:pl-14"
         >
+          {/* Tumbuh mengikuti isi. Dengan rows tetap, kotak yang baru berisi
+              placeholder menyisakan rongga menganga di atas baris berikutnya —
+              dan rongga itulah yang pertama menarik mata, bukan isinya.
+              Atapnya 200px supaya cerita panjang tak mendorong tombol kirim
+              keluar layar. */}
           <textarea
             id="lk-cerita"
             name="deskripsi"
             value={deskripsi}
-            onChange={(e) => setDeskripsi(e.target.value)}
+            onChange={(e) => {
+              setDeskripsi(e.target.value);
+              const el = e.currentTarget;
+              el.style.height = "auto";
+              el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+            }}
             placeholder={t.ceritaPh}
             maxLength={5000}
-            rows={3}
-            className="lk-tulis-isi w-full resize-y bg-transparent py-1 text-[15px] leading-relaxed text-[#f5f5f5] placeholder:text-[#a0a0a0]/70 focus:outline-none"
+            rows={2}
+            className="lk-tulis-isi w-full resize-none bg-transparent py-1 text-[15px] leading-relaxed text-[#f5f5f5] placeholder:text-[#a0a0a0]/70 focus:outline-none"
           />
 
           {galat && (
@@ -1916,39 +1568,74 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
           <input type="hidden" name="captcha" value={captchaToken} />
           <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
 
-          {/* Lokasi + nama ala form /lapor, versi ringkas sebaris: pin mengisi
-              dari GPS (boleh juga ketik manual), nama opsional + centang
-              anonim. Nama memanjang mengisi sisa baris supaya tak ada rongga. */}
+          {/* Satu baris identitas: pil lokasi, nama, anonim — tiga benda, bukan
+              lima. Titiknya ditandai lewat pil (sekali sentuh), bukan dengan
+              mengetik dua bilangan desimal; keadaan "ditandai" dibaca dari pil
+              itu sendiri, jadi tak perlu baris keterangan di bawahnya. Nama
+              memanjang mengisi sisa baris supaya tak ada rongga. */}
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" title={t.tandaiLokasi} aria-label={t.tandaiLokasi}
-                    onClick={lokasiSaya} disabled={mencariLokasi}
-                    className={`${ikonAksi} ${lokasiAda ? "bg-[#ff5a26]/15" : ""} disabled:opacity-50`}>
-              <IkonPin />
+            <button
+              type="button"
+              onClick={adaLokasi ? hapusLokasi : lokasiSaya}
+              disabled={mencariLokasi}
+              title={adaLokasi ? t.lokasiHapus : t.tandaiLokasi}
+              aria-label={adaLokasi ? t.lokasiHapus : t.tandaiLokasi}
+              className={`lk-isian flex cursor-pointer items-center gap-1.5 rounded-full py-1.5 pr-3 pl-2.5 text-[13px]
+                          whitespace-nowrap transition disabled:cursor-not-allowed disabled:opacity-50
+                          focus-visible:outline-2 focus-visible:outline-[#ff5a26] ${
+                adaLokasi
+                  ? "bg-[#ff5a26]/15 text-[#ff5a26] ring-1 ring-[#ff5a26]/30 hover:bg-[#ff5a26]/25"
+                  : "text-[#ff5a26] ring-1 ring-white/10 hover:bg-[#ff5a26]/10"
+              }`}
+            >
+              <IkonPin className="size-[18px]" />
+              <span>{mencariLokasi ? t.mencariLokasi : adaLokasi ? t.lokasiOk : t.tandaiLokasi}</span>
+              {adaLokasi && (
+                <svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor" className="size-3.5 opacity-70">
+                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                </svg>
+              )}
             </button>
-            <label className="sr-only" htmlFor="lk-lat">{t.latPh}</label>
-            <input id="lk-lat" name="lat" inputMode="decimal" placeholder={t.latPh}
-                   value={lat} onChange={(e) => { setLat(e.target.value); setLokasiAda(false); }}
-                   className="lk-isian lk-koord w-[86px] rounded-md bg-white/5 px-2 py-1.5 text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-[#ff5a26]" />
-            <label className="sr-only" htmlFor="lk-lng">{t.lngPh}</label>
-            <input id="lk-lng" name="lng" inputMode="decimal" placeholder={t.lngPh}
-                   value={lng} onChange={(e) => { setLng(e.target.value); setLokasiAda(false); }}
-                   className="lk-isian lk-koord w-[86px] rounded-md bg-white/5 px-2 py-1.5 text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-[#ff5a26]" />
-            <label className="sr-only" htmlFor="lk-nama">{t.namaPh}</label>
-            <input id="lk-nama" name="nama" maxLength={100} disabled={anonim} autoComplete="name"
-                   value={nama} onChange={(e) => setNama(e.target.value)} placeholder={t.namaPh}
-                   className="lk-isian min-w-[120px] flex-1 rounded-md bg-white/5 px-2 py-1.5 text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-[#ff5a26] disabled:opacity-40" />
-            <label className="lk-anonim cursor-pointer flex items-center gap-1.5 text-[13px] whitespace-nowrap text-[#a0a0a0]">
-              <input type="checkbox" name="anonim" value="1" checked={anonim}
-                     onChange={(e) => setAnonim(e.target.checked)}
-                     className="lk-centang cursor-pointer size-4 accent-[#ff5a26]" />
-              {t.anonim}
-            </label>
-            {(mencariLokasi || lokasiAda) && (
-              <span className="w-full text-[12px] text-[#a0a0a0]">
-                {mencariLokasi ? t.mencariLokasi : t.lokasiOk}
-              </span>
+
+            {/* Koordinatnya selalu terpampang, tepat di sebelah pil lokasi.
+                Ia bukan kontrol yang perlu dibuka: begitu titiknya ditandai
+                GPS, dua bilangan itulah buktinya — dan pelapor berhak melihat
+                serta membetulkannya. Sekaligus jalan masuk lat/lng custom. */}
+            <span className="flex items-center gap-2">
+              <label className="sr-only" htmlFor="lk-lat">{t.latPh}</label>
+              <input id="lk-lat" name="lat" inputMode="decimal" placeholder={t.latPh}
+                     value={lat} onChange={(e) => setLat(e.target.value)}
+                     className="lk-isian lk-koord w-[86px] rounded-md bg-white/5 px-2 py-1.5 font-mono text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-white/30" />
+              <label className="sr-only" htmlFor="lk-lng">{t.lngPh}</label>
+              <input id="lk-lng" name="lng" inputMode="decimal" placeholder={t.lngPh}
+                     value={lng} onChange={(e) => setLng(e.target.value)}
+                     className="lk-isian lk-koord w-[86px] rounded-md bg-white/5 px-2 py-1.5 font-mono text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-white/30" />
+            </span>
+
+            {/* Anonim menyembunyikan kolom nama, bukan meredupkannya: kolom mati
+                yang tetap terpampang cuma mengundang orang mengetik ke dalamnya. */}
+            {!anonim && (
+              <>
+                <label className="sr-only" htmlFor="lk-nama">{t.namaPh}</label>
+                <input id="lk-nama" name="nama" maxLength={100} autoComplete="name"
+                       value={nama} onChange={(e) => setNama(e.target.value)} placeholder={t.namaPh}
+                       className="lk-isian min-w-[120px] flex-1 rounded-md bg-white/5 px-2.5 py-1.5 text-[13px] text-[#f5f5f5] ring-1 ring-white/10 placeholder:text-[#a0a0a0]/60 focus:outline-none focus:ring-white/30" />
+              </>
             )}
+
+            <label className="lk-anonim ml-auto flex cursor-pointer items-center gap-2 text-[13px] whitespace-nowrap text-[#a0a0a0]">
+              <Switch
+                name="anonim"
+                value="1"
+                checked={anonim}
+                onCheckedChange={setAnonim}
+                size="sm"
+                aksen="bara"
+              />
+              <span>{t.anonim}</span>
+            </label>
           </div>
+
 
           {/* Pratinjau di bawah baris lokasi+nama: kotak mengikuti ukuran
               gambar (kecil, utuh) berderet rapat ala X (flex-wrap). */}
@@ -1996,6 +1683,13 @@ function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
                     onClick={() => berkasRef.current?.click()} className={ikonAksi}>
               <IkonVideo />
             </button>
+            {/* Syarat wajibnya berdiri di sebelah tombolnya, bukan muncul
+                sebagai galat setelah tombol Kirim ditekan. Di ponsel ia
+                disembunyikan, bukan dipotong: baris ini sudah penuh oleh dua
+                ikon + Batal + Kirim, dan "Foto/vid…" bukan keterangan. */}
+            <span className="lk-isian hidden min-w-0 truncate pl-1 text-[12px] whitespace-nowrap text-[#a0a0a0] sm:inline">
+              {berkas.length > 0 ? `${berkas.length}/${BATAS_BERKAS}` : t.wajibMedia}
+            </span>
             <button type="button" onClick={() => setBuka(false)}
                     className="lk-batal cursor-pointer ml-auto px-3 py-1.5 text-[14px] text-[#a0a0a0] transition hover:text-white
                                focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
@@ -2083,6 +1777,8 @@ export function LandingKarhutla(
     berita = [],
     tampil = "semua",
     statistik,
+    kejadianAwal = null,
+    kolomAwal,
   }: {
     bahasa: Bahasa;
     /** Peta butuh angka provinsi — halaman umpan tak memakainya. */
@@ -2095,6 +1791,10 @@ export function LandingKarhutla(
     sorotan?: Record<KunciSorotan, number>;
     /** Empat angka kartu statistik historis. */
     statistik?: DataStatistik[];
+    /** Kejadian awal yang langsung dibuka saat halaman dimuat (mis. rute /fire/<slug>). */
+    kejadianAwal?: Berita | null;
+    /** Jumlah kolom awal untuk SSR (2 untuk seluler, 3 untuk desktop). */
+    kolomAwal?: number;
   },
 ) {
   const t = TEKS[bahasa];
@@ -2227,6 +1927,26 @@ export function LandingKarhutla(
     }, 0);
     return () => window.clearTimeout(jam);
   }, []);
+  /* Kembaran ?cari=1 untuk tombol "+" di bilah tab halaman panel: komposer
+     tinggal di rel kanan yang tidak dirender di sana, jadi tombolnya mengantar
+     ke halaman ini dan penanda inilah yang membukanya begitu sampai.
+
+     Yang ditekan persis tombol yang sama dengan tab "+" di halaman daftar —
+     satu jalur, bukan dua perilaku yang harus dijaga sinkron. Penandanya
+     dihapus dari URL bersama-sama di dalam callback, dengan alasan Strict Mode
+     yang sama seperti ?cari=1 di atas. */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tulis") !== "1") return;
+    const jam = window.setTimeout(() => {
+      (document.getElementById("lk-tulis") as HTMLButtonElement | null)?.click();
+      window.setTimeout(() => document.getElementById("lk-judul")?.focus({ preventScroll: true }), 150);
+      const params = new URLSearchParams(window.location.search);
+      params.delete("tulis");
+      const sisa = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (sisa ? `?${sisa}` : ""));
+    }, 0);
+    return () => window.clearTimeout(jam);
+  }, []);
   /* Rel kiri (peta WebGL) hanya dirender bila terlihat: di halaman utama
      seluler ia dilepas supaya ponsel tak membayar MapLibre + tile + Zarr
      untuk peta yang tak tampil. Kelas lk-hanya-panggung tetap dipasang
@@ -2264,17 +1984,25 @@ export function LandingKarhutla(
   const LEBAR_REL_KIRI = "clamp(340px,33.5vw,680px)";
   const [kiriBuka, setKiriBuka] = useState(true);
   /* Lembar panel seluler: terkatup atau mengintip. Hanya dipakai di halaman
-     panel; di panggung kelasnya tak punya gaya apa pun. */
-  const [lembarTutup, setLembarTutup] = useState(false);
+     panel; di panggung kelasnya tak punya gaya apa pun.
+
+     Mulai TERKATUP: halaman ini satu layar penuh peta, dan lembar yang terbuka
+     duluan menutupi bilah waktu di dasar peta (z-2 di atas bingkai peta yang
+     z-0). Angka situasi naik saat gagangnya ditekan — pola yang sama dengan
+     lembar komentar. */
+  const [lembarTutup, setLembarTutup] = useState(true);
+  /* Seretan gagang. Tanpa pustaka dan tanpa mengikuti jari piksel demi
+     piksel: begitu lewat ambang 24px arahnya sudah ketahuan, dan transisi
+     `height` milik lembarlah yang menganimasikan sisanya. Ketukan tetap
+     membalik lewat onClick — `jauh` yang membedakan keduanya. */
+  const seretGagang = useRef<{ mulai: number; jauh: boolean } | null>(null);
   const panelTerlihat = tampil === "panel" || !aliran;
   const umpanTerlihat = tampil === "semua" || !aliran;
 
   // Pop-up rincian seperti index: tetap di halaman ini, URL ikut ke
   // /fire/<slug> supaya bisa dibagikan, kembali ke halaman ASAL saat ditutup
   // (rute mana pun yang me-render komponen ini: /, /karhutla, /panel).
-  const [sorot, setSorot] = useState<Berita | null>(null);
-  // Lembar bawah seluler ("..."): pratinjau deskripsi per kartu.
-  const [lembarId, setLembarId] = useState<number | null>(null);
+  const [sorot, setSorot] = useState<Berita | null>(kejadianAwal ?? null);
   /* Provinsi yang ditekan di peta — pop-upnya tumbuh dari titik layar itu,
      pola yang sama dengan konsol /peta. */
   const [wilayah, setWilayah] = useState<
@@ -2296,19 +2024,33 @@ export function LandingKarhutla(
   );
   const tutupRincian = useCallback(() => {
     setSorot(null);
-    if (typeof window !== "undefined" && pathAwalRef.current && window.location.pathname !== pathAwalRef.current) {
-      window.history.replaceState(null, "", pathAwalRef.current);
+    if (typeof window !== "undefined") {
+      const pathBeranda = `/${bahasa}`;
+      const pathKembali =
+        pathAwalRef.current && !/\/fire\/[^/]+$/.test(pathAwalRef.current)
+          ? pathAwalRef.current
+          : pathBeranda;
+      if (window.location.pathname !== pathKembali) {
+        window.history.replaceState(null, "", pathKembali);
+      }
     }
-  }, []);
+  }, [bahasa]);
   useEffect(() => {
     const saatPopState = () => {
-      if (!/\/fire\/[^/]+$/.test(window.location.pathname)) {
-        setSorot(null);
+      const cocokan = window.location.pathname.match(/\/fire\/([^/]+)$/);
+      if (cocokan && cocokan[1]) {
+        const slug = decodeURIComponent(cocokan[1]);
+        const ketemu = berita.find((b) => b.slug === slug || String(b.id) === slug);
+        if (ketemu) {
+          setSorot(ketemu);
+          return;
+        }
       }
+      setSorot(null);
     };
     window.addEventListener("popstate", saatPopState);
     return () => window.removeEventListener("popstate", saatPopState);
-  }, []);
+  }, [berita]);
   const bukaDariId = useCallback(
     (id: number) => {
       const asli = berita.find((b) => b.id === id);
@@ -2316,10 +2058,15 @@ export function LandingKarhutla(
     },
     [berita, bukaRincian],
   );
+
+  const indeksSorot = sorot ? berita.findIndex((b) => b.id === sorot.id) : -1;
+  const adaSebelumnya = indeksSorot > 0;
+  const adaBerikutnya = indeksSorot >= 0 && indeksSorot < berita.length - 1;
+  const keSebelumnya = adaSebelumnya ? () => bukaRincian(berita[indeksSorot - 1]) : undefined;
+  const keBerikutnya = adaBerikutnya ? () => bukaRincian(berita[indeksSorot + 1]) : undefined;
   // Tap media: di seluler pindah ke halaman Postingan; di desktop langsung
   // pop-up rincian. Tanpa slug (tak bisa ditautkan) langsung pop-up juga.
   // Dibaca live (bukan state aliran) supaya selalu benar.
-  const lembar = lembarId !== null ? (berita.find((b) => b.id === lembarId) ?? null) : null;
   /* Overlay peta selayar — dibuka lewat tombol bentang di sudut bingkai.
      Di-render di portal body, tapi petanya BUKAN instance kedua: node <Peta>
      yang sudah hidup dipindah ke sini (lihat hostPeta di bawah). */
@@ -2523,22 +2270,12 @@ export function LandingKarhutla(
   // bukan berganti 3<->4 saat rel ditutup-buka. Pergantian kolom merombak
   // seluruh partisi kartu (isi[i % kolom]) yang membuat kartu meloncat
   // antar-kolom dan memicu kedipan/flickering pada gambar dan layout.
-  const kolom = gunakanKolomUmpan(true);
+  const kolom = gunakanKolomUmpan(true, kolomAwal);
   const bukaMedia = useCallback(
     (id: number) => {
-      const panggung = window.matchMedia("(min-width: 1100px) and (min-height: 640px)").matches;
-      if (panggung) {
-        bukaDariId(id);
-        return;
-      }
-      const l = laporan.find((x) => x.id === id);
-      if (l?.slug) {
-        router.push(`/${bahasa}/fire/${l.slug}`);
-      } else {
-        bukaDariId(id);
-      }
+      bukaDariId(id);
     },
-    [bukaDariId, laporan, bahasa, router],
+    [bukaDariId],
   );
   const [komentarId, setKomentarId] = useState<number | null>(null);
 
@@ -2759,11 +2496,42 @@ export function LandingKarhutla(
           {/* Pembungkus lembar bawah. Di panggung ia sekadar div tanpa gaya —
               isinya mengalir seperti biasa; di halaman panel seluler CSS
               mengangkatnya jadi lembar yang mengintip di atas peta selayar. */}
+          {/* Latar penutup: menekan peta di luar lembar mengatupkannya, seperti
+              lembar komentar. Hanya bergaya di panel seluler — di tempat lain
+              CSS bawaannya display:none, pola yang sama dengan gagang. */}
+          {!lembarTutup && (
+            <button
+              type="button"
+              className="lk-lembar-latar cursor-pointer"
+              onClick={() => setLembarTutup(true)}
+              aria-label={bahasa === "en" ? "Collapse situation panel" : "Tutup panel situasi"}
+            />
+          )}
+
           <div className={`lk-lembar-panel${lembarTutup ? " lk-panel-katup" : ""}`}>
             <button
               type="button"
               className="lk-lembar-gagang cursor-pointer"
-              onClick={() => setLembarTutup((v) => !v)}
+              onPointerDown={(e) => {
+                /* Tangkap pointer-nya: tanpa ini jari yang bergeser keluar
+                   dari gagang berhenti mengirim pointermove. */
+                e.currentTarget.setPointerCapture(e.pointerId);
+                seretGagang.current = { mulai: e.clientY, jauh: false };
+              }}
+              onPointerMove={(e) => {
+                const seret = seretGagang.current;
+                if (!seret || Math.abs(e.clientY - seret.mulai) <= 24) return;
+                seret.jauh = true;
+                setLembarTutup(e.clientY > seret.mulai);
+              }}
+              onClick={() => {
+                const seret = seretGagang.current;
+                seretGagang.current = null;
+                /* Seretan sudah menentukan arahnya — klik penutup jangan
+                   membalikkannya lagi. */
+                if (seret?.jauh) return;
+                setLembarTutup((v) => !v);
+              }}
               aria-expanded={!lembarTutup}
               aria-label={lembarTutup
                 ? (bahasa === "en" ? "Open situation panel" : "Buka panel situasi")
@@ -3061,20 +2829,6 @@ export function LandingKarhutla(
                           {l.judul}
                         </button>
                       </h2>
-                      <button
-                        type="button"
-                        onClick={() => setLembarId(l.id)}
-                        title={t.titikMenu}
-                        aria-label={`${t.titikMenu}: ${l.judul}`}
-                        aria-haspopup="dialog"
-                        className="lk-kartu-titik cursor-pointer shrink-0 rounded-full p-1.5 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor" className="size-5">
-                          <circle cx="5" cy="12" r="1.8" />
-                          <circle cx="12" cy="12" r="1.8" />
-                          <circle cx="19" cy="12" r="1.8" />
-                        </svg>
-                      </button>
                     </div>
                   </div>
                   {/* Media apa adanya: video diputar di tempat dengan poster
@@ -3162,45 +2916,41 @@ export function LandingKarhutla(
             <IkonPanel />
           </Link>
         )}
+        {/* Cari & Tulis: dua slot yang SAMA di kedua halaman. Di panel
+            keduanya tidak punya sasaran lokal — umpannya memang tidak dirender
+            di sana — jadi mereka mengantar ke daftar laporan sambil membawa
+            penanda sekali pakai (?cari=1 / ?tulis=1) yang membuka kolom atau
+            komposernya begitu sampai. Pembacanya ada dekat deklarasi cariBuka. */}
         {tampil === "semua" ? (
-          <>
-            <button
-              type="button"
-              aria-label={t.tabCari}
-              onClick={() => ubahCariBuka(!cariBuka)}
-              className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
-            >
-              <IkonCari className="size-7" />
-            </button>
-            <button
-              type="button"
-              aria-label={t.tabTulis}
-              onClick={() => {
-                (document.getElementById("lk-tulis") as HTMLButtonElement | null)?.click();
-                window.setTimeout(() => document.getElementById("lk-judul")?.focus({ preventScroll: true }), 150);
-              }}
-              className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
-            >
-              <IkonPlus />
-            </button>
-          </>
+          <button
+            type="button"
+            aria-label={t.tabCari}
+            onClick={() => ubahCariBuka(!cariBuka)}
+            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+          >
+            <IkonCari className="size-7" />
+          </button>
         ) : (
-          <>
-            <Link
-              href={`/${bahasa}/karhutla`}
-              aria-label={t.tabTulis}
-              className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
-            >
-              <IkonPlus />
-            </Link>
-            <Link
-              href={`/${bahasa}/lapor`}
-              aria-label={t.tabLapor}
-              className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
-            >
-              <IkonTulis />
-            </Link>
-          </>
+          <Link href={`/${bahasa}/karhutla?cari=1`} aria-label={t.tabCari} className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
+            <IkonCari className="size-7" />
+          </Link>
+        )}
+        {tampil === "semua" ? (
+          <button
+            type="button"
+            aria-label={t.tabTulis}
+            onClick={() => {
+              (document.getElementById("lk-tulis") as HTMLButtonElement | null)?.click();
+              window.setTimeout(() => document.getElementById("lk-judul")?.focus({ preventScroll: true }), 150);
+            }}
+            className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]"
+          >
+            <IkonPlus />
+          </button>
+        ) : (
+          <Link href={`/${bahasa}/karhutla?tulis=1`} aria-label={t.tabTulis} className="cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]">
+            <IkonPlus />
+          </Link>
         )}
       </nav>
       <div aria-hidden="true" className="lk-tabbar-ruang" />
@@ -3208,7 +2958,18 @@ export function LandingKarhutla(
       {/* Rincian di halaman yang sama seperti index (URL ikut pindah agar
           bisa dibagikan, isi halaman tetap). */}
       {sorot && (
-        <RincianLaporan berita={sorot} bahasa={bahasa} onTutup={tutupRincian} gelap />
+        <RincianLaporan
+          berita={sorot}
+          bahasa={bahasa}
+          onTutup={tutupRincian}
+          gelap
+          onSebelumnya={keSebelumnya}
+          onBerikutnya={keBerikutnya}
+          adaSebelumnya={adaSebelumnya}
+          adaBerikutnya={adaBerikutnya}
+          indeksAktif={indeksSorot >= 0 ? indeksSorot : undefined}
+          totalKejadian={berita.length}
+        />
       )}
 
       {/* Pop-up provinsi untuk peta INLINE. Digerbangi !petaPenuh karena versi
@@ -3233,24 +2994,6 @@ export function LandingKarhutla(
         />
       )}
 
-      {/* Lembar deskripsi seluler dari tombol "...". */}
-      {lembar && (
-        <LembarLaporan
-          berita={lembar}
-          bahasa={bahasa}
-          onTutup={() => setLembarId(null)}
-          onBuka={() => {
-            // Ke halaman detail, bukan pop-up.
-            const slug = lembar.slug;
-            setLembarId(null);
-            if (slug) {
-              router.push(`/${bahasa}/fire/${slug}`);
-            } else {
-              bukaRincian(lembar);
-            }
-          }}
-        />
-      )}
 
       {/* Lembar komentar seluler dari ikon komentar postingan. */}
       {komentarId !== null && (

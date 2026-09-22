@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ambilSemuaBerita, hitungLaporanProvinsi } from "@/lib/events";
 import { ambilSorotan } from "@/lib/statistik-sorotan";
+import { ambilKolomUmpanAwal } from "@/lib/perangkat";
 import { LandingKarhutla } from "@/components/landing-karhutla";
 import { BAHASA, adaBahasa, type Bahasa } from "@/lib/bahasa";
 
@@ -71,11 +72,20 @@ export default async function HalamanKarhutla({ params }: Props) {
   // hanya yang terbaru. connection() menandai pembacaan ini dinamis supaya
   // angkanya tidak ikut terbekukan ke dalam cangkang statis halaman.
   await connection();
-  const [jumlahLaporan, berita, sorotan] = await Promise.all([
+  const [jumlahLaporan, berita, sorotan, kolomAwal] = await Promise.all([
     hitungLaporanProvinsi(),
     ambilSemuaBerita(),
     ambilSorotan(),
+    ambilKolomUmpanAwal(),
   ]);
 
-  return <LandingKarhutla bahasa={locale} jumlahLaporan={jumlahLaporan} berita={berita} sorotan={sorotan} />;
+  return (
+    <LandingKarhutla
+      bahasa={locale}
+      jumlahLaporan={jumlahLaporan}
+      berita={berita}
+      sorotan={sorotan}
+      kolomAwal={kolomAwal}
+    />
+  );
 }

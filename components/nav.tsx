@@ -362,7 +362,13 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
           )}
 
           {/* Sakelar pencarian — ikon saja; kolomnya sendiri berdiri di sebelah
-              kiri gugus ini (panggung) atau turun di bawah bilah (aliran). */}
+              kiri gugus ini (panggung) atau turun di bawah bilah (aliran).
+
+              Di aliran tombolnya sendiri TIDAK tampil: bilah tab di dasar layar
+              sudah punya slot cari (`.lk-tabbar`), dan dua kaca pembesar di satu
+              layar ponsel hanya saling berebut. Slot itulah yang membuka panel
+              ini — keadaannya sama-sama satu `cariBuka` milik pemanggil. Di
+              panggung bilah tab itu tersembunyi, jadi tombolnya tetap perlu. */}
           {cari && (
             <button
               type="button"
@@ -372,7 +378,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
               aria-label={cari.terbuka ? teks.tutupCari : teks.cari}
               className={`${gelap
                 ? "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-md p-1 text-xs font-bold sm:p-1.5 sm:text-sm bg-white/[0.05] text-white ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
-                : "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-full p-1 text-xs font-bold sm:p-1.5 sm:text-sm text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"}${
+                : "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-full p-1 text-xs font-bold sm:p-1.5 sm:text-sm text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"} aliran:hidden${
                 /* Selagi kolomnya terbuka, sakelar ini menyingkir di KEDUA
                    ukuran: kolomnya sudah membawa kaca pembesarnya sendiri di
                    ujung kiri dan silang penutup di ujung kanan, jadi tombol ini

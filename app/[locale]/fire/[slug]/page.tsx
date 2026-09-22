@@ -1,18 +1,13 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { headers } from "next/headers";
 import { cacheLife, cacheTag } from "next/cache";
-import { ambilBerita, ambilBeritaSlug, ambilSemuaBerita, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
+import { ambilBeritaSlug, ambilSemuaBerita, hitungLaporanProvinsi, TAYANG } from "@/lib/events";
 import { prisma } from "@/lib/prisma";
 import { JsonLd } from "@/components/json-ld";
-import { ambilTigaTeratas } from "@/lib/wms";
-import { ambilStatistik } from "@/lib/statistik";
-import { HalamanFire } from "@/components/halaman-fire";
-import { HalamanPostingan } from "@/components/postingan-halaman";
-import { KerangkaBeranda } from "@/components/kerangka-beranda";
-import { Nav } from "@/components/nav";
+import { LandingKarhutla } from "@/components/landing-karhutla";
+import { ambilSorotan } from "@/lib/statistik-sorotan";
+import { ambilKolomUmpanAwal } from "@/lib/perangkat";
 import { adaBahasa, type Bahasa } from "@/lib/bahasa";
 
 // Halaman rincian kejadian dengan slug dinamis dari database (dibuat di CMS kapan saja).
@@ -134,39 +129,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-async function IsiHalaman({
-  bahasa,
-  slug,
-  kejadianAwal,
-}: {
-  bahasa: Bahasa;
-  slug: string;
-  kejadianAwal: NonNullable<Awaited<ReturnType<typeof ambilBeritaSlug>>>;
-}) {
-  await connection();
-  const [berita, semuaBerita, jumlahLaporan, tigaTeratas, statistik, seo] = await Promise.all([
-    ambilBerita(),
-    ambilSemuaBerita(),
-    hitungLaporanProvinsi(),
-    ambilTigaTeratas(),
-    ambilStatistik(bahasa),
-    ambilRincianSeo(slug),
-  ]);
-
-  const kejadian = kejadianAwal;
-
-  // Pastikan kejadian selalu ada di daftar berita meskipun sudah lama (di luar top 10)
-  const daftarBerita = berita.some((b) => b.id === kejadian.id)
-    ? berita
-    : [kejadian, ...berita];
-  // Arsip pop-up sudah lengkap dari sononya — tinggal pastikan kejadian
-  // permalink ikut di dalamnya.
-  const arsipPopup = semuaBerita.some((b) => b.id === kejadian.id)
-    ? semuaBerita
-    : [kejadian, ...semuaBerita];
-
-  // Data terstruktur untuk crawler — URL/gambar absolut karena JSON-LD tidak
-  // ikut di-resolve metadataBase; nama organisasi mengikuti siteName layout.
+function bangunDataLd(
+  seo: Awaited<ReturnType<typeof ambilRincianSeo>>,
+  kejadian: NonNullable<Awaited<ReturnType<typeof ambilBeritaSlug>>>,
+  bahasa: Bahasa,
+  slug: string,
+) {
   const { judul: judulSeo, deskripsi: deskripsiSeo } = teksSeo(seo, kejadian, bahasa);
   const urlHalaman = new URL(`/${bahasa}/fire/${slug}`, DASAR_SITUS).toString();
   const gambarAbsolut = kejadian.poster ? new URL(kejadian.poster, DASAR_SITUS).toString() : null;
@@ -210,20 +178,50 @@ async function IsiHalaman({
       },
     ],
   };
+  return { judulSeo, beritaLd, remahLd };
+}
+
+async function IsiHalaman({
+  bahasa,
+  slug,
+  kejadianAwal,
+}: {
+  bahasa: Bahasa;
+  slug: string;
+  kejadianAwal: NonNullable<Awaited<ReturnType<typeof ambilBeritaSlug>>>;
+}) {
+  await connection();
+  const [jumlahLaporan, semuaBerita, sorotan, seo, kolomAwal] = await Promise.all([
+    hitungLaporanProvinsi(),
+    ambilSemuaBerita(),
+    ambilSorotan(),
+    ambilRincianSeo(slug),
+    ambilKolomUmpanAwal(),
+  ]);
+
+  const kejadian = kejadianAwal;
+
+  // Pastikan kejadian selalu ada di daftar berita meskipun di luar kurasi awal
+  const daftarBerita = semuaBerita.some((b) => b.id === kejadian.id)
+    ? semuaBerita
+    : [kejadian, ...semuaBerita];
+
+  // Data terstruktur untuk crawler — URL/gambar absolut karena JSON-LD tidak
+  // ikut di-resolve metadataBase; nama organisasi mengikuti siteName layout.
+  const { judulSeo, beritaLd, remahLd } = bangunDataLd(seo, kejadian, bahasa, slug);
 
   return (
     <>
       <h1 className="sr-only">{judulSeo}</h1>
       <JsonLd data={beritaLd} />
       <JsonLd data={remahLd} />
-      <HalamanFire
-        berita={daftarBerita}
-        semuaBerita={arsipPopup}
-        jumlahLaporan={jumlahLaporan}
-        tigaTeratas={tigaTeratas}
-        statistik={statistik}
-        kejadianAwal={kejadian}
+      <LandingKarhutla
         bahasa={bahasa}
+        jumlahLaporan={jumlahLaporan}
+        berita={daftarBerita}
+        sorotan={sorotan}
+        kejadianAwal={kejadian}
+        kolomAwal={kolomAwal}
       />
     </>
   );
@@ -239,21 +237,7 @@ export default async function HalamanKejadian({ params }: Props) {
   const kejadian = await ambilBeritaSlug(slug);
   if (!kejadian) notFound();
 
-  // Seluler: desain Postingan (penulis–media–aksi–caption); desktop tetap
-  // HalamanFire seperti semula. Dibaca dari user-agent karena yang menentukan
-  // adalah perangkat, bukan lebar jendela — dan rute ini dinamis per request
-  // sehingga tak ada masalah cache.
-  const ua = (await headers()).get("user-agent") ?? "";
-  if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) {
-    return <HalamanPostingan berita={kejadian} bahasa={locale as Bahasa} />;
-  }
-
-  return (
-    <>
-      <Nav bahasa={locale as Bahasa} />
-      <Suspense fallback={<KerangkaBeranda bahasa={locale as Bahasa} />}>
-        <IsiHalaman bahasa={locale as Bahasa} slug={slug} kejadianAwal={kejadian} />
-      </Suspense>
-    </>
-  );
+  // Tampilkan LandingKarhutla dengan rincian kejadian terbuka secara konsisten
+  // di semua perangkat (seluler menggunakan rincian seluler baru, desktop modal 2-rel).
+  return <IsiHalaman bahasa={locale as Bahasa} slug={slug} kejadianAwal={kejadian} />;
 }

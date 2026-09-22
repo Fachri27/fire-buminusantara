@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "@/lib/batas-laporan";
 import { TEKS_LAPOR, type Bahasa } from "@/lib/bahasa";
 import { BilahUnggah } from "@/components/bilah-unggah";
+import { Switch } from "@/components/ui/switch";
 import { kirimLaporan, type KeadaanLapor } from "./aksi";
 
 /** Site key Turnstile. Tanpa ini (pengembangan) widget tidak dirender dan
@@ -177,10 +178,16 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         window.setTimeout(pasang, 100);
         return;
       }
-      try {
-        ts.remove(widgetRef.current);
-      } catch {
-        /* belum ada widget */
+      /* Digerbangi null: remove(null) pada pemasangan pertama bukan no-op —
+         Turnstile mencatatnya sebagai "Nothing to remove found for the
+         provided container." di konsol. Pemasangan berikutnya selalu punya
+         id, jadi gerbang ini hanya membungkam yang tak perlu. */
+      if (widgetRef.current !== null) {
+        try {
+          ts.remove(widgetRef.current);
+        } catch {
+          /* belum ada widget */
+        }
       }
       wadah.innerHTML = "";
 
@@ -540,10 +547,15 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
                value={nama} onChange={(e) => setNama(e.target.value)}
                className={`${ISIAN} disabled:bg-black/[0.03] disabled:text-tinta/35`} />
         <label className="mt-3 flex w-fit cursor-pointer items-center gap-2.5 text-[13.5px]">
-          <input type="checkbox" name="anonim" value="1" checked={anonim}
-                 onChange={(e) => setAnonim(e.target.checked)}
-                 className="cursor-pointer size-4 accent-[var(--color-api)]" />
-          {teks.anonim}
+          <Switch
+            name="anonim"
+            value="1"
+            checked={anonim}
+            onCheckedChange={setAnonim}
+            size="sm"
+            aksen="bara"
+          />
+          <span>{teks.anonim}</span>
         </label>
       </Bidang>
 

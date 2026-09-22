@@ -82,6 +82,12 @@ export function HalamanFire({
     }
   }, [bahasa]);
 
+  const indeksSorot = sorot ? daftarPeta.findIndex((b) => b.id === sorot.id) : -1;
+  const adaSebelumnya = indeksSorot > 0;
+  const adaBerikutnya = indeksSorot >= 0 && indeksSorot < daftarPeta.length - 1;
+  const keSebelumnya = adaSebelumnya ? () => bukaRincian(daftarPeta[indeksSorot - 1]) : undefined;
+  const keBerikutnya = adaBerikutnya ? () => bukaRincian(daftarPeta[indeksSorot + 1]) : undefined;
+
   // Sinkronkan pop-up saat pengunjung menekan tombol Back / Forward di peramban
   useEffect(() => {
     const saatPopState = () => {
@@ -152,7 +158,17 @@ export function HalamanFire({
       </section>
 
       {sorot !== null && (
-        <RincianLaporan berita={sorot} bahasa={bahasa} onTutup={tutupRincian} />
+        <RincianLaporan
+          berita={sorot}
+          bahasa={bahasa}
+          onTutup={tutupRincian}
+          onSebelumnya={keSebelumnya}
+          onBerikutnya={keBerikutnya}
+          adaSebelumnya={adaSebelumnya}
+          adaBerikutnya={adaBerikutnya}
+          indeksAktif={indeksSorot >= 0 ? indeksSorot : undefined}
+          totalKejadian={daftarPeta.length}
+        />
       )}
 
       {wilayah && (

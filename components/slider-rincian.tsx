@@ -21,10 +21,10 @@ type Props = {
 export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
   const [indeks, setIndeks] = useState(0);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  // Jika media awal sudah selesai dimuat di memori peramban (cache), langsung
+  // tandai siap dan simpan rasionya agar tidak berkedip kerangka 1-frame saat
+  // pop-up dibuka.
   const [awalSiap, setAwalSiap] = useState(false);
-  // Rasio asli tiap media (lebar ÷ tinggi), diisi saat metadata video / gambar
-  // selesai dimuat. Menyetel aspect-ratio bingkai slide agar bingkai menempel
-  // pada isi media, bukan pada kotak slide yang bisa lebih besar.
   const [rasioMedia, setRasioMedia] = useState<(number | undefined)[]>([]);
 
   // Apakah bilah kendali video sedang tampak. Peramban tidak memberi tahu kapan
@@ -149,6 +149,27 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
   // media tambahan untuk tiap galeri.
   const dekat = (idx: number) => Math.abs(idx - kini) <= 1;
 
+  const sentuhRef = useRef<{ x: number; y: number } | null>(null);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const s = e.touches[0];
+    sentuhRef.current = { x: s.clientX, y: s.clientY };
+    aktivitasPointer();
+  }, [aktivitasPointer]);
+
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    const awal = sentuhRef.current;
+    sentuhRef.current = null;
+    if (!awal || media.length <= 1) return;
+    const s = e.changedTouches[0];
+    const dx = s.clientX - awal.x;
+    const dy = s.clientY - awal.y;
+    if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      if (dx < 0) geser(1);
+      else geser(-1);
+    }
+  }, [geser, media.length]);
+
   if (!media || media.length === 0) return null;
 
   return (
@@ -156,6 +177,8 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
       className="rincian__slider-wadah"
       onPointerMove={aktivitasPointer}
       onPointerDown={aktivitasPointer}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
     >
       {/* Trek geser horizontal dengan animasi halus */}
       <div
@@ -216,6 +239,10 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                   <video
                     ref={(el) => {
                       videoRefs.current[idx] = el;
+                      if (el && el.readyState >= 1 && el.videoWidth > 0) {
+                        simpanRasio(el.videoWidth, el.videoHeight, idx);
+                        if (idx === 0) setAwalSiap(true);
+                      }
                     }}
                     src={m.url}
                     poster={(m.poster ?? poster) ?? undefined}

@@ -9,6 +9,7 @@ const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
 type TurnstileInstance = {
   render: (wadah: HTMLElement, opsi: Record<string, unknown>) => number;
+  execute: (wadah: HTMLElement, opsi?: Record<string, unknown>) => void;
   reset: (id: number) => void;
   remove: (id: number | null) => void;
 };
@@ -58,7 +59,6 @@ export function gunakanKomentar(idLaporan: number) {
   const [dibuka, setDibuka] = useState<number[]>([]);
   const [website, setWebsite] = useState("");
   const [galat, setGalat] = useState("");
-  const [captchaToken, setCaptchaToken] = useState("");
 
   const [prevId, setPrevId] = useState(idLaporan);
   if (idLaporan !== prevId) {
@@ -69,13 +69,14 @@ export function gunakanKomentar(idLaporan: number) {
     setBalasNama("");
     setDibuka([]);
     setDaftar([]);
-    setCaptchaToken("");
   }
 
   const ketikRef = useRef<HTMLTextAreaElement | null>(null);
-  const captchaRef = useRef<HTMLDivElement | null>(null);
+  const wadahRef = useRef<HTMLDivElement | null>(null);
   const widgetRef = useRef<number | null>(null);
   const sedangKirimRef = useRef(false);
+  // Kiriman yang sedang menunggu token dari execute(); dibangunkan callback widget.
+  const penungguToken = useRef<((token: string) => void)[]>([]);
   const currentIdRef = useRef(idLaporan);
 
   useEffect(() => {
@@ -136,61 +137,92 @@ export function gunakanKomentar(idLaporan: number) {
     }
   }, [idLaporan]);
 
-  // Widget Turnstile dipasang sekali, mode explicit: kotak captcha tidak
-  // ditampilkan sama sekali; token tetap dikirim & diperiksa di server.
-  // Dibungkus useCallback supaya pemilik sheet (mobile) bisa memasang ulang
-  // widgetnya setiap wadahnya di-mount kembali.
-  const pasangCaptcha = useCallback(() => {
-    if (!SITE_KEY) return;
-
-    const pasang = () => {
-      const wadah = captchaRef.current;
-      const ts = turnstile();
-      if (!wadah) return;
-      if (!ts) {
-        window.setTimeout(pasang, 100);
-        return;
-      }
+  /** Buang widget yang sedang menempel, apa pun keadaannya. `remove` pada id
+   *  yang sudah mati itulah yang membuat Turnstile mengeluh di konsol
+   *  ("Cannot find Widget …", "Nothing to remove found…"), jadi id-nya selalu
+   *  dinolkan di sini — sekali lepas, ia tak boleh dipakai lagi. */
+  const lepasWidget = useCallback(() => {
+    const ts = turnstile();
+    if (ts && widgetRef.current !== null) {
       try {
         ts.remove(widgetRef.current);
       } catch {
-        /* belum ada widget */
+        /* sudah lepas bersama wadahnya */
       }
-      wadah.innerHTML = "";
-      widgetRef.current = ts.render(wadah, {
-        sitekey: SITE_KEY,
-        appearance: "interaction-only",
-        callback: (token: string) => setCaptchaToken(token),
-        "expired-callback": () => {
-          setCaptchaToken("");
-          if (widgetRef.current !== null) {
-            try {
-              ts.reset(widgetRef.current);
-            } catch {
-              /* widget sudah lepas bersama pop-up yang ditutup */
-            }
-          }
-        },
-        "error-callback": () => {
-          setCaptchaToken("");
-          if (widgetRef.current !== null) {
-            try {
-              ts.reset(widgetRef.current);
-            } catch {
-              /* widget sudah lepas bersama pop-up yang ditutup */
-            }
-          }
-        },
-      });
-    };
-
-    pasang();
+    }
+    widgetRef.current = null;
   }, []);
+
+  /* Wadah captcha adalah CALLBACK REF, bukan useRef.
+
+     Widget Turnstile hidup menempel pada satu simpul DOM, jadi siklus hidupnya
+     harus mengikuti simpul itu: dipasang saat simpulnya lahir, dibuang saat
+     simpulnya lepas. Dengan useRef biasa pemiliknya tak pernah tahu kapan
+     wadahnya berganti — desktop dan sheet ponsel memakai dua <div> berbeda
+     untuk satu ref yang sama, dan formulir komentar juga di-mount ulang tiap
+     pop-up rincian dibuka. Widget lama pun tertinggal di DOM yang sudah
+     dibuang, dan setiap reset/remove berikutnya menembak id mati.
+
+     Mode explicit dengan appearance "interaction-only": kotak captcha tidak
+     tampil sama sekali; token tetap dikirim & diperiksa di server. */
+  const captchaRef = useCallback(
+    (wadah: HTMLDivElement | null) => {
+      wadahRef.current = wadah;
+      lepasWidget();
+      if (!wadah || !SITE_KEY) return;
+
+      const pasang = () => {
+        // Skrip Turnstile bisa belum termuat, dan dalam penantian itu wadahnya
+        // bisa sudah dilepas React — jangan menempel ke simpul yang hilang.
+        if (wadahRef.current !== wadah) return;
+        const ts = turnstile();
+        if (!ts) {
+          window.setTimeout(pasang, 100);
+          return;
+        }
+        widgetRef.current = ts.render(wadah, {
+          sitekey: SITE_KEY,
+          appearance: "interaction-only",
+          // Tantangan BARU dijalankan saat kirim (lihat ambilToken), bukan saat
+          // formulir dibuka: token Turnstile berumur 5 menit, dan formulir yang
+          // dibuka lalu didiamkan selalu mengirim token yang sudah basi.
+          execution: "execute",
+          callback: (token: string) => {
+            penungguToken.current.splice(0).forEach((bangun) => bangun(token));
+          },
+          "expired-callback": () => {
+            const t = turnstile();
+            if (t && widgetRef.current !== null) {
+              try {
+                t.reset(widgetRef.current);
+              } catch {
+                /* widget sudah lepas */
+              }
+            }
+          },
+          "error-callback": () => {
+            // Jangan gantungkan kiriman yang menunggu: token kosong = gagal.
+            penungguToken.current.splice(0).forEach((bangun) => bangun(""));
+            const t = turnstile();
+            if (t && widgetRef.current !== null) {
+              try {
+                t.reset(widgetRef.current);
+              } catch {
+                /* widget sudah lepas */
+              }
+            }
+          },
+        });
+      };
+
+      pasang();
+    },
+    [lepasWidget],
+  );
 
   // Token Turnstile sekali pakai: setelah dikirim — berhasil atau gagal —
   // widget harus meminta token baru.
   const ulangCaptcha = useCallback(() => {
-    setCaptchaToken("");
     const ts = turnstile();
     if (ts && widgetRef.current !== null) {
       try {
@@ -199,6 +231,43 @@ export function gunakanKomentar(idLaporan: number) {
         /* widget sudah lepas bersama pop-up yang ditutup */
       }
     }
+  }, []);
+
+  /** Jalankan tantangan Turnstile SEKARANG dan tunggu tokennya.
+   *
+   *  Dulu token diminta saat formulir dibuka dan kiriman ditolak kalau ia belum
+   *  tiba ("Verifikasi keamanan belum siap") — padahal yang kurang cuma waktu.
+   *  Sekarang tantangan baru berjalan di detik kirim; token kosong berarti
+   *  benar-benar gagal, bukan sekadar belum sempat. */
+  const ambilToken = useCallback(async (): Promise<string> => {
+    if (!SITE_KEY) return "";
+    // Skrip Turnstile bisa masih dimuat saat tombol ditekan; wadahnya memasang
+    // widget lewat polling 100ms, jadi tunggu sebentar alih-alih menolak.
+    for (let i = 0; widgetRef.current === null && i < 50; i++) {
+      await new Promise((lanjut) => window.setTimeout(lanjut, 100));
+    }
+    const ts = turnstile();
+    const wadah = wadahRef.current;
+    // execute() menerima WADAH-nya, bukan id widget (lihat dokumentasi
+    // client-side rendering Turnstile).
+    if (!ts || !wadah || widgetRef.current === null) return "";
+
+    return new Promise<string>((selesai) => {
+      const bangun = (token: string) => {
+        window.clearTimeout(jam);
+        selesai(token);
+      };
+      const jam = window.setTimeout(() => {
+        penungguToken.current = penungguToken.current.filter((f) => f !== bangun);
+        selesai("");
+      }, 20_000);
+      penungguToken.current.push(bangun);
+      try {
+        ts.execute(wadah);
+      } catch {
+        bangun("");
+      }
+    });
   }, []);
 
   // Saat mulai membalas, fokus dipindah ke kolom ketik yang ada di ujung lain
@@ -255,13 +324,18 @@ export function gunakanKomentar(idLaporan: number) {
 
   const kirim = useCallback(async () => {
     if (sedangKirimRef.current || mengirim || !isi.trim()) return;
-    if (Boolean(SITE_KEY) && !captchaToken) {
-      setGalat("Verifikasi keamanan belum siap. Tunggu sebentar dan coba lagi.");
-      return;
-    }
     sedangKirimRef.current = true;
     setMengirim(true);
     setGalat("");
+
+    const captchaToken = await ambilToken();
+    if (SITE_KEY && !captchaToken) {
+      sedangKirimRef.current = false;
+      setMengirim(false);
+      ulangCaptcha();
+      setGalat("Verifikasi keamanan gagal. Coba kirim lagi.");
+      return;
+    }
 
     const targetId = idLaporan;
     let respon: {
@@ -329,7 +403,7 @@ export function gunakanKomentar(idLaporan: number) {
       /* storage mungkin diblokir */
     }
   }, [
-    alamat, akarDari, anonim, batalBalas, balasKe, captchaToken,
+    alamat, akarDari, ambilToken, anonim, batalBalas, balasKe,
     email, idLaporan, isi, mengirim, nama, ulangCaptcha, website,
   ]);
 
@@ -345,6 +419,6 @@ export function gunakanKomentar(idLaporan: number) {
     tampilkanBalasan, alihkanBalasan,
     sebutanDari, isiTanpaSebutan,
     kirim,
-    ketikRef, captchaRef, pasangCaptcha,
+    ketikRef, captchaRef,
   };
 }

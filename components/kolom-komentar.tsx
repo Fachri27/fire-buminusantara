@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePonsel } from "@/hooks/use-media-query";
 import type { gunakanKomentar } from "@/hooks/gunakan-komentar";
+import { Switch } from "@/components/ui/switch";
 
 type Kendali = ReturnType<typeof gunakanKomentar>;
 
@@ -18,6 +19,59 @@ type UlasanProps = {
   sebutanDari: Kendali["sebutanDari"];
   isiTanpaSebutan: Kendali["isiTanpaSebutan"];
 };
+
+/**
+ * Blok nama + isi sebuah komentar — satu tempat untuk daftar utama maupun
+ * balasan. Isi yang panjang dipangkas empat baris; tombol pembukanya hanya
+ * muncul kalau memang ada yang tersembunyi, dibaca dari selisih tinggi gulir
+ * elemen yang SUDAH terpangkas (bukan ditebak dari jumlah karakter — 180 huruf
+ * bisa jadi dua baris di rel lebar dan lima baris di lembar ponsel).
+ */
+function TeksKomentar({ nama, sebutan, isi }: { nama: string; sebutan?: string | null; isi: string }) {
+  const teksRef = useRef<HTMLParagraphElement>(null);
+  const [terbuka, setTerbuka] = useState(false);
+  const [adaSisa, setAdaSisa] = useState(false);
+
+  useEffect(() => {
+    // Selagi terbuka, patokannya tak ada lagi — mengukur di sini justru
+    // menyimpulkan "tidak ada sisa" dan tombol penutupnya ikut hilang.
+    if (terbuka) return;
+    const n = teksRef.current;
+    if (!n) return;
+    const ukur = () => setAdaSisa(n.scrollHeight - n.clientHeight > 1);
+    ukur();
+    // Balasan yang terlipat di-render dengan display:none, jadi pengukuran
+    // pertama membaca nol. ResizeObserver menagih ulang begitu kotaknya
+    // sungguh berukuran — sekaligus saat layar berputar.
+    const pengamat = new ResizeObserver(ukur);
+    pengamat.observe(n);
+    return () => pengamat.disconnect();
+  }, [isi, terbuka]);
+
+  return (
+    <>
+      <p ref={teksRef} className={`rincian__komen-teks${terbuka ? "" : " rincian__komen-teks--pangkas"}`}>
+        {/* Spasi eksplisit antar span: JSX menghilangkan jeda baris di
+            antara elemen, dan CSS sengaja tanpa margin — tanpa ini nama
+            dan teksnya menempel. */}
+        <span className="rincian__komen-nama">{nama}</span>
+        {sebutan && <> <span className="rincian__sebutan">{sebutan}</span></>}{" "}
+        <span>{isi}</span>
+      </p>
+
+      {adaSisa && (
+        <button
+          type="button"
+          className="rincian__selengkapnya cursor-pointer"
+          aria-expanded={terbuka}
+          onClick={() => setTerbuka((t) => !t)}
+        >
+          {terbuka ? "Lebih sedikit" : "Selengkapnya"}
+        </button>
+      )}
+    </>
+  );
+}
 
 /** Daftar komentar pada pop-up rincian — padanan markup kolom komentar di
  *  beranda.blade.php proyek Pasopati (x-for → .map). */
@@ -38,13 +92,7 @@ export function UlasanKomentar({
             <span className="rincian__inisial" aria-hidden="true">{(k.nama || "?").charAt(0)}</span>
 
             <div className="rincian__komen-isi">
-              <p className="rincian__komen-teks">
-                {/* Spasi eksplisit antar span: JSX menghilangkan jeda baris di
-                    antara elemen, dan CSS sengaja tanpa margin — tanpa ini nama
-                    dan teksnya menempel. */}
-                <span className="rincian__komen-nama">{k.nama}</span>{" "}
-                <span>{k.isi}</span>
-              </p>
+              <TeksKomentar nama={k.nama} isi={k.isi} />
 
               <p className="rincian__komen-kaki">
                 <span>{k.waktu}</span>
@@ -77,11 +125,11 @@ export function UlasanKomentar({
                         <span className="rincian__inisial" aria-hidden="true">{(b.nama || "?").charAt(0)}</span>
 
                         <div className="rincian__komen-isi">
-                          <p className="rincian__komen-teks">
-                            <span className="rincian__komen-nama">{b.nama}</span>{" "}
-                            {sebutanDari(b) && <span className="rincian__sebutan">{sebutanDari(b)}</span>}{" "}
-                            <span>{isiTanpaSebutan(b)}</span>
-                          </p>
+                          <TeksKomentar
+                            nama={b.nama}
+                            sebutan={sebutanDari(b)}
+                            isi={isiTanpaSebutan(b)}
+                          />
 
                           <p className="rincian__komen-kaki">
                             <span>{b.waktu}</span>
@@ -124,10 +172,12 @@ type FormProps = {
   kirim: Kendali["kirim"];
   ketikRef: Kendali["ketikRef"];
   captchaRef: Kendali["captchaRef"];
-  pasangCaptcha: Kendali["pasangCaptcha"];
   /** true = selalu inline ringkas (tanpa baris pemicu + sheet), untuk
    *  dipasang di dalam lembar bawah lain yang ruangnya sudah sempit. */
   tanpaSheet?: boolean;
+  /** Dipanggil setelah kiriman selesai — dipakai induk lembar untuk
+   *  melipat formulir ini kembali menjadi baris pemicunya. */
+  tutup?: () => void;
 };
 
 /** Kolom kirim, dipatok di dasar rel. Cukup isi nama dan email, tidak perlu
@@ -141,8 +191,9 @@ type FormProps = {
 export function FormulirKomentar({
   mengirim, galat, nama, setNama, email, setEmail, anonim, setAnonim, isi, setIsi,
   website, setWebsite, balasKe, balasNama, batalBalas,
-  kirim, ketikRef, captchaRef, pasangCaptcha,
+  kirim, ketikRef, captchaRef,
   tanpaSheet = false,
+  tutup,
 }: FormProps) {
   const belumLengkap = mengirim || !isi.trim() || (!anonim && (!nama.trim() || !email.trim()));
 
@@ -160,22 +211,20 @@ export function FormulirKomentar({
     if (!belumLengkap && !mengirim) {
       await kirim();
       setSheetBukaManual(false);
+      tutup?.();
     }
   };
 
-  // Wadah captcha di desktop terpasang langsung (form inline); di ponsel ikut
-  // sheet yang di-mount/unmount — pasang widget saat wadahnya siap di DOM.
-  // Sebelumnya hanya (ponsel && sheet), jadi di desktop widget tak pernah
-  // ter-render → token kosong → "Verifikasi captcha gagal". Mode tanpaSheet
-  // ikut dipasang karena wadahnya selalu di DOM.
-  useEffect(() => {
-    if (!ponsel || sheet || tanpaSheet) pasangCaptcha();
-  }, [ponsel, sheet, tanpaSheet, pasangCaptcha]);
+  // Pemasangan widget captcha TIDAK lagi diurus di sini: wadahnya kini
+  // callback ref milik hook (lihat gunakanKomentar), jadi widget mengikuti
+  // hidup-matinya <div> itu sendiri — desktop, sheet ponsel, maupun tanpaSheet
+  // sama saja, tanpa cabang yang bisa lupa salah satunya.
 
-  // Fokus ke kotak ketik begitu sheet terbuka.
+  // Fokus ke kotak ketik begitu sheet (miliknya) atau lembar induk
+  // (tanpaSheet) terbuka.
   useEffect(() => {
-    if (ponsel && sheet) ketikRef.current?.focus();
-  }, [ponsel, sheet, ketikRef]);
+    if (ponsel && (sheet || tanpaSheet)) ketikRef.current?.focus();
+  }, [ponsel, sheet, tanpaSheet, ketikRef]);
 
   // Isian yang sama untuk versi inline dan versi sheet — satu sumber markup.
   const bidang = (
@@ -201,6 +250,19 @@ export function FormulirKomentar({
       )}
 
       {SITE_KEY && <div className="rincian__captcha" ref={captchaRef} />}
+
+      {/* Pilihan anonim DI ATAS isian identitas: ia yang menentukan apakah
+          dua isian di bawahnya perlu diisi, jadi dibaca lebih dulu. */}
+      <label className="rincian__anonim cursor-pointer">
+        <Switch
+          id="komentar-anonim"
+          checked={anonim}
+          onCheckedChange={setAnonim}
+          size="sm"
+          aksen="bara"
+        />
+        <span>Kirim sebagai anonim</span>
+      </label>
 
       <div className="rincian__identitas">
         <label className="sr-only" htmlFor="komentar-nama">Nama</label>
@@ -228,18 +290,6 @@ export function FormulirKomentar({
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
-
-      {/* Pilihan anonim, sama polanya dengan form laporan: isian identitas
-          dimatikan dan kiriman tampil sebagai "Anonim". */}
-      <label className="rincian__anonim cursor-pointer">
-        <input
-          type="checkbox"
-          className="cursor-pointer"
-          checked={anonim}
-          onChange={(e) => setAnonim(e.target.checked)}
-        />
-        Kirim sebagai anonim
-      </label>
     </>
   );
 
@@ -254,20 +304,30 @@ export function FormulirKomentar({
         <textarea
           ref={ketikRef}
           className="rincian__ketik"
-          rows={sheet ? 3 : 1}
+          rows={1}
           maxLength={2000}
           placeholder="Tambahkan komentar…"
           value={isi}
           onChange={(e) => setIsi(e.target.value)}
           onKeyDown={(e) => {
-            // Shift+Enter diperbolehkan membuat baris baru di sheet.
-            if (e.key === "Enter" && (!sheet || !e.shiftKey)) {
+            // Shift+Enter membuat baris baru; Enter langsung mengirim
+            if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               tanganiKirim();
             }
           }}
         />
       </label>
+
+      {tutup && (
+        <button
+          type="button"
+          className="rincian__batal cursor-pointer"
+          onClick={tutup}
+        >
+          Batal
+        </button>
+      )}
 
       <button
         type="submit"

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { BATAS_BERKAS, BATAS_TOTAL_BYTE } from "@/lib/batas-laporan";
 import { TEKS_LAPOR, type Bahasa } from "@/lib/bahasa";
 import { BilahUnggah } from "@/components/bilah-unggah";
+import { Switch } from "@/components/ui/switch";
 import { kirimLaporan, type KeadaanLapor } from "@/app/[locale]/lapor/aksi";
 
 /**
@@ -688,17 +689,17 @@ export function KomposerLapor({ bahasa, asapAktif }: { bahasa: Bahasa; asapAktif
               : ajakan.wajibFoto}
           </label>
 
-          <label className="flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12.5px]
+          <label className="flex cursor-pointer items-center gap-2 rounded-full px-2.5 py-1.5 text-[12.5px]
                             text-pantau-abu transition hover:bg-white/5">
-            <input
-              type="checkbox"
+            <Switch
               name="anonim"
               value="1"
               checked={anonim}
-              onChange={(e) => setAnonim(e.target.checked)}
-              className={`cursor-pointer size-3.5 ${aksen.kotak}`}
+              onCheckedChange={setAnonim}
+              size="sm"
+              aksen={asapAktif ? "fuchsia" : "emerald"}
             />
-            {teks.anonim}
+            <span>{teks.anonim}</span>
           </label>
 
           <div className="ml-auto flex items-center gap-2">

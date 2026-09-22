@@ -235,6 +235,12 @@ export function HalamanPeta({
     }
   }, [bahasa]);
 
+  const indeksSorot = sorot ? berita.findIndex((b) => b.id === sorot.id) : -1;
+  const adaSebelumnya = indeksSorot > 0;
+  const adaBerikutnya = indeksSorot >= 0 && indeksSorot < berita.length - 1;
+  const keSebelumnya = adaSebelumnya ? () => bukaRincian(berita[indeksSorot - 1]) : undefined;
+  const keBerikutnya = adaBerikutnya ? () => bukaRincian(berita[indeksSorot + 1]) : undefined;
+
   // Pop-up mana pun yang terbuka menghentikan guliran halaman di belakangnya.
   gunakanParallax(sorot !== null || wilayah !== null);
 
@@ -926,7 +932,18 @@ export function HalamanPeta({
       </div>
 
       {sorot !== null && (
-        <RincianLaporan berita={sorot} bahasa={bahasa} onTutup={tutupRincian} gelap />
+        <RincianLaporan
+          berita={sorot}
+          bahasa={bahasa}
+          onTutup={tutupRincian}
+          gelap
+          onSebelumnya={keSebelumnya}
+          onBerikutnya={keBerikutnya}
+          adaSebelumnya={adaSebelumnya}
+          adaBerikutnya={adaBerikutnya}
+          indeksAktif={indeksSorot >= 0 ? indeksSorot : undefined}
+          totalKejadian={berita.length}
+        />
       )}
 
       {wilayah && (
@@ -1815,39 +1832,32 @@ function Keping({ berita: b, src, alami }: { berita: Berita; src?: string; alami
  *  mengalir dengan rasio aslinya. */
 function VideoKeping({ url, poster, label, alami }: { url: string; poster: string | null; label: string; alami?: boolean }) {
   const ref = useRef<HTMLVideoElement | null>(null);
-  const terlihatRef = useRef(false);
   const [siap, setSiap] = useState(false);
-  // Poster tampil seketika (gambar cache tak boleh berkedip hitam saat daftar
-  // kartu dibangun ulang); state ini hanya menandai poster yang gagal dimuat.
   const [posterGagal, setPosterGagal] = useState(false);
+  const [sedangHover, setSedangHover] = useState(false);
 
-  useEffect(() => {
+  const mulaiHover = useCallback(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const el = ref.current;
     if (!el) return;
-    // Properti muted, bukan sekadar atribut — syarat autoplay sebagian peramban.
     el.muted = true;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const amati = new IntersectionObserver(
-      (masuk) => {
-        terlihatRef.current = masuk.some((m) => m.isIntersecting);
-        if (terlihatRef.current) el.play().catch(() => {});
-        else el.pause();
-      },
-      { threshold: 0.25 },
-    );
-    amati.observe(el);
-    return () => {
-      amati.disconnect();
-      el.pause();
-    };
+    setSedangHover(true);
+    el.play().catch(() => {});
   }, []);
 
-  /* play() saat kartu terlihat bisa ditolak kalau datanya belum siap — janjinya
-     gagal dalam diam dan tak pernah dicoba lagi (kotak hitam). Begitu canplay,
-     coba lagi selama kartunya masih terlihat. */
-  const cobaPutar = useCallback((el: HTMLVideoElement) => {
-    setSiap(true);
-    if (terlihatRef.current) el.play().catch(() => {});
+  const hentiHover = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setSedangHover(false);
+    el.pause();
+    if (el.readyState >= 1 && el.currentTime) el.currentTime = 0;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      const el = ref.current;
+      if (el) el.pause();
+    };
   }, []);
 
   /* Poster sebagai <img> sendiri di belakang video — pola beranda. Poster yang
@@ -1866,11 +1876,8 @@ function VideoKeping({ url, poster, label, alami }: { url: string; poster: strin
       muted
       playsInline
       loop
-      preload="metadata"
-      onCanPlay={(e) => cobaPutar(e.currentTarget)}
-      // canplay bisa lewat sebelum pendengarnya terpasang (video dari cache)
-      // — video lalu berputar tapi tetap opacity-0 di belakang poster.
-      // `playing` datang tiap kali pemutaran benar-benar mulai.
+      preload="none"
+      onCanPlay={() => setSiap(true)}
       onPlaying={() => setSiap(true)}
       className={kelas}
     />
@@ -1878,7 +1885,11 @@ function VideoKeping({ url, poster, label, alami }: { url: string; poster: strin
 
   if (alami) {
     return (
-      <span className="relative block bg-black">
+      <span
+        className="relative block bg-black"
+        onMouseEnter={mulaiHover}
+        onMouseLeave={hentiHover}
+      >
         {poster && !posterGagal ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1889,7 +1900,7 @@ function VideoKeping({ url, poster, label, alami }: { url: string; poster: strin
               className="h-auto min-h-40 w-full transition-[filter] duration-500 group-hover:brightness-105"
             />
             {videoEl(`absolute inset-0 h-full w-full object-cover transition duration-500
-                      group-hover:brightness-105 ${siap ? "opacity-100" : "opacity-0"}`)}
+                      group-hover:brightness-105 ${sedangHover && siap ? "opacity-100" : "opacity-0"}`)}
           </>
         ) : (
           videoEl("h-auto min-h-40 w-full")
@@ -1899,7 +1910,11 @@ function VideoKeping({ url, poster, label, alami }: { url: string; poster: strin
   }
 
   return (
-    <span className="absolute inset-0 bg-black">
+    <span
+      className="absolute inset-0 bg-black"
+      onMouseEnter={mulaiHover}
+      onMouseLeave={hentiHover}
+    >
       {poster && !posterGagal && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -1916,14 +1931,11 @@ function VideoKeping({ url, poster, label, alami }: { url: string; poster: strin
         muted
         playsInline
         loop
-        preload="metadata"
-        onCanPlay={(e) => cobaPutar(e.currentTarget)}
-        // canplay bisa lewat sebelum pendengarnya terpasang (video dari cache)
-        // — video lalu berputar tapi tetap opacity-0 di belakang poster.
-        // `playing` datang tiap kali pemutaran benar-benar mulai.
+        preload="none"
+        onCanPlay={() => setSiap(true)}
         onPlaying={() => setSiap(true)}
         className={`absolute inset-0 h-full w-full object-cover transition duration-500
-                    group-hover:scale-[1.03] ${siap ? "opacity-100" : "opacity-0"}`}
+                    group-hover:scale-[1.03] ${sedangHover && siap ? "opacity-100" : "opacity-0"}`}
       />
     </span>
   );
