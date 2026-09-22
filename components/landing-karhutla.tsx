@@ -673,12 +673,12 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
           className="group block w-full cursor-pointer transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
         >
           {poster && !posterGagal ? (
-            <div className="aspect-[16/10] overflow-hidden rounded-lg bg-black/[0.04] dark:bg-white/5">
+            <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={poster} alt="" aria-hidden="true" loading="lazy"
                 onError={() => setPosterGagal(true)}
-                className="lk-foto h-full w-full object-cover"
+                className="lk-foto h-auto w-full"
               />
               <video
                 ref={ref}
@@ -693,7 +693,7 @@ function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = n
                 onPlaying={() => setSiap(true)}
                 className={`lk-video absolute inset-0 h-full w-full object-cover transition duration-300 ${sedangHover && siap ? "opacity-100" : "opacity-0"}`}
               />
-            </div>
+            </>
           ) : (
             <video
               ref={ref}
@@ -2487,8 +2487,10 @@ export function LandingKarhutla(
     const tab = PULAU_TAB.find((x) => x.kunci === wilayahUmpan);
     const isi = tab ? (tab.isi as readonly string[]) : null;
     const tersaring = isi ? sebelumWilayah.filter((l) => !!l.pulau && isi.includes(l.pulau)) : sebelumWilayah;
-    // Terbaru (bawaan): tanggal kejadian, lalu id (yang dibuat belakangan dulu).
+    // Terbaru: tanggal kejadian, lalu id (yang dibuat belakangan dulu).
     // Komentar terbanyak: jumlah komentar, seri → yang lebih baru dulu.
+    // Bawaan ("semua", tanpa pil menyala): sama dengan Terbaru — seluruh
+    // data tampil dengan yang terbaru di atas.
     const baru = (a: Laporan, b: Laporan) => (waktuTeks(b.tanggal) ?? 0) - (waktuTeks(a.tanggal) ?? 0) || b.id - a.id;
     return [...tersaring].sort(urutanUmpan === "komentar"
       ? (a, b) => (b.komentar ?? 0) - (a.komentar ?? 0) || baru(a, b)
@@ -3079,10 +3081,10 @@ export function LandingKarhutla(
                       type="button"
                       onClick={() => bukaMedia(l.id)}
                       aria-label={l.judul}
-                      className="lk-foto cursor-pointer relative mt-3 block w-full aspect-[16/10] overflow-hidden rounded-lg bg-black/[0.04] dark:bg-white/5 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
+                      className="lk-foto cursor-pointer relative mt-3 block w-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26] hover:brightness-95"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false} className="lk-foto h-full w-full object-cover" />
+                      <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false} className="lk-foto h-auto w-full" />
                       {l.galeri.length > 1 && (
                         <span aria-hidden="true" className="lk-galeri-lencana">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
