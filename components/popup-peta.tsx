@@ -49,8 +49,23 @@ export function PopupPeta({
   onTutup,
 }: Props) {
   const panelRef = useRef<HTMLDivElement | null>(null);
+  /* Daftar beritanya ditunda sampai animasi tumbuh selesai — persis pekerjaan
+     berat yang parameter ketiga gunakanTumbuh disediakan untuk menundanya,
+     dan sampai sekarang tak ada yang memakainya. Sepuluh kartu bergambar yang
+     lahir di frame yang sama dengan panel berarti dekode gambar + tata letak
+     grid masuk ke dalam lapisan will-change yang sedang diskala 0,14 -> 1:
+     itulah tersendatnya saat pop-up dibuka dari poligon.
+
+     Penjaga waktunya bukan sabuk pengaman berlebih: prefers-reduced-motion
+     mematikan animasinya (lihat peta-popup.css), jadi `animationend` tak
+     pernah datang dan tanpa ini daftarnya tak akan pernah muncul di sana. */
+  const [isiSiap, setIsiSiap] = useState(false);
   // eslint-disable-next-line react-hooks/refs
-  gunakanTumbuh(panelRef, asal);
+  gunakanTumbuh(panelRef, asal, () => setIsiSiap(true));
+  useEffect(() => {
+    const jaga = setTimeout(() => setIsiSiap(true), 460);
+    return () => clearTimeout(jaga);
+  }, []);
   const [tabAktif, setTabAktif] = useState(() => tabDariPulau(pulau) ?? PULAU_TAB[0].kunci);
   const [prevPulau, setPrevPulau] = useState(pulau);
   if (pulau !== prevPulau) {
@@ -168,7 +183,7 @@ export function PopupPeta({
     <>
       {/* Backdrop semi-transparan yang menutup saat disentuh/diklik di luar popup */}
       <div
-        className="fixed inset-0 z-[44] bg-black/50 backdrop-blur-[2px] transition-opacity"
+        className="fixed inset-0 z-[44] cursor-pointer bg-black/50 backdrop-blur-[2px] transition-opacity"
         onClick={onTutup}
         aria-hidden="true"
       />
@@ -288,7 +303,9 @@ export function PopupPeta({
              ref={daftarRef}
              className="tanpa-bilah-gulir min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain touch-pan-y
                         p-3 sm:p-5 panggung:px-[28px]">
-          {tampil.length > 0 ? (
+          {!isiSiap ? (
+            <RangkaDaftar mode={tampilan} />
+          ) : tampil.length > 0 ? (
             tampilan === "kartu" ? (
               /* Mode kartu: kotak bergambar berpetak — pratinjau 16:10 di
                  atas, tanggal + judul di bawah, lokasi menempel di dasar
@@ -494,12 +511,15 @@ function PratinjauMedia({ awal, pulau, kelas }: {
        poster berhenti di bingkai kosong. Poster bingkai otomatis (bila ada)
        tampil lebih instan. */
     return (
-      <video src={`${awal.url}#t=0.5`} poster={awal.poster} preload="metadata" muted
+      <video src={`${awal.url}#t=0.5`} poster={awal.poster} preload="none" muted
              playsInline aria-hidden="true" className={kelas} />
     );
   }
   if (awal) {
-    return <img src={awal.url} alt="" aria-hidden="true" className={kelas} />;
+    /* loading+decoding: berkasnya media asli pengunggah (tanpa turunan kecil),
+       jadi satu halaman = sepuluh bitmap penuh. `lazy` menyisakan yang di
+       bawah lipatan rel gulir, `async` menjauhkan dekodenya dari jalur utama. */
+    return <img src={awal.url} alt="" aria-hidden="true" loading="lazy" decoding="async" className={kelas} />;
   }
   return (
     <div aria-hidden="true"
@@ -508,6 +528,46 @@ function PratinjauMedia({ awal, pulau, kelas }: {
                        uppercase tracking-wide text-white/60">
         {pulau || "Belum ada foto"}
       </span>
+    </div>
+  );
+}
+
+/** Rangka daftar selama panel tumbuh — bentuknya mengikuti mode tampilan
+ *  supaya isinya tidak melompat saat menggantikan rangka ini. */
+function RangkaDaftar({ mode }: { mode: ModeTampilan }) {
+  const petak = Array.from({ length: mode === "kartu" ? 10 : 5 });
+  return (
+    <div aria-hidden="true" className="animate-pulse">
+      {mode === "kartu" ? (
+        <div className="grid grid-cols-1 min-[430px]:grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3
+                        panggung:grid-cols-5 panggung:gap-[20px] xl:grid-cols-5">
+          {petak.map((_, i) => (
+            <div key={i} className="overflow-hidden rounded-xl border border-white/10 bg-pantau-malam">
+              <div className="aspect-[16/10] w-full bg-white/10" />
+              <div className="space-y-2 p-3 sm:p-3.5">
+                <div className="h-2.5 w-1/3 rounded bg-white/10" />
+                <div className="h-3 w-full rounded bg-white/10" />
+                <div className="h-3 w-2/3 rounded bg-white/10" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div>
+          {petak.map((_, i) => (
+            <div key={i} className="flex items-center gap-3 sm:gap-[clamp(14px,3.6vw,36px)] border-b border-white/10 py-2 last:border-b-0
+                                    sm:py-[clamp(14px,2.8vw,22px)]">
+              <div className="h-[76px] w-[104px] shrink-0 rounded-[10px] bg-white/10
+                              sm:h-[clamp(80px,18vw,120px)] sm:w-[clamp(120px,27vw,190px)]" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-2.5 w-1/4 rounded bg-white/10" />
+                <div className="h-3.5 w-full rounded bg-white/10" />
+                <div className="h-3.5 w-3/5 rounded bg-white/10" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

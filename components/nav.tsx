@@ -217,7 +217,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
   return (
     <header
       aria-label={teks.navigasi}
-      className={`fixed top-0 left-0 z-50 h-16 w-full transition-all duration-200 ${
+      className={`fixed top-0 left-0 z-50 h-16 w-full transition-[background-color,border-color,box-shadow] duration-200 motion-reduce:transition-none ${
         gelap
           ? "border-b border-white/10 bg-pantau-konsol"
           : tergulir
@@ -244,7 +244,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
              // sudah "kembali ke beranda"; URL-nya dibereskan tutupRincian.
              keBagian(e, BAGIAN[0]);
            }}
-           className="flex shrink-0 items-center gap-2">
+           className="flex shrink-0 cursor-pointer items-center gap-2">
           {/* Aset statis lokal berdimensi tetap — satu-satunya gambar di app ini
               yang next/image bisa optimasi sepenuhnya. priority: logo ada di bilah
               lengket yang selalu terlihat, jadi tidak boleh lazy-load. */}
@@ -317,7 +317,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                 type="button"
                 onClick={() => cari.setTerbuka(false)}
                 aria-label={teks.tutupCari}
-                className={`shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                className={`shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ${
                   gelap
                     ? "text-[#a0a0a0] hover:text-[#f5f5f5] focus-visible:outline-[#ff5a26]"
                     : "text-tinta/50 hover:text-tinta focus-visible:outline-api"
@@ -342,7 +342,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                   href={`#${id}`}
                   onClick={(e) => keBagian(e, id)}
                   aria-current={sedang ? "page" : undefined}
-                  className={`relative rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api ${
+                  className={`relative cursor-pointer rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api ${
                     sedang
                       ? "text-api"
                       : "text-tinta/60 hover:text-tinta hover:bg-black/[0.04]"
@@ -371,8 +371,8 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
               aria-controls="nav-panel-cari"
               aria-label={cari.terbuka ? teks.tutupCari : teks.cari}
               className={`${gelap
-                ? "inline-flex shrink-0 items-center justify-center rounded-md p-1 text-xs font-bold sm:p-1.5 sm:text-sm bg-white/[0.05] text-white ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
-                : "inline-flex shrink-0 items-center justify-center rounded-full p-1 text-xs font-bold sm:p-1.5 sm:text-sm text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"}${
+                ? "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-md p-1 text-xs font-bold sm:p-1.5 sm:text-sm bg-white/[0.05] text-white ring-1 ring-white/10 transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+                : "inline-flex cursor-pointer shrink-0 items-center justify-center rounded-full p-1 text-xs font-bold sm:p-1.5 sm:text-sm text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"}${
                 /* Selagi kolomnya terbuka, sakelar ini menyingkir di KEDUA
                    ukuran: kolomnya sudah membawa kaca pembesarnya sendiri di
                    ujung kiri dan silang penutup di ujung kanan, jadi tombol ini
@@ -396,7 +396,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
           {!gelap && (
             <Link
               href={`/${bahasa}/lapor`}
-              className="rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+              className="cursor-pointer rounded-full bg-api px-3 py-1.5 text-xs sm:text-sm font-semibold tracking-wide uppercase text-white transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
             >
               {teks.lapor}
             </Link>
@@ -422,8 +422,8 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                   key={kode}
                   aria-current="true"
                   className={gelap
-                    ? "rounded-md bg-white/[0.08] px-2 py-1 uppercase text-white ring-1 ring-white/10 sm:px-3 sm:py-1.5"
-                    : "rounded-full bg-tinta px-2.5 py-0.5 uppercase text-white shadow-xs"}
+                    ? "rounded-md bg-[#ff5a26] px-2 py-1 uppercase text-white sm:px-3 sm:py-1.5"
+                    : "rounded-full bg-[#ff5a26] px-2.5 py-0.5 uppercase text-white shadow-xs"}
                 >
                   {kode}
                 </span>
@@ -434,8 +434,8 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                   prefetch={false}
                   aria-label={`${teks.ganti} (${kode.toUpperCase()})`}
                   className={gelap
-                    ? "rounded-md bg-white/[0.04] px-2 py-1 uppercase text-white/60 ring-1 ring-white/[0.07] transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api sm:px-3 sm:py-1.5"
-                    : "rounded-full px-2.5 py-0.5 uppercase text-tinta/50 transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"}
+                    ? "cursor-pointer rounded-md bg-white/[0.04] px-2 py-1 uppercase text-white/60 ring-1 ring-white/[0.07] transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api sm:px-3 sm:py-1.5"
+                    : "cursor-pointer rounded-full px-2.5 py-0.5 uppercase text-tinta/50 transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"}
                 >
                   {kode}
                 </Link>
@@ -452,7 +452,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
             aria-expanded={menuTerbuka}
             aria-controls="menu-ponsel"
             aria-label={menuTerbuka ? teks.tutupNavigasi : teks.bukaNavigasi}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta sm:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+            className="flex cursor-pointer h-9 w-9 items-center justify-center rounded-full text-tinta/70 transition-colors hover:bg-black/[0.04] hover:text-tinta sm:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
           >
             {/* Garis-garisnya menukar bentuk jadi tanda silang saat terbuka. */}
             <span aria-hidden="true" className="relative block h-[14px] w-[18px]">
@@ -486,7 +486,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
                       keBagian(e, id);
                     }}
                     aria-current={sedang ? "page" : undefined}
-                    className={`block rounded-lg px-3 py-3 text-sm font-semibold tracking-wide uppercase transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api ${
+                    className={`block cursor-pointer rounded-lg px-3 py-3 text-sm font-semibold tracking-wide uppercase transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api ${
                       sedang ? "text-api" : "text-tinta/70 hover:bg-black/[0.04] hover:text-tinta"
                     }`}
                   >
@@ -499,7 +499,7 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
               <Link
                 href={`/${bahasa}/lapor`}
                 onClick={() => setMenuTerbuka(false)}
-                className="block rounded-lg px-3 py-3 text-sm font-semibold tracking-wide uppercase text-api transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
+                className="block cursor-pointer rounded-lg px-3 py-3 text-sm font-semibold tracking-wide uppercase text-api transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-api"
               >
                 {teks.lapor}
               </Link>

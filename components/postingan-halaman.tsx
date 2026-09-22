@@ -39,7 +39,7 @@ export function HalamanPostingan({ berita: b, bahasa }: { berita: Berita; bahasa
     router.back();
   };
 
-  const tab = "rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]";
+  const tab = "cursor-pointer rounded-full p-2 text-[#f5f5f5] transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-[#ff5a26]";
 
   return (
     <div className="min-h-dvh bg-[#0a0a0a] text-[#f5f5f5] antialiased">

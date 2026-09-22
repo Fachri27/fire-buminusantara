@@ -141,6 +141,14 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [media.length, geser]);
 
+  // Slide aktif dan tetangganya dimuat lebih awal; sisanya menunggu. Tanpa
+  // ini media di luar layar baru diunduh persis saat ia bergeser masuk,
+  // sehingga bingkainya berubah ukuran DI TENGAH transisi — itulah kedipannya.
+  // Perbandingan tanpa putaran (slide terakhir → pertama) memang tidak
+  // tercakup; satu kedipan di ujung putaran tidak sebanding dengan mengunduh
+  // media tambahan untuk tiap galeri.
+  const dekat = (idx: number) => Math.abs(idx - kini) <= 1;
+
   if (!media || media.length === 0) return null;
 
   return (
@@ -167,10 +175,15 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
             <div key={idx} className="rincian__slider-slide">
               <div
                 className="rincian__slide-bingkai"
+                /* Sebelum rasio aslinya terbaca, bingkai HARUS tetap
+                   berukuran penuh. Dengan `height` saja lebarnya runtuh ke 0
+                   (flex item tanpa isi berukuran intrinsik — medianya sendiri
+                   absolut/`fill`), jadi slide yang masuk tampak kosong lalu
+                   menyentak begitu ukurannya terbaca. */
                 style={
                   rasio
                     ? { aspectRatio: `${rasio}`, width: "100%" }
-                    : { height: "100%" }
+                    : { width: "100%", height: "100%" }
                 }
               >
                 {/* Kredit/hak cipta pelapor di kiri-bawah medianya. Diambil dari
@@ -209,7 +222,7 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                     aria-label={m.keterangan || `${label} - video ${idx + 1}`}
                     controls
                     playsInline
-                    preload={idx === 0 ? "metadata" : "none"}
+                    preload={dekat(idx) ? "metadata" : "none"}
                     onCanPlay={() => {
                       if (idx === 0) setAwalSiap(true);
                     }}
@@ -247,7 +260,7 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                     sizes="(max-width: 767px) 92vw, 55vw"
                     className="rincian__slide-media"
                     decoding="async"
-                    loading={idx === 0 ? "eager" : "lazy"}
+                    loading={dekat(idx) ? "eager" : "lazy"}
                     onLoad={(e) => {
                       const el = e.currentTarget;
                       simpanRasio(el.naturalWidth, el.naturalHeight, idx);
@@ -263,7 +276,7 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                     src={m.url}
                     alt={m.keterangan || `${label} - gambar ${idx + 1}`}
                     decoding="async"
-                    loading={idx === 0 ? "eager" : "lazy"}
+                    loading={dekat(idx) ? "eager" : "lazy"}
                     onLoad={(e) => {
                       const el = e.currentTarget;
                       simpanRasio(el.naturalWidth, el.naturalHeight, idx);
@@ -291,7 +304,7 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
             type="button"
             aria-label="Media sebelumnya"
             onClick={() => geser(-1)}
-            className="rincian__slider-tombol rincian__slider-tombol--kiri"
+            className="rincian__slider-tombol rincian__slider-tombol--kiri cursor-pointer"
           >
             <svg
               viewBox="0 0 24 24"
@@ -309,7 +322,7 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
             type="button"
             aria-label="Media berikutnya"
             onClick={() => geser(1)}
-            className="rincian__slider-tombol rincian__slider-tombol--kanan"
+            className="rincian__slider-tombol rincian__slider-tombol--kanan cursor-pointer"
           >
             <svg
               viewBox="0 0 24 24"

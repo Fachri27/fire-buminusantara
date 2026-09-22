@@ -48,7 +48,7 @@ export function UlasanKomentar({
 
               <p className="rincian__komen-kaki">
                 <span>{k.waktu}</span>
-                <button type="button" className="rincian__balas" onClick={() => mulaiBalas(k)}>
+                <button type="button" className="rincian__balas cursor-pointer" onClick={() => mulaiBalas(k)}>
                   Balas
                 </button>
               </p>
@@ -59,7 +59,7 @@ export function UlasanKomentar({
                       dilipat, seperti pada rujukan. */}
                   <button
                     type="button"
-                    className="rincian__lihat"
+                    className="rincian__lihat cursor-pointer"
                     aria-expanded={tampilkanBalasan(k.id)}
                     onClick={() => alihkanBalasan(k.id)}
                   >
@@ -85,7 +85,7 @@ export function UlasanKomentar({
 
                           <p className="rincian__komen-kaki">
                             <span>{b.waktu}</span>
-                            <button type="button" className="rincian__balas" onClick={() => mulaiBalas(b)}>
+                            <button type="button" className="rincian__balas cursor-pointer" onClick={() => mulaiBalas(b)}>
                               Balas
                             </button>
                           </p>
@@ -194,7 +194,7 @@ export function FormulirKomentar({
           <span>
             Membalas <strong className="rincian__balas">{balasNama}</strong>
           </span>
-          <button type="button" className="rincian__batal" onClick={batalBalas}>
+          <button type="button" className="rincian__batal cursor-pointer" onClick={batalBalas}>
             Batal
           </button>
         </p>
@@ -231,9 +231,10 @@ export function FormulirKomentar({
 
       {/* Pilihan anonim, sama polanya dengan form laporan: isian identitas
           dimatikan dan kiriman tampil sebagai "Anonim". */}
-      <label className="rincian__anonim">
+      <label className="rincian__anonim cursor-pointer">
         <input
           type="checkbox"
+          className="cursor-pointer"
           checked={anonim}
           onChange={(e) => setAnonim(e.target.checked)}
         />
@@ -270,7 +271,7 @@ export function FormulirKomentar({
 
       <button
         type="submit"
-        className="rincian__tombol-kirim"
+        className="rincian__tombol-kirim cursor-pointer disabled:cursor-not-allowed"
         disabled={belumLengkap}
       >
         {mengirim ? "Mengirim…" : "Kirim"}
@@ -301,7 +302,7 @@ export function FormulirKomentar({
       {!sheet && (
         <button
           type="button"
-          className="rincian__kirim rincian__pemicu"
+          className="rincian__kirim rincian__pemicu cursor-pointer"
           onClick={() => setSheetBukaManual(true)}
         >
           <span className="rincian__inisial rincian__inisial--kecil" aria-hidden="true">
@@ -315,14 +316,14 @@ export function FormulirKomentar({
 
       {sheet && (
         <div
-          className="rincian__sheet"
+          className="rincian__sheet cursor-pointer"
           role="dialog"
           aria-modal="true"
           aria-label="Tulis komentar"
           onClick={(e) => { if (e.target === e.currentTarget) tutupSheet(); }}
         >
           <form
-            className="rincian__sheet-panel"
+            className="rincian__sheet-panel cursor-default"
             onSubmit={(e) => {
               e.preventDefault();
               tanganiKirim();
@@ -332,7 +333,7 @@ export function FormulirKomentar({
               <p className="rincian__sheet-judul">Tulis komentar</p>
               <button
                 type="button"
-                className="rincian__sheet-tutup"
+                className="rincian__sheet-tutup cursor-pointer"
                 aria-label="Tutup formulir komentar"
                 onClick={tutupSheet}
               >

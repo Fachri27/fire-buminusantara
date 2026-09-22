@@ -1,4 +1,5 @@
 import Blosc from "numcodecs/blosc";
+import { redisGet, redisSet, redisGetBuffer, redisSetBuffer } from "./redis.ts";
 
 const ZARR_BASE_URL =
   process.env.CAMS_ZARR_BASE_URL ||
@@ -144,6 +145,7 @@ function buatMetaLangkah(
  */
 export async function getZarrMetadata(forceRefresh: boolean = false): Promise<ZarrMetadataResponse> {
   const now = Date.now();
+  // 1. Cek L1 in-memory cache (RAM lokal)
   if (!forceRefresh && cachedMetadata && cachedMetadata.expiresAt > now) {
     const isWarm = frameCache.size >= Math.floor(cachedMetadata.data.timesteps.length * 0.7);
     return {
@@ -151,6 +153,28 @@ export async function getZarrMetadata(forceRefresh: boolean = false): Promise<Za
       isWarm,
       cachedFramesCount: frameCache.size,
     };
+  }
+
+  // 2. Cek L2 Redis cache terpusat
+  const REDIS_KEY_META = "cams:zarr:metadata";
+  if (!forceRefresh) {
+    const redisMetaStr = await redisGet(REDIS_KEY_META);
+    if (redisMetaStr) {
+      try {
+        const parsed: ZarrMetadataResponse = JSON.parse(redisMetaStr);
+        if (parsed?.timesteps?.length > 0) {
+          cachedMetadata = {
+            data: parsed,
+            expiresAt: now + 15 * 60 * 1000,
+          };
+          return {
+            ...parsed,
+            isWarm: frameCache.size >= Math.floor(parsed.timesteps.length * 0.7),
+            cachedFramesCount: frameCache.size,
+          };
+        }
+      } catch {}
+    }
   }
 
   // Pembersihan pasif berkala jika interval tercapai
@@ -290,6 +314,9 @@ export async function getZarrMetadata(forceRefresh: boolean = false): Promise<Za
       expiresAt: now + 15 * 60 * 1000, // cache for 15 minutes
     };
 
+    // Simpan ke L2 Redis (TTL 15 menit)
+    redisSet(REDIS_KEY_META, JSON.stringify(result), 15 * 60).catch(() => {});
+
     return result;
   } catch (error) {
     console.error("[ZarrReader] Error fetching metadata:", error);
@@ -313,11 +340,26 @@ export async function getZarrFrame(timeChunk: number, step: number, timeInner: n
     bersihkanCacheKedaluwarsa(now);
   }
 
+  // 1. Cek L1 In-Memory Cache (RAM lokal proses Node.js)
   const cached = frameCache.get(cacheKey);
   if (cached && cached.expiresAt > now) {
     return cached.buffer;
   }
 
+  // 2. Cek L2 Redis Cache terpusat (berbagi lintas instance / restart)
+  const redisFrameKey = `cams:zarr:frame:${timeChunk}:${step}:${timeInner}`;
+  const redisBuf = await redisGetBuffer(redisFrameKey);
+  if (redisBuf && redisBuf.byteLength === ZARR_GLOBAL_GRID.totalPoints) {
+    const u8 = new Uint8Array(redisBuf.buffer, redisBuf.byteOffset, redisBuf.byteLength);
+    // Simpan juga ke L1 RAM agar pemanggilan berikutnya di proses ini 0ms
+    frameCache.set(cacheKey, {
+      buffer: u8,
+      expiresAt: now + 4 * 3600 * 1000,
+    });
+    return u8;
+  }
+
+  // 3. L3: Ambil dari sumber ECMWF ARCO Zarr (Eropa) & dekompresi Blosc
   const chunkUrl = `${ZARR_BASE_URL}/omaod550/${timeChunk}.${step}.0.0?_fet=${ZARR_TOKEN}`;
   const res = await fetch(chunkUrl);
   if (!res.ok) {
@@ -360,11 +402,14 @@ export async function getZarrFrame(timeChunk: number, step: number, timeInner: n
     }
   }
 
-  // Cache for 4 hours (overlaps seamlessly with 3-hour cron schedule)
+  // Simpan ke L1 in-memory cache (4 jam)
   frameCache.set(cacheKey, {
     buffer: result,
     expiresAt: now + 4 * 3600 * 1000,
   });
+
+  // Simpan ke L2 Redis cache (TTL 24 jam / 86400 detik) agar user lain langsung menikmatinya
+  redisSetBuffer(redisFrameKey, result, 24 * 3600).catch(() => {});
 
   return result;
 }

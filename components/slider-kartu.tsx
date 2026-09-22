@@ -189,13 +189,13 @@ function TitikMedia({
             e.stopPropagation();
             onPilih(i);
           }}
-          className={`flex items-center justify-center p-0.5 ${
+          className={`cursor-pointer flex items-center justify-center p-0.5 ${
             padat ? "min-h-[20px] min-w-[20px]" : "min-h-[24px] min-w-[24px]"
           } sm:min-h-[28px] sm:min-w-[28px] sm:p-1`}
         >
           <span
             aria-hidden="true"
-            className={`block h-[5px] w-[5px] rounded-full transition-all sm:h-2 sm:w-2 ${
+            className={`block h-[5px] w-[5px] rounded-full transition-[transform,background-color] duration-150 motion-reduce:transition-none sm:h-2 sm:w-2 ${
               i === kini ? "scale-110 bg-white" : "bg-white/50 hover:bg-white/75"
             }`}
           />

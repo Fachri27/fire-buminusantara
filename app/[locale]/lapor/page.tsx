@@ -157,7 +157,7 @@ function KopLapor({ bahasa }: { bahasa: Bahasa }) {
           {BAHASA.map((kode) =>
             kode === bahasa ? (
               <span key={kode} aria-current="true"
-                    className="rounded-full bg-tinta px-2.5 py-0.5 uppercase text-white">
+                    className="rounded-full bg-[#ff5a26] px-2.5 py-0.5 uppercase text-white">
                 {kode}
               </span>
             ) : (

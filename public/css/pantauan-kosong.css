@@ -209,6 +209,12 @@
   .pantauan-kosong__sapuan {
     display: none;
   }
+
+  .pantauan-kosong__aksi,
+  .pantauan-kosong__aksi svg {
+    transition: none;
+    transform: none;
+  }
 }
 
 /* Layar pendek: kartu tinggal ~230px, dan bingkai foto yang ikut memipih jadi

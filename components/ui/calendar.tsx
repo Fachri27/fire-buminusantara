@@ -144,7 +144,7 @@ export function Calendar(props: CalendarProps) {
           type="button"
           onClick={prevMonth}
           aria-label="Bulan sebelumnya"
-          className="flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          className="cursor-pointer flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -159,7 +159,7 @@ export function Calendar(props: CalendarProps) {
           type="button"
           onClick={nextMonth}
           aria-label="Bulan berikutnya"
-          className="flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+          className="cursor-pointer flex size-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -192,7 +192,7 @@ export function Calendar(props: CalendarProps) {
                 <button
                   type="button"
                   onClick={() => handleDayClick(date)}
-                  className={`size-8 rounded-md text-xs transition-all flex items-center justify-center relative ${
+                  className={`cursor-pointer size-8 rounded-md text-xs transition-all flex items-center justify-center relative ${
                     isSelected
                       ? "bg-neutral-900 text-white font-semibold shadow-xs"
                       : isCurrentMonth
@@ -239,7 +239,7 @@ export function Calendar(props: CalendarProps) {
               <button
                 type="button"
                 onClick={() => handleDayClick(date)}
-                className={`size-8 text-xs transition-all flex items-center justify-center relative ${
+                className={`cursor-pointer size-8 text-xs transition-all flex items-center justify-center relative ${
                   isFrom || isTo
                     ? "bg-neutral-900 text-white font-semibold shadow-xs rounded-md"
                     : inRange

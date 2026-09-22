@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { ipDari } from "@/lib/turnstile";
-import { namaProvinsiLokal } from "@/lib/wilayah";
+import { namaProvinsiLokal, inferProvinsi, PROVINSI_PETA_NAMA } from "@/lib/wilayah";
+import { provinsiDariTitik } from "@/lib/provinsi-titik";
+import { PUSAT_WILAYAH } from "@/lib/pusat-wilayah";
+import { cariWilayah, kotaTerdekat } from "@/lib/daftar-wilayah";
 
 /**
  * Cuaca lokal pengunjung untuk panel kiri landing karhutla.
@@ -237,6 +240,239 @@ async function cuacaBmkg(adm4: string | null): Promise<Cuaca | null> {
   }
 }
 
+/** Fallback model cuaca global Open-Meteo bila BMKG gagal / di luar cakupan */
+async function cuacaOpenMeteo(lat: number, lng: number): Promise<Cuaca | null> {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,is_day`;
+    const r = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+      headers: { Accept: "application/json" },
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as {
+      current?: { temperature_2m?: unknown; weather_code?: unknown; is_day?: unknown };
+    };
+    const cur = j.current;
+    if (!cur) return null;
+    const suhu =
+      typeof cur.temperature_2m === "number" && Number.isFinite(cur.temperature_2m)
+        ? Math.round(cur.temperature_2m)
+        : null;
+    const kode = typeof cur.weather_code === "number" && Number.isFinite(cur.weather_code) ? cur.weather_code : null;
+    const siang = cur.is_day === 1;
+    return { suhu, kode, siang };
+  } catch {
+    return null;
+  }
+}
+
+/** Pencarian lokasi menggunakan OpenStreetMap Nominatim */
+async function cariOsm(q: string): Promise<{ nama: string; provinsi: string; lat: number; lng: number } | null> {
+  const teks = q.trim();
+  if (!teks) return null;
+
+  // 1. Cek langsung 34 provinsi
+  const provLangsung =
+    inferProvinsi(teks) ??
+    PROVINSI_PETA_NAMA.find((p) => p.toLowerCase() === teks.toLowerCase()) ??
+    PROVINSI_PETA_NAMA.find((p) => p.toLowerCase().includes(teks.toLowerCase()));
+  if (provLangsung && PUSAT_WILAYAH[provLangsung]) {
+    const titik = PUSAT_WILAYAH[provLangsung].titik;
+    return { nama: provLangsung, provinsi: provLangsung, lat: titik[1], lng: titik[0] };
+  }
+
+  // 2. OpenStreetMap Nominatim Search
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(teks)}&format=json&addressdetails=1&limit=1&countrycodes=id`;
+    const r = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(6000),
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "PasopatiKarhutla/1.0",
+      },
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as Array<{
+      name?: string;
+      lat?: string;
+      lon?: string;
+      address?: {
+        city?: string;
+        town?: string;
+        municipality?: string;
+        county?: string;
+        state?: string;
+      };
+    }>;
+    const item = j?.[0];
+    if (!item || !item.lat || !item.lon) return null;
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+    const nama = item.address?.city ?? item.address?.town ?? item.address?.municipality ?? item.name ?? teks;
+    const stateRaw = item.address?.state;
+    const provinsi = stateRaw ? namaProvinsiLokal(stateRaw) : (provinsiDariTitik(lat, lng) ?? CADANGAN.label);
+
+    return { nama, provinsi, lat, lng };
+  } catch {
+    return null;
+  }
+}
+
+/** Reverse geocoding koordinat GPS menggunakan OpenStreetMap Nominatim */
+async function reverseOsm(lat: number, lng: number): Promise<{ nama: string; provinsi: string } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`;
+    const r = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(6000),
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "PasopatiKarhutla/1.0",
+      },
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as {
+      name?: string;
+      address?: {
+        city?: string;
+        town?: string;
+        municipality?: string;
+        county?: string;
+        state?: string;
+        suburb?: string;
+        village?: string;
+      };
+    };
+    const nama =
+      j.address?.city ??
+      j.address?.town ??
+      j.address?.municipality ??
+      j.address?.county ??
+      j.address?.suburb ??
+      j.address?.village ??
+      j.name ??
+      "";
+    const stateRaw = j.address?.state;
+    const provinsi = stateRaw ? namaProvinsiLokal(stateRaw) : (provinsiDariTitik(lat, lng) ?? CADANGAN.label);
+    return { nama: nama.trim(), provinsi };
+  } catch {
+    return null;
+  }
+}
+
+/** Pencarian saran lokasi ala Select2 menggunakan basis data resmi BMKG/Kemendagri + fallback OSM */
+export type ItemSaranLokasi = {
+  id: string;
+  nama: string;
+  provinsi: string;
+  lat: number;
+  lng: number;
+  adm4?: string;
+  tipe?: string;
+};
+
+const kasSaran = new Map<string, { kedaluwarsa: number; hasil: ItemSaranLokasi[] }>();
+
+async function cariSaranLokasi(q: string): Promise<ItemSaranLokasi[]> {
+  const teks = q.trim();
+  if (!teks) return [];
+
+  const kunciKas = teks.toLowerCase();
+  const hit = kasSaran.get(kunciKas);
+  if (hit && hit.kedaluwarsa > Date.now()) {
+    return hit.hasil;
+  }
+
+  // 1. Cari dari basis data Kemendagri / BMKG resmi (548 entri provinsi, kabupaten, kota)
+  const hasilWilayah = cariWilayah(teks, 8);
+  if (hasilWilayah.length > 0) {
+    const hasil: ItemSaranLokasi[] = hasilWilayah.map((w) => ({
+      id: w.id,
+      nama: w.nama,
+      provinsi: w.provinsi,
+      lat: w.lat,
+      lng: w.lng,
+      adm4: w.adm4,
+      tipe: w.tipe,
+    }));
+    kasSaran.set(kunciKas, { kedaluwarsa: Date.now() + 15 * 60_000, hasil });
+    return hasil;
+  }
+
+  const hasil: ItemSaranLokasi[] = [];
+  const terlihat = new Set<string>();
+
+  // 2. OpenStreetMap Nominatim untuk lokasi luar negeri atau pencarian non-administratif
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(teks)}&format=json&addressdetails=1&limit=6&countrycodes=id`;
+    const r = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(5000),
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "PasopatiKarhutla/1.0",
+      },
+    });
+    if (r.ok) {
+      const items = (await r.json()) as Array<{
+        place_id?: number | string;
+        lat?: string;
+        lon?: string;
+        name?: string;
+        address?: {
+          city?: string;
+          town?: string;
+          municipality?: string;
+          county?: string;
+          state?: string;
+          suburb?: string;
+          village?: string;
+        };
+      }>;
+      for (const item of items) {
+        if (!item.lat || !item.lon) continue;
+        const lat = parseFloat(item.lat);
+        const lng = parseFloat(item.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+        const nama =
+          item.address?.city ??
+          item.address?.town ??
+          item.address?.municipality ??
+          item.address?.county ??
+          item.address?.suburb ??
+          item.name ??
+          teks;
+        const stateRaw = item.address?.state;
+        const provinsi = stateRaw ? namaProvinsiLokal(stateRaw) : (provinsiDariTitik(lat, lng) ?? CADANGAN.label);
+        const kunci = `${nama.toLowerCase()}|${provinsi.toLowerCase()}`;
+        if (!terlihat.has(kunci)) {
+          terlihat.add(kunci);
+          const terdekat = kotaTerdekat(lat, lng);
+          hasil.push({
+            id: String(item.place_id ?? `${lat},${lng}`),
+            nama,
+            provinsi,
+            lat,
+            lng,
+            adm4: terdekat?.adm4,
+            tipe: terdekat?.tipe,
+          });
+        }
+        if (hasil.length >= 8) break;
+      }
+    }
+  } catch {
+    // jika osm gagal, kembalikan hasil yang ada
+  }
+
+  kasSaran.set(kunciKas, { kedaluwarsa: Date.now() + 5 * 60_000, hasil });
+  return hasil;
+}
+
 /* Cache 10 menit per titik — refresh tidak mengulang rantai BIG+BMKG. */
 const KAS_TTL = 10 * 60_000;
 const kas = new Map<string, { kedaluwarsa: number; badan: Record<string, unknown> }>();
@@ -245,16 +481,104 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const bahasa = url.searchParams.get("bahasa") === "en" ? "en" : "id";
 
-  const ip = ipDari(req);
-  const dariIp = await lokasiDariIp(ip);
+  const qSaran = url.searchParams.get("saran");
+  if (qSaran !== null) {
+    const saran = await cariSaranLokasi(qSaran);
+    return NextResponse.json(saran, {
+      headers: { "Cache-Control": "public, max-age=120, s-maxage=120" },
+    });
+  }
 
-  // Provinsi pengunjung → adm4 ibu kotanya (tabel terverifikasi di atas).
-  // Tanpa BIG, tanpa model global: IP hanya menentukan provinsi.
-  const provinsi = dariIp.provinsi ? namaProvinsiLokal(dariIp.provinsi) : CADANGAN.label;
-  const adm4 = ADM4_IBU_KOTA[provinsi] ?? ADM4_IBU_KOTA["DKI Jakarta"];
+  const qLat = url.searchParams.get("lat");
+  const qLng = url.searchParams.get("lng");
+  const q = url.searchParams.get("q");
+  const qNama = url.searchParams.get("nama");
+  const qProv = url.searchParams.get("provinsi");
+  const qAdm4 = url.searchParams.get("adm4");
 
-  // Cache dulu sebelum menembak layanan luar.
-  const kunci = `${adm4},${bahasa}`;
+  let lat: number | null = null;
+  let lng: number | null = null;
+  let namaLokasi: string | null = null;
+  let provinsi: string | null = null;
+  let adm4Kandidat: string | null = qAdm4 && qAdm4.trim() ? qAdm4.trim() : null;
+
+  if (qLat !== null && qLng !== null) {
+    const pLat = parseFloat(qLat);
+    const pLng = parseFloat(qLng);
+    if (Number.isFinite(pLat) && Number.isFinite(pLng) && pLat >= -90 && pLat <= 90 && pLng >= -180 && pLng <= 180) {
+      lat = pLat;
+      lng = pLng;
+      const terdekat = kotaTerdekat(lat, lng);
+      if (qNama && qNama.trim()) {
+        namaLokasi = qNama.trim();
+        provinsi = qProv
+          ? namaProvinsiLokal(qProv)
+          : (terdekat?.provinsi ?? (provinsiDariTitik(lat, lng) ?? CADANGAN.label));
+      } else if (terdekat) {
+        namaLokasi = terdekat.nama;
+        provinsi = terdekat.provinsi;
+        if (!adm4Kandidat) adm4Kandidat = terdekat.adm4;
+      } else {
+        const osm = await reverseOsm(lat, lng);
+        if (osm && osm.nama) {
+          namaLokasi = osm.nama;
+          provinsi = osm.provinsi;
+        } else {
+          namaLokasi = await kotaLokal(lat, lng, bahasa);
+          provinsi = provinsiDariTitik(lat, lng);
+        }
+      }
+      if (!adm4Kandidat && terdekat) {
+        adm4Kandidat = terdekat.adm4;
+      }
+    }
+  } else if (q && q.trim()) {
+    // 1. Cek dari master Kemendagri / BMKG
+    const hasilWilayah = cariWilayah(q, 1);
+    if (hasilWilayah.length > 0) {
+      const target = hasilWilayah[0];
+      lat = target.lat;
+      lng = target.lng;
+      namaLokasi = target.nama;
+      provinsi = target.provinsi;
+      adm4Kandidat = target.adm4;
+    } else {
+      const osm = await cariOsm(q);
+      if (osm) {
+        lat = osm.lat;
+        lng = osm.lng;
+        namaLokasi = osm.nama;
+        provinsi = osm.provinsi;
+        const terdekat = kotaTerdekat(lat, lng);
+        if (terdekat) adm4Kandidat = terdekat.adm4;
+      }
+    }
+  }
+
+  // Fallback ke pembacaan IP bila tidak ada koordinat/pencarian
+  let dariIp: HasilIp | null = null;
+  if (!provinsi) {
+    const ip = ipDari(req);
+    dariIp = await lokasiDariIp(ip);
+    lat = lat ?? dariIp.lat ?? CADANGAN.lat;
+    lng = lng ?? dariIp.lng ?? CADANGAN.lng;
+    const terdekat = kotaTerdekat(lat, lng);
+    provinsi = dariIp.provinsi
+      ? namaProvinsiLokal(dariIp.provinsi)
+      : (terdekat?.provinsi ?? (provinsiDariTitik(lat, lng) ?? CADANGAN.label));
+    if (!namaLokasi) {
+      namaLokasi = (await kotaLokal(lat, lng, bahasa)) ?? dariIp.kota ?? terdekat?.nama ?? provinsi;
+    }
+    if (!adm4Kandidat && terdekat) {
+      adm4Kandidat = terdekat.adm4;
+    }
+  }
+
+  const provKanonik = namaProvinsiLokal(provinsi ?? CADANGAN.label);
+  const adm4 = adm4Kandidat ?? ADM4_IBU_KOTA[provKanonik] ?? ADM4_IBU_KOTA["DKI Jakarta"];
+
+  // Cache response 10 menit
+  const kunci = `${namaLokasi ?? ""},${adm4},${bahasa}`;
   const hit = kas.get(kunci);
   if (hit && hit.kedaluwarsa > Date.now()) {
     return NextResponse.json(hit.badan, {
@@ -262,23 +586,21 @@ export async function GET(req: Request) {
     });
   }
 
-  const lat = dariIp.lat ?? CADANGAN.lat;
-  const lng = dariIp.lng ?? CADANGAN.lng;
-  const [kota, bmkg] = await Promise.all([
-    kotaLokal(lat, lng, bahasa),
-    cuacaBmkg(adm4),
-  ]);
+  // Cuaca dari BMKG
+  const bmkg = await cuacaBmkg(adm4);
+  let cuaca: Cuaca = bmkg ?? { suhu: null, kode: null, siang: true };
+  let sumber: "bmkg" | "model" | null = bmkg && bmkg.suhu !== null ? "bmkg" : null;
 
-  // Suhu hanya dari BMKG — tanpa cadangan model global. Gagal = null
-  // (sumber ikut null supaya tak ada atribusi palsu), bukan angka cadangan.
-  const cuaca: Cuaca = bmkg ?? { suhu: null, kode: null, siang: true };
-  const sumber: "bmkg" | null = bmkg && bmkg.suhu !== null ? "bmkg" : null;
+  // Fallback Open-Meteo bila BMKG tidak tersedia
+  if (cuaca.suhu === null && lat !== null && lng !== null) {
+    const model = await cuacaOpenMeteo(lat, lng);
+    if (model && model.suhu !== null) {
+      cuaca = model;
+      sumber = "model";
+    }
+  }
 
-  // Nama tampil: kota BigDataCloud > kota ipwho.is > provinsi (kanonik 34
-  // nama peta bila cocok) > cadangan. Tak pernah kosong.
-  const nama = kota ?? dariIp.kota ??
-    (dariIp.provinsi ? namaProvinsiLokal(dariIp.provinsi) : CADANGAN.label);
-
+  const nama = namaLokasi ?? provKanonik;
   const badan = { nama, suhu: cuaca.suhu, kodeCuaca: cuaca.kode, siang: cuaca.siang, sumber };
   kas.set(kunci, { kedaluwarsa: Date.now() + KAS_TTL, badan });
   return NextResponse.json(badan, {

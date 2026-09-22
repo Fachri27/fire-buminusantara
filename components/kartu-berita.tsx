@@ -43,7 +43,7 @@ export function KartuBerita({ k, aktif, kurangiGerak, bahasa = "id", onPilih, on
       onClick={onPilih}
       aria-hidden={!aktif}
       className={[
-        aktif ? "z-10 opacity-100 translate-y-[6px] scale-[1.0557]" : "opacity-45",
+        aktif ? "z-10 opacity-100 translate-y-[6px] scale-[1.0557]" : "opacity-45 cursor-pointer",
         // Penanda "sudah diam di tengah" — kaitan css/kartu-kursor.css, yang
         // memberi kursor pointer hanya saat penunjuk benar-benar di atas media
         // kartu tengah.

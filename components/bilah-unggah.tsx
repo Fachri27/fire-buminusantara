@@ -17,11 +17,12 @@ export function BilahUnggah() {
       style={{ height: 3 }}
     >
       <div
-        className="rounded-full bg-current"
+        className="bilah-unggah-bar rounded-full bg-current"
         style={{
           height: "100%",
           width: "40%",
           animation: "bilah-unggah 1.2s ease-in-out infinite",
+          willChange: "transform",
         }}
       />
     </div>
