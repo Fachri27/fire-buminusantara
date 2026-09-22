@@ -471,6 +471,9 @@
   min-width: 0;
 }
 
+/* Sela masonry desktop 1rem — antar-kolom dan antar-kartu sama, supaya
+   kisi terbaca rata. (0.5rem terasa mepet, 1.2rem terlalu renggang.)
+   Seluler punya selanya sendiri di bawah. */
 .lk-masonry {
   gap: 1rem;
 }
@@ -1406,15 +1409,21 @@ html.dark .lk-bingkai-peta {
   --tw-ring-color: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Rel kanan panggung (.lk-kanan) */
-html:not(.dark) .lk-kanan {
-  background-color: #ffffff !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
-}
-html.dark .lk-kanan {
-  background-color: #1e1e1e !important;
-  border-color: rgba(255, 255, 255, 0.06) !important;
+/* Rel kanan panggung (.lk-kanan). Dikurung ambang panggung: rupa panel
+   (latar, garis, bayangan) milik dasbor desktop saja. Tanpa kurungan ini
+   aturan tema yang ber-!important ikut berlaku di seluler, dan umpan ponsel
+   terbungkus kotak abu-abu — padahal di sana kartunya harus berdiri langsung
+   di atas latar halaman (lihat .lk-kanan di blok panggung atas). */
+@media (min-width: 1100px) and (min-height: 640px) {
+  html:not(.dark) .lk-kanan {
+    background-color: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  }
+  html.dark .lk-kanan {
+    background-color: #1e1e1e !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+  }
 }
 
 /* Kartu umpan (.lk-kartu) */

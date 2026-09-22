@@ -455,7 +455,7 @@ html.dark .rincian .rincian__kerangka::before,
 
 @media (min-width: 640px) {
   .rincian__dots {
-    gap: 6px;
+    gap: 4px;
   }
 }
 

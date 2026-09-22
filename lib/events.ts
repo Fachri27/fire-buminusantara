@@ -35,6 +35,9 @@ export type Berita = {
   media: ItemMedia[];
   /** true = foto memenuhi bingkai kartu, judul menumpang putih di atasnya. */
   vertikal: boolean;
+  /** Jumlah komentar tersetujui — hanya diisi ambilUmpan (urutan "komentar
+   *  terbanyak" di umpan). Kosong di sumber lain, dibaca sebagai 0. */
+  jumlahKomentar?: number;
 };
 
 const tanggalId = new Intl.DateTimeFormat("id-ID", {
@@ -225,6 +228,44 @@ export async function ambilSemuaBerita(): Promise<Berita[]> {
     select: PILIH,
   });
   return semua.map((b) => keBerita(b as Baris));
+}
+
+/**
+ * Seluruh kejadian tayang untuk umpan rel kanan — terbaru dulu (tanggal
+ * kejadian, lalu id) — masing-masing membawa jumlah komentarnya. Pengurutan
+ * "komentar terbanyak" terjadi di klien lewat saklar urutan umpan, jadi
+ * angkanya ikut dikirim alih-alih mengurutkan di sini.
+ */
+export async function ambilUmpan(): Promise<Berita[]> {
+  // Mode contoh — lihat ambilRelKanan di atas. Tanpa basis data tak ada
+  // komentar; semua laporan dianggap 0.
+  if (process.env.PETA_DUMMY === "1") {
+    const { BERITA_CONTOH } = await import("./contoh-peta");
+    return BERITA_CONTOH;
+  }
+
+  const [semua, hitung] = await Promise.all([
+    prisma.events.findMany({
+      where: TAYANG,
+      orderBy: [{ event_date: "desc" }, { id: "desc" }],
+      select: PILIH,
+    }),
+    // Komentar polimorfik ala Laravel, bukan relasi Prisma — dihitung terpisah.
+    prisma.comments.groupBy({
+      by: ["commentable_id"],
+      where: { commentable_type: "App\\Models\\Event", is_approved: true, commentable_id: { not: null } },
+      _count: true,
+    }),
+  ]);
+
+  const jumlahKomentar = new Map<number, number>();
+  for (const h of hitung) {
+    if (h.commentable_id != null) jumlahKomentar.set(Number(h.commentable_id), h._count);
+  }
+  return semua.map((b) => ({
+    ...keBerita(b as Baris),
+    jumlahKomentar: jumlahKomentar.get(Number(b.id)) ?? 0,
+  }));
 }
 
 /** Satu kejadian lewat permalink /fire/<slug>. */
