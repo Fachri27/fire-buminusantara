@@ -2892,7 +2892,7 @@ export function LandingKarhutla(
           <KomposerLapor bahasa={bahasa} />
 
           {hasil.length === 0 ? (
-            <p className="mt-5 rounded-xl bg-white border border-black/[0.06] text-black/60 shadow-sm dark:bg-black dark:border-white/5 dark:text-[#a0a0a0] px-4 py-12 text-center text-[13px]">
+            <p className="mt-5 text-black/60 dark:text-[#a0a0a0] px-4 py-12 text-center text-[13px]">
               {t.hasilKosong}
             </p>
           ) : (
@@ -2900,7 +2900,7 @@ export function LandingKarhutla(
               daftar={hasil}
               kolom={kolom}
               kartu={(l) => (
-                <article key={l.id} className="lk-kartu rounded-xl p-3.5 bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-white/[0.04] dark:border-white/10 dark:text-[#f5f5f5]">
+                <article key={l.id} className="lk-kartu text-tinta dark:text-[#f5f5f5]">
                   <div className="lk-kartu-teks">
                     <p className="lk-kartu-tanggal text-[13px] text-black/60 dark:text-white/85 sm:text-[14px]">{l.tanggal}</p>
                     <div className="lk-kartu-judulbar">
