@@ -769,6 +769,54 @@ export function LembarLaporan({ berita: b, bahasa, onTutup, onBuka }: {
   );
 }
 
+/* Titik carousel: pil gelap berisi lajur titik (aktif = pil putih
+   memanjang). Satu salinan dirender di DALAM tiap slide dengan offset lajur
+   yang sama, sehingga yang terlihat selalu menempel di dasar foto aktif.
+   Salinan di slide non-aktif disembunyikan induknya via `inert` +
+   `aria-hidden`. Navigasi lewat seret jari dan ketuk titik — tanpa panah. */
+function TitikPostingan({ jumlah, idx, geser, maks, onPilih, pasangRel }: {
+  jumlah: number; idx: number; geser: number; maks: number;
+  onPilih: (i: number) => void;
+  pasangRel: (el: HTMLDivElement | null) => void;
+}) {
+  return (
+    <div
+      className="lk-postingan-titik"
+      role="group"
+      aria-label={`${idx + 1} / ${jumlah}`}
+    >
+      <div className={`lk-postingan-titik-jendela${jumlah > maks ? " lk-postingan-titik-jendela--geser" : ""}`}>
+        <div
+          ref={pasangRel}
+          className="lk-postingan-titik-rel"
+          style={{ transform: `translateX(${-geser}px)` }}
+        >
+          {Array.from({ length: jumlah }, (_, i) => {
+            const jarak = Math.abs(i - idx);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onPilih(i)}
+                aria-label={`${i + 1} / ${jumlah}`}
+                aria-current={i === idx}
+                tabIndex={jarak > 2 && jumlah > maks ? -1 : undefined}
+                className="lk-postingan-titik-tombol"
+              >
+                <span
+                  aria-hidden="true"
+                  data-aktif={i === idx}
+                  data-jarak={jarak}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* Tampilan "Postingan" seluler ala IG — dibuka dari tap gambar di umpan
    (desktop langsung ke rincian). Bilah kembali + judul, baris penulis,
    media selebar layar (dots ketuk, tanpa geser), baris aksi (suka
@@ -785,7 +833,18 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
   const [idx, setIdx] = useState(0);
   const [tersalin, setTersalin] = useState(false);
   const [descPenuh, setDescPenuh] = useState(false);
-  const sentuh = useRef<{ x: number; y: number } | null>(null);
+  /* Geser ikut-jari ala IG: transform trek ditulis LANGSUNG ke DOM selama
+     jari menempel (tanpa lewat state → tanpa re-render per frame, jadi
+     60fps), dan lajur titik ikut "jalan" mengikuti kemajuan seret. State
+     `idx` hanya berubah saat jari dilepas (snap) atau titik/panah ditekan. */
+  const wadahRef = useRef<HTMLDivElement | null>(null);
+  const trekRef = useRef<HTMLDivElement | null>(null);
+  const relRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const sentuh = useRef<{
+    x: number; y: number; id: number; idxAwal: number; lebar: number;
+    dx: number; tAkhir: number; kec: number;
+  } | null>(null);
   // Jumlah komentar untuk angka di samping ikon — diambil sekali saat buka.
   const [jumlahKomentar, setJumlahKomentar] = useState<number | null>(null);
   useEffect(() => {
@@ -829,20 +888,103 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
     ? l.galeri
     : [{ url: "", jenis: "gambar" as const }];
   const n = items.length;
-  const aktif = items[Math.min(idx, n - 1)];
-  /* Jendela titik carousel: media bisa belasan (11 titik berjajar penuh dan
-     terlihat berantakan). Di atas 7, hanya 5 titik di sekitar posisi aktif
-     yang digambar — polanya meniru carousel IG. */
+  /* Lajur titik: jendela 5 langkah (LANGKAH = lebar tombol 24 + gap 5).
+     Sengaja TIDAK menengah (bukan pos-2): offset hanya bergeser saat titik
+     aktif mau keluar jendela, sehingga titiknya terlihat BERJALAN dari slot
+     ke slot sampai ujung — bukan diam di tengah sementara latarnya yang
+     bergeser. Maju: berjalan 0→4 lalu lajur mengantar sampai titik terakhir;
+     mundur sebaliknya. Saat jari menempel, offset ditulis langsung ke DOM
+     mengikuti kemajuan seret (lihat tulisSeret) supaya lajurnya ikut gerak. */
+  const LANGKAH_TITIK = 29;
   const MAKS_TITIK = 5;
-  const AMBANG_JENDELA = 7;
-  const awalTitik = n > AMBANG_JENDELA ? Math.min(Math.max(idx - 2, 0), n - MAKS_TITIK) : 0;
-  const titikTampil: number[] = items
-    .map((_, i) => i)
-    .filter((i) => i >= awalTitik && i < awalTitik + (n > AMBANG_JENDELA ? MAKS_TITIK : n));
+  const offsetTitik = useCallback((pos: number) => (
+    n <= MAKS_TITIK ? 0 : Math.min(Math.max(pos - (MAKS_TITIK - 1), 0), n - MAKS_TITIK) * LANGKAH_TITIK
+  ), [n]);
+  /* Posisi yang ditunjukkan titik — TERTINGGAL satu langkah dari foto saat
+     pindah lewat ketuk: foto meluncur dulu (380ms), titik baru berjalan
+     menyusul setelah foto tiba. Tanpa jeda ini, geseran lajur 29px tertutup
+     gerakan trek ratusan px dan tak terlihat ("tidak ada animasi geser").
+     Saat pindah lewat seret-jari, lajur sudah terlihat ikut bergerak selama
+     seret (tulisSeret), jadi keduanya diperbarui sekaligus saat dilepas. */
+  const [idxTitik, setIdxTitik] = useState(0);
+  const tundaTitik = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geserTitik = offsetTitik(idxTitik);
+
+  const pergiKe = useCallback((i: number) => {
+    const tuju = ((i % n) + n) % n;
+    setIdx(tuju);
+    if (tundaTitik.current) clearTimeout(tundaTitik.current);
+    // Samakan dengan durasi snap trek (380ms); gerak dikurangi = langsung.
+    const jeda = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 380;
+    tundaTitik.current = setTimeout(() => setIdxTitik(tuju), jeda);
+  }, [n]);
+
+  /* Bersihkan timer tunda-titik saat dibongkar. (Komponen ini selalu
+     dipasang ulang per laporan, jadi tak perlu reset idx saat l.id berubah.) */
+  useEffect(() => () => {
+    if (tundaTitik.current) clearTimeout(tundaTitik.current);
+  }, []);
+
+  /* Wadah memeluk tinggi slide AKTIF — bukan slide tertinggi. Tanpa ini,
+     galeri campur lanskap + potrait menyisakan lembah hitam sebesar selisih
+     tingginya di bawah foto pendek. ResizeObserver menangkap foto yang baru
+     selesai dimuat (tinggi 0 → penuh) dan rotasi layar; transisi height di
+     CSS menganimasikannya berbarengan dengan luncuran trek. */
+  useEffect(() => {
+    const wadah = wadahRef.current;
+    const slide = slideRefs.current[idx];
+    if (!wadah || !slide) return;
+    const terapkan = () => {
+      const tinggi = slide.offsetHeight;
+      if (tinggi > 0) wadah.style.height = `${tinggi}px`;
+    };
+    terapkan();
+    if (typeof ResizeObserver === "undefined") return;
+    const amati = new ResizeObserver(terapkan);
+    amati.observe(slide);
+    return () => amati.disconnect();
+  }, [idx, n]);
+
+  /* Tulis posisi seret langsung ke DOM (trek + semua salinan lajur titik)
+     tanpa re-render — syarat 60fps saat jari bergerak. */
+  const tulisSeret = useCallback((dx: number, idxAwal: number, lebar: number) => {
+    const trek = trekRef.current;
+    if (trek) {
+      trek.style.transition = "none";
+      trek.style.transform = `translateX(${-idxAwal * lebar + dx}px)`;
+    }
+    const dasar = offsetTitik(idxAwal - dx / lebar);
+    for (const rel of [...relRefs.current]) {
+      if (!rel) continue;
+      rel.style.transition = "none";
+      rel.style.transform = `translateX(${-dasar}px)`;
+    }
+  }, [offsetTitik]);
+
+  /* Kembalikan kendali ke React (state idx) — transisi CSS menganimasikan
+     snap dari posisi jari ke slide tujuan. */
+  const lepasSeret = useCallback(() => {
+    const trek = trekRef.current;
+    if (trek) {
+      trek.style.transition = "";
+      trek.style.transform = "";
+    }
+    for (const rel of [...relRefs.current]) {
+      if (!rel) continue;
+      rel.style.transition = "";
+      rel.style.transform = "";
+    }
+  }, []);
 
   useEffect(() => {
     const saatTombol = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onTutup();
+      if (e.key === "Escape") {
+        onTutup();
+        return;
+      }
+      if (n < 2) return;
+      if (e.key === "ArrowLeft") pergiKe(idx - 1);
+      if (e.key === "ArrowRight") pergiKe(idx + 1);
     };
     window.addEventListener("keydown", saatTombol);
     // Kunci badan hanya mode overlay — varian halaman (statis) harus bisa
@@ -856,7 +998,7 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
       window.removeEventListener("keydown", saatTombol);
       document.body.style.overflow = limpahan;
     };
-  }, [onTutup, statis]);
+  }, [onTutup, statis, n, idx, pergiKe]);
 
   async function bagikan() {
     const tautan = `${window.location.origin}${l.href}`;
@@ -889,50 +1031,130 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onKomentar, sta
       </div>
 
       <div
+        ref={wadahRef}
         className="lk-postingan-media"
         onTouchStart={(e) => {
+          if (n < 2) return;
           const s = e.touches[0];
-          sentuh.current = { x: s.clientX, y: s.clientY };
+          sentuh.current = {
+            x: s.clientX, y: s.clientY, id: s.identifier,
+            idxAwal: idx, lebar: wadahRef.current?.clientWidth || 320,
+            dx: 0, tAkhir: performance.now(), kec: 0,
+          };
         }}
-        onTouchEnd={(e) => {
+        onTouchMove={(e) => {
           const awal = sentuh.current;
-          sentuh.current = null;
           if (!awal || n < 2) return;
-          const s = e.changedTouches[0];
-          const dx = s.clientX - awal.x;
-          const dy = s.clientY - awal.y;
-          if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-            setIdx((i) => (i + (dx < 0 ? 1 : -1) + n) % n);
+          for (const s of Array.from(e.touches)) {
+            if (s.identifier !== awal.id) continue;
+            const dxMentah = s.clientX - awal.x;
+            const dy = s.clientY - awal.y;
+            // Gerak vertikal dominan = niat menggulir halaman — batalkan seret
+            // supaya scroll vertikal tetap mulus dan tidak tertahan.
+            if (Math.abs(dy) > Math.abs(dxMentah) * 1.5 && Math.abs(dy) > 12) {
+              sentuh.current = null;
+              lepasSeret();
+              return;
+            }
+            // Tahanan di tepi (bagi 3) supaya ujung trek terasa "kenyal",
+            // bukan mati — pola yang sama dengan carousel native.
+            let dx = dxMentah;
+            if ((awal.idxAwal === 0 && dx > 0) || (awal.idxAwal === n - 1 && dx < 0)) dx = dxMentah / 3;
+            dx = Math.max(-awal.lebar, Math.min(awal.lebar, dx));
+            // Kecepatan sentuh (px/ms, dihaluskan) untuk jentikan cepat.
+            const kini = performance.now();
+            const dt = Math.max(1, kini - awal.tAkhir);
+            awal.kec = 0.8 * awal.kec + 0.2 * ((dx - awal.dx) / dt);
+            awal.tAkhir = kini;
+            awal.dx = dx;
+            tulisSeret(dx, awal.idxAwal, awal.lebar);
           }
         }}
+        onTouchEnd={() => {
+          const awal = sentuh.current;
+          sentuh.current = null;
+          if (!awal || n < 2) {
+            lepasSeret();
+            return;
+          }
+          const ambang = Math.max(48, awal.lebar * 0.12);
+          // Jentikan cepat (>0.5px/ms, sejauh >24px) ikut pindah walau belum
+          // sampai ambang — seperti carousel native.
+          const jentik = Math.abs(awal.kec) > 0.5 && Math.abs(awal.dx) > 24
+            ? Math.sign(awal.kec)
+            : 0;
+          lepasSeret();
+          // Lajur sudah terlihat ikut bergerak selama seret, jadi titik
+          // diperbarui sekaligus — tanpa jeda susulan seperti jalur ketuk.
+          if (tundaTitik.current) clearTimeout(tundaTitik.current);
+          if (awal.dx <= -ambang || jentik < 0) {
+            const tuju = (awal.idxAwal + 1) % n;
+            setIdx(tuju);
+            setIdxTitik(tuju);
+          } else if (awal.dx >= ambang || jentik > 0) {
+            const tuju = ((awal.idxAwal - 1) % n + n) % n;
+            setIdx(tuju);
+            setIdxTitik(tuju);
+          }
+        }}
+        onTouchCancel={() => {
+          sentuh.current = null;
+          lepasSeret();
+        }}
       >
-        {aktif.jenis === "video" ? (
-          <VideoOtomatis url={aktif.url} poster={aktif.poster ?? l.gambar} label={l.judul} tanpaMt tanpaBuka kredit={aktif.keterangan ?? "anonim"} bahasa={bahasa} />
-        ) : aktif.url ? (
-          <span className="lk-media-statis">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={aktif.url} alt={l.alt} className="lk-postingan-foto" />
-            <span aria-hidden="true" className="lk-kredit">
-              ©&nbsp;{aktif.keterangan ?? "anonim"}
-            </span>
-          </span>
-        ) : null}
-        {n > 1 && (
-          <div className="lk-postingan-titik" role="group" aria-label={`${idx + 1} / ${n}`}>
-            {titikTampil.map((i) => (
-              <button
-                key={`${items[i].url}-${i}`}
-                type="button"
-                onClick={() => setIdx(i)}
-                aria-label={`${i + 1} / ${n}`}
-                aria-current={i === idx}
-                className="lk-postingan-titik-tombol"
-              >
-                <span aria-hidden="true" data-aktif={i === idx} />
-              </button>
-            ))}
-          </div>
-        )}
+        <div
+          ref={trekRef}
+          className="lk-postingan-trek"
+          style={{ transform: `translateX(${-idx * 100}%)` }}
+        >
+          {items.map((m, i) => (
+            <div
+              key={`${m.url}-${i}`}
+              ref={(el) => {
+                slideRefs.current[i] = el;
+              }}
+              className="lk-postingan-slide"
+              aria-hidden={i !== idx}
+              inert={i !== idx}
+            >
+              {m.jenis === "video" ? (
+                <VideoOtomatis url={m.url} poster={m.poster ?? l.gambar} label={l.judul} tanpaMt tanpaBuka kredit={m.keterangan ?? "anonim"} bahasa={bahasa} />
+              ) : m.url ? (
+                <span className="lk-media-statis">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={m.url}
+                    alt={l.alt}
+                    className="lk-postingan-foto"
+                    loading={Math.abs(i - idx) > 1 ? "lazy" : "eager"}
+                    draggable={false}
+                  />
+                  <span aria-hidden="true" className="lk-kredit">
+                    ©&nbsp;{m.keterangan ?? "anonim"}
+                  </span>
+                </span>
+              ) : null}
+              {/* Titik menempel di tiap slide (bukan overlay wadah): tinggi tiap
+                 foto beda-beda, dan tinggi wadah = slide tertinggi — overlay
+                 wadah jatuh di lembah hitam jauh di bawah foto aktif sehingga
+                 tak terbaca. Salinan di slide non-aktif ikut `inert` + 
+                 `aria-hidden` induknya, jadi tak bisa difokus maupun terbaca
+                 teknologi asistif. */}
+              {n > 1 && (
+                <TitikPostingan
+                  jumlah={n}
+                  idx={idxTitik}
+                  geser={geserTitik}
+                  maks={MAKS_TITIK}
+                  onPilih={pergiKe}
+                  pasangRel={(el) => {
+                    relRefs.current[i] = el;
+                  }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="lk-postingan-aksi">
