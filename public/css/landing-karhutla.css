@@ -472,11 +472,11 @@
 }
 
 .lk-masonry {
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
 .lk-masonry-kolom {
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
 @media (min-width: 1100px) and (min-height: 640px) {
