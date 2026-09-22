@@ -359,6 +359,13 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
       {/* Kerangka pemuatan awal (gelap halus, hanya muncul di awal buka modal) */}
       <div aria-hidden="true" className={`rincian__kerangka ${awalSiap ? "tutup" : ""}`} />
 
+      {/* Pil nomor urut media (mis. 1 / 3) di pojok kanan atas slider */}
+      {media.length > 1 && (
+        <div aria-hidden="true" className="rincian__slider-penghitung">
+          {kini + 1} / {media.length}
+        </div>
+      )}
+
       {/* Navigasi panah jika media lebih dari 1 */}
       {media.length > 1 && (
         <>
@@ -422,8 +429,8 @@ export function SliderRincian({ media, poster, label, kurangiGerak }: Props) {
                   aria-hidden="true"
                   className={`rincian__dot-item block transition-all duration-300 ${
                     i === kini
-                      ? "w-4 bg-white sm:w-5"
-                      : "w-1.5 bg-white/45 hover:bg-white/70 sm:w-2"
+                      ? "w-4 bg-white shadow-xs sm:w-5"
+                      : "w-1.5 bg-white/50 hover:bg-white/80 sm:w-2"
                   }`}
                 />
               </button>

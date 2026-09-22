@@ -5,6 +5,8 @@ import { gunakanTumbuh, type TitikAsal } from "@/hooks/gunakan-tumbuh";
 import { PULAU_TAB, tabDariPulau, waktuIso, waktuTeks } from "@/lib/tanggal";
 import { PROVINSI_KE_PULAU } from "@/lib/wilayah";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { useTheme } from "next-themes";
+import { useMounted } from "@/hooks/use-mounted";
 import type { Berita } from "@/lib/events";
 import type { ItemMedia } from "@/lib/media";
 
@@ -18,8 +20,7 @@ type Props = {
   jumlahLaporan?: Record<string, number>;
   onBukaRincian: (i: number) => void;
   onTutup: () => void;
-  /** Sisa prop lama — diabaikan (tema kini selalu terang). Dibiarkan opsional
-   *  supaya pemanggil lama yang masih mengoper `gelap` tidak error. */
+  /** Sisa prop lama — jika ada, dipakai sebagai fallback sebelum mounted. */
   gelap?: boolean;
 };
 
@@ -47,7 +48,12 @@ export function PopupPeta({
   jumlahLaporan,
   onBukaRincian,
   onTutup,
+  gelap: gelapProp,
 }: Props) {
+  const { resolvedTheme } = useTheme();
+  const mounted = useMounted();
+  const isDark = mounted ? resolvedTheme === "dark" : Boolean(gelapProp);
+
   const panelRef = useRef<HTMLDivElement | null>(null);
   /* Daftar beritanya ditunda sampai animasi tumbuh selesai — persis pekerjaan
      berat yang parameter ketiga gunakanTumbuh disediakan untuk menundanya,
@@ -192,15 +198,17 @@ export function PopupPeta({
            className="peta-popup fixed inset-x-2.5 sm:inset-x-[clamp(10px,4vw,190px)]
                       top-[calc(3.75rem+env(safe-area-inset-top,0px))] sm:top-[calc(4rem+clamp(10px,2.4vw,26px))]
                       bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-[clamp(10px,2.4vw,26px)]
-                      z-[45] flex flex-col overflow-hidden rounded-[14px] border border-white/10
-                      bg-pantau-konsol text-white shadow-[0_26px_70px_rgb(0_0_0/0.75)]
+                      z-[45] flex flex-col overflow-hidden rounded-[14px]
+                      border border-black/[0.08] bg-white text-tinta shadow-[0_26px_70px_rgb(0_0_0/0.25)]
+                      dark:border-white/10 dark:bg-pantau-konsol dark:text-white dark:shadow-[0_26px_70px_rgb(0_0_0/0.75)]
                       panggung:inset-x-[7vw] panggung:top-[calc(4rem+3vh)] panggung:bottom-[5vh]">
 
         {/* Kepala: wilayah yang ditekan / tab yang aktif */}
-        <div className="flex shrink-0 items-start gap-2.5 sm:gap-[clamp(10px,2.6vw,14px)] border-b border-white/10
+        <div className="flex shrink-0 items-start gap-2.5 sm:gap-[clamp(10px,2.6vw,14px)]
+                        border-b border-black/[0.08] dark:border-white/10
                         p-3 sm:p-5 pr-12 sm:pr-[54px] panggung:p-[22px_28px] panggung:pr-[76px]">
           <div className="grid min-w-0 flex-1 gap-[2px]">
-            <p className="text-[length:var(--ukuran-rincian-nama)] leading-[1.1] font-bold tracking-[-0.01em]">
+            <p className="text-[length:var(--ukuran-rincian-nama)] leading-[1.1] font-bold tracking-[-0.01em] text-tinta dark:text-white">
               {judulTampil}
             </p>
             {subTampil && (
@@ -209,8 +217,8 @@ export function PopupPeta({
               </p>
             )}
             {jumlahTampil !== null && (
-              <p className="mt-1 text-[length:var(--ukuran-catatan)] text-white/60">
-                <span className="font-bold text-white">{jumlahTampil.toLocaleString("id-ID")}</span>{" "}
+              <p className="mt-1 text-[length:var(--ukuran-catatan)] text-black/60 dark:text-white/60">
+                <span className="font-bold text-tinta dark:text-white">{jumlahTampil.toLocaleString("id-ID")}</span>{" "}
                 <span>laporan tercatat</span>
               </p>
             )}
@@ -218,8 +226,10 @@ export function PopupPeta({
 
           <button type="button" aria-label="Tutup berita wilayah" onClick={onTutup}
                   className="absolute top-3 right-3 sm:top-[clamp(12px,3vw,18px)] sm:right-[clamp(12px,3vw,18px)] z-[1] grid size-8 sm:size-[32px]
-                             cursor-pointer place-items-center rounded-full border border-white/15 bg-white/10
-                             text-white transition hover:rotate-90 hover:bg-white/20 active:scale-95 panggung:size-[34px]">
+                             cursor-pointer place-items-center rounded-full
+                             border border-black/10 bg-black/5 text-tinta hover:bg-black/10
+                             dark:border-white/15 dark:bg-white/10 dark:text-white dark:hover:bg-white/20
+                             transition hover:rotate-90 active:scale-95 panggung:size-[34px]">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
                  strokeWidth="2" strokeLinecap="round" className="size-4">
               <path d="M6 6l12 12M18 6 6 18" />
@@ -228,12 +238,13 @@ export function PopupPeta({
         </div>
 
         {/* Saringan tanggal + dropdown pilih pulau */}
-        <div className="flex shrink-0 flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 border-b border-white/10
+        <div className="flex shrink-0 flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3
+                        border-b border-black/[0.08] dark:border-white/10
                         p-3 sm:p-5 py-2.5 sm:py-[10px] panggung:px-[28px]">
           <DateRangePicker
             dari={dari}
             sampai={sampai}
-            gelap
+            gelap={isDark}
             onChange={({ dari, sampai }) => {
               setDari(dari);
               setSampai(sampai);
@@ -249,18 +260,23 @@ export function PopupPeta({
                 value={tabAktif}
                 onChange={(e) => setTabAktif(e.target.value)}
                 aria-label="Pilih wilayah pulau tercatat"
-                className="w-full appearance-none rounded-lg border border-white/15 bg-pantau-malam py-1.5 pl-3 pr-8 text-xs sm:text-sm font-semibold text-white shadow-xs outline-none transition-colors hover:border-white/30 focus:border-white/40 focus:ring-1 focus:ring-white/30 cursor-pointer"
+                className="w-full appearance-none rounded-lg
+                           border border-black/15 bg-white text-tinta
+                           hover:border-black/30 focus:border-black/40 focus:ring-1 focus:ring-black/20
+                           dark:border-white/15 dark:bg-pantau-malam dark:text-white
+                           dark:hover:border-white/30 dark:focus:border-white/40 dark:focus:ring-white/30
+                           py-1.5 pl-3 pr-8 text-xs sm:text-sm font-semibold shadow-xs outline-none transition-colors cursor-pointer"
               >
                 {PULAU_TAB.map((t) => {
                   const jml = jumlahLaporanSemuaTab[t.kunci];
                   return (
-                    <option key={t.kunci} value={t.kunci}>
+                    <option key={t.kunci} value={t.kunci} className="bg-white text-tinta dark:bg-[#1a1919] dark:text-white">
                       {t.label} {jml !== undefined ? `(${jml} laporan)` : ""}
                     </option>
                   );
                 })}
               </select>
-              <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-white/50">
+              <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-black/50 dark:text-white/50">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
@@ -270,7 +286,9 @@ export function PopupPeta({
             {/* Saklar mode tampilan: daftar (baris ringkas) atau kartu (kotak
                 bergambar). Segmen aktif mengikuti rupa bilah saringan lain. */}
             <div role="group" aria-label="Mode tampilan berita"
-                 className="flex shrink-0 items-center gap-0.5 self-center rounded-lg border border-white/15 bg-pantau-malam p-0.5 shadow-xs">
+                 className="flex shrink-0 items-center gap-0.5 self-center rounded-lg
+                            border border-black/15 bg-black/[0.04] p-0.5 shadow-xs
+                            dark:border-white/15 dark:bg-pantau-malam">
               <TombolTampilan aktif={tampilan === "daftar"} label="Tampilan daftar"
                               onClick={() => setTampilan("daftar")}>
                 <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
@@ -319,34 +337,36 @@ export function PopupPeta({
                     <li key={b.id} className="flex">
                       <button type="button" onClick={() => onBukaRincian(i)}
                               className="group flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-xl
-                                         border border-white/10 bg-pantau-malam text-left shadow-xs
+                                         border border-black/[0.08] bg-white text-left shadow-xs
+                                         dark:border-white/10 dark:bg-pantau-malam
                                          transition-all duration-200 ease-out
-                                         hover:-translate-y-1 hover:border-white/30 hover:shadow-[0_10px_24px_rgb(0_0_0/0.5)]
+                                         hover:-translate-y-1 hover:border-black/20 hover:shadow-md
+                                         dark:hover:border-white/30 dark:hover:shadow-[0_10px_24px_rgb(0_0_0/0.5)]
                                          active:translate-y-0">
-                        <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-white/10">
+                        <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-black/5 dark:bg-white/10">
                           <PratinjauMedia awal={awal} pulau={b.pulau}
                                           kelas="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                         </div>
                         <div className="flex flex-1 flex-col justify-between p-3 sm:p-3.5">
                           <div>
-                            <p className="text-[11px] sm:text-xs font-medium text-white/50 transition-colors group-hover:text-white/70">
+                            <p className="text-[11px] sm:text-xs font-medium text-black/50 transition-colors group-hover:text-black/70 dark:text-white/50 dark:group-hover:text-white/70">
                               {b.tanggal}
                             </p>
                             <h3 className="mt-1 text-[13.5px] sm:text-[14px] font-semibold leading-snug
-                                           text-white transition-colors group-hover:text-white line-clamp-2 sm:line-clamp-3">
+                                           text-tinta transition-colors group-hover:text-api dark:text-white dark:group-hover:text-white line-clamp-2 sm:line-clamp-3">
                               {b.judul}
                             </h3>
                           </div>
                           {b.lokasi && (
-                            <div className="mt-3 pt-2.5 border-t border-white/10">
-                              <p className="flex items-start gap-1.5 text-[11px] sm:text-[11.5px] leading-snug text-white/55">
+                            <div className="mt-3 pt-2.5 border-t border-black/[0.06] dark:border-white/10">
+                              <p className="flex items-start gap-1.5 text-[11px] sm:text-[11.5px] leading-snug text-black/60 dark:text-white/55">
                                 <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
                                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                                     className="mt-0.5 size-3 shrink-0 text-white/40 transition-colors group-hover:text-white/60">
+                                     className="mt-0.5 size-3 shrink-0 text-black/40 transition-colors group-hover:text-black/60 dark:text-white/40 dark:group-hover:text-white/60">
                                   <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />
                                   <circle cx="12" cy="10" r="3" />
                                 </svg>
-                                <span className="line-clamp-2 transition-colors group-hover:text-white/80" title={b.lokasi}>
+                                <span className="line-clamp-2 transition-colors group-hover:text-black/80 dark:group-hover:text-white/80" title={b.lokasi}>
                                   {b.lokasi}
                                 </span>
                               </p>
@@ -373,31 +393,34 @@ export function PopupPeta({
                    placeholder lokasi, bukan foto dummy. */
                 const awal = b.media[0];
                 return (
-                <li key={b.id} className="border-b border-white/10 last:border-b-0">
+                <li key={b.id} className="border-b border-black/[0.06] dark:border-white/10 last:border-b-0">
                   <button type="button" onClick={() => onBukaRincian(i)}
                           className="group -mx-2 flex w-[calc(100%+1rem)] sm:-mx-2.5 sm:w-[calc(100%+1.25rem)] cursor-pointer items-center
                                      gap-3 sm:gap-[clamp(14px,3.6vw,36px)] rounded-[10px] p-2 sm:px-2.5 sm:py-[clamp(14px,2.8vw,22px)]
-                                     text-left transition-colors hover:bg-white/10 active:bg-white/15 panggung:gap-[48px] panggung:py-[24px]">
-                    <div className="relative shrink-0 overflow-hidden rounded-[10px] bg-white/10 ring-1 ring-white/15">
+                                     text-left transition-colors
+                                     hover:bg-black/[0.04] active:bg-black/[0.08]
+                                     dark:hover:bg-white/10 dark:active:bg-white/15
+                                     panggung:gap-[48px] panggung:py-[24px]">
+                    <div className="relative shrink-0 overflow-hidden rounded-[10px] bg-black/5 ring-1 ring-black/10 dark:bg-white/10 dark:ring-white/15">
                       <PratinjauMedia awal={awal} pulau={b.pulau}
                                       kelas="h-[76px] w-[104px] sm:h-[clamp(80px,18vw,120px)] sm:w-[clamp(120px,27vw,190px)] object-cover
                                              transition-transform duration-300 group-hover:scale-105
                                              panggung:h-[130px] panggung:w-[210px]" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-x-2 text-xs text-white/55">
-                        <span className="font-medium text-white/55 transition-colors group-hover:text-white/80">
+                      <div className="flex flex-wrap items-center gap-x-2 text-xs text-black/60 dark:text-white/55">
+                        <span className="font-medium text-black/60 transition-colors group-hover:text-black/80 dark:text-white/55 dark:group-hover:text-white/80">
                           {b.tanggal}
                         </span>
                         {b.lokasi && (
                           <>
-                            <span className="text-white/30">·</span>
-                            <span className="truncate text-white/50">{b.lokasi}</span>
+                            <span className="text-black/30 dark:text-white/30">·</span>
+                            <span className="truncate text-black/50 dark:text-white/50">{b.lokasi}</span>
                           </>
                         )}
                       </div>
                       <p className="mt-1 sm:mt-1.5 text-sm sm:text-base font-semibold leading-snug
-                                    text-white transition-colors group-hover:text-white">
+                                    text-tinta transition-colors group-hover:text-api dark:text-white dark:group-hover:text-white">
                         {b.judul}
                       </p>
                     </div>
@@ -412,8 +435,8 @@ export function PopupPeta({
             </>
             )
           ) : (
-            <p className="py-6 sm:py-[clamp(24px,7vw,48px)] text-[length:var(--ukuran-catatan)] leading-[1.5] text-white/65">
-              Belum ada laporan untuk <span className="font-semibold">{tab.label}</span>
+            <p className="py-6 sm:py-[clamp(24px,7vw,48px)] text-[length:var(--ukuran-catatan)] leading-[1.5] text-black/65 dark:text-white/65">
+              Belum ada laporan untuk <span className="font-semibold text-tinta dark:text-white">{tab.label}</span>
               {adaSaringan ? " pada rentang tanggal ini" : ""}.
               {adaSaringan && (
                 <button type="button" onClick={hapusTanggal}
@@ -456,12 +479,12 @@ function NavigasiHalaman({ halaman, totalHalaman, awal, akhir, total, onPilih }:
   }
 
   const kelasTombol =
-    "flex min-h-[34px] cursor-pointer items-center justify-center gap-1 rounded-lg border border-white/15 bg-pantau-malam px-3 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-xs transition-colors hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/15 disabled:hover:bg-pantau-malam focus-visible:border-white/40 focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:outline-none";
+    "flex min-h-[34px] cursor-pointer items-center justify-center gap-1 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs sm:text-sm font-semibold text-tinta shadow-xs transition-colors hover:border-black/20 hover:bg-black/[0.04] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-black/10 disabled:hover:bg-white focus-visible:border-black/30 focus-visible:ring-1 focus-visible:ring-black/20 focus-visible:outline-none dark:border-white/15 dark:bg-pantau-malam dark:text-white dark:hover:border-white/30 dark:hover:bg-white/10 dark:disabled:hover:border-white/15 dark:disabled:hover:bg-pantau-malam dark:focus-visible:border-white/40 dark:focus-visible:ring-white/40";
 
   return (
     <nav aria-label="Paginasi laporan"
-         className="mt-4 flex flex-col items-center gap-2.5 border-t border-white/10 pt-3.5 sm:mt-5">
-      <p className="text-[length:var(--ukuran-catatan)] text-white/55">
+         className="mt-4 flex flex-col items-center gap-2.5 border-t border-black/[0.08] dark:border-white/10 pt-3.5 sm:mt-5">
+      <p className="text-[length:var(--ukuran-catatan)] text-black/60 dark:text-white/55">
         Menampilkan {awal}–{akhir} dari {total} laporan
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1.5">
@@ -472,12 +495,12 @@ function NavigasiHalaman({ halaman, totalHalaman, awal, akhir, total, onPilih }:
         <div className="hidden items-center gap-1 px-1 min-[430px]:flex">
           {nomor.map((item, idx) =>
             item === "..." ? (
-              <span key={`ellipsis-${idx}`} className="select-none px-1.5 text-[13px] text-white/40">
+              <span key={`ellipsis-${idx}`} className="select-none px-1.5 text-[13px] text-black/40 dark:text-white/40">
                 …
               </span>
             ) : item === halaman ? (
               <span key={item} aria-current="page"
-                    className="grid min-h-[34px] min-w-[34px] place-items-center rounded-lg bg-white px-2 py-1.5 text-xs sm:text-sm font-bold text-black shadow-xs">
+                    className="grid min-h-[34px] min-w-[34px] place-items-center rounded-lg bg-tinta text-white px-2 py-1.5 text-xs sm:text-sm font-bold shadow-xs dark:bg-white dark:text-black">
                 {item}
               </span>
             ) : (
@@ -523,9 +546,9 @@ function PratinjauMedia({ awal, pulau, kelas }: {
   }
   return (
     <div aria-hidden="true"
-         className={`flex items-center justify-center bg-white/10 ${kelas}`}>
-      <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold
-                       uppercase tracking-wide text-white/60">
+         className={`flex items-center justify-center bg-black/5 dark:bg-white/10 ${kelas}`}>
+      <span className="rounded-full bg-black/10 dark:bg-white/15 px-2 py-0.5 text-[10px] font-semibold
+                       uppercase tracking-wide text-black/60 dark:text-white/60">
         {pulau || "Belum ada foto"}
       </span>
     </div>
@@ -542,12 +565,12 @@ function RangkaDaftar({ mode }: { mode: ModeTampilan }) {
         <div className="grid grid-cols-1 min-[430px]:grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3
                         panggung:grid-cols-5 panggung:gap-[20px] xl:grid-cols-5">
           {petak.map((_, i) => (
-            <div key={i} className="overflow-hidden rounded-xl border border-white/10 bg-pantau-malam">
-              <div className="aspect-[16/10] w-full bg-white/10" />
+            <div key={i} className="overflow-hidden rounded-xl border border-black/[0.08] bg-white dark:border-white/10 dark:bg-pantau-malam">
+              <div className="aspect-[16/10] w-full bg-black/5 dark:bg-white/10" />
               <div className="space-y-2 p-3 sm:p-3.5">
-                <div className="h-2.5 w-1/3 rounded bg-white/10" />
-                <div className="h-3 w-full rounded bg-white/10" />
-                <div className="h-3 w-2/3 rounded bg-white/10" />
+                <div className="h-2.5 w-1/3 rounded bg-black/5 dark:bg-white/10" />
+                <div className="h-3 w-full rounded bg-black/5 dark:bg-white/10" />
+                <div className="h-3 w-2/3 rounded bg-black/5 dark:bg-white/10" />
               </div>
             </div>
           ))}
@@ -555,14 +578,14 @@ function RangkaDaftar({ mode }: { mode: ModeTampilan }) {
       ) : (
         <div>
           {petak.map((_, i) => (
-            <div key={i} className="flex items-center gap-3 sm:gap-[clamp(14px,3.6vw,36px)] border-b border-white/10 py-2 last:border-b-0
+            <div key={i} className="flex items-center gap-3 sm:gap-[clamp(14px,3.6vw,36px)] border-b border-black/[0.06] dark:border-white/10 py-2 last:border-b-0
                                     sm:py-[clamp(14px,2.8vw,22px)]">
-              <div className="h-[76px] w-[104px] shrink-0 rounded-[10px] bg-white/10
+              <div className="h-[76px] w-[104px] shrink-0 rounded-[10px] bg-black/5 dark:bg-white/10
                               sm:h-[clamp(80px,18vw,120px)] sm:w-[clamp(120px,27vw,190px)]" />
               <div className="min-w-0 flex-1 space-y-2">
-                <div className="h-2.5 w-1/4 rounded bg-white/10" />
-                <div className="h-3.5 w-full rounded bg-white/10" />
-                <div className="h-3.5 w-3/5 rounded bg-white/10" />
+                <div className="h-2.5 w-1/4 rounded bg-black/5 dark:bg-white/10" />
+                <div className="h-3.5 w-full rounded bg-black/5 dark:bg-white/10" />
+                <div className="h-3.5 w-3/5 rounded bg-black/5 dark:bg-white/10" />
               </div>
             </div>
           ))}
@@ -582,7 +605,9 @@ function TombolTampilan({ aktif, label, onClick, children }: {
   return (
     <button type="button" onClick={onClick} aria-pressed={aktif} aria-label={label} title={label}
             className={`grid size-[26px] cursor-pointer place-items-center rounded-[6px] transition-colors sm:size-[28px]
-                        ${aktif ? "bg-white/20 text-white" : "text-white/50 hover:bg-white/10 hover:text-white"}`}>
+                        ${aktif
+                          ? "bg-white text-tinta shadow-2xs dark:bg-white/20 dark:text-white"
+                          : "text-black/50 hover:bg-black/5 hover:text-tinta dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"}`}>
       {children}
     </button>
   );

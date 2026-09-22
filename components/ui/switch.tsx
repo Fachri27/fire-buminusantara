@@ -111,13 +111,13 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(
           aria-hidden="true"
           className={`rincian__saklar-jalur relative inline-flex items-center rounded-full transition-colors duration-200 ease-in-out motion-reduce:transition-none ${trackSizeClass} ${
             isChecked
-              ? `${aksenAktifClass} ring-1 ring-white/10`
-              : "bg-neutral-500/30 dark:bg-white/20 ring-1 ring-black/15 dark:ring-white/15 hover:bg-neutral-500/40 dark:hover:bg-white/25"
+              ? `${aksenAktifClass} ring-1 ring-white/10 dark:ring-white/20`
+              : "bg-neutral-300 hover:bg-neutral-400/80 ring-1 ring-black/10 dark:bg-white/20 dark:hover:bg-white/25 dark:ring-white/15"
           } peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 ${aksenFokusClass} ${trackClassName}`}
         >
           {/* Tombol Geser (Thumb) Saklar */}
           <span
-            className={`rincian__saklar-tombol pointer-events-none inline-block rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.3)] transition-transform duration-200 cubic-bezier(0.4,0,0.2,1) motion-reduce:transition-none ${thumbSizeClass} ${thumbTranslateClass} ${thumbClassName}`}
+            className={`rincian__saklar-tombol pointer-events-none inline-block rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.3)] dark:bg-white dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] transition-transform duration-200 cubic-bezier(0.4,0,0.2,1) motion-reduce:transition-none ${thumbSizeClass} ${thumbTranslateClass} ${thumbClassName}`}
           />
         </span>
       </span>

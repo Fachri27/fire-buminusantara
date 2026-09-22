@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
+import { useTheme } from "next-themes";
 
 const PetaAsap = dynamic(
   () => import("./peta-asap").then((mod) => mod.PetaAsap),
@@ -108,10 +109,13 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
      bingkai kecil, dan tombol bentang muncul di peta yang sudah selayar.
      Ganti src berarti iframe memuat ulang; itu memang sudah pasti terjadi,
      sebab memindahkan <iframe> di DOM selalu memuatnya ulang. */
+  const { resolvedTheme } = useTheme();
   const [windyKamera, setWindyKamera] = useState("lat=0.200&lon=118.000&zoom=5");
   const windySrc = `/api/forecasting?${windyKamera}${zoomRoda ? "&konsol=1" : ""}${
     onExpand ? "&bentang=1" : ""
-  }${legendaRingkas ? "&ringkas=1" : ""}${tombolRapat ? "&rapat=1" : ""}`;
+  }${legendaRingkas ? "&ringkas=1" : ""}${tombolRapat ? "&rapat=1" : ""}${
+    resolvedTheme ? `&tema=${resolvedTheme}` : ""
+  }`;
   const [sedangSyncAsap, setSedangSyncAsap] = useState(true);
 
   // Peta asap baru dipasang begitu layarnya mendekati pandangan. Begitu
@@ -260,6 +264,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       if (data.type === "FORECASTING_READY") {
         iframeReadyRef.current = true;
         setMemuatWindy(false);
+        if (resolvedTheme) {
+          kirimData({ type: "SET_TEMA", tema: resolvedTheme });
+        }
         const kamera = kameraTertundaRef.current ?? (isPenuh ? kameraWindyNusantara(true) : kameraAerosolKini());
         if (kamera) {
           kirimData({ type: "SET_KAMERA", ...kamera });
@@ -321,7 +328,14 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
     window.addEventListener("message", saatPesan);
     return () => window.removeEventListener("message", saatPesan);
-  }, [kirimData, berita, onBukaRincian, isPenuh]);
+  }, [kirimData, berita, onBukaRincian, isPenuh, resolvedTheme]);
+
+  // Siarkan pergantian tema secara langsung ke iframe Windy
+  useEffect(() => {
+    if (iframeReadyRef.current && resolvedTheme) {
+      kirimData({ type: "SET_TEMA", tema: resolvedTheme });
+    }
+  }, [resolvedTheme, kirimData]);
 
   /* Saat mode selayar dibuka ATAU ditutup, sesuaikan kamera Windy dinamis ke
      Nusantara. Sela selayar dan sela bingkai kecil berbeda jauh, jadi tanpa
@@ -431,7 +445,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   const kelasPil = `flex cursor-pointer items-center gap-1 sm:gap-2 rounded-full font-semibold transition-all ${
     tombolRapat ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs"
   }`;
-  const kelasInfo = `flex cursor-pointer items-center justify-center rounded-full bg-black/85 text-white/80 shadow-2xl ring-1 ring-white/20 backdrop-blur-md transition-all hover:bg-black hover:text-white hover:ring-white/40 active:scale-95 ${
+  const kelasInfo = `flex cursor-pointer items-center justify-center rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:shadow-2xl dark:ring-1 dark:ring-white/20 backdrop-blur-md transition-all active:scale-95 ${
     tombolRapat ? "h-7 w-7" : "h-8 w-8 sm:h-9 sm:w-9"
   }`;
 
@@ -443,7 +457,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     >
       {/* Tombol Alih Mode Layer Peta & Info Perbedaan */}
       <div className={`pointer-events-auto absolute left-4 z-[450] flex items-center gap-1.5 sm:gap-2 sm:left-6 ${tombolRapat ? "top-4" : "top-20"}`}>
-        <div className="flex items-center gap-1 rounded-full bg-black/85 p-1 shadow-2xl ring-1 ring-white/20 backdrop-blur-md">
+        <div className="flex items-center gap-1 rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:shadow-2xl dark:ring-1 dark:ring-white/20 p-1 backdrop-blur-md">
           <button
             type="button"
             onClick={() => handlePilihMode("asap")}
@@ -458,7 +472,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             className={`${kelasPil} ${
               mode === "asap"
                 ? "text-white shadow-md shadow-purple-950/50 ring-1 ring-fuchsia-400/40 [text-shadow:_0_1px_2px_rgb(0_0_0_/_70%)]"
-                : "text-white/70 hover:bg-white/10 hover:text-white"
+                : "text-tinta/75 hover:bg-black/[0.05] hover:text-tinta dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
             }`}
           >
             <span className="text-xs sm:text-sm leading-none">🔥</span>
@@ -478,7 +492,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             className={`${kelasPil} ${
               mode === "windy"
                 ? "text-white shadow-md shadow-emerald-950/50 ring-1 ring-emerald-400/40 [text-shadow:_0_1px_2px_rgb(0_0_0_/_70%)]"
-                : "text-white/70 hover:bg-white/10 hover:text-white"
+                : "text-tinta/75 hover:bg-black/[0.05] hover:text-tinta dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
             }`}
           >
             <span className="text-xs sm:text-sm leading-none">💨</span>
@@ -507,25 +521,25 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           ponsel serta bilah navigasi. */}
       {bukaInfoPerbedaan && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex cursor-pointer items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex cursor-pointer items-center justify-center bg-black/60 dark:bg-black/75 p-4 backdrop-blur-sm"
           onClick={() => setBukaInfoPerbedaan(false)}
         >
           <div
-            className="relative w-full max-w-lg max-h-[calc(100svh-2rem)] flex cursor-default flex-col overflow-hidden rounded-2xl border border-white/10 bg-pantau-konsol p-4 sm:p-5 shadow-2xl text-white"
+            className="relative w-full max-w-lg max-h-[calc(100svh-2rem)] flex cursor-default flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-white text-tinta dark:border-white/10 dark:bg-pantau-konsol dark:text-white p-4 sm:p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-white/10 pb-3">
+            <div className="flex shrink-0 items-center justify-between border-b border-black/[0.08] dark:border-white/10 pb-3">
               <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-white/60" />
-                <h3 className="text-sm font-semibold tracking-wide text-white">
+                <span className="h-2 w-2 rounded-full bg-tinta/60 dark:bg-white/60" />
+                <h3 className="text-sm font-semibold tracking-wide text-tinta dark:text-white">
                   Panduan Data
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setBukaInfoPerbedaan(false)}
-                className="rounded-lg cursor-pointer p-1.5 text-white/40 hover:bg-white/10 hover:text-white transition-colors"
+                className="rounded-lg cursor-pointer p-1.5 text-tinta/50 hover:bg-black/[0.06] hover:text-tinta dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white transition-colors"
                 aria-label="Tutup panduan"
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
@@ -537,30 +551,30 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             {/* List Indikator Data */}
             <div className="mt-3.5 grid min-h-0 flex-1 gap-3 overflow-y-auto overscroll-contain pr-1 sm:grid-cols-2 text-xs">
               {/* Kolom 1: Aerosol Karhutla */}
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5 flex flex-col justify-between">
+              <div className="rounded-xl border border-black/[0.08] bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03] p-3.5 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="font-medium text-white text-xs">Aerosol Karhutla</span>
+                  <div className="flex items-center justify-between border-b border-black/[0.08] dark:border-white/10 pb-2">
+                    <span className="font-medium text-tinta dark:text-white text-xs">Aerosol Karhutla</span>
                   </div>
-                  <div className="mt-2.5 space-y-2.5 text-white/75">
+                  <div className="mt-2.5 space-y-2.5 text-tinta/75 dark:text-white/75">
                     <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Data</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Data</span>
                       <p className="mt-0.5 text-[11px] leading-relaxed">
-                        <strong className="text-white font-medium">OMAOD 550nm</strong> (Organic Matter AOD) dari CAMS global, mengukur kepekatan partikel asap biomassa.
+                        <strong className="text-tinta dark:text-white font-medium">OMAOD 550nm</strong> (Organic Matter AOD) dari CAMS global, mengukur kepekatan partikel asap biomassa.
                       </p>
                     </div>
                     <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Cakupan Waktu</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Cakupan Waktu</span>
                       <p className="mt-0.5 text-[11px] leading-relaxed">
                         Riwayat 7 hari ke belakang hingga proyeksi gerak asap 3 hari ke depan (tiap 3 jam).
                       </p>
                     </div>
                     <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Atribusi & Lisensi</span>
-                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-white/65">
-                        Contains modified <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" className="text-white font-medium underline underline-offset-2">Copernicus Atmosphere Monitoring Service</a> information 2026.
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Atribusi & Lisensi</span>
+                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-tinta/65 dark:text-white/65">
+                        Contains modified <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">Copernicus Atmosphere Monitoring Service</a> information 2026.
                       </p>
-                      <p className="mt-1 text-[9.5px] leading-normal text-white/45 italic">
+                      <p className="mt-1 text-[9.5px] leading-normal text-tinta/45 dark:text-white/45 italic">
                         Baik Komisi Eropa maupun ECMWF tidak bertanggung jawab atas penggunaan data atau informasi yang disajikan.
                       </p>
                     </div>
@@ -569,28 +583,28 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
               </div>
 
               {/* Kolom 2: Angin dan Kualitas Udara */}
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5 flex flex-col justify-between">
+              <div className="rounded-xl border border-black/[0.08] bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03] p-3.5 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="font-medium text-white text-xs">Angin dan Kualitas Udara</span>
+                  <div className="flex items-center justify-between border-b border-black/[0.08] dark:border-white/10 pb-2">
+                    <span className="font-medium text-tinta dark:text-white text-xs">Angin dan Kualitas Udara</span>
                   </div>
-                  <div className="mt-2.5 space-y-2.5 text-white/75">
+                  <div className="mt-2.5 space-y-2.5 text-tinta/75 dark:text-white/75">
                     <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Data</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Data</span>
                       <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Indeks Kualitas Udara (<strong className="text-white font-medium">AQI</strong>) berbasis model atmosfer <strong className="text-white font-medium">Copernicus CAMS</strong>, dipadukan hembusan angin model <strong className="text-white font-medium">ECMWF IFS</strong>.
+                        Indeks Kualitas Udara (<strong className="text-tinta dark:text-white font-medium">AQI</strong>) berbasis model atmosfer <strong className="text-tinta dark:text-white font-medium">Copernicus CAMS</strong>, dipadukan hembusan angin model <strong className="text-tinta dark:text-white font-medium">ECMWF IFS</strong>.
                       </p>
                     </div>
                     <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Cakupan Waktu</span>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Cakupan Waktu</span>
                       <p className="mt-0.5 text-[11px] leading-relaxed">
                         Near real-time (menggunakan data aktual yang paling mendekati waktu saat ini).
                       </p>
                     </div>
                     <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-white/40 block">Atribusi & Penyedia</span>
-                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-white/65">
-                        Disajikan melalui <a href="https://www.windy.com" target="_blank" rel="noopener noreferrer" className="text-white font-medium underline underline-offset-2">Windy.com</a> dengan integrasi model Copernicus CAMS & ECMWF IFS.
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Atribusi & Penyedia</span>
+                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-tinta/65 dark:text-white/65">
+                        Disajikan melalui <a href="https://www.windy.com" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">Windy.com</a> dengan integrasi model Copernicus CAMS & ECMWF IFS.
                       </p>
                     </div>
                   </div>
@@ -603,7 +617,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
               <button
                 type="button"
                 onClick={() => setBukaInfoPerbedaan(false)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                className="rounded-lg border border-black/[0.08] bg-black/[0.04] text-tinta/80 hover:bg-black/[0.08] hover:text-tinta dark:border-white/10 dark:bg-white/5 px-3.5 py-1.5 text-xs font-medium dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white transition-colors"
               >
                 Tutup
               </button>
@@ -674,8 +688,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           />
         )}
         {mode === "windy" && memuatWindy && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/85 transition-opacity duration-500">
-            <div className="flex items-center gap-3 rounded-full bg-black/75 px-5 py-2.5 text-sm text-white/90 shadow-xl ring-1 ring-white/15">
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-black/85 transition-opacity duration-500">
+            <div className="flex items-center gap-3 rounded-full bg-white/95 border border-black/[0.08] text-tinta shadow-lg dark:bg-black/75 dark:border-0 dark:ring-1 dark:ring-white/15 dark:text-white/90 px-5 py-2.5 text-sm">
               <svg
                 className="h-4 w-4 animate-spin text-api"
                 xmlns="http://www.w3.org/2000/svg"

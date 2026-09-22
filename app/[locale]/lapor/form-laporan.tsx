@@ -599,6 +599,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
 
 const ISIAN =
   "w-full rounded-md border border-black/[0.14] bg-white px-3 py-2.5 text-[14px] text-tinta " +
+  "dark:border-white/10 dark:bg-pantau-konsol dark:text-[#f5f5f5] dark:placeholder:text-white/30 " +
   "outline-none transition-colors placeholder:text-tinta/30 focus:border-api/60 " +
   "focus:ring-2 focus:ring-api/15";
 
@@ -609,7 +610,8 @@ const TOMBOL_UTAMA =
 
 const TOMBOL_GARIS =
   "inline-flex items-center rounded-md border border-black/[0.16] bg-white px-4 py-2 text-[13px] cursor-pointer " +
-  "font-medium text-tinta transition-colors hover:border-black/30 focus-visible:outline-2 " +
+  "dark:border-white/15 dark:bg-white/[0.05] dark:text-white " +
+  "font-medium text-tinta transition-colors hover:border-black/30 dark:hover:border-white/30 focus-visible:outline-2 " +
   "focus-visible:outline-offset-2 focus-visible:outline-api";
 
 /**
@@ -632,12 +634,12 @@ function Bidang({
 }) {
   return (
     <div className="grid gap-2">
-      <label htmlFor={id} className="text-[13.5px] font-semibold text-tinta">
+      <label htmlFor={id} className="text-[13.5px] font-semibold text-tinta dark:text-[#f5f5f5]">
         {label}
         {wajib && <span aria-hidden="true" className="ml-1 text-api">*</span>}
       </label>
       {petunjuk && (
-        <p id={`${id}-petunjuk`} className="-mt-1 text-[12.5px] leading-[1.5] text-tinta/50">
+        <p id={`${id}-petunjuk`} className="-mt-1 text-[12.5px] leading-[1.5] text-tinta/50 dark:text-[#a0a0a0]">
           {petunjuk}
         </p>
       )}

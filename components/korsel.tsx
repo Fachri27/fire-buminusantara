@@ -54,10 +54,12 @@ export function Korsel({
       onMouseLeave={mulaiOtomatis}
       onFocus={hentikanOtomatis}
       className="sticky top-0 z-[1] flex min-h-[100svh] flex-col justify-center overflow-hidden
+                 bg-white dark:bg-panggung text-tinta dark:text-[#f5f5f5]
                  px-[var(--pias)] pt-[calc(4rem+clamp(18px,5vw,56px))] pb-[clamp(20px,5vw,56px)]
                  pendek:static pendek:z-auto pendek:min-h-0
                  panggung:block panggung:h-screen panggung:min-h-0
-                 panggung:sticky panggung:top-0 panggung:z-[1] panggung:p-0"
+                 panggung:sticky panggung:top-0 panggung:z-[1] panggung:p-0
+                 transition-colors duration-300"
     >
       {/* Foto latar hero — DIAM, tanpa parallax.
 
@@ -67,8 +69,9 @@ export function Korsel({
       <picture className="absolute inset-0 h-full w-full">
         <source srcSet="/assets/img/bg-karhutla.webp" type="image/webp" />
         <img src="/assets/img/bg-karhutla.jpg" alt="" aria-hidden="true" fetchPriority="high"
-             className="h-full w-full object-cover" />
+             className="h-full w-full object-cover opacity-90 dark:opacity-75 transition-opacity duration-300" />
       </picture>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-white/20 dark:bg-panggung/50 transition-colors duration-300" />
 
       <div data-kanvas
            className="relative mx-auto w-full max-w-[940px]
@@ -151,10 +154,11 @@ function Panah({ arah, label, onClick }: { arah: -1 | 1; label: string; onClick:
   return (
     <button type="button" aria-label={label} onClick={onClick}
             className={`cursor-pointer absolute top-1/2 ${sisi} z-20 grid size-[var(--panah-ukuran)] -translate-y-1/2
-                        place-items-center rounded-full bg-black/30 text-white backdrop-blur-[6px]
-                        transition-colors hover:bg-black/55 focus-visible:outline-2
-                        focus-visible:outline-offset-2 focus-visible:outline-white
-                        panggung:top-[468px] panggung:bg-transparent panggung:backdrop-blur-none
+                        place-items-center rounded-full bg-white/85 dark:bg-black/40 text-tinta dark:text-white
+                        border border-black/[0.08] dark:border-white/15 backdrop-blur-[6px] shadow-md dark:shadow-none
+                        transition-all hover:bg-white dark:hover:bg-black/65 hover:scale-105 active:scale-95 focus-visible:outline-2
+                        focus-visible:outline-offset-2 focus-visible:outline-api
+                        panggung:top-[468px] panggung:bg-transparent panggung:border-transparent panggung:shadow-none panggung:backdrop-blur-none
                         panggung:drop-shadow-[0_2px_6px_rgb(0_0_0/0.45)]
                         panggung:hover:bg-transparent panggung:hover:opacity-75`}>
       <svg viewBox="0 0 27 45" aria-hidden="true" fill="none" stroke="currentColor"
@@ -179,10 +183,10 @@ function RakKosong() {
       <div className="pantauan-kosong__jendela">
         <div className="pantauan-kosong__rak">
           <div aria-hidden="true" className="pantauan-kosong__slot pantauan-kosong__slot--sisi" />
-          <article className="pantauan-kosong__slot pantauan-kosong__slot--utama">
+          <article className="pantauan-kosong__slot pantauan-kosong__slot--utama bg-white/90 dark:bg-pantau-konsol/90 border border-black/[0.06] dark:border-white/10 text-tinta dark:text-[#f5f5f5]">
             <div className="pantauan-kosong__isi">
-              <p className="pantauan-kosong__judul">Belum ada laporan</p>
-              <p className="pantauan-kosong__catatan">
+              <p className="pantauan-kosong__judul text-tinta dark:text-[#f5f5f5]">Belum ada laporan</p>
+              <p className="pantauan-kosong__catatan text-tinta/70 dark:text-[#f5f5f5]/70">
                 Laporan lapangan karhutla akan muncul di kartu ini begitu yang pertama tercatat.
               </p>
             </div>

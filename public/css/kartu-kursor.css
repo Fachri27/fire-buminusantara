@@ -27,3 +27,28 @@
 .kartu-hidup .kartu-media:hover {
   cursor: pointer;
 }
+
+/* Umpan balik kursor visual pada kartu aktif yang bisa diklik */
+.kartu-hidup .kartu-media {
+  transition: box-shadow 300ms ease, filter 300ms ease, border-color 300ms ease;
+}
+
+.kartu-hidup .kartu-media:hover {
+  box-shadow: 0 12px 26px rgb(0 0 0 / 0.16);
+}
+
+:is(.dark, :root.dark, html.dark) .kartu-hidup .kartu-media:hover {
+  box-shadow: 0 14px 30px rgb(0 0 0 / 0.5);
+}
+
+.kartu-hidup .kartu-bingkai {
+  transition: border-color 250ms ease, box-shadow 250ms ease;
+}
+
+.kartu-hidup:hover .kartu-bingkai {
+  border-color: rgb(0 0 0 / 0.12);
+}
+
+:is(.dark, :root.dark, html.dark) .kartu-hidup:hover .kartu-bingkai {
+  border-color: rgb(255 255 255 / 0.2);
+}

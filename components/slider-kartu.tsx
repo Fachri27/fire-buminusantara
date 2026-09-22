@@ -59,6 +59,39 @@ export function SliderKartu({
                    className={kelasMedia} onBuka={onBuka} />
       )}
 
+      {media.length > 1 && aktif && (
+        <>
+          <button
+            type="button"
+            aria-label="Media sebelumnya"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIndeks((prev) => (prev > 0 ? prev - 1 : media.length - 1));
+              onGeser();
+            }}
+            className="cursor-pointer absolute left-2 top-1/2 -translate-y-1/2 z-20 grid size-7 place-items-center rounded-full bg-white/85 dark:bg-black/50 text-tinta dark:text-white border border-black/10 dark:border-white/15 shadow-md dark:shadow-none backdrop-blur-[4px] transition-all hover:bg-white dark:hover:bg-black/80 hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3.5">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            aria-label="Media berikutnya"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIndeks((prev) => (prev < media.length - 1 ? prev + 1 : 0));
+              onGeser();
+            }}
+            className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 z-20 grid size-7 place-items-center rounded-full bg-white/85 dark:bg-black/50 text-tinta dark:text-white border border-black/10 dark:border-white/15 shadow-md dark:shadow-none backdrop-blur-[4px] transition-all hover:bg-white dark:hover:bg-black/80 hover:scale-105 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-api"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="size-3.5">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </>
+      )}
+
       {media.length > 1 && (
         <TitikMedia
           jumlah={media.length}
@@ -175,7 +208,7 @@ function TitikMedia({
   const padat = jumlah > 13;
   return (
     <div
-      className="absolute bottom-1.5 left-1/2 z-20 flex -translate-x-1/2 items-center"
+      className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full px-1.5 py-0.5 bg-black/30 dark:bg-black/50 backdrop-blur-[4px] border border-white/20 dark:border-white/15 shadow-sm"
       role="group"
       aria-label={`Media ${kini + 1} dari ${jumlah}`}
     >
@@ -196,7 +229,7 @@ function TitikMedia({
           <span
             aria-hidden="true"
             className={`block h-[5px] w-[5px] rounded-full transition-[transform,background-color] duration-150 motion-reduce:transition-none sm:h-2 sm:w-2 ${
-              i === kini ? "scale-110 bg-white" : "bg-white/50 hover:bg-white/75"
+              i === kini ? "scale-110 bg-white shadow-sm" : "bg-white/50 hover:bg-white/80"
             }`}
           />
         </button>

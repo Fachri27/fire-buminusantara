@@ -80,12 +80,14 @@ export default async function HalamanKarhutla({ params }: Props) {
   ]);
 
   return (
-    <LandingKarhutla
-      bahasa={locale}
-      jumlahLaporan={jumlahLaporan}
-      berita={berita}
-      sorotan={sorotan}
-      kolomAwal={kolomAwal}
-    />
+    <div className="min-h-dvh bg-white text-tinta dark:bg-[#0a0a0a] dark:text-[#f5f5f5] transition-colors duration-200">
+      <LandingKarhutla
+        bahasa={locale}
+        jumlahLaporan={jumlahLaporan}
+        berita={berita}
+        sorotan={sorotan}
+        kolomAwal={kolomAwal}
+      />
+    </div>
   );
 }

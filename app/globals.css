@@ -29,6 +29,7 @@
    sama persis tanpa koma. */
 @custom-variant aliran (@media not all and (min-width: 1100px) and (min-height: 640px));
 @custom-variant pendek (@media (max-height: 620px));
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   /* Palet Pasopati. */
@@ -55,18 +56,14 @@
   --color-peta-5: #90101a;
   --color-peta-tanpa-data: #d5d2cb;
 
-  /* Palet dasbor pantau (/peta) — mengikuti referensi: hanya dua nada.
-     malam/sumur = hitam murni (#000) untuk tengah + search/sumur/placeholder,
-     konsol = abu netral (#1e1e1e) untuk rel kiri/kanan + header. List dibuat
-     flat di atas rel (tanpa pil hitam) seperti referensi. Teks netral
-     (bukan kebiruan / kekuningan) supaya putih-abu sesuai referensi. */
-  --color-pantau-malam: #000000;
-  --color-pantau-konsol: #1e1e1e;
-  --color-pantau-sumur: #000000;
+  /* Palet dasbor pantau (/peta) — mendukung tema terang & gelap lewat CSS variables */
+  --color-pantau-malam: var(--pantau-malam);
+  --color-pantau-konsol: var(--pantau-konsol);
+  --color-pantau-sumur: var(--pantau-sumur);
   --color-pantau-bara: #ff5a26;
   --color-pantau-gambut: #9db35c;
-  --color-pantau-abu: #a0a0a0;
-  --color-pantau-tulang: #f5f5f5;
+  --color-pantau-abu: var(--pantau-abu);
+  --color-pantau-tulang: var(--pantau-tulang);
 }
 
 /* ── Token tata letak ─────────────────────────────────────────────────────
@@ -74,6 +71,28 @@
    sebagai custom property, bukan kelas, karena dipakai bergantian oleh markup
    dan oleh CSS komponen (kartu, peta, pop-up). */
 :root {
+  /* ── Palet Dasbor Pantau & Konsol (Light Mode Bawaan) ──────────────────── */
+  --pantau-malam: #ffffff;
+  --pantau-konsol: #ffffff;
+  --pantau-sumur: #ffffff;
+  --pantau-abu: #555555;
+  --pantau-tulang: #1a1919;
+
+  /* ── Token Desain Tema Terang ────────────────────────────────────────── */
+  --tema-bg: #ffffff;
+  --tema-bg-panel: #ffffff;
+  --tema-bg-kartu: #ffffff;
+  --tema-bg-sumur: #ffffff;
+  --tema-bg-elevasi: #ffffff;
+  --tema-teks-primer: #1a1919;
+  --tema-teks-sekunder: #555555;
+  --tema-teks-tersier: #777777;
+  --tema-teks-pudar: rgba(26, 25, 25, 0.45);
+  --tema-border: rgba(0, 0, 0, 0.08);
+  --tema-border-kuat: rgba(0, 0, 0, 0.16);
+  --tema-bayangan: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --tema-bayangan-lembar: 0 -12px 32px rgba(0, 0, 0, 0.12);
+
   --pias: clamp(16px, 5vw, 40px);
   --sela: clamp(12px, 3.2vw, 20px);
 
@@ -178,8 +197,42 @@
 @media (max-width: 1488px) { :root { --skala-rel: 0.775; } }
 
 html {
+  background: var(--tema-bg, #ffffff);
+  color: var(--tema-teks-primer, var(--color-tinta));
+  color-scheme: light;
+}
+
+html.dark {
   background: var(--color-panggung);
-  color: var(--color-tinta);
+  color: #f5f5f5;
+  color-scheme: dark;
+
+  /* ── Palet Dasbor Pantau & Konsol (Dark Mode) ────────────────────────── */
+  --pantau-malam: #000000;
+  --pantau-konsol: #1e1e1e;
+  --pantau-sumur: #000000;
+  --pantau-abu: #a0a0a0;
+  --pantau-tulang: #f5f5f5;
+
+  /* ── Token Desain Tema Gelap ─────────────────────────────────────────── */
+  --tema-bg: var(--color-panggung);
+  --tema-bg-panel: #1e1e1e;
+  --tema-bg-kartu: #1e1e1e;
+  --tema-bg-sumur: #000000;
+  --tema-bg-elevasi: #101010;
+  --tema-teks-primer: #f5f5f5;
+  --tema-teks-sekunder: #d5d2cb;
+  --tema-teks-tersier: #a0a0a0;
+  --tema-teks-pudar: rgba(245, 245, 245, 0.55);
+  --tema-border: rgba(255, 255, 255, 0.1);
+  --tema-border-kuat: rgba(255, 255, 255, 0.2);
+  --tema-bayangan: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --tema-bayangan-lembar: 0 -12px 32px rgba(0, 0, 0, 0.5);
+}
+
+body {
+  background-color: inherit;
+  color: inherit;
 }
 
 /* ── Lapisan latar section 2 ──────────────────────────────────────────────
@@ -412,8 +465,12 @@ html.lenis body {
   background: transparent;
   font-family: inherit;
   font-size: var(--ukuran-catatan);
-  color: var(--color-tinta);
+  color: var(--tema-teks-primer, var(--color-tinta));
   touch-action: manipulation;
+}
+
+html.dark .leaflet-container {
+  color: #f5f5f5;
 }
 
 /* ── Bilah unggah ─────────────────────────────────────────────────────────

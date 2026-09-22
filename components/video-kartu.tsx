@@ -155,7 +155,7 @@ export function VideoKartu({ src, poster, label, aktif, kurangiGerak, className 
         onEnded={() => { setUsai(true); setJalan(false); catat(); }}
         onClick={alih}
         aria-label={jalan ? `Jeda video: ${label}` : `Putar video: ${label}`}
-        className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"} cursor-pointer`}
+        className={`${className} ${aktif ? "grayscale-0" : "grayscale-[0.65]"} cursor-pointer border border-black/[0.06] dark:border-white/10 transition-[filter,border-color]`}
       />
 
       {/* Kerangka pemuatan: menutupi kotak selama video/poster belum siap.

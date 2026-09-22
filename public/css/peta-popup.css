@@ -37,6 +37,102 @@ body:has(.peta-popup) iframe[src*="forecasting"] {
 
   /* `both` menahan bingkai awal sejak elemen muncul, jadi tidak ada kedipan
      panel ukuran penuh sebelum animasinya jalan. */
+
+  /* Tema terang (bawaan) */
+  background: white;
+  color: #1a1919;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+
+  /* Tema gelap */
+  .dark & {
+    background: #1e1e1e;
+    color: #f5f5f5;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+:where(.dark) .peta-popup,
+.dark .peta-popup {
+  background: #1e1e1e !important;
+  color: #f5f5f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Penyesuaian elemen internal .peta-popup saat mode terang (tanpa kelas .dark) */
+:not(.dark) .peta-popup [class*="border-white/10"],
+:not(.dark) .peta-popup [class*="border-white/15"] {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+:not(.dark) .peta-popup select#pilih-wilayah-pulau,
+:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] {
+  background-color: #f4f4f5 !important;
+  color: #1a1919 !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button {
+  color: #52525b !important;
+}
+
+:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button.bg-white\/20,
+:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button[class*="bg-white"] {
+  background-color: #ffffff !important;
+  color: #1a1919 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+
+:not(.dark) .peta-popup button[class*="border-white/15"] {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: #1a1919 !important;
+}
+
+:not(.dark) .peta-popup .bg-pantau-malam {
+  background-color: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+:not(.dark) .peta-popup .text-white {
+  color: #1a1919 !important;
+}
+
+:not(.dark) .peta-popup .text-white\/70,
+:not(.dark) .peta-popup .text-white\/60,
+:not(.dark) .peta-popup .text-white\/55,
+:not(.dark) .peta-popup .text-white\/50 {
+  color: #52525b !important;
+}
+
+:not(.dark) .peta-popup .text-white\/40,
+:not(.dark) .peta-popup .text-white\/30 {
+  color: #71717a !important;
+}
+
+/* Tooltip Mengambang Peta Wilayah */
+#asap-provinsi-tooltip,
+#provinsi-tooltip,
+.asap-provinsi-tooltip,
+.leaflet-tooltip.provinsi-tooltip {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: #1a1919 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+
+:where(.dark) #asap-provinsi-tooltip,
+:where(.dark) #provinsi-tooltip,
+:where(.dark) .asap-provinsi-tooltip,
+:where(.dark) .leaflet-tooltip.provinsi-tooltip,
+.dark #asap-provinsi-tooltip,
+.dark #provinsi-tooltip,
+.dark .asap-provinsi-tooltip,
+.dark .leaflet-tooltip.provinsi-tooltip {
+  background: rgba(20, 16, 15, 0.94) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
 }
 
 .peta-popup--jalan {

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#faf8f5] px-6 text-center text-[#1a1919]">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-white dark:bg-[#0a0a0a] px-6 text-center text-[#1a1919] dark:text-[#f5f5f5] transition-colors duration-200">
       <p className="text-sm font-semibold tracking-widest text-[#d9381e] uppercase">
         Galat 404
       </p>

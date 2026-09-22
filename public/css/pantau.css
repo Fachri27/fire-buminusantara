@@ -56,6 +56,10 @@
   scrollbar-color: rgb(255 255 255 / 0.18) transparent;
 }
 
+html:not(.dark) .pantau-rel {
+  scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
+}
+
 .pantau-rel::-webkit-scrollbar {
   width: 8px;
 }
@@ -67,6 +71,60 @@
 .pantau-rel::-webkit-scrollbar-thumb {
   background: rgb(255 255 255 / 0.14);
   border-radius: 8px;
+}
+
+html:not(.dark) .pantau-rel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.14);
+}
+
+html:not(.dark) .pantau-rel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+/* ── Titik bara adaptif ─────────────────────────────────────────────────── */
+html:not(.dark) .pantau-titik {
+  background-image: radial-gradient(circle, rgb(230 50 40 / 0.35) 1px, transparent 1.4px);
+}
+
+/* ── Adaptasi Kontrol & Panel Dasbor Pantau (/peta) untuk Light Mode ───── */
+html:not(.dark) .pantau-rel.border-white\/10,
+html:not(.dark) .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html:not(.dark) .ring-white\/10 {
+  --tw-ring-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html:not(.dark) .ring-white\/15 {
+  --tw-ring-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+html:not(.dark) input.bg-\[\#141414\],
+html:not(.dark) .bg-\[\#141414\] {
+  background-color: #ffffff !important;
+  color: #1a1919 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+html:not(.dark) input.bg-\[\#141414\]::placeholder {
+  color: #777777 !important;
+}
+
+html:not(.dark) .bg-white\/5 {
+  background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+html:not(.dark) .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+html:not(.dark) .bg-white\/15 {
+  background-color: rgba(0, 0, 0, 0.09) !important;
+}
+
+html:not(.dark) .hover\:bg-white\/10:hover {
+  background-color: rgba(0, 0, 0, 0.06) !important;
 }
 
 /* Gerak yang diminta dikurangi: denyutnya mati, titiknya tetap menyala. */

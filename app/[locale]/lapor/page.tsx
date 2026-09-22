@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BAHASA, TEKS_LAPOR, TEKS_NAV, adaBahasa, type Bahasa } from "@/lib/bahasa";
 import { FormLaporan } from "./form-laporan";
+import { SakelarTema } from "@/components/sakelar-tema";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -66,9 +67,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // yang berbahasa turun ke dalam <Suspense>.
 export default function HalamanLapor({ params }: Props) {
   return (
-    // <html> berlatar gelap untuk panggung beranda; halaman ini bidang tulis,
-    // jadi ia membawa alas terangnya sendiri.
-    <div className="min-h-screen bg-[#faf8f5] text-tinta">
+    // Bidang halaman lapor — mendukung mode terang dan gelap
+    <div className="min-h-screen bg-white text-tinta dark:bg-[#0a0a0a] dark:text-[#f5f5f5] transition-colors duration-200">
       <Suspense fallback={<KerangkaKop />}>
         <KopLokal params={params} />
       </Suspense>
@@ -100,7 +100,7 @@ async function IsiLapor({ params }: Props) {
       <h1 className="text-[clamp(24px,6vw,32px)] leading-tight font-semibold">
         {teks.judulHalaman}
       </h1>
-      <p className="mt-3 mb-9 max-w-[52ch] text-[14px] leading-[1.6] text-tinta/60">
+      <p className="mt-3 mb-9 max-w-[52ch] text-[14px] leading-[1.6] text-tinta/60 dark:text-[#a0a0a0]">
         {teks.catatan}
       </p>
 
@@ -114,7 +114,7 @@ async function IsiLapor({ params }: Props) {
 function KerangkaKop() {
   return (
     <header className="sticky top-0 z-50 h-16 w-full border-b border-black/[0.06]
-                       bg-white/85 backdrop-blur-md" />
+                       bg-white/85 dark:border-white/10 dark:bg-pantau-konsol/90 backdrop-blur-md" />
   );
 }
 
@@ -126,8 +126,8 @@ function KerangkaIsi() {
     <div role="status">
       <p className="sr-only">Memuat formulir laporan…</p>
       <div aria-hidden="true">
-        <div className="h-[clamp(24px,6vw,32px)] w-3/4 animate-pulse rounded bg-black/[0.06]" />
-        <div className="mt-3 mb-9 h-[42px] max-w-[52ch] animate-pulse rounded bg-black/[0.04]" />
+        <div className="h-[clamp(24px,6vw,32px)] w-3/4 animate-pulse rounded bg-black/[0.06] dark:bg-white/10" />
+        <div className="mt-3 mb-9 h-[42px] max-w-[52ch] animate-pulse rounded bg-black/[0.04] dark:bg-white/5" />
       </div>
     </div>
   );
@@ -138,36 +138,41 @@ function KerangkaIsi() {
  *
  * Nav beranda berisi tautan yang menggulir ke #beranda dan #peta; di halaman
  * ini kedua bagian itu tidak ada, jadi tautannya akan diam saja saat ditekan.
- * Yang dibutuhkan di sini cuma dua: jalan pulang, dan penukar bahasa.
+ * Yang dibutuhkan di sini: jalan pulang, penukar bahasa, dan sakelar tema.
  */
 function KopLapor({ bahasa }: { bahasa: Bahasa }) {
   const teks = TEKS_NAV[bahasa];
 
   return (
-    <header className="sticky top-0 z-50 h-16 w-full border-b border-black/[0.06] bg-white/85 backdrop-blur-md">
+    <header className="sticky top-0 z-50 h-16 w-full border-b border-black/[0.06] bg-white/85 dark:border-white/10 dark:bg-pantau-konsol/90 backdrop-blur-md">
       <div className="mx-auto flex h-full max-w-[680px] items-center justify-between gap-4 px-[var(--pias)]">
         {/* Pulang ke halaman utama (konsol peta) — /beranda ditutup proxy. */}
         <Link href={`/${bahasa}`}
-              className="text-[13px] font-semibold text-tinta/70 underline-offset-4 transition-colors hover:text-tinta">
+              className="text-[13px] font-semibold text-tinta/70 dark:text-white/70 underline-offset-4 transition-colors hover:text-tinta dark:hover:text-white">
           ← {teks.bagian.beranda}
         </Link>
 
-        <div role="group" aria-label={teks.ganti}
-             className="flex items-center rounded-full border border-black/[0.06] bg-black/[0.04] p-0.5 text-xs font-bold">
-          {BAHASA.map((kode) =>
-            kode === bahasa ? (
-              <span key={kode} aria-current="true"
-                    className="rounded-full bg-[#ff5a26] px-2.5 py-0.5 uppercase text-white">
-                {kode}
-              </span>
-            ) : (
-              <Link key={kode} href={`/${kode}/lapor`}
-                    aria-label={`${teks.ganti} (${kode.toUpperCase()})`}
-                    className="rounded-full px-2.5 py-0.5 uppercase text-tinta/50 transition-colors hover:text-tinta">
-                {kode}
-              </Link>
-            ),
-          )}
+        <div className="flex items-center gap-2">
+          <div role="group" aria-label={teks.ganti}
+               className="flex items-center rounded-full border border-black/[0.06] bg-black/[0.04] dark:border-white/10 dark:bg-white/[0.05] p-0.5 text-xs font-bold">
+            {BAHASA.map((kode) =>
+              kode === bahasa ? (
+                <span key={kode} aria-current="true"
+                      className="rounded-full bg-[#ff5a26] px-2.5 py-0.5 uppercase text-white shadow-xs">
+                  {kode}
+                </span>
+              ) : (
+                <Link key={kode} href={`/${kode}/lapor`}
+                      aria-label={`${teks.ganti} (${kode.toUpperCase()})`}
+                      className="rounded-full px-2.5 py-0.5 uppercase text-tinta/50 dark:text-white/60 transition-colors hover:text-tinta dark:hover:text-white">
+                  {kode}
+                </Link>
+              ),
+            )}
+          </div>
+
+          {/* Sakelar Tema tepat di samping penukar bahasa */}
+          <SakelarTema bahasa={bahasa} />
         </div>
       </div>
     </header>
