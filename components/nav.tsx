@@ -154,16 +154,21 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
 
   /* Klik di luar bilah ikut menutup. Wajib ada sejak sakelarnya bersembunyi di
      panggung selagi kolom terbuka: tanpa ini Escape jadi satu-satunya jalan
-     keluar, dan itu tidak kelihatan bagi yang memakai tetikus. */
+     keluar, dan itu tidak kelihatan bagi yang memakai tetikus.
+     Hanya selagi kolomnya KOSONG: begitu ada kata kunci, hasilnya (umpan yang
+     tersaring) justru di luar bilah — menutup di mousedown mengosongkan
+     saringan sebelum klik mendarat, jadi hasilnya tak pernah bisa diklik.
+     Silang dan Escape tetap menutup. */
+  const cariBerisi = (cari?.nilai.trim() ?? "") !== "";
   useEffect(() => {
-    if (!cariTerbuka) return;
+    if (!cariTerbuka || cariBerisi) return;
     const diLuar = (e: MouseEvent) => {
       const sasaran = e.target as HTMLElement | null;
       if (!sasaran?.closest?.("header")) setCariTerbuka?.(false);
     };
     document.addEventListener("mousedown", diLuar);
     return () => document.removeEventListener("mousedown", diLuar);
-  }, [cariTerbuka, setCariTerbuka]);
+  }, [cariTerbuka, cariBerisi, setCariTerbuka]);
 
   /** Tukar prefiks bahasa pada URL */
   const tautanBahasa = useCallback(
