@@ -5,6 +5,7 @@ import type { Bahasa } from "@/lib/bahasa";
 import { TEKS } from "./teks";
 import type { Laporan } from "./tipe";
 import { IkonBagikan, IkonCentang, IkonJempol, IkonKomentar } from "./ikon";
+import { aturHitung, bacaHitung, useHitungHidup } from "./hitung-hidup";
 
 /* Id laporan yang sudah disukai perangkat ini — hanya untuk menyalakan
    jempol; server yang menjaga satu suka per perangkat (ip + user agent). */
@@ -53,23 +54,25 @@ export function AksiKartu({ laporan: l, bahasa, onKomentar }: {
     timer.current = window.setTimeout(() => setTersalin(false), 2000);
   };
   const disukai = useSyncExternalStore(langganSuka, () => bacaSuka().includes(l.id), () => false);
-  // Selisih dari angka umpan (optimistis, lalu dikoreksi jawaban server).
-  const [selisih, setSelisih] = useState(0);
-  const jumlahSuka = Math.max(0, (l.suka ?? 0) + selisih);
+  // Angka hidup (/api/hitung), angka umpan yang di-cache hanya cadangan.
+  const hidup = useHitungHidup(l.id);
+  const jumlahSuka = hidup?.suka ?? l.suka ?? 0;
+  const komentar = hidup?.komentar ?? l.komentar ?? 0;
 
   async function alihSuka() {
     const suka = !disukai;
+    const sebelum = bacaHitung(l.id)?.suka ?? l.suka ?? 0;
     tulisSuka(l.id, suka);
-    setSelisih((n) => n + (suka ? 1 : -1));
+    aturHitung(l.id, { komentar, suka: Math.max(0, sebelum + (suka ? 1 : -1)) });
     try {
       const r = await fetch(`/api/laporan/${l.id}/suka`, { method: suka ? "POST" : "DELETE" });
       if (r.status === 429) return; // ketukan beruntun: biarkan tampilan optimistis
       if (!r.ok) throw new Error();
       const j = (await r.json()) as { jumlah?: number };
-      if (typeof j.jumlah === "number") setSelisih(j.jumlah - (l.suka ?? 0));
+      if (typeof j.jumlah === "number") aturHitung(l.id, { suka: j.jumlah });
     } catch {
       tulisSuka(l.id, !suka);
-      setSelisih((n) => n - (suka ? 1 : -1));
+      aturHitung(l.id, { suka: sebelum });
     }
   }
 
@@ -86,7 +89,6 @@ export function AksiKartu({ laporan: l, bahasa, onKomentar }: {
 
   const tombol =
     "lk-aksi-tombol cursor-pointer rounded-full text-tinta transition hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-[#ff5a26] dark:text-[#f5f5f5] dark:hover:bg-white/10";
-  const komentar = l.komentar ?? 0;
   const angka = new Intl.NumberFormat(bahasa === "en" ? "en" : "id-ID", { notation: "compact" });
 
   return (

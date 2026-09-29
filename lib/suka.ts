@@ -72,3 +72,21 @@ export async function daftarSuka(halaman = 1, batas = 20): Promise<{ daftar: Bar
     })),
   };
 }
+
+/** Jumlah suka & komentar tersetujui terkini untuk sekumpulan kejadian —
+ *  tanpa cache, untuk angka hidup di kartu umpan. */
+export async function hitungLangsung(ids: number[]): Promise<Record<number, { suka: number; komentar: number }>> {
+  const [suka, komentar] = await Promise.all([
+    prisma.event_likes.groupBy({ by: ["event_id"], where: { event_id: { in: ids } }, _count: true }),
+    prisma.comments.groupBy({
+      by: ["commentable_id"],
+      where: { commentable_type: "App\\Models\\Event", is_approved: true, commentable_id: { in: ids } },
+      _count: true,
+    }),
+  ]);
+  const hasil: Record<number, { suka: number; komentar: number }> = {};
+  for (const id of ids) hasil[id] = { suka: 0, komentar: 0 };
+  for (const s of suka) hasil[Number(s.event_id)].suka = s._count;
+  for (const k of komentar) if (k.commentable_id != null) hasil[Number(k.commentable_id)].komentar = k._count;
+  return hasil;
+}
