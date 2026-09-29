@@ -27,10 +27,10 @@ import { mediaLokal } from "@/lib/media";
 import { TEKS } from "./landing-karhutla/teks";
 import { UKURAN_FOTO_UMPAN, VideoOtomatis } from "./landing-karhutla/video-otomatis";
 import { UmpanMasonry } from "./landing-karhutla/umpan-masonry";
+import { AksiKartu } from "./landing-karhutla/aksi-kartu";
 import { KomposerLapor } from "./landing-karhutla/komposer-lapor";
 import { IsiSaranLokasi } from "./landing-karhutla/saran-lokasi";
 import { TabRelKiri } from "./landing-karhutla/tab-rel-kiri";
-import { LembarKomentar } from "./landing-karhutla/lembar-komentar";
 import { useCuacaLokal } from "./landing-karhutla/gunakan-cuaca";
 import { useAliran } from "./landing-karhutla/gunakan-aliran";
 import type { Laporan, SaranLokasi } from "./landing-karhutla/tipe";
@@ -385,6 +385,9 @@ export function LandingKarhutla(
   // /fire/<slug> supaya bisa dibagikan, kembali ke halaman ASAL saat ditutup
   // (rute mana pun yang me-render komponen ini: /, /karhutla, /panel).
   const [sorot, setSorot] = useState<Berita | null>(kejadianAwal ?? null);
+  /* Dibuka lewat tombol komentar kartu (bukan tap media): lembar komentar
+     seluler langsung terbuka; desktop memang inline. Direset saat tutup. */
+  const [sorotKomentar, setSorotKomentar] = useState(false);
   /* Provinsi yang ditekan di peta — pop-upnya tumbuh dari titik layar itu,
      pola yang sama dengan konsol /peta. */
   const [wilayah, setWilayah] = useState<
@@ -406,6 +409,7 @@ export function LandingKarhutla(
   );
   const tutupRincian = useCallback(() => {
     setSorot(null);
+    setSorotKomentar(false);
     if (typeof window !== "undefined") {
       const pathBeranda = `/${bahasa}`;
       const pathKembali =
@@ -430,6 +434,7 @@ export function LandingKarhutla(
         muatPenuh();
       }
       setSorot(null);
+      setSorotKomentar(false);
     };
     window.addEventListener("popstate", saatPopState);
     return () => window.removeEventListener("popstate", saatPopState);
@@ -732,7 +737,18 @@ export function LandingKarhutla(
     },
     [bukaDariId],
   );
-  const [komentarId, setKomentarId] = useState<number | null>(null);
+  /* Tombol komentar kartu umpan: langsung ke rincian laporannya (bukan lembar
+     kecil) — desktop komentarnya inline, seluler lembarnya langsung dibuka
+     via komentarAwal. */
+  const bukaKomentar = useCallback(
+    (id: number) => {
+      const asli = berita.find((b) => b.id === id);
+      if (!asli) return;
+      setSorotKomentar(true);
+      bukaRincian(asli);
+    },
+    [berita, bukaRincian],
+  );
 
   return (
     <div className={`lk-bingkai${tampil === "panel" ? " lk-mode-panel" : ""} min-h-dvh bg-white text-tinta dark:bg-[#0a0a0a] dark:text-[#f5f5f5] pt-16 antialiased`}>
@@ -1319,6 +1335,9 @@ export function LandingKarhutla(
                     </span>
                   )}
                   </div>
+                  {/* Baris aksi ala IG tepat di bawah media: suka, komentar
+                      (+angka asli), bagikan ulang, salin tautan, simpan. */}
+                  <AksiKartu laporan={l} bahasa={bahasa} onKomentar={() => bukaKomentar(l.id)} />
                 </article>
               )}
             />
@@ -1406,6 +1425,7 @@ export function LandingKarhutla(
           totalKejadian={urutanNav.length}
           beritaSebelumnya={adaSebelumnya ? urutanNav[indeksSorot - 1] : undefined}
           beritaBerikutnya={adaBerikutnya ? urutanNav[indeksSorot + 1] : undefined}
+          komentarAwal={sorotKomentar}
         />
       )}
 
@@ -1430,15 +1450,6 @@ export function LandingKarhutla(
         />
       )}
 
-
-      {/* Lembar komentar seluler dari ikon komentar postingan. */}
-      {komentarId !== null && (
-        <LembarKomentar
-          id={komentarId}
-          bahasa={bahasa}
-          onTutup={() => setKomentarId(null)}
-        />
-      )}
     </div>
   );
 }

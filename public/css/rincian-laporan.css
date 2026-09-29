@@ -1564,22 +1564,38 @@ html.dark .rincian .rincian__anonim .rincian__saklar-jalur,
 
 /* Lencana jumlah komentar di puncak tombolnya — memberi tahu isi lembar
    bawah tanpa harus membukanya. Cukup di ponsel; tombolnya memang tak
-   dirender di desktop. */
+   dirender di desktop.
+
+   Ukurannya sengaja jauh di bawah tombolnya (14px
+   lawan 32px): pada 16px ia terbaca sebagai lingkaran kedua, bukan penanda.
+   Menjoroknya pun tinggal 3px supaya sisa jaraknya ke tombol bagikan (8px
+   antar-tombol) tetap lebih lebar daripada lencananya sendiri.
+
+   Cincinnya memakai warna rel, bukan putih transparan: di rel gelap putih
+   20% terbaca sebagai halo, di rel terang ia hilang. Dengan warna rel,
+   lencananya tampak dilubangkan dari permukaan di kedua tema.
+
+   Angkanya dipusatkan grid, bukan line-height — line-height 14px pada kotak
+   16px menyisakan selisih 1px yang terlihat pada angka sekecil ini. */
 .rincian__komentar-jumlah {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border: 1px solid rgb(255 255 255 / 0.2);
+  top: -3px;
+  right: -3px;
+  display: grid;
+  place-items: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border: 2px solid var(--r-rel);
   border-radius: 999px;
   background: var(--color-pantau-bara, #ff5a26);
   color: #fff;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  line-height: 14px;
-  text-align: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 /* --- Toast "Link tersalin" ------------------------------------------------

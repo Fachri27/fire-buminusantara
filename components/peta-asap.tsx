@@ -1393,41 +1393,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     });
 
     const perbaruiAngka = () => {
-      const activeMap = mapRef.current;
-      if (!activeMap || !angkaMarkersRef.current.length) return;
-
-      const ANGKA_SELA = 12;
+      // Semua angka SELALU tampil, berapa pun padatnya: penyembunyian
+      // anti-tumpuk (kelas peta-angka--bertumpuk) dimatikan atas permintaan —
+      // di zoom Nusantara label provinsi kecil memang bisa bersinggungan,
+      // tapi semuanya tetap kelihatan dan terbaca penuh saat di-zoom.
       for (const a of angkaMarkersRef.current) {
         a.el.classList.remove("peta-angka--bertumpuk");
-      }
-
-      const kotak = angkaMarkersRef.current.map((a, urut) => {
-        const isi = a.el.firstElementChild as HTMLElement | null;
-        const pusat = activeMap.project(a.titik);
-        const d = a.kotak;
-        const ka = activeMap.project([d[0], d[3]]);
-        const kb = activeMap.project([d[2], d[1]]);
-        return {
-          urut,
-          x: pusat.x,
-          y: pusat.y,
-          w: (isi ? isi.offsetWidth : 0) + ANGKA_SELA,
-          h: (isi ? isi.offsetHeight : 0) + ANGKA_SELA,
-          luas: Math.abs(kb.x - ka.x) * Math.abs(kb.y - ka.y),
-        };
-      });
-
-      kotak.sort((a, b) => b.luas - a.luas);
-      const ditempatkan: Array<{ x: number; y: number; w: number; h: number }> = [];
-      for (const c of kotak) {
-        const bertumpuk = ditempatkan.some(
-          (t) => Math.abs(c.x - t.x) * 2 < c.w + t.w && Math.abs(c.y - t.y) * 2 < c.h + t.h
-        );
-        if (bertumpuk) {
-          angkaMarkersRef.current[c.urut].el.classList.add("peta-angka--bertumpuk");
-        } else {
-          ditempatkan.push(c);
-        }
       }
     };
 

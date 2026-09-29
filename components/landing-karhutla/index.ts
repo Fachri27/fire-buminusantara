@@ -8,11 +8,13 @@ export {
   IkonCari, IkonLokasi, IkonTutup, IkonCuaca, IkonFoto, IkonVideo, IkonPin,
   IkonOrang, IkonSuara, IkonBisu, IkonUlang, IkonPutarBadge, IkonBagikan,
   IkonBeranda, IkonPlus, IkonTulis, IkonPanel, IkonUmpan,
+  IkonSuka, IkonKomentar, IkonKirim, IkonSimpan, IkonCentang,
 } from "./ikon";
 export { VideoOtomatis, UKURAN_FOTO_UMPAN } from "./video-otomatis";
 export { TampilanPostingan } from "./tampilan-postingan";
 export { LembarKomentar } from "./lembar-komentar";
 export { UmpanMasonry } from "./umpan-masonry";
+export { AksiKartu } from "./aksi-kartu";
 export { KomposerLapor } from "./komposer-lapor";
 export { IsiSaranLokasi } from "./saran-lokasi";
 export { TabRelKiri } from "./tab-rel-kiri";
