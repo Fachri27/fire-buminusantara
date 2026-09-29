@@ -479,9 +479,8 @@
 }
 
 /* ── Baris aksi kartu umpan ala IG ──────────────────────────────────────────
-   Tepat di bawah media: hati, komentar (+angka), repost, kirim — simpan di
-   kanan. Urutan flex diatur per breakpoint di bawah (selalu sesudah media).
-   Suka aktif merah khas IG; simpan aktif mengisi tintanya sendiri. */
+   Tepat di bawah media: komentar (+angka), bagikan. Urutan flex diatur per
+   breakpoint di bawah (selalu sesudah media). */
 .lk-kartu-aksi {
   display: flex;
   align-items: center;
@@ -497,7 +496,7 @@
   gap: 0.3rem;
   min-width: 0;
   min-height: 2.5rem;
-  padding: 0.375rem 0.3rem;
+  padding: 0.375rem 0.125rem;
 }
 
 /* Kolom umpan sempit (seluler 2 kolom): ikon 22px — bertiga muat sebaris
@@ -539,10 +538,6 @@
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-}
-
-.lk-aksi-aktif-suka {
-  color: #ff3040;
 }
 
 @media (prefers-reduced-motion: reduce) {

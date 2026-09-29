@@ -8,7 +8,7 @@ export {
   IkonCari, IkonLokasi, IkonTutup, IkonCuaca, IkonFoto, IkonVideo, IkonPin,
   IkonOrang, IkonSuara, IkonBisu, IkonUlang, IkonPutarBadge, IkonBagikan,
   IkonBeranda, IkonPlus, IkonTulis, IkonPanel, IkonUmpan,
-  IkonSuka, IkonKomentar, IkonKirim, IkonSimpan, IkonCentang,
+  IkonKomentar, IkonSimpan, IkonCentang,
 } from "./ikon";
 export { VideoOtomatis, UKURAN_FOTO_UMPAN } from "./video-otomatis";
 export { TampilanPostingan } from "./tampilan-postingan";

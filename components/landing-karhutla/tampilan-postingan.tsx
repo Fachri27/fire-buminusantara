@@ -11,8 +11,8 @@ import type { Laporan } from "./tipe";
 
 /* Tampilan "Postingan" seluler ala IG — dibuka dari tap gambar di umpan
    (desktop langsung ke rincian). Bilah kembali + judul, baris penulis,
-   media selebar layar (dots ketuk, tanpa geser), baris aksi (suka
-   perangkat-lokal, komentar, bagikan), caption + selengkapnya + tanggal. */
+   media selebar layar (dots ketuk, tanpa geser), baris aksi (komentar,
+   bagikan), caption + selengkapnya + tanggal. */
 export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomentar, onPrev, onNext, statis = false }: {
   laporan: Laporan;
   bahasa: Bahasa;

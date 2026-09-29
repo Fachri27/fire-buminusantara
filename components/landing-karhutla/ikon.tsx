@@ -150,10 +150,10 @@ export function IkonBagikan({ className = "size-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"
          strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="6" cy="12" r="2.5" />
-      <circle cx="18" cy="6" r="2.5" />
-      <circle cx="18" cy="18" r="2.5" />
-      <path d="m8.2 10.8 7.6-3.6M8.2 13.2l7.6 3.6" />
+      <circle cx="7" cy="12" r="2.75" />
+      <circle cx="17" cy="6" r="2.75" />
+      <circle cx="17" cy="18" r="2.75" />
+      <path d="m9.4 10.6 5.2-3.2M9.4 13.4l5.2 3.2" />
     </svg>
   );
 }
@@ -218,31 +218,12 @@ export function IkonUmpan({ className = "size-7" }: { className?: string }) {
 }
 
 /* Ikon baris aksi kartu umpan ala IG — garis 1.9, 24px. Varian `aktif`
-   mengisi bentuknya (suka merah, simpan tinta) tanpa ikon terpisah. */
-export function IkonSuka({ aktif = false, className = "size-6" }: { aktif?: boolean; className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" fill={aktif ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9"
-         strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M12 20.5s-7.4-4.6-9.2-9C1.6 8.2 3.6 5.2 6.9 5.2c1.9 0 3.6 1.1 5.1 2.9 1.5-1.8 3.2-2.9 5.1-2.9 3.3 0 5.3 3 4.1 6.3-1.8 4.4-9.2 9-9.2 9Z" />
-    </svg>
-  );
-}
-
+   mengisi bentuknya (simpan tinta) tanpa ikon terpisah. */
 export function IkonKomentar({ className = "size-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
          strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
-    </svg>
-  );
-}
-
-export function IkonKirim({ className = "size-6" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
-         strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M22 2 11 13" />
-      <path d="M22 2 15 22l-4-9-9-4Z" />
     </svg>
   );
 }
