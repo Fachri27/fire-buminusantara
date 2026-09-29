@@ -478,6 +478,79 @@
   min-width: 0;
 }
 
+/* ── Baris aksi kartu umpan ala IG ──────────────────────────────────────────
+   Tepat di bawah media: hati, komentar (+angka), repost, kirim — simpan di
+   kanan. Urutan flex diatur per breakpoint di bawah (selalu sesudah media).
+   Suka aktif merah khas IG; simpan aktif mengisi tintanya sendiri. */
+.lk-kartu-aksi {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.lk-aksi-tombol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 0.3rem;
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.3rem;
+}
+
+/* Kolom umpan sempit (seluler 2 kolom): ikon 22px — bertiga muat sebaris
+   dengan sisa ruang, sejak tombol simpan dilepas. */
+.lk-kartu-aksi svg {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+
+/* Tombol komentar yang sudah berisi: ikon garis biasa + lencana oranye
+   (tanpa lingkaran latar). Tanpa komentar: ikon garis tanpa lencana. */
+.lk-aksi-komentar-ada {
+  position: relative;
+}
+
+/* Lencana jumlah komentar. Menempel di bahu kanan-atas IKON — dipatok ke
+   .lk-aksi-ikon-bungkus, bukan ke tombolnya: tombol setinggi 40px membuat
+   lencana melayang di atas ikon 22px, terbaca sebagai benda terpisah. Angkanya berlebar digit seragam supaya tak bergeser
+   saat jumlahnya berubah. */
+.lk-aksi-ikon-bungkus {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.lk-aksi-lencana {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  display: grid;
+  place-items: center;
+  min-width: 0.875rem;
+  height: 0.875rem;
+  padding-inline: 0.1875rem;
+  border-radius: 999px;
+  background: #ff5a26;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.lk-aksi-aktif-suka {
+  color: #ff3040;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk-aksi-tombol {
+    transition: none;
+  }
+}
+
 /* Sela masonry desktop 1rem — antar-kolom dan antar-kartu sama, supaya
    kisi terbaca rata. (0.5rem terasa mepet, 1.2rem terlalu renggang.)
    Seluler punya selanya sendiri di bawah. */
@@ -496,6 +569,11 @@
 
   .lk-kartu-media {
     order: 2;
+  }
+
+  .lk-kartu-aksi {
+    order: 3;
+    margin-top: 0.5rem;
   }
 }
 
@@ -665,9 +743,15 @@
     order: 1;
   }
 
-  .lk-kartu-teks {
+  /* Aksi tepat di bawah foto (urutan IG: foto → aksi → teks), teks sesudahnya. */
+  .lk-kartu-aksi {
     order: 2;
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .lk-kartu-teks {
+    order: 3;
+    margin-top: 0.375rem;
   }
 
   .lk-kartu-media .lk-foto {

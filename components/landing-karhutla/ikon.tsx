@@ -216,3 +216,51 @@ export function IkonUmpan({ className = "size-7" }: { className?: string }) {
     </svg>
   );
 }
+
+/* Ikon baris aksi kartu umpan ala IG — garis 1.9, 24px. Varian `aktif`
+   mengisi bentuknya (suka merah, simpan tinta) tanpa ikon terpisah. */
+export function IkonSuka({ aktif = false, className = "size-6" }: { aktif?: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill={aktif ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 20.5s-7.4-4.6-9.2-9C1.6 8.2 3.6 5.2 6.9 5.2c1.9 0 3.6 1.1 5.1 2.9 1.5-1.8 3.2-2.9 5.1-2.9 3.3 0 5.3 3 4.1 6.3-1.8 4.4-9.2 9-9.2 9Z" />
+    </svg>
+  );
+}
+
+export function IkonKomentar({ className = "size-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
+    </svg>
+  );
+}
+
+export function IkonKirim({ className = "size-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4Z" />
+    </svg>
+  );
+}
+
+export function IkonSimpan({ aktif = false, className = "size-6" }: { aktif?: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill={aktif ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M19 21l-7-4.5L5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />
+    </svg>
+  );
+}
+
+export function IkonCentang({ className = "size-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}

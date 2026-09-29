@@ -38,10 +38,14 @@ export function RincianLaporan({
   totalKejadian,
   beritaSebelumnya,
   beritaBerikutnya,
+  komentarAwal = false,
 }: {
   berita: Berita;
   bahasa?: Bahasa;
   onTutup: () => void;
+  /** true = lembar komentar seluler langsung terbuka (dari tombol komentar
+   *  kartu umpan). Desktop tak terpengaruh: komentarnya memang inline. */
+  komentarAwal?: boolean;
   /** true = rel kanan abu gelap (#1e1e1e) senada konsol /peta. Bawaan false
    *  supaya beranda dan /fire tetap putih. */
   gelap?: boolean;
@@ -50,7 +54,7 @@ export function RincianLaporan({
   // Di ponsel komentar pindah dari rel ke lembar bawah: tombol komentar di
   // bilah atas membukanya setinggi ±70% layar (komentar + kolom kirim).
   const ponsel = usePonsel();
-  const [sheetKomentar, setSheetKomentar] = useState(false);
+  const [sheetKomentar, setSheetKomentar] = useState(komentarAwal);
   // Kolom kirim TIDAK terbuka bawaannya — lembar komentar hanya daftar, plus
   // baris pemicu. Formulirnya muncul saat pemicu ditekan atau saat membalas,
   // dan menutup kembali setelah terkirim.
