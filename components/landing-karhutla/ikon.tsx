@@ -217,13 +217,14 @@ export function IkonUmpan({ className = "size-7" }: { className?: string }) {
   );
 }
 
-/* Ikon baris aksi kartu umpan ala IG — garis 1.9, 24px. Varian `aktif`
+/* Ikon baris aksi kartu umpan ala IG — garis 1.9, 24px. Komentar = gelembung
+   bulat berekor kanan-bawah, geometri ikon komentar IG. Varian `aktif`
    mengisi bentuknya (simpan tinta) tanpa ikon terpisah. */
 export function IkonKomentar({ className = "size-6" }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.9"
          strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" />
+      <path d="M20.66 17.01a10 10 0 1 0-3.6 3.61L22 22Z" />
     </svg>
   );
 }

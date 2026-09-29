@@ -485,7 +485,8 @@
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 0;
+  /* Sela antar-ikon ala IG (~14px dengan padding tombol). */
+  gap: 0.625rem;
 }
 
 .lk-aksi-tombol {
@@ -504,6 +505,13 @@
 .lk-kartu-aksi svg {
   width: 1.375rem;
   height: 1.375rem;
+}
+
+/* Glif simpul hanya ~16/24 viewBox, gelembung komentar ~20/24 — dibesarkan
+   supaya bobot optisnya setara. */
+.lk-aksi-bagikan svg {
+  width: 1.625rem;
+  height: 1.625rem;
 }
 
 /* Tombol komentar yang sudah berisi: ikon garis biasa + lencana oranye

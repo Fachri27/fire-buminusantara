@@ -64,7 +64,7 @@ export function AksiKartu({ laporan: l, bahasa, onKomentar }: {
         type="button"
         aria-label={tersalin ? t.lembarTersalin : t.salinTautan}
         onClick={salinTautan}
-        className={tombol}
+        className={`${tombol} lk-aksi-bagikan`}
       >
         {tersalin ? <IkonCentang /> : <IkonBagikan />}
       </button>
