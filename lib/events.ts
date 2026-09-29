@@ -39,6 +39,8 @@ export type Berita = {
   /** Jumlah komentar tersetujui — hanya diisi ambilUmpan (urutan "komentar
    *  terbanyak" di umpan). Kosong di sumber lain, dibaca sebagai 0. */
   jumlahKomentar?: number;
+  /** Jumlah suka (jempol) — hanya diisi ambilUmpan, sama seperti komentar. */
+  jumlahSuka?: number;
 };
 
 /** Pemformat tanggal per bahasa — dipilih sesuai locale, bukan hardcode id-ID.
@@ -221,7 +223,7 @@ export async function ambilUmpan(bahasa: Bahasa = "id"): Promise<Berita[]> {
     return BERITA_CONTOH;
   }
 
-  const [semua, hitung] = await Promise.all([
+  const [semua, hitung, hitungSuka] = await Promise.all([
     prisma.events.findMany({
       where: TAYANG,
       orderBy: [{ event_date: "desc" }, { id: "desc" }],
@@ -233,15 +235,18 @@ export async function ambilUmpan(bahasa: Bahasa = "id"): Promise<Berita[]> {
       where: { commentable_type: "App\\Models\\Event", is_approved: true, commentable_id: { not: null } },
       _count: true,
     }),
+    prisma.event_likes.groupBy({ by: ["event_id"], _count: true }),
   ]);
 
   const jumlahKomentar = new Map<number, number>();
   for (const h of hitung) {
     if (h.commentable_id != null) jumlahKomentar.set(Number(h.commentable_id), h._count);
   }
+  const jumlahSuka = new Map(hitungSuka.map((h) => [Number(h.event_id), h._count]));
   return semua.map((b) => ({
     ...keBerita(b as Baris, bahasa),
     jumlahKomentar: jumlahKomentar.get(Number(b.id)) ?? 0,
+    jumlahSuka: jumlahSuka.get(Number(b.id)) ?? 0,
   }));
 }
 

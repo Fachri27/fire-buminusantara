@@ -50,6 +50,7 @@ model events {
   status           events_status      @default(published)
   created_at       DateTime?          @db.Timestamp(0)
   updated_at       DateTime?          @db.Timestamp(0)
+  event_likes      event_likes[]
 
   @@index([event_date], map: "events_event_date_index")
   @@index([status, event_date(sort: Desc)], map: "events_status_event_date_index")
@@ -95,6 +96,21 @@ model comment_reactions {
   @@unique([comment_id, user_id], map: "comment_reactions_comment_id_user_id_unique")
   @@index([comment_id, ip_address], map: "comment_reactions_comment_id_ip_address_index")
   @@index([user_id], map: "comment_reactions_user_id_foreign")
+}
+
+/// Suka (jempol) pengunjung pada kejadian — satu per perangkat
+/// (visitor_hash = sha256(ip|user agent)) per kejadian. Tabel milik CMS ini.
+model event_likes {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  event_id     BigInt    @db.UnsignedBigInt
+  visitor_hash String    @db.Char(64)
+  ip_address   String?   @db.VarChar(45)
+  user_agent   String?   @db.VarChar(512)
+  created_at   DateTime? @db.Timestamp(0)
+  events       events    @relation(fields: [event_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "event_likes_event_id_foreign")
+
+  @@unique([event_id, visitor_hash], map: "event_likes_event_id_visitor_hash_unique")
+  @@index([created_at], map: "event_likes_created_at_index")
 }
 
 enum users_role {

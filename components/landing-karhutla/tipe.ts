@@ -18,6 +18,8 @@ export type Laporan = {
   pulau?: string | null;
   /** Jumlah komentar — kunci urutan "komentar terbanyak" umpan. */
   komentar?: number;
+  /** Jumlah suka (jempol). */
+  suka?: number;
 };
 
 /** Satu saran lokasi dari pencarian wilayah BMKG/Kemendagri. */

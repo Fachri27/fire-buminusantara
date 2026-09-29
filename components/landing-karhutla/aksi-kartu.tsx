@@ -1,14 +1,43 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import type { Bahasa } from "@/lib/bahasa";
 import { TEKS } from "./teks";
 import type { Laporan } from "./tipe";
-import { IkonBagikan, IkonCentang, IkonKomentar } from "./ikon";
+import { IkonBagikan, IkonCentang, IkonJempol, IkonKomentar } from "./ikon";
 
-/* Baris aksi kartu umpan ala IG — di bawah media, di atas teks (mobile) atau
-   di bawah media (desktop). Komentar = angka asli + langsung ke rincian
-   laporan, bagikan = salin tautan. */
+/* Id laporan yang sudah disukai perangkat ini — hanya untuk menyalakan
+   jempol; server yang menjaga satu suka per perangkat (ip + user agent). */
+const KUNCI_SUKA = "lk-suka";
+function bacaSuka(): number[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(KUNCI_SUKA) ?? "[]");
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+function tulisSuka(id: number, suka: boolean) {
+  try {
+    const lain = bacaSuka().filter((x) => x !== id);
+    localStorage.setItem(KUNCI_SUKA, JSON.stringify(suka ? [...lain, id] : lain));
+  } catch {
+    /* penyimpanan diblokir */
+  }
+  window.dispatchEvent(new Event(KUNCI_SUKA));
+}
+function langganSuka(ubah: () => void) {
+  window.addEventListener(KUNCI_SUKA, ubah);
+  window.addEventListener("storage", ubah);
+  return () => {
+    window.removeEventListener(KUNCI_SUKA, ubah);
+    window.removeEventListener("storage", ubah);
+  };
+}
+
+/* Baris aksi kartu umpan — di bawah media. Kiri: suka (jempol), komentar
+   (langsung ke rincian laporan), bagikan (salin tautan). Angka suka &
+   komentar tepat di kanan ikonnya. */
 export function AksiKartu({ laporan: l, bahasa, onKomentar }: {
   laporan: Laporan;
   bahasa: Bahasa;
@@ -23,6 +52,27 @@ export function AksiKartu({ laporan: l, bahasa, onKomentar }: {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setTersalin(false), 2000);
   };
+  const disukai = useSyncExternalStore(langganSuka, () => bacaSuka().includes(l.id), () => false);
+  // Selisih dari angka umpan (optimistis, lalu dikoreksi jawaban server).
+  const [selisih, setSelisih] = useState(0);
+  const jumlahSuka = Math.max(0, (l.suka ?? 0) + selisih);
+
+  async function alihSuka() {
+    const suka = !disukai;
+    tulisSuka(l.id, suka);
+    setSelisih((n) => n + (suka ? 1 : -1));
+    try {
+      const r = await fetch(`/api/laporan/${l.id}/suka`, { method: suka ? "POST" : "DELETE" });
+      if (r.status === 429) return; // ketukan beruntun: biarkan tampilan optimistis
+      if (!r.ok) throw new Error();
+      const j = (await r.json()) as { jumlah?: number };
+      if (typeof j.jumlah === "number") setSelisih(j.jumlah - (l.suka ?? 0));
+    } catch {
+      tulisSuka(l.id, !suka);
+      setSelisih((n) => n - (suka ? 1 : -1));
+    }
+  }
+
   const tautan = () => `${window.location.origin}${l.href}`;
 
   async function salinTautan() {
@@ -37,28 +87,28 @@ export function AksiKartu({ laporan: l, bahasa, onKomentar }: {
   const tombol =
     "lk-aksi-tombol cursor-pointer rounded-full text-tinta transition hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-[#ff5a26] dark:text-[#f5f5f5] dark:hover:bg-white/10";
   const komentar = l.komentar ?? 0;
-  const angkaKomentar =
-    komentar > 0
-      ? new Intl.NumberFormat(bahasa === "en" ? "en" : "id-ID", { notation: "compact" }).format(komentar)
-      : null;
+  const angka = new Intl.NumberFormat(bahasa === "en" ? "en" : "id-ID", { notation: "compact" });
 
   return (
     <div className="lk-kartu-aksi">
       <button
         type="button"
-        aria-label={angkaKomentar !== null ? `${t.komentar} (${angkaKomentar})` : t.komentar}
-        onClick={onKomentar}
-        className={`${tombol}${angkaKomentar !== null ? " lk-aksi-komentar-ada" : ""}`}
+        aria-label={jumlahSuka > 0 ? `${t.suka} (${angka.format(jumlahSuka)})` : t.suka}
+        aria-pressed={disukai}
+        onClick={alihSuka}
+        className={`${tombol}${disukai ? " lk-aksi-disukai" : ""}`}
       >
-        {/* Ikon + lencana dibungkus wadah setinggi ikonnya: lencana dipatok ke
-            bahu IKON, bukan ke tombol yang jauh lebih tinggi (40px) — di sana
-            ia melayang beberapa piksel di atas ikonnya. */}
-        <span className="lk-aksi-ikon-bungkus">
-          <IkonKomentar />
-          {angkaKomentar !== null && (
-            <span aria-hidden="true" className="lk-aksi-lencana">{angkaKomentar}</span>
-          )}
-        </span>
+        <IkonJempol aktif={disukai} />
+        {jumlahSuka > 0 && <span aria-hidden="true" className="lk-aksi-angka">{angka.format(jumlahSuka)}</span>}
+      </button>
+      <button
+        type="button"
+        aria-label={komentar > 0 ? `${t.komentar} (${angka.format(komentar)})` : t.komentar}
+        onClick={onKomentar}
+        className={tombol}
+      >
+        <IkonKomentar />
+        {komentar > 0 && <span aria-hidden="true" className="lk-aksi-angka">{angka.format(komentar)}</span>}
       </button>
       <button
         type="button"

@@ -642,6 +642,7 @@ export function LandingKarhutla(
           href: b.slug ? `/${bahasa}/fire/${b.slug}` : `/${bahasa}`,
           pulau: b.pulau,
           komentar: b.jumlahKomentar ?? 0,
+          suka: b.jumlahSuka ?? 0,
         };
       }),
     [berita, bahasa],
@@ -1332,8 +1333,8 @@ export function LandingKarhutla(
                     </span>
                   )}
                   </div>
-                  {/* Baris aksi ala IG tepat di bawah media: komentar
-                      (+angka asli), bagikan (salin tautan). */}
+                  {/* Baris aksi tepat di bawah media: suka, komentar,
+                      bagikan; jumlah suka & komentar di kanan ala LinkedIn. */}
                   <AksiKartu laporan={l} bahasa={bahasa} onKomentar={() => bukaKomentar(l.id)} />
                 </article>
               )}

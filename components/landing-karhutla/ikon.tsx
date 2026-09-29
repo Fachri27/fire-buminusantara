@@ -229,6 +229,17 @@ export function IkonKomentar({ className = "size-6" }: { className?: string }) {
   );
 }
 
+/** Jempol (suka) — garis 1.9; `aktif` mengisi bentuknya. */
+export function IkonJempol({ aktif = false, className = "size-6" }: { aktif?: boolean; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill={aktif ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9"
+         strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" />
+      <path d="M7 10l4-7.5a2.3 2.3 0 0 1 3 2.6L13.2 9H19a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 17.7 21H7" />
+    </svg>
+  );
+}
+
 export function IkonSimpan({ aktif = false, className = "size-6" }: { aktif?: boolean; className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" fill={aktif ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.9"
