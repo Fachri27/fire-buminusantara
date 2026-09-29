@@ -731,6 +731,27 @@
   .lk-kartu-aksi {
     order: 2;
     margin-top: 0.25rem;
+    gap: 0.5rem;
+  }
+
+  /* Kolom seluler ~170px: ikon 22px + angka 14px terlalu besar untuk
+     kartunya. Diperkecil seimbang: ikon 18px, simpul 21px, angka 12px. */
+  .lk-kartu-aksi svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
+
+  .lk-kartu-aksi .lk-aksi-bagikan svg {
+    width: 1.3125rem;
+    height: 1.3125rem;
+  }
+
+  .lk-aksi-angka {
+    font-size: 0.75rem;
+  }
+
+  .lk-aksi-tombol {
+    min-height: 2.25rem;
   }
 
   .lk-kartu-teks {
