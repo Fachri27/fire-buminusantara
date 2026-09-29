@@ -13,7 +13,6 @@ export default async function Statistik() {
       <KopHalaman
         mata="Konten"
         judul="Angka sorotan karhutla"
-        catatan="Enam angka kartu statistik di landing karhutla — dari sumber luar (sipongi/BNPB/dll), disalin manual ke sini. Kosong = 5.000."
       />
       <FormSorotan awal={awal} />
     </div>

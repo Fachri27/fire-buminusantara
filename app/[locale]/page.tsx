@@ -80,7 +80,7 @@ export default async function Halaman({ params }: Props) {
       jumlahLaporan={jumlahLaporan}
       berita={berita.slice(0, UMPAN_AWAL)}
       totalBerita={berita.length}
-      sorotan={sorotan}
+      statistik={sorotan[locale]}
       kolomAwal={kolomAwal}
     />
   );

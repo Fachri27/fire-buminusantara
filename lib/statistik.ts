@@ -11,7 +11,7 @@ export type Statistik = {
 /**
  * Isi strip statistik, per bahasa.
  *
- * Angka tetap (belum ada tabelnya di CMS). `nilai` = angka besar, `keterangan`
+ * Bawaan strip; CMS (/admin/statistik) menimpanya. `nilai` = angka besar, `keterangan`
  * = penjelas di bawahnya, lengkap dengan sumbernya dalam kurung. `tanggal` dan
  * `label` dikosongkan: rentangnya musiman (Jan-Jul, Jan-Agu 2026), bukan
  * "angka hari ini", jadi tak ada eyebrow tanggal harian maupun judul kartu —
@@ -20,7 +20,7 @@ export type Statistik = {
  * Angkanya sendiri (nilai) diformat sesuai bahasa: id memakai koma desimal &
  * titik ribuan ("Rp 123,1 triliun"), en memakai gaya Inggris.
  */
-const DATA: Record<Bahasa, Statistik[]> = {
+export const BAWAN_STATISTIK: Record<Bahasa, Statistik[]> = {
   id: [
     { tanggal: "", label: "", nilai: "321K+ ha", keterangan: "area terbakar Jan-Jul 2026 (MapBiomas Indonesia)" },
     { tanggal: "", label: "", nilai: "Rp 123,1 triliun", keterangan: "estimasi kerugian ekonomi dan biaya kesehatan akibat karhutla Jan-Agu 2026 (CELIOS)" },
@@ -35,8 +35,7 @@ const DATA: Record<Bahasa, Statistik[]> = {
   ],
 };
 
-/** Ditaruh di berkas tersendiri supaya jelas mana yang nanti perlu diganti
- *  sumber sungguhan, cukup mengubah satu tabel tanpa menyentuh komponennya. */
+/** Bawaan bila CMS belum diisi — isi sungguhan dari lib/statistik-sorotan.ts. */
 export function ambilStatistik(bahasa: Bahasa): Statistik[] {
-  return DATA[bahasa];
+  return BAWAN_STATISTIK[bahasa];
 }

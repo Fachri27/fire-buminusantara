@@ -227,7 +227,7 @@ async function IsiHalaman({
         jumlahLaporan={jumlahLaporan}
         berita={daftarBerita}
         totalBerita={semuaBerita.length}
-        sorotan={sorotan}
+        statistik={sorotan[bahasa]}
         kejadianAwal={kejadian}
         kolomAwal={kolomAwal}
       />

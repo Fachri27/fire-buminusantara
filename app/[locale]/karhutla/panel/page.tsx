@@ -91,7 +91,7 @@ export default async function HalamanPanel({ params }: Props) {
         jumlahLaporan={jumlahLaporan}
         berita={berita.slice(0, UMPAN_AWAL)}
         totalBerita={berita.length}
-        sorotan={sorotan}
+        statistik={sorotan[locale]}
         tampil="panel"
         kolomAwal={kolomAwal}
       />

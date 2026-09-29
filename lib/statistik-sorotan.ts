@@ -1,71 +1,79 @@
 import { cacheLife, cacheTag } from "next/cache";
+import { BAHASA, type Bahasa } from "./bahasa";
 import { prisma } from "./prisma";
-import {
-  BAWAN_SOROTAN, KUNCI_SOROTAN, LABEL_SOROTAN,
-  type KunciSorotan,
-} from "./statistik-sorotan-teks";
+import { BAWAN_STATISTIK, type Statistik } from "./statistik";
 
-export { BAWAN_SOROTAN, KUNCI_SOROTAN, LABEL_SOROTAN, type KunciSorotan };
+/** Kartu strip statistik landing, per bahasa. */
+export type Sorotan = Record<Bahasa, Statistik[]>;
+
+/** Banyak kartu tetap — sama dengan bawaan; form CMS mengisi sejumlah ini. */
+export const JUMLAH_KARTU = BAWAN_STATISTIK.id.length;
+const MAKS_NILAI = 40;
+const MAKS_KETERANGAN = 300;
+
+type Kartu = { nilai: string; keterangan: string };
+
+function kartuSah(k: unknown): k is Kartu {
+  const x = k as Partial<Kartu> | null;
+  return typeof x?.nilai === "string" && x.nilai !== "" && typeof x.keterangan === "string" && x.keterangan !== "";
+}
+
+/** JSON dari basis data → Sorotan. Bahasa yang isinya rusak/kurang jatuh ke bawaannya. */
+function rapikan(kartu: unknown): Sorotan {
+  const hasil = {} as Sorotan;
+  for (const b of BAHASA) {
+    const daftar = (kartu as Record<string, unknown> | null)?.[b];
+    hasil[b] = Array.isArray(daftar) && daftar.length === JUMLAH_KARTU && daftar.every(kartuSah)
+      ? daftar.map(({ nilai, keterangan }) => ({ tanggal: "", label: "", nilai, keterangan }))
+      : BAWAN_STATISTIK[b];
+  }
+  return hasil;
+}
 
 /** Satu baris hidup (id terkecil); kosong/gagal = bawaan. TAK PERNAH
  *  melempar: galat basis data (pool habis, tabel belum migrasi, dsb) hanya
- *  berarti angka bawaan — halaman publik tidak boleh 500 karenanya.
+ *  berarti isi bawaan — halaman publik tidak boleh 500 karenanya.
  *
  *  Di-cache dengan tag "sorotan", bukan cache dalam-memori per-instans
  *  (yang membuat simpanan CMS tak kunjung tampil di instans lain): aksi
- *  simpan CMS memanggil updateTag("sorotan"), jadi angka baru langsung
+ *  simpan CMS memanggil updateTag("sorotan"), jadi isi baru langsung
  *  tampil. Galat hanya di-cache sebentar supaya bawaan tidak tertahan. */
-export async function ambilSorotan(): Promise<Record<KunciSorotan, number>> {
+export async function ambilSorotan(): Promise<Sorotan> {
   "use cache";
   cacheTag("sorotan");
   try {
-    const baris = await prisma.sorotan_statistik.findFirst({ orderBy: { id: "asc" } });
+    const baris = await prisma.sorotan_statistik.findFirst({ orderBy: { id: "asc" }, select: { kartu: true } });
     cacheLife("hours");
-    if (!baris) return { ...BAWAN_SOROTAN };
-    return {
-      hotspot: Number(baris.hotspot),
-      api_aktif: Number(baris.api_aktif),
-      lahan_terbakar: Number(baris.lahan_terbakar),
-      korban_ispa: Number(baris.korban_ispa),
-      rugi_ekonomi: Number(baris.rugi_ekonomi),
-      korban_satwa: Number(baris.korban_satwa),
-    };
+    return rapikan(baris?.kartu ?? null);
   } catch {
     cacheLife("seconds");
-    return { ...BAWAN_SOROTAN };
+    return rapikan(null);
   }
 }
 
-/** Angka ala Indonesia ("5.000", "5,5") maupun Inggris ("5,000", "5.5"):
- *  koma selalu desimal; titik ribuan kecuali jelas desimal (1-2 digit). */
-function bacaAngka(mentah: string): number | null {
-  const s = mentah.trim();
-  if (s === "") return null;
-  let normal = s;
-  if (s.includes(",")) {
-    normal = s.replace(/\./g, "").replace(",", ".");
-  } else if (!/^\d+\.\d{1,2}$/.test(s)) {
-    normal = s.replace(/\./g, "");
-  }
-  const angka = Number(normal);
-  return Number.isFinite(angka) ? angka : null;
-}
-
-/** Simpan dari FormData CMS. Semua kunci wajib angka ≥ 0. */
+/** Simpan dari FormData CMS: `nilai_<bahasa>_<i>` dan `keterangan_<bahasa>_<i>`, semua wajib. */
 export async function simpanSorotan(
   masukan: FormData,
-): Promise<{ ok: true } | { ok: false; galat: string; bidang?: KunciSorotan }> {
-  const nilai = {} as Record<KunciSorotan, number>;
-  for (const kunci of KUNCI_SOROTAN) {
-    const angka = bacaAngka(String(masukan.get(kunci) ?? ""));
-    if (angka === null || angka < 0) {
-      return { ok: false, galat: `"${LABEL_SOROTAN[kunci].id}" harus angka ≥ 0.`, bidang: kunci };
+): Promise<{ ok: true } | { ok: false; galat: string; bidang?: string }> {
+  const kartu = {} as Record<Bahasa, Kartu[]>;
+  for (const b of BAHASA) {
+    kartu[b] = [];
+    for (let i = 0; i < JUMLAH_KARTU; i++) {
+      const nilai = String(masukan.get(`nilai_${b}_${i}`) ?? "").trim();
+      const keterangan = String(masukan.get(`keterangan_${b}_${i}`) ?? "").trim();
+      const nama = `Kartu ${i + 1} (${b.toUpperCase()})`;
+      if (nilai === "" || nilai.length > MAKS_NILAI) {
+        return { ok: false, galat: `${nama}: angka wajib diisi, maks. ${MAKS_NILAI} karakter.`, bidang: `nilai_${b}_${i}` };
+      }
+      if (keterangan === "" || keterangan.length > MAKS_KETERANGAN) {
+        return { ok: false, galat: `${nama}: keterangan wajib diisi, maks. ${MAKS_KETERANGAN} karakter.`, bidang: `keterangan_${b}_${i}` };
+      }
+      kartu[b].push({ nilai, keterangan });
     }
-    nilai[kunci] = angka;
   }
 
   const ada = await prisma.sorotan_statistik.findFirst({ orderBy: { id: "asc" }, select: { id: true } });
-  const data = { ...nilai, updated_at: new Date() };
+  const data = { kartu, updated_at: new Date() };
   if (ada) {
     await prisma.sorotan_statistik.update({ where: { id: ada.id }, data });
   } else {

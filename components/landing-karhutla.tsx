@@ -10,7 +10,6 @@ import { Peta } from "@/components/peta";
 import { Nav } from "@/components/nav";
 import { gunakanKolomUmpan } from "@/hooks/gunakan-kolom-umpan";
 import { ambilStatistik, type Statistik as DataStatistik } from "@/lib/statistik";
-import type { KunciSorotan } from "@/lib/statistik-sorotan-teks";
 import { type Bahasa } from "@/lib/bahasa";
 import type { Berita } from "@/lib/events";
 import { waktuIso, waktuTeks } from "@/lib/tanggal";
@@ -84,9 +83,7 @@ export function LandingKarhutla(
     /** "semua" = dasbor (desktop dua rel; seluler hanya daftar laporan);
         "panel" = halaman panel situasi saja (peta+cuaca+statistik). */
     tampil?: "semua" | "panel";
-    /** Enam angka kartu statistik dari CMS (bawaan 5.000 bila kosong). */
-    sorotan?: Record<KunciSorotan, number>;
-    /** Empat angka kartu statistik historis. */
+    /** Kartu strip statistik dari CMS (bawaan lib/statistik.ts). */
     statistik?: DataStatistik[];
     /** Kejadian awal yang langsung dibuka saat halaman dimuat (mis. rute /fire/<slug>). */
     kejadianAwal?: Berita | null;
@@ -1335,8 +1332,8 @@ export function LandingKarhutla(
                     </span>
                   )}
                   </div>
-                  {/* Baris aksi ala IG tepat di bawah media: suka, komentar
-                      (+angka asli), bagikan ulang, salin tautan, simpan. */}
+                  {/* Baris aksi ala IG tepat di bawah media: komentar
+                      (+angka asli), bagikan (salin tautan). */}
                   <AksiKartu laporan={l} bahasa={bahasa} onKomentar={() => bukaKomentar(l.id)} />
                 </article>
               )}
