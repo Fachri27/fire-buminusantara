@@ -1027,7 +1027,7 @@ export function LandingKarhutla(
           {/* Sumur lokasi + cuaca: panel abu di atas latar hitam, pil lokasi
               yang lebih gelap di dalamnya — sesuai rujukan. mx-4: blok ini
               sengaja lebih sempit dan menengah dibanding peta di atasnya. */}
-          <div className="mx-4 mt-3 rounded-xl bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-[#1e1e1e] dark:border-white/10 dark:text-[#f5f5f5] p-5">
+          <div className="mx-4 mt-3 rounded-xl bg-white border border-black/[0.50] text-tinta shadow-sm dark:bg-[#1e1e1e] dark:border-white/10 dark:text-[#f5f5f5] p-5">
             <div
               ref={wadahSelectRef}
               className={`lk-lokasi relative hidden panggung:flex items-center gap-3 rounded-xl px-5 py-4 text-[13px] sm:text-[15px] transition-all ${
@@ -1169,7 +1169,7 @@ export function LandingKarhutla(
                 meluber 31px di 1440x900 dan kaki halaman terpotong — rel boleh
                 menggulir di layar pendek, tapi di ukuran desain tak perlu. */}
             {daftarStatistik.map((s, idx) => (
-              <div key={s.keterangan || idx} className="flex min-w-0 flex-col justify-center rounded-xl bg-white border border-black/[0.06] text-tinta shadow-sm dark:bg-[#1e1e1e] dark:border-white/10 dark:text-[#f5f5f5] px-3 py-5 text-center">
+              <div key={s.keterangan || idx} className="flex min-w-0 flex-col justify-center rounded-xl bg-white border border-black/[0.50] text-tinta shadow-sm dark:bg-[#1e1e1e] dark:border-white/10 dark:text-[#f5f5f5] px-3 py-5 text-center">
                 <dd className="lk-angka order-1 text-[clamp(18px,1.5vw,28px)] leading-tight font-medium text-tinta dark:text-[#f5f5f5]">
                   {s.nilai}
                 </dd>
