@@ -64,24 +64,34 @@ export function FormKejadian({
   const [saran, setSaran] = useState<SaranTitik | null>(null);
   const [mengenali, setMengenali] = useState(false);
 
-  // Galeri berkas baru hidup di sini, bukan di isi <input type="file">:
-  // begitu form dikirim, isi input DOM langsung diserialisasi, sedangkan
-  // daftar kartunya masih bisa diedit. Berkas dilampirkan dari state ini di
-  // kirimFormulir() — input pemilihnya sendiri tak bernama dan tak pernah ikut
-  // diserialisasi — jadi kartu yang tampil selalu persis berkas yang terkirim.
-  const [mediaBaru, setMediaBaru] = useState<ItemBaruGaleri[]>([]);
+  // Galeri media dikelola dalam satu state berurutan (baik media tersimpan maupun baru):
+  // pengguna bisa mengatur urutan (geser kiri/kanan, drag & drop, atau 'Jadikan Pertama'),
+  // dan item nomor 01 menjadi media utama yang tampil pertama di korsel/kartu.
+  const [daftarMedia, setDaftarMedia] = useState<ItemGaleriForm[]>(() => {
+    return awal.galeri.map((m, i) => ({
+      id: `tersimpan-${i}`,
+      tipe: "tersimpan" as const,
+      indeksAsli: i,
+      path: m.path ?? "",
+      jenis: m.jenis,
+      url: m.url,
+      poster: m.poster,
+      keterangan: m.keterangan ?? "",
+      dibuang: false,
+    }));
+  });
 
-  // URL objek menahan berkasnya di memori sampai dilepas. Pencabutan hanya
-  // saat unmount — cleanup yang jalan di tiap perubahan daftar akan mencabut
-  // URL yang masih dipakai pratinjau (termasuk tangkapan bingkai yang sedang
-  // berjalan). Berkas yang dibuang manual dicabut sendiri di hapusBaru().
-  const rujukMediaBaru = useRef(mediaBaru);
+  const rujukDaftarMedia = useRef(daftarMedia);
   useEffect(() => {
-    rujukMediaBaru.current = mediaBaru;
-  }, [mediaBaru]);
+    rujukDaftarMedia.current = daftarMedia;
+  }, [daftarMedia]);
   useEffect(() => {
     return () => {
-      rujukMediaBaru.current.forEach((b) => URL.revokeObjectURL(b.url));
+      rujukDaftarMedia.current.forEach((b) => {
+        if (b.tipe === "baru" && b.url) {
+          URL.revokeObjectURL(b.url);
+        }
+      });
     };
   }, []);
 
@@ -134,11 +144,24 @@ export function FormKejadian({
     return () => clearTimeout(tundaSaran.current);
   }, [lat, lng]);
 
-  // Lampirkan berkas galeri dari state, bukan dari input berkasnya. Ini juga
-  // melepas ketergantungan pada mutasi input.files lewat DataTransfer, yang
-  // tidak didukung semua peramban.
+  // Lampirkan berkas galeri dan urutan eksplisit dari state.
   function kirimFormulir(data: FormData) {
-    for (const b of mediaBaru) data.append("media_files", b.berkas);
+    const aktif = daftarMedia.filter((m) => !m.dibuang);
+
+    let baruIdx = 0;
+    for (const item of aktif) {
+      if (item.tipe === "baru" && item.berkas) {
+        data.append("media_files", item.berkas);
+        data.append("media_desc_baru", item.keterangan || "");
+        data.append("media_urutan", `baru:${baruIdx}`);
+        baruIdx++;
+      } else if (item.tipe === "tersimpan" && item.indeksAsli !== undefined) {
+        data.append("media_urutan", `lama:${item.indeksAsli}`);
+        data.append(`media_desc_${item.indeksAsli}`, item.keterangan || "");
+        data.append("keep_media", String(item.indeksAsli));
+      }
+    }
+
     return aksi(data);
   }
 
@@ -279,7 +302,7 @@ export function FormKejadian({
       </Bagian>
 
       <Bagian nomor="03" judul="Media">
-        <Galeri tersimpan={awal.galeri} baru={mediaBaru} setBaru={setMediaBaru} />
+        <Galeri daftar={daftarMedia} setDaftar={setDaftarMedia} />
       </Bagian>
 
       {/* Bilah aksi menempel di dasar layar: form ini panjang, dan tombol simpan
@@ -325,15 +348,19 @@ function Bagian({ nomor, judul, children }: { nomor: string; judul: string; chil
   );
 }
 
-type ItemBaruGaleri = {
+export type ItemGaleriForm = {
   id: string;
-  berkas: File;
-  nama: string;
+  tipe: "tersimpan" | "baru";
+  indeksAsli?: number;
+  path?: string;
+  berkas?: File;
+  nama?: string;
+  jenis: "gambar" | "video";
   url: string;
-  video: boolean;
-  /** Bingkai pertama video, ditangkap di peramban — poster pratinjau sebelum tersimpan. */
+  poster?: string;
   bingkai?: string;
-  keterangan?: string;
+  keterangan: string;
+  dibuang?: boolean;
 };
 
 /**
@@ -396,57 +423,47 @@ function bingkaiLokal(url: string): Promise<string | null> {
 }
 
 /**
- * Galeri media: beberapa foto/video per kejadian.
- *
- * Yang sudah tersimpan dirender sebagai kotak centang `keep_media` bernilai
- * INDEKS — melepas centang berarti berkasnya dibuang saat disimpan. Tiap berkas
- * punya isian `media_desc_<indeks>` (tersimpan) / `media_desc_baru` (baru,
- * dijumlah urut sama dengan berkas baru) untuk keterangannya. Berkas baru
- * masuk lewat satu input multiple yang TERAKUMULASI ke state induk tanpa
- * menghapus pilihan sebelumnya; menghapus kartu cukup membuangnya dari state.
- *
- * Selama pengiriman pending semua kontrol galeri dikunci: isi form sudah
- * diserialisasi saat tombol simpan ditekan, jadi melepas centang atau
- * membatalkan berkas setelahnya tidak mengubah kiriman yang sedang terbang —
- * tanpa kunci ini hapus-media tampak "tidak berfungsi" karena hasil simpannya
- * memuat lagi media yang sudah dibuang dari layar.
+ * Galeri media interaktif dengan kemampuan menentukan urutan tampil:
+ * - Media nomor 01 otomatis menjadi media utama yang tampil pertama di korsel/kartu publik.
+ * - Pengguna bisa menggeser kartu dengan drag-and-drop, tombol panah (← / →), atau tombol pintas "★ Tampil pertama".
+ * - Berkas baru maupun tersimpan dikelola bersama dalam satu daftar terurut.
  */
 function Galeri({
-  tersimpan, baru, setBaru,
+  daftar,
+  setDaftar,
 }: {
-  tersimpan: ItemMedia[];
-  baru: ItemBaruGaleri[];
-  setBaru: Dispatch<SetStateAction<ItemBaruGaleri[]>>;
+  daftar: ItemGaleriForm[];
+  setDaftar: Dispatch<SetStateAction<ItemGaleriForm[]>>;
 }) {
   const { pending: mengirim } = useFormStatus();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [sedangTarikBerkas, setSedangTarikBerkas] = useState(false);
 
   function pilih(berkasList: FileList | null) {
     if (!berkasList || berkasList.length === 0) return;
 
-    const tambahan: ItemBaruGaleri[] = Array.from(berkasList).map((f) => ({
-      id: `${f.name}-${f.size}-${Date.now()}-${Math.random()}`,
+    const tambahan: ItemGaleriForm[] = Array.from(berkasList).map((f) => ({
+      id: `baru-${f.name}-${f.size}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      tipe: "baru",
       berkas: f,
       nama: f.name,
+      jenis: f.type.startsWith("video/") ? "video" : "gambar",
       url: URL.createObjectURL(f),
-      video: f.type.startsWith("video/"),
       keterangan: "",
     }));
 
-    // Pemilihnya dikosongkan supaya berkas yang sama bisa dipilih lagi di
-    // pemilihan berikutnya. Daftar kartunya hidup di state induk — yang dikirim
-    // ke server pun dari sana (lihat kirimFormulir), bukan dari isi input ini.
     if (inputRef.current) inputRef.current.value = "";
 
-    setBaru((lama) => [...lama, ...tambahan]);
+    setDaftar((lama) => [...lama, ...tambahan]);
 
-    // Poster pratinjau untuk video baru ditangkap di belakang; bila berhasil,
-    // kartu video berganti dari <video> ke gambar statis tanpa perlu disimpan.
+    // Poster pratinjau untuk video baru ditangkap di belakang
     for (const item of tambahan) {
-      if (!item.video) continue;
+      if (item.jenis !== "video") continue;
       void bingkaiLokal(item.url).then((dataUrl) => {
         if (!dataUrl) return;
-        setBaru((lama) =>
+        setDaftar((lama) =>
           lama.map((b) => (b.id === item.id ? { ...b, bingkai: dataUrl } : b)),
         );
       });
@@ -454,200 +471,362 @@ function Galeri({
   }
 
   function hapusBaru(id: string) {
-    const target = baru.find((b) => b.id === id);
-    if (target) URL.revokeObjectURL(target.url);
-    setBaru((lama) => lama.filter((b) => b.id !== id));
+    const target = daftar.find((b) => b.id === id);
+    if (target?.url) URL.revokeObjectURL(target.url);
+    setDaftar((lama) => lama.filter((b) => b.id !== id));
   }
+
+  function toggleBuang(id: string) {
+    setDaftar((lama) =>
+      lama.map((b) => (b.id === id ? { ...b, dibuang: !b.dibuang } : b)),
+    );
+  }
+
+  function jadikanPertama(id: string) {
+    setDaftar((prev) => {
+      const idx = prev.findIndex((m) => m.id === id);
+      if (idx <= 0) return prev;
+      const target = prev[idx];
+      const sisa = prev.filter((_, i) => i !== idx);
+      return [target, ...sisa];
+    });
+  }
+
+  function geser(id: string, arah: -1 | 1) {
+    setDaftar((prev) => {
+      const idx = prev.findIndex((m) => m.id === id);
+      if (idx < 0) return prev;
+      const targetIdx = idx + arah;
+      if (targetIdx < 0 || targetIdx >= prev.length) return prev;
+      const salinan = [...prev];
+      const temp = salinan[targetIdx];
+      salinan[targetIdx] = salinan[idx];
+      salinan[idx] = temp;
+      return salinan;
+    });
+  }
+
+  function ubahKeterangan(id: string, teks: string) {
+    setDaftar((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, keterangan: teks } : b)),
+    );
+  }
+
+  function handleDragStart(e: React.DragEvent, id: string) {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+  }
+
+  function handleDragOver(e: React.DragEvent, id: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverId !== id) {
+      setDragOverId(id);
+    }
+  }
+
+  function handleDragLeave(_e: React.DragEvent, id: string) {
+    if (dragOverId === id) {
+      setDragOverId(null);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    setDragOverId(null);
+    const sourceId = draggedId || e.dataTransfer.getData("text/plain");
+    if (!sourceId || sourceId === targetId) return;
+
+    setDaftar((prev) => {
+      const sourceIdx = prev.findIndex((m) => m.id === sourceId);
+      const targetIdx = prev.findIndex((m) => m.id === targetId);
+      if (sourceIdx < 0 || targetIdx < 0) return prev;
+
+      const salinan = [...prev];
+      const [item] = salinan.splice(sourceIdx, 1);
+      salinan.splice(targetIdx, 0, item);
+      return salinan;
+    });
+    setDraggedId(null);
+  }
+
+  function handleDragEnd() {
+    setDraggedId(null);
+    setDragOverId(null);
+  }
+
+  const aktif = daftar.filter((m) => !m.dibuang);
 
   return (
     <div>
-      <label htmlFor="media_files" className="cms-mata mb-1.5 block">
-        Galeri media
-      </label>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <label htmlFor="media_files" className="cms-mata block">
+          Galeri Media ({aktif.length} aktif)
+        </label>
+        <span className="text-[12px] text-[var(--redup)]">
+          Media nomor <strong>01</strong> otomatis tampil pertama di beranda & kartu.
+        </span>
+      </div>
 
-      {tersimpan.length > 0 && (
-        <>
-          <p className="mb-2 text-[12.5px] text-[var(--redup)]">
-            Tersimpan sekarang — lepas centang untuk membuangnya saat disimpan.
-          </p>
-          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {tersimpan.map((m, i) => (
-              <div key={i}
-                   className="overflow-hidden rounded-[3px] border border-[var(--garis-tegas)]
-                              bg-[var(--papan)]">
-                {/* Kotak centang dan gambarnya satu label; isian keterangan
-                    sengaja DI LUAR label — label yang menaungi dua kontrol
-                    membuat klik pada isian ikut menyalakan centangnya. */}
-                <label className="group relative block cursor-pointer
-                                  has-[:focus-visible]:outline has-[:focus-visible]:outline-2
-                                  has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--limau)]
-                                  has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
-                  <input type="checkbox" name="keep_media" value={i} defaultChecked
-                         disabled={mengirim} className="peer sr-only" />
+      {/* Area pilih & drop berkas */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setSedangTarikBerkas(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setSedangTarikBerkas(false);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setSedangTarikBerkas(false);
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            pilih(e.dataTransfer.files);
+          }
+        }}
+        className={`rounded-[3px] border-2 border-dashed p-4 text-center transition-colors ${
+          sedangTarikBerkas
+            ? "border-[var(--limau)] bg-[var(--limau)]/10"
+            : "border-[var(--garis)] bg-[var(--papan)]"
+        }`}
+      >
+        <p className="text-[13px] font-medium text-[var(--jelaga)]">
+          Tarik & lepas foto/video ke sini, atau pilih berkas dari perangkat
+        </p>
+        <div className="mt-2 flex justify-center">
+          <input
+            ref={inputRef}
+            id="media_files"
+            type="file"
+            multiple
+            disabled={mengirim}
+            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+            onChange={(e) => pilih(e.target.files)}
+            className="cms-isian w-full max-w-sm text-[12px] disabled:opacity-60"
+          />
+        </div>
+        <Bantuan>
+          Format JPG, PNG, WEBP, MP4, MOV, WEBM (maksimal 100 MB per berkas). Menambah berkas baru tidak menghapus daftar yang ada.
+        </Bantuan>
+      </div>
 
-                  {/* Yang akan dibuang diredupkan dan diberi cap; tanpa penanda
-                      seperti ini, melepas centang tidak terlihat sama sekali. */}
-                  <div aria-hidden="true"
-                       className="pointer-events-none absolute inset-0 z-[1] bg-[var(--jelaga)]/55
-                                  transition-opacity peer-checked:opacity-0" />
-                  <span aria-hidden="true"
-                        className="cms-cap absolute top-1.5 left-1.5 z-[2] border-white bg-[var(--api)] text-white
-                                   opacity-100 transition-opacity peer-checked:opacity-0">
-                    Dibuang
-                  </span>
+      {/* Daftar kartu media berurutan */}
+      {daftar.length > 0 && (
+        <div className="mt-5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--garis)] pb-2">
+            <p className="cms-mata text-[var(--jelaga)]">
+              Urutan Tampilan ({aktif.length} aktif{daftar.length > aktif.length ? `, ${daftar.length - aktif.length} dibuang` : ""})
+            </p>
+            <p className="text-[11.5px] text-[var(--redup)]">
+              Gunakan drag & drop, tombol panah (← / →), atau tombol <strong>★ Pertama</strong> untuk mengatur urutan.
+            </p>
+          </div>
 
-                  {m.jenis === "video" ? (
-                    m.poster ? (
-                      <div className="relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns */}
-                        <img src={m.poster} alt={`Media ${i + 1}`} className="h-[96px] w-full object-cover" />
-                        <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
-                          <span className="flex size-6 items-center justify-center rounded-full bg-black/60 shadow-xs">
-                            <svg viewBox="0 0 20 20" fill="currentColor" className="ml-0.5 size-3">
-                              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                            </svg>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {daftar.map((m) => {
+              const activeIndex = aktif.findIndex((a) => a.id === m.id);
+              const isFirst = activeIndex === 0;
+              const isLast = activeIndex === aktif.length - 1;
+              const isBeingDragged = draggedId === m.id;
+              const isDragTarget = dragOverId === m.id;
+
+              return (
+                <div
+                  key={m.id}
+                  draggable={!mengirim && !m.dibuang}
+                  onDragStart={(e) => handleDragStart(e, m.id)}
+                  onDragOver={(e) => handleDragOver(e, m.id)}
+                  onDragLeave={(e) => handleDragLeave(e, m.id)}
+                  onDrop={(e) => handleDrop(e, m.id)}
+                  onDragEnd={handleDragEnd}
+                  className={`group relative flex flex-col overflow-hidden rounded-[3px] transition-all ${
+                    m.dibuang
+                      ? "border border-dashed border-[var(--garis)] bg-[var(--kertas)] opacity-60"
+                      : isFirst
+                        ? "border-2 border-[var(--api)] bg-white shadow-md ring-2 ring-[var(--api)]/20"
+                        : "border border-[var(--garis-tegas)] bg-[var(--papan)] hover:border-[var(--redup)]"
+                  } ${isBeingDragged ? "opacity-30 scale-95" : ""} ${
+                    isDragTarget ? "ring-2 ring-[var(--limau)] scale-[1.02]" : ""
+                  }`}
+                >
+                  {/* Bilah status kartu */}
+                  <div className="flex items-center justify-between border-b border-[var(--garis)] bg-[var(--papan)] px-2.5 py-1.5">
+                    <div className="flex items-center gap-1.5">
+                      {m.dibuang ? (
+                        <span className="cms-cap border-[var(--api)] bg-[var(--api)] text-white">
+                          Dibuang
+                        </span>
+                      ) : isFirst ? (
+                        <span className="cms-cap border-[var(--api)] bg-[var(--api)] text-white font-bold tracking-wider">
+                          ★ 01 · TAMPIL PERTAMA
+                        </span>
+                      ) : (
+                        <span className="cms-cap border-[var(--garis-tegas)] bg-white text-[var(--jelaga)] font-semibold">
+                          <span className="cms-angka font-bold">
+                            {String(activeIndex + 1).padStart(2, "0")}
                           </span>
                         </span>
-                      </div>
-                    ) : (
-                      <div className="flex h-[96px] w-full flex-col items-center justify-center bg-[var(--kertas)] text-[var(--redup)]">
-                        <svg viewBox="0 0 20 20" fill="currentColor" className="size-6 opacity-40">
-                          <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                        </svg>
-                        <span className="cms-mata mt-1 text-[10px]">Video {i + 1}</span>
-                      </div>
-                    )
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
-                    <img src={m.url} alt={`Media ${i + 1}`} className="h-[96px] w-full object-cover" />
-                  )}
+                      )}
+                    </div>
 
-                  <p className="cms-mata flex items-center justify-between px-2 py-1.5">
-                    <span>{m.jenis === "video" ? "Video" : "Foto"}</span>
-                    <span className="cms-angka text-[11px] text-[var(--jelaga)]">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                  </p>
-                </label>
-
-                <div className="border-t border-[var(--garis)] bg-[var(--kertas)] p-2">
-                  <label htmlFor={`media_desc_${i}`} className="cms-mata mb-1 block text-[10px] text-[var(--redup)]">
-                    Keterangan media
-                  </label>
-                  <input
-                    id={`media_desc_${i}`}
-                    type="text"
-                    name={`media_desc_${i}`}
-                    defaultValue={m.keterangan ?? ""}
-                    placeholder="Deskripsi / alt teks…"
-                    aria-label={`Keterangan media ${i + 1}`}
-                    className="w-full rounded-[2px] border border-[var(--garis)] bg-white px-2 py-1 text-[11.5px] text-[var(--jelaga)]
-                               outline-none placeholder:text-[var(--lirih)] focus:border-[var(--limau)]"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      <input
-        ref={inputRef}
-        id="media_files"
-        type="file"
-        multiple
-        disabled={mengirim}
-        accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
-        onChange={(e) => pilih(e.target.files)}
-        className="cms-isian w-full disabled:opacity-60"
-      />
-      <Bantuan>
-        Boleh beberapa foto/video sekaligus, maksimal 100 MB per berkas. Memilih berkas
-        lagi akan menambah ke daftar tanpa menghapus pilihan sebelumnya.
-      </Bantuan>
-
-      {baru.length > 0 && (
-        <div className="mt-3">
-          <p className="mb-2 text-[12.5px] font-semibold text-[var(--hijau)]">
-            Berkas baru terpilih ({baru.length}):
-          </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {baru.map((b) => (
-              <div
-                key={b.id}
-                className="group relative overflow-hidden rounded-[3px] border border-[var(--hijau)] bg-[var(--papan)]"
-              >
-                <button
-                  type="button"
-                  onClick={() => hapusBaru(b.id)}
-                  disabled={mengirim}
-                  title="Batalkan berkas ini"
-                  aria-label={`Batalkan ${b.nama}`}
-                  className="absolute top-1 right-1 z-[3] grid size-5 cursor-pointer place-items-center rounded-full
-                             bg-black/60 text-white transition hover:bg-[var(--api)]
-                             disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor" className="size-3">
-                    <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                  </svg>
-                </button>
-
-                <span className="cms-cap absolute top-1 left-1 z-[2] border-[var(--hijau)] bg-[var(--papan)] text-[var(--hijau)] text-[9px]">
-                  Baru
-                </span>
-
-                {b.video ? (
-                  b.bingkai ? (
-                    <div className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element -- pratinjau blob dari createObjectURL — next/image tak bisa memuatnya */}
-                      <img src={b.bingkai} alt="" className="h-[96px] w-full object-cover" />
-                      <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-black/20 text-white">
-                        <span className="flex size-6 items-center justify-center rounded-full bg-black/60 shadow-xs">
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="ml-0.5 size-3">
-                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                          </svg>
+                    <div className="flex items-center gap-1">
+                      {m.tipe === "baru" ? (
+                        <span className="cms-cap border-[var(--hijau)] bg-emerald-50 text-[var(--hijau)] text-[9px]">
+                          Baru
                         </span>
+                      ) : (
+                        <span className="cms-cap border-[var(--garis)] text-[var(--redup)] text-[9px]">
+                          Tersimpan
+                        </span>
+                      )}
+                      <span className="cms-cap border-transparent text-[var(--redup)] text-[9px] uppercase">
+                        {m.jenis === "video" ? "Video" : "Foto"}
                       </span>
                     </div>
-                  ) : (
-                    <div className="flex h-[96px] w-full flex-col items-center justify-center bg-[var(--kertas)] text-[var(--redup)]">
-                      <svg viewBox="0 0 20 20" fill="currentColor" className="size-6 opacity-40">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
-                      </svg>
-                      <span className="cms-mata mt-1 text-[10px]">Video</span>
-                    </div>
-                  )
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element -- pratinjau blob dari createObjectURL — next/image tak bisa memuatnya
-                  <img src={b.url} alt="" className="h-[96px] w-full object-cover" />
-                )}
-                <p className="truncate px-2 pt-1.5 text-[11px] text-[var(--redup)]" title={b.nama}>
-                  {b.nama}
-                </p>
+                  </div>
 
-                <div className="border-t border-[var(--garis)] bg-[var(--kertas)] p-2">
-                  <label htmlFor={`media_desc_baru_${b.id}`} className="cms-mata mb-1 block text-[10px] text-[var(--redup)]">
-                    Keterangan media
-                  </label>
-                  <input
-                    id={`media_desc_baru_${b.id}`}
-                    type="text"
-                    name="media_desc_baru"
-                    value={b.keterangan ?? ""}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setBaru((lama) =>
-                        lama.map((item) => (item.id === b.id ? { ...item, keterangan: val } : item)),
-                      );
-                    }}
-                    placeholder="Deskripsi / alt teks…"
-                    aria-label={`Keterangan ${b.nama}`}
-                    className="w-full rounded-[2px] border border-[var(--garis)] bg-white px-2 py-1 text-[11.5px] text-[var(--jelaga)]
-                               outline-none placeholder:text-[var(--lirih)] focus:border-[var(--hijau)]"
-                  />
+                  {/* Thumbnail / Pratinjau */}
+                  <div className="relative h-[110px] w-full bg-[var(--jelaga)]">
+                    {m.jenis === "video" ? (
+                      m.poster || m.bingkai ? (
+                        <div className="relative h-full w-full">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={m.poster || m.bingkai}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                          <span
+                            aria-hidden="true"
+                            className="absolute inset-0 flex items-center justify-center bg-black/25 text-white"
+                          >
+                            <span className="flex size-7 items-center justify-center rounded-full bg-black/70 shadow-sm">
+                              <svg viewBox="0 0 20 20" fill="currentColor" className="ml-0.5 size-3.5">
+                                <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                              </svg>
+                            </span>
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex h-full w-full flex-col items-center justify-center bg-[var(--kertas)] text-[var(--redup)]">
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="size-6 opacity-40">
+                            <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                          </svg>
+                          <span className="cms-mata mt-1 text-[10px]">Video</span>
+                        </div>
+                      )
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.url} alt="" className="h-full w-full object-cover" />
+                    )}
+
+                    {m.nama && (
+                      <span className="absolute inset-x-0 bottom-0 truncate bg-black/70 px-1.5 py-0.5 text-[10px] text-white/90">
+                        {m.nama}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Tombol aksi & pengurutan */}
+                  <div className="flex items-center justify-between border-t border-[var(--garis)] bg-[var(--papan)] px-2 py-1.5">
+                    {m.dibuang ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleBuang(m.id)}
+                        disabled={mengirim}
+                        className="cms-tombol cms-tombol--kecil w-full justify-center"
+                      >
+                        ↩ Pulihkan
+                      </button>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1">
+                          {!isFirst && (
+                            <button
+                              type="button"
+                              onClick={() => jadikanPertama(m.id)}
+                              disabled={mengirim}
+                              title="Jadikan media ini tampil paling pertama"
+                              className="cms-tombol cms-tombol--kecil text-[11px] font-semibold text-[var(--api)] hover:bg-[var(--api)]/10"
+                            >
+                              ★ Pertama
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => geser(m.id, -1)}
+                            disabled={mengirim || isFirst}
+                            title="Geser ke kiri / urutan lebih awal"
+                            aria-label="Geser ke kiri"
+                            className="cms-tombol cms-tombol--kecil px-2 disabled:opacity-30"
+                          >
+                            ←
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => geser(m.id, 1)}
+                            disabled={mengirim || isLast}
+                            title="Geser ke kanan / urutan berikutnya"
+                            aria-label="Geser ke kanan"
+                            className="cms-tombol cms-tombol--kecil px-2 disabled:opacity-30"
+                          >
+                            →
+                          </button>
+                        </div>
+
+                        <div>
+                          {m.tipe === "baru" ? (
+                            <button
+                              type="button"
+                              onClick={() => hapusBaru(m.id)}
+                              disabled={mengirim}
+                              title="Batalkan berkas ini"
+                              aria-label={`Batalkan ${m.nama || "berkas"}`}
+                              className="cms-tombol cms-tombol--kecil text-[var(--api)] hover:bg-[var(--api)]/10"
+                            >
+                              ✕
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => toggleBuang(m.id)}
+                              disabled={mengirim}
+                              title="Buang berkas ini saat disimpan"
+                              className="cms-tombol cms-tombol--kecil text-[var(--api)] hover:bg-[var(--api)]/10"
+                            >
+                              🗑
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Keterangan / Alt text */}
+                  <div className="border-t border-[var(--garis)] bg-[var(--kertas)] p-2">
+                    <label
+                      htmlFor={`media_desc_${m.id}`}
+                      className="cms-mata mb-1 block text-[10px] text-[var(--redup)]"
+                    >
+                      Keterangan media
+                    </label>
+                    <input
+                      id={`media_desc_${m.id}`}
+                      type="text"
+                      value={m.keterangan}
+                      onChange={(e) => ubahKeterangan(m.id, e.target.value)}
+                      disabled={mengirim || m.dibuang}
+                      placeholder="Deskripsi / alt teks…"
+                      aria-label={`Keterangan media ${activeIndex >= 0 ? activeIndex + 1 : ""}`}
+                      className="w-full rounded-[2px] border border-[var(--garis)] bg-white px-2 py-1 text-[11.5px] text-[var(--jelaga)] outline-none placeholder:text-[var(--lirih)] focus:border-[var(--limau)] disabled:opacity-60"
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

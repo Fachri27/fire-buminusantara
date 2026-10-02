@@ -52,3 +52,9 @@ export async function aksiOrientasi(id: number, url: string, orientasi: Orientas
   await jaga();
   return aturOrientasiLaporan(id, url, orientasi);
 }
+
+/** Atur urutan lampiran laporan warga (atas/bawah/pertama). */
+export async function aksiUrutanLampiran(id: number, url: string, arah: "atas" | "bawah" | "pertama") {
+  await jaga();
+  return (await import("@/lib/laporan-publik")).aturUrutanLampiran(id, url, arah);
+}

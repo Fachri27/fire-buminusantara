@@ -10,6 +10,7 @@ import { HALAMAN, KopHalaman } from "../../kop-halaman";
 import { Segarkan } from "../../segarkan";
 import { TombolVerifikasi } from "../tombol-verifikasi";
 import { PilihOrientasi } from "../pilih-orientasi";
+import { TombolUrutanLampiran } from "../tombol-urutan";
 import { SuntingLaporan } from "../sunting-laporan";
 
 const waktuPanjang = new Intl.DateTimeFormat("id-ID", {
@@ -99,7 +100,12 @@ export default async function RincianLaporan({
                 Pelapor tidak melampirkan foto atau video.
               </p>
             ) : (
-              <LampiranPenuh id={laporan.id} daftar={laporan.lampiran} judul={laporan.judul} />
+              <LampiranPenuh
+                id={laporan.id}
+                daftar={laporan.lampiran}
+                judul={laporan.judul}
+                terkunci={laporan.status !== "pending"}
+              />
             )}
           </Bagian>
         </div>
@@ -203,14 +209,28 @@ function Baris({ label, children }: { label: string; children: React.ReactNode }
  * muat — dibatasi tinggi layar supaya foto potret tidak mendorong sisa halaman
  * jauh ke bawah. Menekan gambar membuka berkas aslinya, ukuran penuh.
  */
-function LampiranPenuh({ id, daftar, judul }: { id: number; daftar: Lampiran[]; judul: string }) {
+function LampiranPenuh({
+  id,
+  daftar,
+  judul,
+  terkunci,
+}: {
+  id: number;
+  daftar: Lampiran[];
+  judul: string;
+  terkunci: boolean;
+}) {
   return (
     <ul className="grid gap-4">
       {daftar.map((m, i) => (
         <li key={m.url}>
-          {/* Orientasi dipilih peninjau: potret atau lanskap. Disimpan ke
-              metadata berkas lewat aksi, dipakai penampil media. */}
-          <PilihOrientasi id={id} url={m.url} nilai={m.orientasi} />
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {/* Orientasi dipilih peninjau: potret atau lanskap. */}
+            <PilihOrientasi id={id} url={m.url} nilai={m.orientasi} />
+            {!terkunci && daftar.length > 1 && (
+              <TombolUrutanLampiran id={id} url={m.url} indeks={i} total={daftar.length} />
+            )}
+          </div>
 
           {m.jenis === "gambar" ? (
             <a href={m.url} target="_blank" rel="noreferrer"

@@ -1,12 +1,12 @@
-import { revalidatePath } from "next/cache";
-import { prisma } from "./prisma";
-import { simpanBerkasGaleri, hapusBerkas } from "./unggah";
-import { bacaBerkasMedia, orientasiKartu, type BerkasMedia } from "./media";
-import { lokasiDariKoordinat } from "./geo";
+import { prisma } from "./prisma.ts";
+import { simpanBerkasGaleri, hapusBerkas } from "./unggah.ts";
+import { bacaBerkasMedia, orientasiKartu, type BerkasMedia } from "./media.ts";
+import { lokasiDariKoordinat } from "./geo.ts";
 
 /** Revalidasi cache halaman beranda dan locale saat data kejadian berubah. */
-export function revalidasiKejadian() {
+export async function revalidasiKejadian() {
   try {
+    const { revalidatePath } = await import("next/cache");
     revalidatePath("/[locale]", "page");
     revalidatePath("/id", "page");
     revalidatePath("/en", "page");
@@ -48,7 +48,7 @@ function berkasTerisi(nilai: FormDataEntryValue | null): File | null {
  * Jika berkas baru gagal diunggah atau database gagal menyimpan, berkas lama
  * tetap utuh dan berkas baru yang sempat terunggah dibersihkan (rollback).
  */
-async function susunGaleri(
+export async function susunGaleri(
   data: FormData,
   lama: BerkasMedia[],
 ): Promise<
@@ -61,15 +61,16 @@ async function susunGaleri(
   );
   const simpanPath = new Set(keepEntries);
 
-  const media: BerkasMedia[] = [];
+  const urutanEntries = data.getAll("media_urutan").map((v) => String(v).trim());
+
   const dihapus: BerkasMedia[] = [];
-  const baruDiupload: BerkasMedia[] = [];
+  const petaLamaSimpan = new Map<number, BerkasMedia>();
 
   for (const [i, berkas] of lama.entries()) {
     if (simpanIndex.has(i) || simpanPath.has(berkas.path)) {
       const ket = String(data.get(`media_desc_${i}`) ?? "").trim();
       // Keterangan kosong berarti sengaja dikosongkan — jangan pakai yang lama.
-      media.push({ ...berkas, keterangan: ket || undefined });
+      petaLamaSimpan.set(i, { ...berkas, keterangan: ket || undefined });
     } else {
       // Tandai untuk dihapus NANTI setelah database berhasil di-commit
       dihapus.push(berkas);
@@ -83,6 +84,7 @@ async function susunGaleri(
   // Dipasangkan lewat indeks — bukan digeser saat berkas kosong dilewati —
   // supaya urutan keterangan selalu cocok dengan urutan kiriman berkasnya.
   const keteranganBaru = data.getAll("media_desc_baru").map((v) => String(v).trim());
+  const baruDiupload: BerkasMedia[] = [];
 
   for (const [i, nilai] of kiriman.entries()) {
     const berkas = berkasTerisi(nilai);
@@ -101,7 +103,47 @@ async function susunGaleri(
     }
     const entri = { ...hasil, keterangan: keteranganBaru[i] || undefined };
     baruDiupload.push(entri);
-    media.push(entri);
+  }
+
+  // Susun urutan galeri: jika pengguna mengirim urutan eksplisit lewat media_urutan,
+  // ikuti urutan tersebut (mis. ["baru:0", "lama:1", "lama:0"]).
+  const media: BerkasMedia[] = [];
+
+  if (urutanEntries.length > 0) {
+    for (const token of urutanEntries) {
+      if (token.startsWith("lama:")) {
+        const idx = Number(token.slice(5));
+        const item = petaLamaSimpan.get(idx);
+        if (item) {
+          media.push(item);
+          petaLamaSimpan.delete(idx);
+        }
+      } else if (token.startsWith("baru:")) {
+        const idx = Number(token.slice(5));
+        const item = baruDiupload[idx];
+        if (item && !media.includes(item)) {
+          media.push(item);
+        }
+      }
+    }
+    // Sisa berkas lama yang tersimpan tapi tidak tercantum di urutan
+    for (const item of petaLamaSimpan.values()) {
+      media.push(item);
+    }
+    // Sisa berkas baru yang belum tercantum di urutan
+    for (const item of baruDiupload) {
+      if (!media.includes(item)) {
+        media.push(item);
+      }
+    }
+  } else {
+    // Fallback kompatibilitas: simpan berkas lama lalu berkas baru
+    for (const item of petaLamaSimpan.values()) {
+      media.push(item);
+    }
+    for (const item of baruDiupload) {
+      media.push(item);
+    }
   }
 
   return { media, dihapus, baruDiupload };
@@ -152,6 +194,23 @@ export async function simpanKejadian(data: FormData, id?: number, mediaAwal?: Be
   const slugDiminta = String(data.get("slug") ?? "").trim();
   let slug = slugDiminta || (await buatSlug(judulId, id));
 
+  const pertama = galeri.media[0];
+  const videoPertama = galeri.media.find((m) => m.type === "video");
+  const gambarPertama = galeri.media.find((m) => m.type === "image");
+
+  let imageIdBaru: string | null = null;
+  let videoBaru: string | null = null;
+
+  if (pertama) {
+    if (pertama.type === "video") {
+      videoBaru = pertama.path;
+      imageIdBaru = pertama.poster ?? gambarPertama?.path ?? null;
+    } else {
+      imageIdBaru = pertama.path;
+      videoBaru = videoPertama?.path ?? null;
+    }
+  }
+
   const isi = {
     title_id: judulId,
     title_en: judulEn,
@@ -165,6 +224,8 @@ export async function simpanKejadian(data: FormData, id?: number, mediaAwal?: Be
     orientation: orientasi === "horizontal" ? ("horizontal" as const) : ("landscape" as const),
     status,
     media: galeri.media,
+    image_id: imageIdBaru,
+    video: videoBaru,
     updated_at: new Date(),
   };
 
@@ -281,6 +342,21 @@ export async function promosiKeKejadian(
 
   const slug = await buatSlug(laporan.title);
 
+  const lampiran = bacaBerkasMedia(laporan.media);
+  const pertama = lampiran[0];
+  const videoPertama = lampiran.find((m) => m.type === "video");
+  const gambarPertama = lampiran.find((m) => m.type === "image");
+  const imageId = pertama
+    ? pertama.type === "video"
+      ? pertama.poster ?? gambarPertama?.path ?? null
+      : pertama.path
+    : null;
+  const videoPath = pertama
+    ? pertama.type === "video"
+      ? pertama.path
+      : videoPertama?.path ?? null
+    : null;
+
   const dataKejadian = {
     title_id: laporan.title,
     // Tanpa rapian kurator, judul Indonesia disalin — situs berbahasa Inggris
@@ -299,6 +375,8 @@ export async function promosiKeKejadian(
     // seperti sebelumnya.
     status: laporan.event_status === "draft" ? ("draft" as const) : ("published" as const),
     media: laporan.media ?? undefined,
+    image_id: imageId,
+    video: videoPath,
     image_en: null,
     created_at: new Date(),
     updated_at: new Date(),

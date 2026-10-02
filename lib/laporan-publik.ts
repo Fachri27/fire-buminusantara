@@ -633,3 +633,54 @@ export async function aturOrientasiLaporan(
 
   return { ok: true };
 }
+
+/**
+ * Ubah urutan lampiran dalam satu laporan (geser ke atas/bawah/pertama).
+ * Mengatur lampiran mana yang tampil pertama saat dipromosikan ke events.
+ */
+export async function aturUrutanLampiran(
+  id: number,
+  urlTarget: string,
+  arah: "atas" | "bawah" | "pertama",
+): Promise<{ ok: boolean; galat?: string }> {
+  const baris = await prisma.public_reports.findUnique({
+    where: { id },
+    select: { media: true, updated_at: true },
+  });
+  if (!baris) return { ok: false, galat: "Laporan tidak ditemukan." };
+
+  const media = Array.isArray(baris.media) ? [...baris.media] : [];
+  const idx = media.findIndex((item) => {
+    if (!item || typeof item !== "object") return false;
+    const b = item as Record<string, unknown>;
+    return typeof b.path === "string" && urlMedia(b.path) === urlTarget;
+  });
+  if (idx < 0) return { ok: false, galat: "Lampiran tidak ditemukan." };
+
+  if (arah === "pertama") {
+    if (idx === 0) return { ok: true };
+    const [item] = media.splice(idx, 1);
+    media.unshift(item);
+  } else if (arah === "atas") {
+    if (idx === 0) return { ok: true };
+    const temp = media[idx - 1];
+    media[idx - 1] = media[idx];
+    media[idx] = temp;
+  } else if (arah === "bawah") {
+    if (idx >= media.length - 1) return { ok: true };
+    const temp = media[idx + 1];
+    media[idx + 1] = media[idx];
+    media[idx] = temp;
+  }
+
+  const hasil = await prisma.public_reports.updateMany({
+    where: { id, updated_at: baris.updated_at },
+    data: { media, updated_at: new Date() },
+  });
+
+  if (hasil.count === 0) {
+    return { ok: false, galat: "Konflik perubahan: data telah diperbarui oleh pengguna lain. Silakan muat ulang." };
+  }
+
+  return { ok: true };
+}

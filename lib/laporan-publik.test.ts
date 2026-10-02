@@ -142,3 +142,48 @@ test("simpanLaporanPublik mengekstrak EXIF dan menyimpannya ke DB JSON saat ungg
   assert.ok(Math.abs(mediaItem.exif.lng - 98.675833) < 0.001);
   assert.ok(mediaItem.exif.waktu && mediaItem.exif.waktu.includes("Agustus 2026"));
 });
+
+test("aturUrutanLampiran memindahkan urutan lampiran dengan benar", async (t) => {
+  const global_ = globalThis as unknown as { prisma?: unknown };
+  const originalPrisma = global_.prisma;
+
+  let mediaTersimpan: Array<{ path: string }> = [
+    { path: "fire/gambar/foto0.jpg" },
+    { path: "fire/video/vid1.mp4" },
+    { path: "fire/gambar/foto2.jpg" },
+  ];
+  const now = new Date();
+
+  global_.prisma = {
+    public_reports: {
+      findUnique: async () => ({
+        media: mediaTersimpan,
+        updated_at: now,
+      }),
+      updateMany: async ({ data }: { data: { media: Array<{ path: string }> } }) => {
+        mediaTersimpan = data.media;
+        return { count: 1 };
+      },
+    },
+  };
+
+  t.after(() => {
+    global_.prisma = originalPrisma;
+  });
+
+  const { aturUrutanLampiran } = await import("./laporan-publik.ts");
+
+  // Pindahkan item terakhir (foto2) ke pertama
+  const r1 = await aturUrutanLampiran(123, "/media/gambar/foto2.jpg", "pertama");
+  assert.equal(r1.ok, true);
+  assert.equal(mediaTersimpan[0].path, "fire/gambar/foto2.jpg");
+  assert.equal(mediaTersimpan[1].path, "fire/gambar/foto0.jpg");
+  assert.equal(mediaTersimpan[2].path, "fire/video/vid1.mp4");
+
+  // Geser vid1 ke atas (swaps with foto0)
+  const r2 = await aturUrutanLampiran(123, "/media/video/vid1.mp4", "atas");
+  assert.equal(r2.ok, true);
+  assert.equal(mediaTersimpan[0].path, "fire/gambar/foto2.jpg");
+  assert.equal(mediaTersimpan[1].path, "fire/video/vid1.mp4");
+  assert.equal(mediaTersimpan[2].path, "fire/gambar/foto0.jpg");
+});

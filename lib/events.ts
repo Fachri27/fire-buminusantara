@@ -81,10 +81,17 @@ function keBerita(e: Baris, bahasa: Bahasa): Berita {
   const judul = bahasa === "en" ? enAtauId(e.title_en, e.title_id) : e.title_id;
   const deskripsi =
     bahasa === "en" ? enAtauId(e.description_en, e.description_id ?? "") : e.description_id;
-  // Thumbnail kejadian: gambar utama → foto galeri → poster video
-  // (urutan sama dengan pratinjau admin). Fallback poster video menjaga kejadian
-  // yang hanya bervideo tetap punya thumbnail untuk pratinjau bagikan (og:image).
+  // Thumbnail kejadian: media pertama (foto atau poster video), fallback ke
+  // image_id legacy, foto galeri pertama, atau poster video apa pun.
+  const pertama = mediaList[0];
+  const posterPertama = pertama
+    ? pertama.jenis === "gambar"
+      ? pertama.url
+      : pertama.poster ?? null
+    : null;
+
   const poster =
+    posterPertama ??
     urlMedia(e.image_id) ??
     (mediaList.find((m) => m.jenis === "gambar")?.url ?? null) ??
     mediaList.find((m) => m.poster)?.poster ??

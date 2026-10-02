@@ -21,8 +21,17 @@ export function Pratinjau({
 }) {
   const galeri = bacaBerkasMedia(media);
 
-  // Prioritaskan gambar poster utama, foto galeri, atau poster video
+  // Prioritaskan media urutan pertama dari galeri (gambar atau poster video),
+  // baru kemudian imageId dan fallback lainnya.
+  const pertama = galeri[0];
+  const posterPertama = pertama
+    ? pertama.type === "image"
+      ? pertama.path
+      : pertama.poster ?? null
+    : null;
+
   const gambarPath =
+    posterPertama ??
     imageId ??
     galeri.find((b) => b.type === "image")?.path ??
     galeri.find((b) => b.type === "video" && b.poster)?.poster ??

@@ -1,5 +1,5 @@
 import { Pool } from "pg";
-import { provinsiDariTitik } from "./provinsi-titik";
+import { provinsiDariTitik } from "./provinsi-titik.ts";
 
 /**
  * Layer lokasi PostGIS Simontini.

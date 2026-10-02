@@ -59,6 +59,7 @@ export type ItemMedia = {
   url: string;
   poster?: string;
   keterangan?: string;
+  path?: string;
 };
 
 /**
@@ -163,12 +164,12 @@ export function galeriTersimpan(media: unknown): ItemMedia[] {
   return bacaBerkasMedia(media).map((b) => {
     const url = urlMedia(b.path) ?? "";
     if (b.type !== "video") {
-      return { jenis: "gambar" as const, url, keterangan: b.keterangan };
+      return { jenis: "gambar" as const, url, path: b.path, keterangan: b.keterangan };
     }
     const poster = b.poster ? urlMedia(b.poster) : null;
     return poster
-      ? { jenis: "video" as const, url, poster, keterangan: b.keterangan }
-      : { jenis: "video" as const, url, keterangan: b.keterangan };
+      ? { jenis: "video" as const, url, path: b.path, poster, keterangan: b.keterangan }
+      : { jenis: "video" as const, url, path: b.path, keterangan: b.keterangan };
   });
 }
 
