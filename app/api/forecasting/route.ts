@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   // dan disisipkan sebagai anak pertama tumpukan — sama seperti posisi tombol
   // bentang di tumpukan kendali lapisan Aerosol (PetaAsap).
   const tombolBentang = bentang
-    ? '<button id="btn-bentang" type="button" aria-label="Buka peta selayar" title="Buka peta selayar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" /></svg></button>'
+    ? '<button id="btn-bentang" type="button" aria-label="Buka peta selayar" title="Buka peta selayar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg></button>'
     : "";
 
   // Router Windy hanya mengenali zoom bulat di URL — zoom pecahan membuatnya
@@ -355,6 +355,11 @@ export async function GET(req: NextRequest) {
         #articles,
         #unlegal-embed,
         .unlegal-embed,
+        /* Pemilih peta dasar Mapy.com (Outdoor / Winter sports / Aerial) —
+           muncul sendiri saat zoom > 11; zoom pun dibatasi, lihat setMaxZoom. */
+        [data-plugin="map-selector"],
+        #plugin-map-selector,
+        .map-selector,
         #warnings {
           display: none !important;
           opacity: 0 !important;
@@ -881,28 +886,66 @@ export async function GET(req: NextRequest) {
           color: #000000 !important;
         }
 
-        /* Tombol bentang selayar — selalu 36px (h-9 w-9) */
+        /* Tombol bentang selayar — ajakan utama membuka peta besar, jadi lebih
+           besar dari tombol navigasi: 44px (padanan h-11 w-11 PetaAsap) */
         #btn-bentang {
-          width: 36px !important;
-          height: 36px !important;
+          width: 44px !important;
+          height: 44px !important;
         }
         #btn-bentang svg {
-          width: 16px !important;
-          height: 16px !important;
+          width: 20px !important;
+          height: 20px !important;
         }
+${ringkas ? `
+        /* Bingkai ringkas yang lebar (peta kecil landing di desktop, sematan):
+           tombol bentang 40px (padanan bentangBesar h-10 di PetaAsap, ambangnya
+           sama: AMBANG_SEMPIT 800) — tetap lebih besar dari tombol rapat 28px. */
+        @media (min-width: 800px) {
+          #btn-bentang {
+            width: 40px !important;
+            height: 40px !important;
+          }
+        }
+        /* Kolom kendali ringkas lebih rapat (padanan gap-1.5 PetaAsap). */
+        #custom-zoom-controls {
+          gap: 6px;
+        }` : ""}
 
-        /* Tombol navigasi (+, -, home) — 28px jika ringkas (legendaRingkas), default 36px */
+        /* Tombol navigasi (+, -, home, lapisan) — 28px jika ringkas (legendaRingkas), default 36px */
         #btn-zoom-in,
         #btn-zoom-out,
-        #btn-zoom-home {
+        #btn-zoom-home,
+        #btn-lapisan {
           width: ${ringkas ? "28px" : "36px"} !important;
           height: ${ringkas ? "28px" : "36px"} !important;
         }
         #btn-zoom-in svg,
         #btn-zoom-out svg,
-        #btn-zoom-home svg {
+        #btn-zoom-home svg,
+        #btn-lapisan svg {
           width: ${ringkas ? "13px" : "16px"} !important;
           height: ${ringkas ? "13px" : "16px"} !important;
+        }
+        /* Tombol Lapisan: titik merah = lapisan hotspot menyala (kelas ada-hotspot). */
+        #btn-lapisan {
+          position: relative;
+        }
+        #btn-lapisan .lencana-hotspot {
+          display: none;
+          position: absolute;
+          top: -2px;
+          right: -2px;
+          width: 8px;
+          height: 8px;
+          border-radius: 9999px;
+          background: #ef4444;
+          box-shadow: 0 0 0 2px rgba(20, 16, 15, 0.95);
+        }
+        #btn-lapisan.ada-hotspot .lencana-hotspot {
+          display: block;
+        }
+        html.light #btn-lapisan .lencana-hotspot {
+          box-shadow: 0 0 0 2px #ffffff;
         }
 
         /* MOBILE: Pastikan sentuhan pan dan pinch-to-zoom di perangkat sentuh mulus dan responsif */
@@ -936,8 +979,981 @@ export async function GET(req: NextRequest) {
           let geoLayer = null;
           let markersLayer = null;
           let daftarAngka = [];
-          let hasSyncedTime = false;
           let mapInitialized = false;
+
+          // ── Lapisan udara: AQI + partikel angin dari /api/udara ──────────
+          // Pengganti lapisan AQI & partikel bawaan Windy: frame Windy per jam,
+          // tanpa pembauran dan tanpa riwayat, jadi pemutarannya patah-patah.
+          // Mesin ini meniru renderLoop lapisan Aerosol (peta-asap.tsx):
+          // progres pecahan maju dt / durasi langkah (0,75 dtk pada 1×, 0,35 dtk
+          // pada 2×) dan berulang; frame A = floor, B = A + 1, campuran = sisa
+          // pecahannya. Medan AQI dibaurkan di GPU (dua tekstur LINEAR,
+          // mix(a, b, u_mix)); partikel angin mengambil u/v dengan bobot
+          // campuran yang sama — angin dan AQI bergerak bersama.
+          //
+          // Semuanya satu custom layer di MapLibre milik Windy (v5:
+          // render(gl, opsi)), disisipkan tepat di bawah 'raster-basemap' —
+          // posisi lapisan AQI Windy ('tileLayer') — jadi garis pantai Windy
+          // dan pane Leaflet (batas provinsi, hotspot, angka) tetap di atasnya.
+          // Lapisan AQI Windy dibiarkan tampil di bawahnya: di dalam kotak data
+          // tertutup medan kita yang buram, di luarnya (peta diperkecil jauh)
+          // jadi latar — tanpa itu di sana kanvasnya abu-abu kosong. Partikel
+          // Windy baru dimatikan setelah frame pertama kita tergambar: bila
+          // /api/udara gagal, peta Windy tetap utuh.
+          //
+          // Pemutaran mulai dari langkah terdekat dengan sekarang, lalu
+          // berulang dari awal rentang (7 hari lalu) — sama dengan Aerosol.
+          //
+          // Bilah waktunya di induk (peta.tsx). Masuk: PUTAR_UDARA {putar, laju},
+          // SET_PROGRES {progres}, GESER_UDARA {geser, progres}, WINDY_ACTIVE /
+          // WINDY_NONAKTIF. Keluar: LINIMASA_UDARA (daftar langkah, sekali per
+          // metadata) dan WAKTU_UDARA (progres tiap frame selama berputar/digeser).
+          const URL_UDARA = location.origin + '/api/udara';
+          // Versi format frame (v2: wilayah diperlebar + tata per bidang) —
+          // ikut di URL supaya tembolok HTTP peramban tak menyajikan format lama.
+          const VERSI_UDARA = '&v=2';
+          const DURASI_LANGKAH = { 1: 0.75, 2: 0.35 };
+          const MAKS_UNDUH_SERENTAK = 3;
+          let petaUdara = null;          // MapLibre milik Windy
+          let udaraMeta = null;          // { grid, enkode, timesteps, latestModelRunIso, ... }
+          let udaraLangkah = [];
+          let udaraKunci = [];           // kunci frame per indeks langkah
+          let udaraFrame = {};           // kunci → Uint8Array cols*rows*3 [aqi, u, v]
+          const udaraDiambil = {};       // kunci → Promise (permintaan berjalan, tak diulang)
+          const udaraGagal = {};         // kunci → waktu gagal terakhir (jeda coba ulang 5 dtk)
+          let udaraAntre = [];
+          let udaraUnduhJalan = 0;
+          let udaraTerunduh = 0;
+          let udaraProgres = 0;          // indeks pecahan; mulai dari langkah terdekat dengan sekarang
+          let udaraProgresDariInduk = false; // induk sudah menyetel posisi (lanjut setelah iframe dimuat ulang)
+          let udaraMemutar = false;
+          let udaraLaju = 1;
+          let udaraGeser = false;        // slider induk sedang digeser
+          let udaraAktif = true;         // lapisan Angin sedang ditampilkan induk
+          let udaraTerlihat = true;      // iframe berada di viewport halaman induk
+          let udaraSiap = false;         // frame pertama tergambar → lapisan Windy disembunyikan
+          let udaraSiapDijadwalkan = false;
+          let udaraMenunggu = false;     // putar tertahan menunggu frame berikutnya
+          let udaraRaf = 0;
+          let udaraWaktuLalu = 0;
+          const mqKurangiGerak = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+          function kurangiGerak() { return !!(mqKurangiGerak && mqKurangiGerak.matches); }
+
+          function kunciUdara(m) { return m.timeChunk + '_' + m.step + '_' + m.timeInner; }
+          function kirimInduk(pesan) {
+            if (window.parent && window.parent !== window) window.parent.postMessage(pesan, '*');
+          }
+          function hitungTerunduh() {
+            let t = 0;
+            for (let i = 0; i < udaraKunci.length; i++) if (udaraFrame[udaraKunci[i]]) t++;
+            udaraTerunduh = t;
+          }
+          function laporWaktuUdara() {
+            if (!udaraLangkah.length) return;
+            kirimInduk({
+              type: 'WAKTU_UDARA',
+              progres: udaraProgres,
+              memutar: udaraMemutar,
+              laju: udaraLaju,
+              menunggu: udaraMenunggu,
+              terunduh: udaraTerunduh,
+              total: udaraLangkah.length
+            });
+          }
+
+          // Frame disimpan di jendela induk (satu origin) per siklus model:
+          // iframe dimuat ulang tiap masuk/keluar selayar, framenya tak perlu
+          // diunduh lagi. Disematkan lintas origin → cache lokal saja.
+          function cacheBersama(run) {
+            try {
+              const induk = window.parent && window.parent !== window ? window.parent : null;
+              if (induk) {
+                const c = induk.__frameUdara;
+                if (c && c.run === run && c.frame) return c.frame;
+                const baru = {};
+                induk.__frameUdara = { run: run, frame: baru };
+                return baru;
+              }
+            } catch (e) {}
+            return {};
+          }
+
+          function muatFrameUdara(m) {
+            const k = kunciUdara(m);
+            if (udaraFrame[k]) return Promise.resolve(udaraFrame[k]);
+            if (udaraDiambil[k]) return udaraDiambil[k];
+            const g = udaraMeta.grid;
+            const ukuran = g.cols * g.rows * 3;
+            const p = fetch(URL_UDARA + '?mode=frame&timeChunk=' + m.timeChunk + '&step=' + m.step + '&timeInner=' + m.timeInner + VERSI_UDARA)
+              .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.arrayBuffer();
+              })
+              .then(function(b) {
+                if (b.byteLength !== ukuran) throw new Error('ukuran frame ' + b.byteLength);
+                // Dikirim per bidang (aqi | u | v — lebih mampat), disusun ulang
+                // jadi [aqi, u, v] per titik untuk tekstur RGB & sampel partikel.
+                const bidang = new Uint8Array(b);
+                const n = g.cols * g.rows;
+                const u8 = new Uint8Array(ukuran);
+                for (let i = 0, o = 0; i < n; i++, o += 3) {
+                  u8[o] = bidang[i];
+                  u8[o + 1] = bidang[n + i];
+                  u8[o + 2] = bidang[2 * n + i];
+                }
+                udaraFrame[k] = u8;
+                hitungTerunduh();
+                mintaGambarUdara();
+                laporWaktuUdara();
+                return u8;
+              })
+              .catch(function() {
+                udaraGagal[k] = Date.now();
+                return null;
+              })
+              .finally(function() {
+                delete udaraDiambil[k];
+              });
+            udaraDiambil[k] = p;
+            return p;
+          }
+          // Frame A, B, dan sesudahnya — dipanggil tiap frame layar; permintaan
+          // yang sedang berjalan atau baru gagal tak diulang.
+          function pastikanFrameUdara(i) {
+            const m = udaraLangkah[i];
+            if (!m) return;
+            const k = udaraKunci[i];
+            if (udaraFrame[k] || udaraDiambil[k] || (udaraGagal[k] && Date.now() - udaraGagal[k] < 5000)) return;
+            muatFrameUdara(m);
+          }
+          // Unduhan latar seluruh linimasa (±114 KB per frame), berurutan dari
+          // posisi putar ke depan supaya frame yang segera tampil datang duluan.
+          function antreUnduhanUdara() {
+            const n = udaraLangkah.length;
+            const awal = Math.floor(udaraProgres) % n;
+            udaraAntre = [];
+            for (let i = 0; i < n; i++) udaraAntre.push(udaraLangkah[(awal + i) % n]);
+            pompaUnduhanUdara();
+          }
+          function pompaUnduhanUdara() {
+            while (udaraUnduhJalan < MAKS_UNDUH_SERENTAK && udaraAntre.length) {
+              const m = udaraAntre.shift();
+              if (udaraFrame[kunciUdara(m)]) continue;
+              udaraUnduhJalan++;
+              muatFrameUdara(m).then(function() {
+                udaraUnduhJalan--;
+                pompaUnduhanUdara();
+              });
+            }
+          }
+
+          let penundaMetaUdara = null;
+          function muatMetaUdara(jeda) {
+            clearTimeout(penundaMetaUdara);
+            fetch(URL_UDARA + '?mode=metadata' + VERSI_UDARA)
+              .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+              })
+              .then(function(d) {
+                const g = d && d.grid;
+                if (!d || !Array.isArray(d.timesteps) || d.timesteps.length < 2 || !g || !(g.cols > 1) || !(g.rows > 1) || !(g.resolusi > 0)) {
+                  throw new Error('metadata udara tak sah');
+                }
+                terimaMetaUdara(d);
+                // Siklus model baru terbit tiap ±12 jam — periksa tiap 30 menit.
+                penundaMetaUdara = setTimeout(function() { muatMetaUdara(); }, 30 * 60 * 1000);
+              })
+              .catch(function() {
+                const berikut = Math.min(60000, (jeda || 4000) * 2);
+                penundaMetaUdara = setTimeout(function() { muatMetaUdara(berikut); }, jeda || 4000);
+              });
+          }
+          function terimaMetaUdara(d) {
+            const runLama = udaraMeta && udaraMeta.latestModelRunIso;
+            const nLama = udaraLangkah.length;
+            udaraMeta = d;
+            if (runLama === d.latestModelRunIso && nLama === d.timesteps.length) return;
+            udaraLangkah = d.timesteps;
+            udaraKunci = udaraLangkah.map(kunciUdara);
+            udaraFrame = cacheBersama((d.latestModelRunIso || '') + VERSI_UDARA);
+            hitungTerunduh();
+            const n = udaraLangkah.length;
+            // Seperti mulaiDariSekarang Aerosol: pemuatan awal dan siklus model
+            // baru mulai dari langkah terdekat dengan sekarang. Kecuali iframe
+            // baru dimuat ulang (masuk/keluar selayar) dan induk sudah
+            // menyetel posisi lanjutannya, atau slider sedang digeser.
+            const awal = nLama === 0 && udaraProgresDariInduk;
+            if (!awal && !udaraGeser) udaraProgres = indeksKiniUdara();
+            udaraProgres = Math.min(Math.max(0, udaraProgres), n - 1);
+            kirimInduk({
+              type: 'LINIMASA_UDARA',
+              langkah: udaraLangkah.map(function(m) {
+                return { labelWib: m.labelWib, adalahPrediksi: !!m.adalahPrediksi };
+              }),
+              modelRunWib: d.latestModelRunWib || null
+            });
+            antreUnduhanUdara();
+            laporWaktuUdara();
+            mintaGambarUdara();
+          }
+
+          // Padanan indeksWaktuKini peta-asap.tsx: langkah terdekat dengan sekarang.
+          function indeksKiniUdara() {
+            const kini = Date.now();
+            let terbaik = 0;
+            let selisihTerbaik = Infinity;
+            for (let i = 0; i < udaraLangkah.length; i++) {
+              const selisih = Math.abs((udaraLangkah[i].waktu || 0) - kini);
+              if (selisih < selisihTerbaik) {
+                selisihTerbaik = selisih;
+                terbaik = i;
+              }
+            }
+            return terbaik;
+          }
+          function frameSiapUdara(i) {
+            return !!udaraFrame[udaraKunci[i]];
+          }
+          function setelProgresUdara(p) {
+            const n = udaraLangkah.length;
+            udaraProgres = n ? ((p % n) + n) % n : Math.max(0, p);
+            if (n) {
+              const iA = Math.floor(udaraProgres) % n;
+              pastikanFrameUdara(iA);
+              pastikanFrameUdara((iA + 1) % n);
+            }
+            mintaGambarUdara();
+            laporWaktuUdara();
+          }
+
+          // Loop 60 FPS — semantik renderLoop Aerosol. Peta digambar ulang tiap
+          // frame selama berputar/digeser, atau selama partikel angin hidup.
+          function putaranUdara(t) {
+            udaraRaf = 0;
+            if (!udaraAktif || !udaraTerlihat || document.hidden) {
+              udaraWaktuLalu = 0;
+              return;
+            }
+            const dt = udaraWaktuLalu ? Math.min(0.1, (t - udaraWaktuLalu) / 1000) : 0;
+            udaraWaktuLalu = t;
+            const n = udaraLangkah.length;
+            if (n > 1) {
+              if (udaraMemutar && !udaraGeser) {
+                const iA = Math.floor(udaraProgres) % n;
+                if (!frameSiapUdara((iA + 1) % n)) {
+                  // Frame tujuan belum tiba: tahan di tempat — tanpa loncatan.
+                  udaraMenunggu = true;
+                } else {
+                  udaraMenunggu = false;
+                  let p = udaraProgres + dt / DURASI_LANGKAH[udaraLaju];
+                  // Melewati batas langkah sementara frame sesudahnya belum ada:
+                  // berhenti tepat di batas (campuran 0 = frame yang sudah ada).
+                  if (Math.floor(p) > iA && !frameSiapUdara((iA + 2) % n)) p = iA + 1;
+                  udaraProgres = p % n;
+                }
+              } else {
+                udaraMenunggu = false;
+              }
+              const jA = Math.floor(udaraProgres) % n;
+              pastikanFrameUdara(jA);
+              pastikanFrameUdara((jA + 1) % n);
+              pastikanFrameUdara((jA + 2) % n);
+              if (udaraMemutar || udaraGeser) laporWaktuUdara();
+            }
+            const partikelHidup = udaraSiap && !kurangiGerak();
+            if ((n > 1 && (udaraMemutar || udaraGeser)) || partikelHidup) {
+              if (petaUdara) petaUdara.triggerRepaint();
+              udaraRaf = requestAnimationFrame(putaranUdara);
+            } else {
+              udaraWaktuLalu = 0;
+            }
+          }
+          function mulaiPutaranUdara() {
+            if (udaraRaf || !udaraAktif || !udaraTerlihat || document.hidden) return;
+            udaraWaktuLalu = 0;
+            udaraRaf = requestAnimationFrame(putaranUdara);
+          }
+          function hentikanPutaranUdara() {
+            if (udaraRaf) cancelAnimationFrame(udaraRaf);
+            udaraRaf = 0;
+            udaraWaktuLalu = 0;
+          }
+          function mintaGambarUdara() {
+            if (petaUdara) {
+              try { petaUdara.triggerRepaint(); } catch (e) {}
+            }
+            mulaiPutaranUdara();
+          }
+
+          // ── Palet AQI ──
+          // Diambil langsung dari gradien AQI Windy sendiri (W.colors.aqi) —
+          // Windy tidak menginterpolasi linear di RGB, jadi mencontoh warnanya
+          // lebih setia daripada menyalin titik hentinya. Cadangan: hasil
+          // sampel yang sama tiap 10 AQI (0–500), diambil dari Windy v51.
+          const PALET_CADANGAN = [20,141,20, 14,132,14, 7,124,7, 0,115,0, 94,180,13, 203,243,49, 184,185,6, 219,190,40, 255,198,80, 229,165,70, 203,133,61, 197,115,57, 192,99,54, 186,82,52, 180,66,51, 172,50,50, 179,53,75, 185,56,105, 186,61,135, 182,68,163, 177,78,185, 180,74,178, 182,70,169, 185,66,159, 187,62,150, 188,59,139, 189,56,129, 189,54,118, 189,51,107, 188,49,98, 187,47,87, 185,47,86, 183,46,85, 181,46,84, 179,45,83, 177,44,83, 175,44,82, 173,43,81, 171,43,80, 169,42,79, 167,42,78, 165,41,77, 163,41,76, 161,40,75, 159,40,74, 157,39,73, 155,38,72, 153,38,71, 151,37,70, 149,37,69, 147,36,68];
+          const LEBAR_PALET = 512;
+          let paletUdara = null;  // Uint8Array LEBAR_PALET*4, AQI 0..aqiMaks
+          function warnaCadangan(v) {
+            const x = Math.min(50, Math.max(0, v / 10));
+            const i = Math.min(49, Math.floor(x));
+            const f = x - i;
+            const c = [];
+            for (let j = 0; j < 3; j++) c.push(Math.round(PALET_CADANGAN[i * 3 + j] + (PALET_CADANGAN[i * 3 + 3 + j] - PALET_CADANGAN[i * 3 + j]) * f));
+            return c;
+          }
+          function warnaAqi(v) {
+            try {
+              const g = window.W && W.colors && W.colors.aqi && W.colors.aqi.getColor();
+              const c = g && g.RGBA(v);
+              if (c && c.length >= 3 && isFinite(c[0])) return [c[0], c[1], c[2]];
+            } catch (e) {}
+            return warnaCadangan(v);
+          }
+          function bangunPaletUdara() {
+            const maks = (udaraMeta && udaraMeta.enkode && udaraMeta.enkode.aqiMaks) || 500;
+            const p = new Uint8Array(LEBAR_PALET * 4);
+            for (let i = 0; i < LEBAR_PALET; i++) {
+              const c = warnaAqi((i / (LEBAR_PALET - 1)) * maks);
+              p[i * 4] = c[0];
+              p[i * 4 + 1] = c[1];
+              p[i * 4 + 2] = c[2];
+              p[i * 4 + 3] = 255;
+            }
+            return p;
+          }
+
+          // ── WebGL ──
+          // GLSL digabung dengan spasi (tanpa komentar GLSL & tanpa direktif #).
+          const VS_MEDAN = [
+            'attribute vec2 a_pos;',
+            'uniform mat4 u_matrix;',
+            'varying vec2 v_pos;',
+            'void main() { v_pos = a_pos; gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0); }'
+          ].join(' ');
+          // Koordinat Mercator → lon/lat → texel: s = ((lon - barat) / res + 0,5) / kolom
+          // (nilai ada di titik grid = pusat texel). Kanal R = AQI/aqiMaks.
+          // Tepi kotak data memudar lembut ke latar Windy (u_tepi derajat).
+          const FS_MEDAN = [
+            'precision highp float;',
+            'uniform sampler2D u_texA;',
+            'uniform sampler2D u_texB;',
+            'uniform sampler2D u_palet;',
+            'uniform float u_mix;',
+            'uniform vec4 u_batas;',
+            'uniform vec3 u_grid;',
+            'uniform float u_tepi;',
+            'varying vec2 v_pos;',
+            'const float PI = 3.141592653589793;',
+            'void main() {',
+            '  float lon = fract(v_pos.x) * 360.0 - 180.0;',
+            '  float lat = degrees(2.0 * atan(exp(PI * (1.0 - 2.0 * v_pos.y))) - PI * 0.5);',
+            '  vec2 st = vec2(((lon - u_batas.x) / u_grid.x + 0.5) / u_grid.y, ((lat - u_batas.y) / u_grid.x + 0.5) / u_grid.z);',
+            '  float aqi = mix(texture2D(u_texA, st).r, texture2D(u_texB, st).r, u_mix);',
+            '  vec3 rgb = texture2D(u_palet, vec2(aqi * 0.998046875 + 0.0009765625, 0.5)).rgb;',
+            '  float w = smoothstep(0.0, u_tepi, lon - u_batas.x) * smoothstep(0.0, u_tepi, u_batas.z - lon)',
+            '    * smoothstep(0.0, u_tepi, lat - u_batas.y) * smoothstep(0.0, u_tepi, u_batas.w - lat);',
+            '  gl_FragColor = vec4(rgb * w, w);',
+            '}'
+          ].join(' ');
+          const VS_LAYAR = [
+            'attribute vec2 a_pos;',
+            'varying vec2 v_uv;',
+            'void main() { v_uv = a_pos * 0.5 + 0.5; gl_Position = vec4(a_pos, 0.0, 1.0); }'
+          ].join(' ');
+          // Jejak partikel memudar tiap frame. floor() memastikan nilai 8-bit
+          // benar-benar turun — tanpa itu sisa jejak tipis tak pernah hilang.
+          const FS_PUDAR = [
+            'precision mediump float;',
+            'uniform sampler2D u_jejak;',
+            'uniform float u_pudar;',
+            'varying vec2 v_uv;',
+            'void main() { gl_FragColor = floor(texture2D(u_jejak, v_uv) * 255.0 * u_pudar) / 255.0; }'
+          ].join(' ');
+          const FS_TAMPIL = [
+            'precision mediump float;',
+            'uniform sampler2D u_jejak;',
+            'uniform float u_opasitas;',
+            'varying vec2 v_uv;',
+            'void main() { gl_FragColor = texture2D(u_jejak, v_uv) * u_opasitas; }'
+          ].join(' ');
+          const VS_GARIS = [
+            'attribute vec3 a_titik;',
+            'uniform vec2 u_ukuran;',
+            'varying float v_a;',
+            'void main() { v_a = a_titik.z; gl_Position = vec4(a_titik.x / u_ukuran.x * 2.0 - 1.0, 1.0 - a_titik.y / u_ukuran.y * 2.0, 0.0, 1.0); }'
+          ].join(' ');
+          const FS_GARIS = [
+            'precision mediump float;',
+            'varying float v_a;',
+            'void main() { gl_FragColor = vec4(v_a); }'
+          ].join(' ');
+
+          function buatProgram(gl, vs, fs) {
+            function shader(jenis, sumber) {
+              const s = gl.createShader(jenis);
+              gl.shaderSource(s, sumber);
+              gl.compileShader(s);
+              if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+                console.error('[udara] shader:', gl.getShaderInfoLog(s));
+                return null;
+              }
+              return s;
+            }
+            const v = shader(gl.VERTEX_SHADER, vs);
+            const f = shader(gl.FRAGMENT_SHADER, fs);
+            if (!v || !f) return null;
+            const p = gl.createProgram();
+            gl.attachShader(p, v);
+            gl.attachShader(p, f);
+            gl.linkProgram(p);
+            if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+              console.error('[udara] program:', gl.getProgramInfoLog(p));
+              return null;
+            }
+            const info = { p: p, a: {}, u: {} };
+            const nA = gl.getProgramParameter(p, gl.ACTIVE_ATTRIBUTES);
+            for (let i = 0; i < nA; i++) {
+              const a = gl.getActiveAttrib(p, i);
+              info.a[a.name] = gl.getAttribLocation(p, a.name);
+            }
+            const nU = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+            for (let i = 0; i < nU; i++) {
+              const u = gl.getActiveUniform(p, i);
+              info.u[u.name] = gl.getUniformLocation(p, u.name);
+            }
+            return info;
+          }
+          function buatTekstur(gl, filter) {
+            const t = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, t);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+            return t;
+          }
+          function mercY(lat) {
+            const s = Math.sin((Math.max(-85.0511, Math.min(85.0511, lat)) * Math.PI) / 180);
+            return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI);
+          }
+          function latDariMercY(y) {
+            return (Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180) / Math.PI;
+          }
+
+          const gpu = {
+            gl: null, medan: null, pudar: null, tampil: null, garis: null,
+            bufMedan: null, bufLayar: null, bufGaris: null,
+            texA: null, texB: null, texPalet: null,
+            kunciA: '', kunciB: '', campur: 0, adaMedan: false, gridKunci: ''
+          };
+          // Keadaan frame yang sedang digambar — dipakai bersama medan AQI dan partikel.
+          const bingkai = { a: null, b: null, kunciA: '', kunciB: '', campur: 0 };
+          function tentukanBingkai() {
+            const n = udaraLangkah.length;
+            if (!n) return false;
+            const iA = Math.floor(udaraProgres) % n;
+            const iB = (iA + 1) % n;
+            let kA = udaraKunci[iA], kB = udaraKunci[iB];
+            let a = udaraFrame[kA] || null, b = udaraFrame[kB] || null;
+            let campur = udaraProgres - Math.floor(udaraProgres);
+            if (!a && b) { a = b; kA = kB; campur = 0; }
+            if (!b) { b = a; kB = kA; campur = 0; }
+            if (!a) {
+              // Belum ada frame di titik ini (lompat jauh): tahan gambar terakhir.
+              if (!bingkai.a) return false;
+              return true;
+            }
+            bingkai.a = a; bingkai.b = b; bingkai.kunciA = kA; bingkai.kunciB = kB; bingkai.campur = campur;
+            return true;
+          }
+          function unggahFrame(gl, tex, data) {
+            const g = udaraMeta.grid;
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            // Baris 0 = tepi selatan → t = 0; kolom 0 = tepi barat → s = 0.
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, g.cols, g.rows, 0, gl.RGB, gl.UNSIGNED_BYTE, data);
+          }
+          function bangunKotakMedan(gl) {
+            const g = udaraMeta.grid;
+            const x0 = (g.west + 180) / 360, x1 = (g.east + 180) / 360;
+            const yU = mercY(g.north), yS = mercY(g.south);
+            const d = [];
+            // Salinan dunia -1, 0, +1 (lihat fract() di shader), seperti lapisan Aerosol.
+            for (let w = -1; w <= 1; w++) {
+              d.push(x0 + w, yU, x1 + w, yU, x0 + w, yS, x0 + w, yS, x1 + w, yU, x1 + w, yS);
+            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, gpu.bufMedan);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(d), gl.STATIC_DRAW);
+            gpu.gridKunci = [g.west, g.south, g.east, g.north, g.cols, g.rows].join(',');
+          }
+          function siapkanMedan(gl) {
+            const g = udaraMeta.grid;
+            const kunciGrid = [g.west, g.south, g.east, g.north, g.cols, g.rows].join(',');
+            if (kunciGrid !== gpu.gridKunci) {
+              bangunKotakMedan(gl);
+              gpu.kunciA = gpu.kunciB = '';
+            }
+            if (!gpu.texPalet) {
+              gpu.texPalet = buatTekstur(gl, gl.LINEAR);
+              paletUdara = bangunPaletUdara();
+              gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+              gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, LEBAR_PALET, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, paletUdara);
+            }
+            if (bingkai.kunciA !== gpu.kunciA) {
+              unggahFrame(gl, gpu.texA, bingkai.a);
+              gpu.kunciA = bingkai.kunciA;
+            }
+            if (bingkai.kunciB !== gpu.kunciB) {
+              unggahFrame(gl, gpu.texB, bingkai.b);
+              gpu.kunciB = bingkai.kunciB;
+            }
+            gpu.campur = bingkai.campur;
+            gpu.adaMedan = true;
+          }
+          function gambarMedan(gl, matriks) {
+            const m = gpu.medan;
+            if (!m || !gpu.adaMedan || !matriks) return;
+            const g = udaraMeta.grid;
+            gl.useProgram(m.p);
+            gl.bindBuffer(gl.ARRAY_BUFFER, gpu.bufMedan);
+            gl.enableVertexAttribArray(m.a.a_pos);
+            gl.vertexAttribPointer(m.a.a_pos, 2, gl.FLOAT, false, 0, 0);
+            gl.uniformMatrix4fv(m.u.u_matrix, false, matriks);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, gpu.texA);
+            gl.uniform1i(m.u.u_texA, 0);
+            gl.activeTexture(gl.TEXTURE1);
+            gl.bindTexture(gl.TEXTURE_2D, gpu.texB);
+            gl.uniform1i(m.u.u_texB, 1);
+            gl.activeTexture(gl.TEXTURE2);
+            gl.bindTexture(gl.TEXTURE_2D, gpu.texPalet);
+            gl.uniform1i(m.u.u_palet, 2);
+            gl.uniform1f(m.u.u_mix, gpu.campur);
+            gl.uniform4f(m.u.u_batas, g.west, g.south, g.east, g.north);
+            gl.uniform3f(m.u.u_grid, g.resolusi, g.cols, g.rows);
+            gl.uniform1f(m.u.u_tepi, 3.0);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            gl.drawArrays(gl.TRIANGLES, 0, 18);
+            gl.disableVertexAttribArray(m.a.a_pos);
+            gl.activeTexture(gl.TEXTURE0);
+          }
+
+          // ── Partikel angin ──
+          // Simulasi di CPU (beberapa ribu partikel, murah), posisi dalam piksel
+          // CSS layar. Angin diambil bilinear di ruang (grid 0,4°) dan linear di
+          // waktu (campuran yang sama dengan medan AQI). Tiap frame ruas
+          // (posisi lama → baru) digambar ke tekstur jejak seukuran layar yang
+          // memudar — teknik jejak ala Windy/webgl-wind — lalu tekstur itu
+          // ditumpuk ke peta. Jejak dikosongkan selama peta digeser/di-zoom.
+          const KEC_PARTIKEL = 4.5;     // piksel CSS per detik per m/s
+          const PUDAR_PER_FRAME = 0.962;
+          // Tekstur jejak 0,7× piksel perangkat: garis 1 texel jadi ±1,4 piksel
+          // perangkat yang lembut (setipis partikel Windy), dan pass pudarnya
+          // lebih murah dari resolusi penuh.
+          const SKALA_JEJAK = 0.7 * Math.min(2, window.devicePixelRatio || 1);
+          const LANGKAH_STATIS = 8;     // ruas garis diam (prefers-reduced-motion)
+          const partikel = { n: 0, kap: 0, x: null, y: null, umur: null, maks: null, verts: null };
+          const jejak = {
+            tex: [null, null], fbo: [null, null], aktif: 0, w: 0, h: 0, cssW: 0, cssH: 0,
+            bersih: false, opasitas: 0, waktu: 0, kunciKamera: '', gerakTerakhir: 0,
+            perluPeta: true, perluSebar: true
+          };
+          const petaLayar = { gx0: 0, dgx: 0, gy: null, w: 0, h: 0 };
+
+          function siapkanJejak(gl, cssW, cssH) {
+            const w = Math.max(1, Math.round(cssW * SKALA_JEJAK));
+            const h = Math.max(1, Math.round(cssH * SKALA_JEJAK));
+            jejak.cssW = cssW;
+            jejak.cssH = cssH;
+            if (jejak.tex[0] && jejak.w === w && jejak.h === h) return;
+            for (let i = 0; i < 2; i++) {
+              if (!jejak.tex[i]) {
+                jejak.tex[i] = buatTekstur(gl, gl.LINEAR);
+                jejak.fbo[i] = gl.createFramebuffer();
+              }
+              gl.bindTexture(gl.TEXTURE_2D, jejak.tex[i]);
+              gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+              gl.bindFramebuffer(gl.FRAMEBUFFER, jejak.fbo[i]);
+              gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, jejak.tex[i], 0);
+            }
+            jejak.w = w;
+            jejak.h = h;
+            jejak.bersih = false;
+            jejak.perluPeta = true;
+            jejak.perluSebar = true;
+            bersihkanJejak(gl);
+          }
+          function bersihkanJejak(gl) {
+            if (jejak.bersih) return;
+            for (let i = 0; i < 2; i++) {
+              gl.bindFramebuffer(gl.FRAMEBUFFER, jejak.fbo[i]);
+              gl.viewport(0, 0, jejak.w, jejak.h);
+              gl.clearColor(0, 0, 0, 0);
+              gl.clear(gl.COLOR_BUFFER_BIT);
+            }
+            jejak.bersih = true;
+          }
+          // Layar → grid: lon linear di x; lintang lewat Mercator per baris piksel.
+          // Peta Windy tak pernah diputar/dimiringkan.
+          function hitungPetaLayar(w, h) {
+            const g = udaraMeta.grid;
+            const p0 = petaUdara.unproject([0, 0]);
+            const p1 = petaUdara.unproject([w, h]);
+            petaLayar.gx0 = (p0.lng - g.west) / g.resolusi;
+            petaLayar.dgx = (p1.lng - p0.lng) / w / g.resolusi;
+            const y0 = mercY(p0.lat), y1 = mercY(p1.lat);
+            if (!petaLayar.gy || petaLayar.gy.length < h + 2) petaLayar.gy = new Float32Array(h + 2);
+            for (let r = 0; r <= h + 1; r++) {
+              petaLayar.gy[r] = (latDariMercY(y0 + ((y1 - y0) * r) / h) - g.south) / g.resolusi;
+            }
+            petaLayar.w = w;
+            petaLayar.h = h;
+          }
+          const anginSampel = [0, 0];
+          // u/v (m/s) di titik layar (x, y), atau false di luar kotak data.
+          function sampelAngin(x, y) {
+            const g = udaraMeta.grid;
+            const cols = g.cols, rows = g.rows, baris = cols * 3;
+            const gx = petaLayar.gx0 + x * petaLayar.dgx;
+            const yi = y | 0;
+            const gyA = petaLayar.gy[yi];
+            const gy = gyA + (petaLayar.gy[yi + 1] - gyA) * (y - yi);
+            if (!(gx >= 0 && gy >= 0 && gx < cols - 1 && gy < rows - 1)) return false;
+            const i0 = gx | 0, j0 = gy | 0;
+            const fx = gx - i0, fy = gy - j0;
+            const k00 = j0 * baris + i0 * 3 + 1;
+            const k10 = k00 + 3, k01 = k00 + baris, k11 = k01 + 3;
+            const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+            const A = bingkai.a, B = bingkai.b, m = bingkai.campur;
+            const uA = A[k00] * w00 + A[k10] * w10 + A[k01] * w01 + A[k11] * w11;
+            const vA = A[k00 + 1] * w00 + A[k10 + 1] * w10 + A[k01 + 1] * w01 + A[k11 + 1] * w11;
+            const uB = B[k00] * w00 + B[k10] * w10 + B[k01] * w01 + B[k11] * w11;
+            const vB = B[k00 + 1] * w00 + B[k10 + 1] * w10 + B[k01 + 1] * w01 + B[k11 + 1] * w11;
+            const e = udaraMeta.enkode || {};
+            const min = isFinite(e.anginMin) ? e.anginMin : -40;
+            const skala = ((isFinite(e.anginMaks) ? e.anginMaks : 40) - min) / 255;
+            anginSampel[0] = (uA + (uB - uA) * m) * skala + min;
+            anginSampel[1] = (vA + (vB - vA) * m) * skala + min;
+            return true;
+          }
+          // Kepadatan mengikuti luas layar; bingkai kecil/ponsel lebih jarang.
+          function sebarPartikel(w, h) {
+            const n = Math.max(200, Math.min(5000, Math.round((w * h) / (w < 640 ? 380 : 260))));
+            if (partikel.kap < n) {
+              partikel.kap = n;
+              partikel.x = new Float32Array(n);
+              partikel.y = new Float32Array(n);
+              partikel.umur = new Float32Array(n);
+              partikel.maks = new Float32Array(n);
+              partikel.verts = new Float32Array(Math.max(n * 6, Math.ceil(n / 2) * LANGKAH_STATIS * 6));
+            }
+            partikel.n = n;
+            for (let i = 0; i < n; i++) {
+              lahirkanPartikel(i, w, h);
+              partikel.umur[i] = Math.random() * partikel.maks[i];
+            }
+          }
+          function lahirkanPartikel(i, w, h) {
+            let x = 0, y = 0;
+            for (let c = 0; c < 4; c++) {
+              x = Math.random() * w;
+              y = Math.random() * h;
+              if (sampelAngin(x, y)) break;
+            }
+            partikel.x[i] = x;
+            partikel.y[i] = y;
+            partikel.umur[i] = 0;
+            partikel.maks[i] = 1 + Math.random() * 1.6;
+          }
+          function langkahPartikel(dt, w, h) {
+            const v = partikel.verts;
+            const K = KEC_PARTIKEL * dt;
+            let s = 0;
+            for (let i = 0; i < partikel.n; i++) {
+              if (partikel.umur[i] >= partikel.maks[i]) lahirkanPartikel(i, w, h);
+              const x = partikel.x[i], y = partikel.y[i];
+              if (!sampelAngin(x, y)) {
+                partikel.umur[i] = partikel.maks[i];
+                continue;
+              }
+              const u = anginSampel[0], vv = anginSampel[1];
+              const nx = x + u * K, ny = y - vv * K;
+              const um = partikel.umur[i], maks = partikel.maks[i];
+              // Makin kencang makin terang; muncul & hilang lembut (0,25 dtk).
+              const a = (0.4 + 0.6 * Math.min(1, Math.sqrt(u * u + vv * vv) / 12)) * Math.min(1, um * 4, (maks - um) * 4);
+              v[s++] = x; v[s++] = y; v[s++] = a;
+              v[s++] = nx; v[s++] = ny; v[s++] = a;
+              partikel.x[i] = nx;
+              partikel.y[i] = ny;
+              partikel.umur[i] = um + dt;
+              if (nx < 0 || ny < 0 || nx >= w || ny >= h) partikel.umur[i] = maks;
+            }
+            return s;
+          }
+          // prefers-reduced-motion: garis arus diam (benih tetap, LANGKAH_STATIS
+          // ruas searah angin, ekor memudar) — ikut berubah saat waktu digeser.
+          function garisStatis(w, h) {
+            const v = partikel.verts;
+            const benih = Math.ceil(partikel.n / 2);
+            const K = KEC_PARTIKEL * 0.06;
+            let s = 0;
+            for (let i = 0; i < benih; i++) {
+              let x = partikel.x[i], y = partikel.y[i];
+              for (let j = 0; j < LANGKAH_STATIS; j++) {
+                if (x < 0 || y < 0 || x >= w || y >= h || !sampelAngin(x, y)) break;
+                const u = anginSampel[0], vv = anginSampel[1];
+                const nx = x + u * K, ny = y - vv * K;
+                const a = (0.25 + 0.55 * Math.min(1, Math.sqrt(u * u + vv * vv) / 14)) * ((j + 1) / LANGKAH_STATIS);
+                v[s++] = x; v[s++] = y; v[s++] = a;
+                v[s++] = nx; v[s++] = ny; v[s++] = a;
+                x = nx;
+                y = ny;
+              }
+            }
+            return s;
+          }
+          function gambarLayar(gl, prog) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, gpu.bufLayar);
+            gl.enableVertexAttribArray(prog.a.a_pos);
+            gl.vertexAttribPointer(prog.a.a_pos, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            gl.disableVertexAttribArray(prog.a.a_pos);
+          }
+          function gambarRuas(gl, jumlah) {
+            if (!jumlah) return;
+            const p = gpu.garis;
+            gl.useProgram(p.p);
+            gl.uniform2f(p.u.u_ukuran, jejak.cssW, jejak.cssH);
+            gl.bindBuffer(gl.ARRAY_BUFFER, gpu.bufGaris);
+            gl.bufferData(gl.ARRAY_BUFFER, partikel.verts.subarray(0, jumlah), gl.DYNAMIC_DRAW);
+            gl.enableVertexAttribArray(p.a.a_titik);
+            gl.vertexAttribPointer(p.a.a_titik, 3, gl.FLOAT, false, 0, 0);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            gl.drawArrays(gl.LINES, 0, jumlah / 3);
+            gl.disableVertexAttribArray(p.a.a_titik);
+          }
+          // Pass luar layar (prerender): perbarui tekstur jejak partikel.
+          function perbaruiJejak(gl) {
+            const kanvas = petaUdara.getCanvas();
+            const w = kanvas.clientWidth, h = kanvas.clientHeight;
+            if (!w || !h || !gpu.garis) return;
+            siapkanJejak(gl, w, h);
+            const kini = performance.now();
+            const dt = jejak.waktu ? Math.min(0.05, (kini - jejak.waktu) / 1000) : 0;
+            jejak.waktu = kini;
+            const c = petaUdara.getCenter();
+            const kunci = c.lng.toFixed(6) + ',' + c.lat.toFixed(6) + ',' + petaUdara.getZoom().toFixed(5) + ',' + w + 'x' + h;
+            if (kunci !== jejak.kunciKamera) {
+              jejak.kunciKamera = kunci;
+              jejak.gerakTerakhir = kini;
+              jejak.perluPeta = true;
+            }
+            gl.disable(gl.DEPTH_TEST);
+            gl.disable(gl.STENCIL_TEST);
+            gl.disable(gl.SCISSOR_TEST);
+            gl.disable(gl.CULL_FACE);
+            gl.colorMask(true, true, true, true);
+            if (kurangiGerak()) {
+              if (jejak.perluPeta) { hitungPetaLayar(w, h); jejak.perluPeta = false; }
+              if (jejak.perluSebar) { sebarPartikel(w, h); jejak.perluSebar = false; }
+              const jumlah = garisStatis(w, h);
+              gl.bindFramebuffer(gl.FRAMEBUFFER, jejak.fbo[jejak.aktif]);
+              gl.viewport(0, 0, jejak.w, jejak.h);
+              gl.clearColor(0, 0, 0, 0);
+              gl.clear(gl.COLOR_BUFFER_BIT);
+              gambarRuas(gl, jumlah);
+              jejak.bersih = false;
+              jejak.opasitas = 1;
+              return;
+            }
+            // Peta sedang bergeser/di-zoom: jejak lama tak lagi sejajar —
+            // kosongkan dan sembunyikan partikel sampai peta diam 150 ms.
+            if (kini - jejak.gerakTerakhir < 150) {
+              bersihkanJejak(gl);
+              jejak.opasitas = 0;
+              jejak.perluSebar = true;
+              return;
+            }
+            if (jejak.perluPeta) { hitungPetaLayar(w, h); jejak.perluPeta = false; }
+            if (jejak.perluSebar) { sebarPartikel(w, h); jejak.perluSebar = false; }
+            jejak.opasitas = Math.min(1, jejak.opasitas + dt * 2.5);
+            const jumlah = langkahPartikel(dt, w, h);
+            const lain = 1 - jejak.aktif;
+            gl.bindFramebuffer(gl.FRAMEBUFFER, jejak.fbo[lain]);
+            gl.viewport(0, 0, jejak.w, jejak.h);
+            gl.disable(gl.BLEND);
+            gl.useProgram(gpu.pudar.p);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, jejak.tex[jejak.aktif]);
+            gl.uniform1i(gpu.pudar.u.u_jejak, 0);
+            gl.uniform1f(gpu.pudar.u.u_pudar, Math.pow(PUDAR_PER_FRAME, dt * 60));
+            gambarLayar(gl, gpu.pudar);
+            gambarRuas(gl, jumlah);
+            jejak.aktif = lain;
+            jejak.bersih = false;
+          }
+          function tampilkanJejak(gl) {
+            if (!gpu.tampil || !jejak.tex[0] || jejak.opasitas <= 0) return;
+            gl.useProgram(gpu.tampil.p);
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, jejak.tex[jejak.aktif]);
+            gl.uniform1i(gpu.tampil.u.u_jejak, 0);
+            gl.uniform1f(gpu.tampil.u.u_opasitas, jejak.opasitas * 0.9);
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            gambarLayar(gl, gpu.tampil);
+          }
+
+          const lapisUdara = {
+            id: 'udara',
+            type: 'custom',
+            renderingMode: '2d',
+            onAdd: function(_peta, gl) {
+              gpu.gl = gl;
+              gpu.medan = buatProgram(gl, VS_MEDAN, FS_MEDAN);
+              gpu.pudar = buatProgram(gl, VS_LAYAR, FS_PUDAR);
+              gpu.tampil = buatProgram(gl, VS_LAYAR, FS_TAMPIL);
+              gpu.garis = buatProgram(gl, VS_GARIS, FS_GARIS);
+              gpu.bufMedan = gl.createBuffer();
+              gpu.bufGaris = gl.createBuffer();
+              gpu.bufLayar = gl.createBuffer();
+              gl.bindBuffer(gl.ARRAY_BUFFER, gpu.bufLayar);
+              gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+              gpu.texA = buatTekstur(gl, gl.LINEAR);
+              gpu.texB = buatTekstur(gl, gl.LINEAR);
+              gpu.kunciA = gpu.kunciB = gpu.gridKunci = '';
+            },
+            prerender: function(gl) {
+              if (!udaraMeta || !gpu.medan || !tentukanBingkai()) return;
+              if (gl.bindVertexArray) gl.bindVertexArray(null);
+              siapkanMedan(gl);
+              perbaruiJejak(gl);
+              gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+              gl.bindBuffer(gl.ARRAY_BUFFER, null);
+              gl.useProgram(null);
+            },
+            render: function(gl, opsi) {
+              if (!udaraMeta || !gpu.adaMedan) return;
+              if (gl.bindVertexArray) gl.bindVertexArray(null);
+              const matriks = (opsi && opsi.defaultProjectionData && opsi.defaultProjectionData.mainMatrix) ||
+                (opsi && opsi.modelViewProjectionMatrix) || opsi;
+              gl.disable(gl.DEPTH_TEST);
+              gl.disable(gl.STENCIL_TEST);
+              gambarMedan(gl, matriks);
+              tampilkanJejak(gl);
+              gl.bindBuffer(gl.ARRAY_BUFFER, null);
+              gl.useProgram(null);
+              // Frame pertama tergambar. Efeknya (sembunyikan lapisan Windy,
+              // ubah store) dijalankan sesudah render — bukan di tengahnya.
+              if (!udaraSiap && !udaraSiapDijadwalkan) {
+                udaraSiapDijadwalkan = true;
+                setTimeout(tandaiSiapUdara, 0);
+              }
+            },
+            onRemove: function(_peta, gl) {
+              [gpu.texA, gpu.texB, gpu.texPalet, jejak.tex[0], jejak.tex[1]].forEach(function(t) { if (t) gl.deleteTexture(t); });
+              [jejak.fbo[0], jejak.fbo[1]].forEach(function(f) { if (f) gl.deleteFramebuffer(f); });
+              [gpu.bufMedan, gpu.bufGaris, gpu.bufLayar].forEach(function(b) { if (b) gl.deleteBuffer(b); });
+              gpu.texPalet = null;
+              gpu.adaMedan = false;
+              jejak.tex = [null, null];
+              jejak.fbo = [null, null];
+              jejak.w = jejak.h = 0;
+            }
+          };
+
+          // Lapisan kita di bawah 'raster-basemap' (garis pantai & bayangan
+          // daratan Windy menimpa warna AQI, sama seperti lapisan AQI Windy) dan
+          // di atas lapisan AQI Windy ('tileLayer'), yang tetap tampil sebagai
+          // latar di luar kotak data. Setelah data siap: partikel Windy
+          // dimatikan. Diperiksa ulang saat gaya peta berubah dan tiap
+          // 500 ms (pastikanSemuaLogo) — Windy bisa memasang ulang lapisannya.
+          function jagaLapisanUdara() {
+            const peta = petaUdara;
+            if (!peta) return;
+            try {
+              const adaDasar = !!peta.getLayer('raster-basemap');
+              if (!peta.getLayer('udara')) {
+                peta.addLayer(lapisUdara, adaDasar ? 'raster-basemap' : undefined);
+              } else if (typeof peta.getLayersOrder === 'function') {
+                // Windy bisa memasang lapisannya SESUDAH kita (lapisan kita lalu
+                // terkubur di bawah 'alpha_clear' yang menghapus kanvas): harus
+                // tepat di bawah 'raster-basemap', atau paling atas bila tak ada.
+                const urut = peta.getLayersOrder();
+                const iU = urut.indexOf('udara');
+                const iB = urut.indexOf('raster-basemap');
+                if (adaDasar ? urut[iB - 1] !== 'udara' : iU !== urut.length - 1) {
+                  peta.moveLayer('udara', adaDasar ? 'raster-basemap' : undefined);
+                }
+              }
+            } catch (e) {}
+            if (udaraSiap) {
+              try {
+                if (window.W.store.get('particlesAnim') !== 'off') window.W.store.set('particlesAnim', 'off');
+              } catch (e) {}
+            }
+          }
+          function tandaiSiapUdara() {
+            udaraSiap = true;
+            jagaLapisanUdara();
+            mulaiPutaranUdara();
+          }
+          function mulaiLapisanUdara() {
+            if (petaUdara) return;
+            petaUdara = petaMapLibreWindy();
+            if (!petaUdara) return;
+            jagaLapisanUdara();
+            try { petaUdara.on('styledata', jagaLapisanUdara); } catch (e) {}
+            muatMetaUdara();
+            document.addEventListener('visibilitychange', function() {
+              if (!document.hidden) mintaGambarUdara();
+            });
+            // Iframe di luar viewport halaman (beranda digulir): jangan animasi.
+            try {
+              new IntersectionObserver(function(entri) {
+                udaraTerlihat = entri[entri.length - 1].isIntersecting;
+                if (udaraTerlihat) mintaGambarUdara();
+              }).observe(document.body);
+            } catch (e) {}
+          }
+
+          // Lapisan tambahan Titik Hotspot (pesan SET_HOTSPOT dari peta.tsx) —
+          // padanan lib/lapisan-hotspot.ts di lapisan Aerosol, warnanya sama.
+          // Titik [lng, lat, kepercayaan] digambar di kanvas pada pane sendiri
+          // yang tak menangkap klik, supaya klik provinsi di bawahnya tetap
+          // jalan. Pesan yang tiba sebelum peta siap disimpan dulu.
+          const WARNA_HOTSPOT = ['#facc15', '#f97316', '#ef4444'];
+          const JARI_HOTSPOT = [1.8, 2.4, 3.4];
+          let hotspotTertunda = null;
+          let lapisHotspot = null;
+          function gambarHotspot(map, titik) {
+            if (lapisHotspot) {
+              try { map.removeLayer(lapisHotspot); } catch (e) {}
+              lapisHotspot = null;
+            }
+            if (!titik || !titik.length || typeof L === 'undefined' || !map.getPane('hotspotPane')) return;
+            const penggambar = L.canvas({ pane: 'hotspotPane', padding: 0.5 });
+            // Kepercayaan tinggi digambar terakhir (paling atas).
+            const urut = titik.slice().sort(function(a, b) { return a[2] - b[2]; });
+            lapisHotspot = L.layerGroup(urut.map(function(t) {
+              const k = t[2];
+              return L.circleMarker([t[1], t[0]], {
+                renderer: penggambar,
+                pane: 'hotspotPane',
+                interactive: false,
+                radius: JARI_HOTSPOT[k] || JARI_HOTSPOT[0],
+                weight: 0.6,
+                color: 'rgba(0, 0, 0, 0.55)',
+                fillColor: WARNA_HOTSPOT[k] || WARNA_HOTSPOT[0],
+                fillOpacity: k === 0 ? 0.75 : 0.95
+              });
+            })).addTo(map);
+          }
           // Tampilan awal peta: disinkronkan dengan zoom/center asli Windy sampai pengguna berinteraksi
           // Konsol /peta: roda memperbesar peta, dan zoom awalnya pecahan (hasil
           // cameraForBounds lapisan Aerosol) — jangan dibulatkan ke bawah.
@@ -1174,6 +2190,15 @@ export async function GET(req: NextRequest) {
 
             const map = window.W.map.map;
             disableMapScrollZoom(map);
+            // Di atas zoom 11 Windy menyembunyikan lapisan AQI dan berganti ke
+            // peta Outdoor Mapy.com (lengkap dengan panel pemilih peta dasarnya)
+            // — lapisan ini jadi kosong. Batasi zoom supaya warna kualitas udara
+            // selalu tampil. Zoom Windy = zoom MapLibre + 1.
+            try {
+              if (typeof map.setMaxZoom === 'function') map.setMaxZoom(11);
+              const mmlBatas = map._maplibreMap;
+              if (mmlBatas && typeof mmlBatas.setMaxZoom === 'function') mmlBatas.setMaxZoom(10);
+            } catch (e) {}
             if (KONSOL) matikanLacakResize();
             if (window.W && window.W.store && typeof window.W.store.set === 'function') {
               try {
@@ -1211,8 +2236,11 @@ export async function GET(req: NextRequest) {
               zoomBox.innerHTML = '${tombolBentang}' +
                 '<button id="btn-zoom-in" type="button" aria-label="Perbesar peta" title="Perbesar peta"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg></button>' +
                 '<button id="btn-zoom-out" type="button" aria-label="Perkecil peta" title="Perkecil peta"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12" /></svg></button>' +
-                '<button id="btn-zoom-home" type="button" aria-label="Fokus seluruh Nusantara" title="Fokus seluruh Nusantara"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg></button>';
+                '<button id="btn-zoom-home" type="button" aria-label="Fokus seluruh Nusantara" title="Fokus seluruh Nusantara"><svg viewBox="0 0 24 24" width="${ringkas ? "13" : "16"}" height="${ringkas ? "13" : "16"}" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg></button>' +
+                '<button id="btn-lapisan" type="button" aria-label="Lapisan peta" title="Lapisan peta" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z" /><path d="m2 17 10 5 10-5" /><path d="m2 12 10 5 10-5" /></svg><span class="lencana-hotspot"></span></button>';
               document.body.appendChild(zoomBox);
+              // SET_HOTSPOT bisa tiba sebelum tombol ini ada.
+              if (hotspotTertunda) document.getElementById('btn-lapisan')?.classList.add('ada-hotspot');
 
               document.getElementById('btn-bentang')?.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -1229,6 +2257,16 @@ export async function GET(req: NextRequest) {
               document.getElementById('btn-zoom-out')?.addEventListener('click', function(e) {
                 e.stopPropagation();
                 if (window.W && window.W.map && window.W.map.map) window.W.map.map.zoomOut(1);
+              });
+
+              // Tombol Lapisan: panelnya hidup di halaman induk (peta.tsx) —
+              // kirim kotak tombol supaya panel bisa dijangkarkan ke sini.
+              document.getElementById('btn-lapisan')?.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const r = this.getBoundingClientRect();
+                if (window.parent && window.parent !== window) {
+                  window.parent.postMessage({ type: 'ALIH_LAPISAN', kotak: { left: r.left, top: r.top, right: r.right, bottom: r.bottom } }, '*');
+                }
               });
 
               document.getElementById('btn-zoom-home')?.addEventListener('click', function(e) {
@@ -1255,6 +2293,13 @@ export async function GET(req: NextRequest) {
                 const p = map.getPane('angkaPane');
                 p.style.zIndex = '460';
                 p.style.pointerEvents = 'none';
+              }
+              // Titik hotspot: di atas poligon provinsi, di bawah angka laporan.
+              if (!map.getPane('hotspotPane')) {
+                map.createPane('hotspotPane');
+                const ph = map.getPane('hotspotPane');
+                ph.style.zIndex = '440';
+                ph.style.pointerEvents = 'none';
               }
             } catch (e) {}
 
@@ -1397,11 +2442,14 @@ export async function GET(req: NextRequest) {
             });
 
             mapInitialized = true;
+            if (hotspotTertunda) gambarHotspot(map, hotspotTertunda);
 
             // Pastikan logo Copernicus & logo Windy selalu hadir di DOM dan tampil
             function pastikanSemuaLogo() {
               // Pastikan interaksi sentuh geser/cubit selalu aktif di mobile
               pastikanSentuhMulus();
+              // Lapisan udara tetap terpasang & lapisan AQI Windy tetap tersembunyi.
+              jagaLapisanUdara();
               // 1. Copernicus: Windy di mobile tidak menyisipkan logo Copernicus (!C di script internalnya)
               var ci = document.querySelector('img[src*="copernicus"]');
               var wsp = document.querySelector('.rhpane__bottom-messages');
@@ -1449,6 +2497,8 @@ export async function GET(req: NextRequest) {
             if (window.parent) {
               window.parent.postMessage({ type: 'FORECASTING_READY' }, '*');
             }
+            // Lapisan AQI + angin kita (lihat mesin lapisan udara di atas).
+            mulaiLapisanUdara();
           }
 
           // Listener pesan dari parent Next.js
@@ -1510,6 +2560,41 @@ export async function GET(req: NextRequest) {
                 try {
                   window.W.map.map.invalidateSize();
                 } catch(e) {}
+              }
+              // Lapisan Angin tampil lagi: lanjutkan animasi (partikel & putar).
+              udaraAktif = true;
+              mintaGambarUdara();
+            } else if (data.type === 'WINDY_NONAKTIF') {
+              // Induk beralih ke lapisan Aerosol: iframe tersembunyi
+              // (opacity 0), jadi loop animasi & partikel berhenti total.
+              udaraAktif = false;
+              hentikanPutaranUdara();
+            } else if (data.type === 'PUTAR_UDARA') {
+              if (data.laju === 1 || data.laju === 2) udaraLaju = data.laju;
+              if (typeof data.putar === 'boolean') udaraMemutar = data.putar;
+              mintaGambarUdara();
+              laporWaktuUdara();
+            } else if (data.type === 'SET_PROGRES') {
+              // Lompat (tombol sebelum/berikut, slider) — putar tak dihentikan,
+              // sama seperti bilah waktu Aerosol.
+              if (typeof data.progres === 'number' && isFinite(data.progres)) {
+                udaraProgresDariInduk = true;
+                setelProgresUdara(data.progres);
+              }
+            } else if (data.type === 'GESER_UDARA') {
+              // Slider sedang digeser: progres ditahan di tangan pengguna dan
+              // peta digambar ulang tiap frame; dilepas → putar berlanjut.
+              udaraGeser = !!data.geser;
+              if (typeof data.progres === 'number' && isFinite(data.progres)) setelProgresUdara(data.progres);
+              else {
+                mintaGambarUdara();
+                laporWaktuUdara();
+              }
+            } else if (data.type === 'SET_HOTSPOT') {
+              hotspotTertunda = Array.isArray(data.titik) ? data.titik : null;
+              document.getElementById('btn-lapisan')?.classList.toggle('ada-hotspot', !!hotspotTertunda);
+              if (mapInitialized && window.W && window.W.map && window.W.map.map) {
+                gambarHotspot(window.W.map.map, hotspotTertunda);
               }
             } else if (data.type === 'SET_TEMA') {
               const zb = document.getElementById('custom-zoom-controls');

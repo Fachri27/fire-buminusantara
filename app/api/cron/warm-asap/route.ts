@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { hangatkanSemuaFrame } from "@/lib/zarr-reader";
+import { hangatkanSemuaFrameUdara } from "@/lib/udara-reader";
 
 export const maxDuration = 60; // Timeout 60 detik untuk pre-warm background
 
@@ -74,10 +75,24 @@ async function prosesPrewarm(req: NextRequest) {
   try {
     const hasil = await hangatkanSemuaFrame();
 
+    // Lapisan udara (AQI + angin) memakai store & linimasa yang sama, jadi
+    // ikut dihangatkan di sini — cron yang sudah ada langsung mencakupnya.
+    // Berurutan (bukan paralel) agar beban unduhan ke ECMWF tidak menumpuk;
+    // metadata tidak dipaksa segar lagi karena baru saja diperbarui di atas.
+    // Gagalnya tidak menggagalkan hasil sebaran asap yang sudah selesai.
+    let udara: Awaited<ReturnType<typeof hangatkanSemuaFrameUdara>> | { error: string };
+    try {
+      udara = await hangatkanSemuaFrameUdara(undefined, false);
+    } catch (err) {
+      console.error("[Cron warm-asap] Gagal pre-warm udara:", err);
+      udara = { error: err instanceof Error ? err.message : "Gagal menghangatkan cache udara" };
+    }
+
     return NextResponse.json({
       success: true,
       message: `Berhasil menghangatkan ${hasil.berhasil}/${hasil.total} frame sebaran asap ke memori server`,
       ...hasil,
+      udara,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

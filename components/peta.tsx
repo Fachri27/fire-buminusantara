@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, type CSSProperties, type KeyboardEvent as KeyboardEventReact, type PointerEvent as PointerEventReact } from "react";
 import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
@@ -18,6 +18,15 @@ const PetaAsap = dynamic(
 
 import type { Berita } from "@/lib/events";
 import { BATAS_NUSANTARA, selaNusantara } from "@/lib/kamera-nusantara";
+// Hanya konstanta & tipe — modul ini mengimpor maplibre-gl sebatas tipe,
+// jadi peta.tsx tetap tak ikut menarik maplibre-gl ke bundelnya.
+import {
+  formatWib,
+  hitungKepercayaan,
+  LABEL_KEPERCAYAAN,
+  WARNA_HOTSPOT,
+  type DataHotspot,
+} from "@/lib/lapisan-hotspot";
 
 /** Bagian peta MapLibre lapisan Aerosol yang dibaca untuk menyamakan kamera
  *  Windy — diakses lewat window supaya peta.tsx tak mengimpor maplibre-gl. */
@@ -63,6 +72,51 @@ function kameraAerosolKini(): { lat: number; lon: number; zoom: number } | null 
  *  asap = ungu berbahaya #49006A, windy = oren bara. */
 export type ModePeta = "asap" | "windy";
 
+/** Peta dasar di dropdown kiri atas. `latar` = gradien pil saat aktif. */
+const LAPISAN: {
+  mode: ModePeta;
+  ikon: string;
+  label: string;
+  labelPendek: string;
+  keterangan: string;
+  latar: string;
+  kelasAktif: string;
+}[] = [
+  {
+    mode: "asap",
+    ikon: "🔥",
+    label: "Aerosol Karhutla",
+    labelPendek: "Karhutla",
+    keterangan: "Sebaran asap karhutla",
+    latar: "linear-gradient(to right, #49006a 0%, #86198f 35%, #b90d84 65%, #f472b6 90%, #fce7f3 100%)",
+    kelasAktif: "shadow-purple-950/50 ring-fuchsia-400/40",
+  },
+  {
+    mode: "windy",
+    ikon: "💨",
+    label: "Angin dan Kualitas Udara",
+    labelPendek: "Angin",
+    keterangan: "Kualitas udara dan arah angin",
+    latar: "linear-gradient(to right, #047857 0%, #059669 40%, #10b981 75%, #84cc16 100%)",
+    kelasAktif: "shadow-emerald-950/50 ring-emerald-400/40",
+  },
+];
+
+/** Data hotspot dianggap basi setelah ini — sama dengan cache server. */
+const UMUR_DATA_HOTSPOT = 30 * 60 * 1000;
+
+/** Warna slider bilah waktu lapisan Angin — hijau pil lapisannya (LAPISAN),
+ *  menimpa magenta Aerosol pada .timeline-slider (gaya global PetaAsap). */
+const JEJAK_SLIDER_ANGIN = {
+  "--jejak-awal": "#059669",
+  "--jejak-akhir": "#84cc16",
+  "--jejak-cincin": "rgba(132, 204, 22, 0.4)",
+} as CSSProperties;
+
+/** Satu titik waktu lapisan Angin — dikirim iframe (LINIMASA_UDARA) dari
+ *  metadata /api/udara, langkahnya sama dengan lapisan Aerosol. */
+type LangkahUdara = { labelWib: string; adalahPrediksi: boolean };
+
 type Props = {
   jumlahLaporan: Record<string, number>;
   onPilihWilayah: (nama: string, pulau: string | null, asal: { x: number; y: number }) => void;
@@ -100,6 +154,11 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   // fallback ke state dalam supaya pemakaian lama (beranda) tak berubah.
   const terkendali = modeLuar !== undefined && onModeChange !== undefined;
   const mode = terkendali ? modeLuar : modeDalam;
+  // Mode terkini untuk efek & pendengar yang tak ingin bergantung pada `mode`.
+  const modeRef = useRef(mode);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
   const [hasOpenedWindy, setHasOpenedWindy] = useState(() => (modeLuar ?? "asap") === "windy");
   /* Hanya kamera awalnya yang disimpan sebagai state. Sisa parameter iframe
      dirangkai saat render, BUKAN dibekukan saat Windy pertama dibuka: bingkai
@@ -181,6 +240,102 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     }
   }, []);
 
+  /* Lapisan tambahan Titik Hotspot (lib/lapisan-hotspot.ts) — dinyalakan dari
+     menu lapisan dan ditumpangkan di peta dasar mana pun yang tampil: PetaAsap
+     lewat prop, iframe Windy lewat pesan SET_HOTSPOT. Data diambil sekali di
+     sini lalu dibagi ke keduanya. */
+  // Menyala sejak peta dibuka — datanya langsung diambil saat terpasang.
+  const [hotspotAktif, setHotspotAktif] = useState(true);
+  const [dataHotspot, setDataHotspot] = useState<DataHotspot | null>(null);
+  const [statusHotspot, setStatusHotspot] = useState<"diam" | "memuat" | "siap" | "galat">("memuat");
+  const waktuAmbilHotspotRef = useRef(0);
+  const ambilHotspot = useCallback(() => {
+    fetch("/api/hotspot")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((d: DataHotspot) => {
+        waktuAmbilHotspotRef.current = Date.now();
+        setDataHotspot(d);
+        setStatusHotspot("siap");
+      })
+      .catch(() => setStatusHotspot("galat"));
+  }, []);
+  useEffect(() => {
+    ambilHotspot();
+  }, [ambilHotspot]);
+  const alihHotspot = () => {
+    const nyala = !hotspotAktif;
+    setHotspotAktif(nyala);
+    const basi = Date.now() - waktuAmbilHotspotRef.current > UMUR_DATA_HOTSPOT;
+    if (!nyala || statusHotspot === "memuat" || (statusHotspot === "siap" && !basi)) return;
+    setStatusHotspot("memuat");
+    ambilHotspot();
+  };
+  const hotspotTampil = hotspotAktif ? dataHotspot : null;
+  const perKepercayaan = dataHotspot ? hitungKepercayaan(dataHotspot) : null;
+
+  // Iframe Windy cukup menerima [lng, lat, kepercayaan]; disimpan juga untuk
+  // dikirim ulang setiap iframe (ulang) siap.
+  const hotspotWindyRef = useRef<number[][] | null>(null);
+  useEffect(() => {
+    hotspotWindyRef.current = hotspotTampil ? hotspotTampil.titik.map((t) => [t[0], t[1], t[2]]) : null;
+    if (iframeReadyRef.current) kirimData({ type: "SET_HOTSPOT", titik: hotspotWindyRef.current });
+  }, [hotspotTampil, kirimData]);
+
+  /* Bilah waktu lapisan Angin — tampilannya di sini (rupa sama persis dengan
+     bilah waktu Aerosol), mesinnya di iframe: progres pecahan, frame AQI +
+     angin dari /api/udara yang dibaurkan di GPU (lihat "Lapisan udara" di
+     app/api/forecasting/route.ts). PUTAR_UDARA / SET_PROGRES / GESER_UDARA
+     keluar; LINIMASA_UDARA (daftar langkah) dan WAKTU_UDARA (progres, tiap
+     frame selama berputar/digeser) masuk.
+     Seperti bilah waktu Aerosol, posisi slider & label waktu ditulis langsung
+     ke DOM (tampilkanWaktuWindy) — me-render ulang seluruh Peta tiap pesan
+     membuat geraknya patah-patah. State statusWindy hanya berubah saat indeks
+     langkah, status putar, atau persen unduhan berganti. */
+  const [linimasaWindy, setLinimasaWindy] = useState<{
+    langkah: LangkahUdara[];
+    modelRunWib: string | null;
+  } | null>(null);
+  const [statusWindy, setStatusWindy] = useState({ memutar: false, menunggu: false, indeks: 0, persenUnduh: 0 });
+  const [lajuWindy, setLajuWindy] = useState<1 | 2>(1);
+  const lajuWindyRef = useRef<1 | 2>(1);
+  // Bilah waktu Windy berputar sendiri (seperti Aerosol) setiap lapisannya
+  // dibuka — kecuali pengunjung sendiri yang menjedanya.
+  const dijedaPenggunaRef = useRef(false);
+  // Progres terakhir (indeks pecahan) — juga diteruskan ke iframe yang dimuat
+  // ulang (masuk/keluar selayar) supaya putarannya melanjutkan, bukan mengulang.
+  const progresWindyRef = useRef(0);
+  const langkahWindyRef = useRef<LangkahUdara[]>([]);
+  const sliderWindyRef = useRef<HTMLInputElement | null>(null);
+  const labelWindyRef = useRef<HTMLSpanElement | null>(null);
+  // Selama slider digeser, laporan iframe tak menimpa posisi jempolnya.
+  const geserWindyRef = useRef(false);
+  const tampilkanWaktuWindy = useCallback((progres: number) => {
+    const langkah = langkahWindyRef.current;
+    const n = langkah.length;
+    const slider = sliderWindyRef.current;
+    if (slider && n > 1) {
+      slider.value = progres.toFixed(2);
+      slider.style.setProperty("--progress-percent", `${((Math.min(progres, n - 1) / (n - 1)) * 100).toFixed(1)}%`);
+    }
+    const label = labelWindyRef.current;
+    const teks = n ? langkah[Math.floor(progres) % n]?.labelWib : undefined;
+    if (label && teks && label.textContent !== teks) label.textContent = teks;
+  }, []);
+
+  // Panel "Lapisan peta" — lihat alihPanelAerosol di bawah.
+  const [panelLapisan, setPanelLapisan] = useState<{
+    kanan: number;
+    bawah: number;
+    asal: ModePeta;
+    penuh: boolean;
+  } | null>(null);
+  const panelTampil = panelLapisan !== null && panelLapisan.asal === mode && panelLapisan.penuh === isPenuh;
+  const tombolLapisanRef = useRef<HTMLButtonElement | null>(null);
+  const panelLapisanRef = useRef<HTMLDivElement | null>(null);
+  // Klik #btn-lapisan saat panel terbuka memicu blur jendela (panel tutup)
+  // lalu pesan ALIH_LAPISAN — tanpa penanda ini panel langsung terbuka lagi.
+  const ditutupBlurRef = useRef(0);
+
   // Aktifkan pemuatan iframe saat pertama kali beralih ke mode Windy
   const handlePilihMode = (m: ModePeta) => {
     if (terkendali) onModeChange?.(m);
@@ -209,12 +364,22 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         );
       }
       setHasOpenedWindy(true);
+      // Kembali ke lapisan Angin dengan iframe yang sudah siap: putar lagi.
+      // (Pembukaan pertama diputar saat FORECASTING_READY.)
       kirimData({ type: "WINDY_ACTIVE" });
+      if (iframeReadyRef.current && !dijedaPenggunaRef.current) {
+        kirimData({ type: "PUTAR_UDARA", putar: true, laju: lajuWindyRef.current });
+      }
       kirimData({ type: "SET_JUMLAH", jumlahLaporan });
       if (berita && berita.length > 0) {
         kirimData({ type: "SET_EVENTS", events: berita });
       }
     } else if (m === "asap" && hasOpenedWindy) {
+      // Animasi Angin tak perlu jalan di balik lapisan Aerosol: putar dijeda
+      // (bukan oleh pengunjung — kembali ke Angin memutarnya lagi) dan loop
+      // partikel di iframe berhenti total.
+      kirimData({ type: "PUTAR_UDARA", putar: false });
+      kirimData({ type: "WINDY_NONAKTIF" });
       try {
         const windy = (iframeRef.current?.contentWindow as unknown as {
           W?: { map?: { map?: PetaWindy & { _maplibreMap?: { getZoom: () => number } } } };
@@ -284,6 +449,20 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             events: berita,
           });
         }
+        if (hotspotWindyRef.current) {
+          kirimData({ type: "SET_HOTSPOT", titik: hotspotWindyRef.current });
+        }
+        // Iframe dimuat ulang (masuk/keluar selayar): lanjutkan dari posisi
+        // terakhir. Pembukaan pertama (linimasa belum pernah diterima) dibiarkan
+        // iframe mulai dari langkah terdekat dengan sekarang, seperti Aerosol.
+        if (langkahWindyRef.current.length > 0) kirimData({ type: "SET_PROGRES", progres: progresWindyRef.current });
+        if (lajuWindyRef.current !== 1) kirimData({ type: "PUTAR_UDARA", laju: lajuWindyRef.current });
+        // Putar otomatis begitu peta Windy siap (juga setelah iframe dimuat ulang).
+        if (modeRef.current !== "windy") {
+          kirimData({ type: "WINDY_NONAKTIF" });
+        } else if (!dijedaPenggunaRef.current) {
+          kirimData({ type: "PUTAR_UDARA", putar: true, laju: lajuWindyRef.current });
+        }
       } else if (data.type === "PILIH_WILAYAH") {
         const rect = iframeRef.current?.getBoundingClientRect();
         const asal = {
@@ -295,6 +474,52 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         // Tombol bentang di dalam iframe Windy (route /api/forecasting
         // memasangnya bila query bentang=1): teruskan aksinya ke induk.
         onExpandRef.current?.();
+      } else if (data.type === "LINIMASA_UDARA") {
+        // Daftar langkah dari metadata /api/udara — sekali per siklus model.
+        if (!Array.isArray(data.langkah)) return;
+        const langkah: LangkahUdara[] = data.langkah.map((l: { labelWib?: unknown; adalahPrediksi?: unknown }) => ({
+          labelWib: typeof l?.labelWib === "string" ? l.labelWib : "",
+          adalahPrediksi: Boolean(l?.adalahPrediksi),
+        }));
+        langkahWindyRef.current = langkah;
+        setLinimasaWindy({ langkah, modelRunWib: typeof data.modelRunWib === "string" ? data.modelRunWib : null });
+        if (!geserWindyRef.current) tampilkanWaktuWindy(progresWindyRef.current);
+      } else if (data.type === "WAKTU_UDARA") {
+        // Tiap frame layar selama berputar/digeser — DOM ditulis langsung.
+        if (typeof data.progres !== "number" || !isFinite(data.progres)) return;
+        const n = langkahWindyRef.current.length;
+        if (!geserWindyRef.current) {
+          progresWindyRef.current = data.progres;
+          tampilkanWaktuWindy(data.progres);
+        }
+        const baru = {
+          memutar: Boolean(data.memutar),
+          // Putar tertahan menunggu frame berikutnya diunduh (bukan macet).
+          menunggu: Boolean(data.memutar && data.menunggu),
+          indeks: n ? Math.floor(progresWindyRef.current) % n : 0,
+          persenUnduh: data.total > 0 ? Math.round((Math.min(data.terunduh, data.total) / data.total) * 100) : 0,
+        };
+        // Objek lama dikembalikan bila statusnya sama → React tak me-render.
+        setStatusWindy((p) =>
+          p.memutar === baru.memutar && p.menunggu === baru.menunggu && p.indeks === baru.indeks && p.persenUnduh === baru.persenUnduh
+            ? p
+            : baru,
+        );
+      } else if (data.type === "ALIH_LAPISAN") {
+        // Tombol Lapisan di kolom kendali iframe Windy. Kotaknya dalam
+        // koordinat iframe — sama dengan koordinat logis akar, karena lapisan
+        // Windy menempel di sudut kiri-atas akar.
+        if (Date.now() - ditutupBlurRef.current < 400) return; // klik inilah yang menutupnya
+        const akar = akarRef.current;
+        const k = data.kotak;
+        if (!akar || !k || !isFinite(k.left) || !isFinite(k.bottom)) return;
+        // Alih menurut panel yang TAMPIL — state basi dari bingkai lain
+        // (sebelum masuk/keluar selayar) tersembunyi, jadi dibuka ulang.
+        setPanelLapisan((p) =>
+          p && p.asal === "windy" && p.penuh === isPenuh
+            ? null
+            : { kanan: akar.offsetWidth - k.left + 8, bawah: akar.offsetHeight - k.bottom, asal: "windy", penuh: isPenuh },
+        );
       } else if (data.type === "BUKA_RINCIAN_KEJADIAN") {
         const ketemu = berita?.find((b) => b.id === data.eventId || b.slug === data.slug);
         if (ketemu && onBukaRincian) {
@@ -328,7 +553,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
     window.addEventListener("message", saatPesan);
     return () => window.removeEventListener("message", saatPesan);
-  }, [kirimData, berita, onBukaRincian, isPenuh, resolvedTheme]);
+  }, [kirimData, berita, onBukaRincian, isPenuh, resolvedTheme, tampilkanWaktuWindy]);
 
   // Siarkan pergantian tema secara langsung ke iframe Windy
   useEffect(() => {
@@ -345,11 +570,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
      Dikunci ke perubahan isPenuh saja; `mode` dibaca lewat ref. Kalau `mode`
      ikut jadi dependensi, tiap ganti tab kamera dipaksa balik ke framing
      Nusantara dan geseran/zoom pengunjung hilang — padahal handlePilihMode
-     sudah menyamakan kamera antar-tab dari kamera Aerosol yang sedang tampil. */
-  const modeRef = useRef(mode);
-  useEffect(() => {
-    modeRef.current = mode;
-  }, [mode]);
+     sudah menyamakan kamera antar-tab dari kamera Aerosol yang sedang tampil.
+     (modeRef dideklarasikan di dekat `mode` — pendengar pesan iframe juga
+     membacanya.) */
   useEffect(() => {
     if (modeRef.current !== "windy") return;
     if (!isPenuh && !muatNusantara) return;
@@ -457,14 +680,255 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     navigator.clipboard.writeText(teks).then(() => setTersalin(jenis), () => {});
   };
 
+  /* Panel "Lapisan peta" — dibuka dari tombol Lapisan di ujung kolom kendali
+     kanan: tombolLapisan (slotKendali PetaAsap) di lapisan Aerosol, dan
+     #btn-lapisan di iframe Windy (pesan ALIH_LAPISAN). Panelnya dirender di
+     sini, dijangkarkan ke tombol: terbuka ke kiri, rata dasar tombol, tumbuh
+     ke atas — di bingkai kecil landing (403px logis) bawahnya tak cukup.
+     `penuh` & `asal` menyembunyikannya bila jangkarnya berpindah (masuk/keluar
+     selayar, ganti peta dasar) tanpa perlu efek penutup. State-nya dideklarasikan
+     di atas, dekat state hotspot — pendengar pesan iframe ikut memakainya. */
+  const alihPanelAerosol = () => {
+    if (panelTampil) {
+      setPanelLapisan(null);
+      return;
+    }
+    const akar = akarRef.current;
+    const tombol = tombolLapisanRef.current;
+    if (!akar || !tombol) return;
+    // Koordinat layar → logis: bingkai landing diperkecil transform:scale.
+    const ra = akar.getBoundingClientRect();
+    const rt = tombol.getBoundingClientRect();
+    const s = ra.width / akar.offsetWidth || 1;
+    setPanelLapisan({ kanan: (ra.right - rt.left) / s + 8, bawah: (ra.bottom - rt.bottom) / s, asal: "asap", penuh: isPenuh });
+  };
+  useEffect(() => {
+    if (!panelLapisan) return;
+    const tutupLuar = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (panelLapisanRef.current?.contains(t) || tombolLapisanRef.current?.contains(t)) return;
+      setPanelLapisan(null);
+    };
+    const tutupEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setPanelLapisan(null);
+      // Kembalikan fokus ke tombol Lapisan yang membukanya.
+      if (modeRef.current === "asap") tombolLapisanRef.current?.focus();
+      else iframeRef.current?.contentDocument?.getElementById("btn-lapisan")?.focus();
+    };
+    const tutupBlur = () => {
+      ditutupBlurRef.current = Date.now();
+      setPanelLapisan(null);
+    };
+    // Fase tangkap: kanvas MapLibre menangani pointerdown-nya sendiri.
+    document.addEventListener("pointerdown", tutupLuar, true);
+    document.addEventListener("keydown", tutupEsc);
+    window.addEventListener("blur", tutupBlur);
+    panelLapisanRef.current?.querySelector<HTMLElement>('[role="switch"]')?.focus();
+    return () => {
+      document.removeEventListener("pointerdown", tutupLuar, true);
+      document.removeEventListener("keydown", tutupEsc);
+      window.removeEventListener("blur", tutupBlur);
+    };
+  }, [panelLapisan]);
+
+  /* Dropdown peta dasar (kiri atas). Tertutup saat klik di luar, Escape, atau
+     saat jendela kehilangan fokus — klik di dalam iframe Windy tak memicu
+     pointerdown di dokumen ini, tapi memindah fokus ke iframe. */
+  const [bukaPilihan, setBukaPilihan] = useState(false);
+  const pilihanRef = useRef<HTMLDivElement | null>(null);
+  const pemicuPilihanRef = useRef<HTMLButtonElement | null>(null);
+  const menuPilihanRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!bukaPilihan) return;
+    const tutupLuar = (e: PointerEvent) => {
+      if (!pilihanRef.current?.contains(e.target as Node)) setBukaPilihan(false);
+    };
+    const tutupEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setBukaPilihan(false);
+      pemicuPilihanRef.current?.focus();
+    };
+    const tutup = () => setBukaPilihan(false);
+    document.addEventListener("pointerdown", tutupLuar, true);
+    document.addEventListener("keydown", tutupEsc);
+    window.addEventListener("blur", tutup);
+    // Fokus ke peta dasar aktif supaya panah atas/bawah langsung bisa dipakai.
+    menuPilihanRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+    return () => {
+      document.removeEventListener("pointerdown", tutupLuar, true);
+      document.removeEventListener("keydown", tutupEsc);
+      window.removeEventListener("blur", tutup);
+    };
+  }, [bukaPilihan]);
+  const gerakFokusPilihan = (e: KeyboardEventReact<HTMLDivElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const item = [...(menuPilihanRef.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])];
+    const i = item.indexOf(document.activeElement as HTMLElement);
+    item[(i + (e.key === "ArrowDown" ? 1 : -1) + item.length) % item.length]?.focus();
+  };
+  const lapisanAktif = LAPISAN.find((l) => l.mode === mode) ?? LAPISAN[0];
+
   /* Pil alih mode versi rapat untuk bingkai dasbor — sedikit lebih kecil
      dari versi fullscreen beranda. */
   const kelasPil = `flex cursor-pointer items-center gap-1 sm:gap-2 rounded-full font-semibold transition-all ${
     tombolRapat ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs"
   }`;
+
   const kelasInfo = `flex cursor-pointer items-center justify-center rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:shadow-2xl dark:ring-1 dark:ring-white/20 backdrop-blur-md transition-all active:scale-95 ${
     tombolRapat ? "h-7 w-7" : "h-8 w-8 sm:h-9 sm:w-9"
   }`;
+
+  /* Bilah waktu lapisan Angin — lihat linimasaWindy. Legenda hotspot di atas logo
+     Windy naik ke atas bilah ini bila bilahnya melebar sampai sisi kiri
+     (ponsel, bingkai sempit); di layar lega keduanya berdampingan. */
+  const adaLinimasaWindy = mode === "windy" && linimasaWindy !== null && linimasaWindy.langkah.length > 1;
+  const langkahWindyKini = linimasaWindy?.langkah[statusWindy.indeks];
+  const prediksiWindy = Boolean(langkahWindyKini?.adalahPrediksi);
+  const linimasaWindyRef = useRef<HTMLDivElement | null>(null);
+  // null = jarak bawaan di atas logo Windy (kelas bottom-[88px] sm:bottom-[66px]).
+  const [legendaWindyBawah, setLegendaWindyBawah] = useState<number | null>(null);
+  useEffect(() => {
+    const el = linimasaWindyRef.current;
+    const lapis = lapisWindyRef.current;
+    if (!adaLinimasaWindy || !el || !lapis) return;
+    // Legenda: left-5 (20px) + w-52 (208px) + sela 8px. Bila bilah waktu
+    // menjangkau area itu, legenda naik tepat 8px di atas bilahnya.
+    const amati = new ResizeObserver(() => {
+      setLegendaWindyBawah(el.offsetLeft < 236 ? lapis.clientHeight - el.offsetTop + 8 : null);
+    });
+    amati.observe(el);
+    amati.observe(lapis);
+    return () => amati.disconnect();
+  }, [adaLinimasaWindy]);
+  // Slider baru terpasang (pertama dibuka / kembali dari Aerosol): isi posisinya.
+  useEffect(() => {
+    if (adaLinimasaWindy) tampilkanWaktuWindy(progresWindyRef.current);
+  }, [adaLinimasaWindy, tampilkanWaktuWindy]);
+  // Lompat/geser dari bilah waktu — sama seperti Aerosol, putar tak dihentikan.
+  const setelProgresWindy = (progres: number) => {
+    progresWindyRef.current = progres;
+    tampilkanWaktuWindy(progres);
+    kirimData({ type: "SET_PROGRES", progres });
+  };
+  const lompatWindy = (arah: -1 | 1) => {
+    const n = langkahWindyRef.current.length;
+    if (n < 2) return;
+    const kini = Math.floor(progresWindyRef.current);
+    setelProgresWindy(arah === -1 ? Math.max(0, kini - 1) : (kini + 1) % n);
+  };
+  // Scrubbing ala handlePointerDown Aerosol: jempol langsung melompat ke titik
+  // tekan, progres ditahan selama ditekan, putar berlanjut setelah dilepas.
+  const mulaiGeserWindy = (e: PointerEventReact<HTMLInputElement>) => {
+    geserWindyRef.current = true;
+    const kotak = e.currentTarget.getBoundingClientRect();
+    const n = langkahWindyRef.current.length;
+    let progres: number | undefined;
+    if (kotak.width > 0 && n > 1) {
+      progres = Math.max(0, Math.min(1, (e.clientX - kotak.left) / kotak.width)) * (n - 1);
+      progresWindyRef.current = progres;
+      tampilkanWaktuWindy(progres);
+    }
+    kirimData({ type: "GESER_UDARA", geser: true, progres });
+    const lepas = () => {
+      geserWindyRef.current = false;
+      kirimData({ type: "GESER_UDARA", geser: false });
+      window.removeEventListener("pointerup", lepas);
+      window.removeEventListener("pointercancel", lepas);
+    };
+    window.addEventListener("pointerup", lepas);
+    window.addEventListener("pointercancel", lepas);
+  };
+  const alihPutarWindy = () => {
+    const putar = !statusWindy.memutar;
+    dijedaPenggunaRef.current = !putar;
+    kirimData({ type: "PUTAR_UDARA", putar, laju: lajuWindy });
+  };
+  const alihLajuWindy = () => {
+    const laju = lajuWindy === 1 ? 2 : 1;
+    setLajuWindy(laju);
+    lajuWindyRef.current = laju;
+    kirimData({ type: "PUTAR_UDARA", laju });
+  };
+
+  /* Tombol Lapisan untuk ujung kolom kendali PetaAsap (slotKendali) — gaya &
+     ukurannya sama dengan tombol navigasi di atasnya. Titik merah = lapisan
+     hotspot sedang menyala. Padanannya di iframe Windy: #btn-lapisan. */
+  const tombolLapisan = (
+    <button
+      ref={tombolLapisanRef}
+      type="button"
+      onClick={alihPanelAerosol}
+      aria-haspopup="dialog"
+      aria-expanded={panelTampil}
+      aria-label="Lapisan peta"
+      title="Lapisan peta"
+      className={`relative cursor-pointer flex items-center justify-center rounded-xl bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-transform active:scale-90 ${legendaRingkas ? "h-7 w-7" : "h-9 w-9"}`}
+    >
+      <svg viewBox="0 0 24 24" width={legendaRingkas ? 13 : 16} height={legendaRingkas ? 13 : 16} fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+        <path d="m2 17 10 5 10-5" />
+        <path d="m2 12 10 5 10-5" />
+      </svg>
+      {hotspotAktif && (
+        <span
+          className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full ring-2 ring-white dark:ring-pantau-konsol"
+          style={{ background: WARNA_HOTSPOT[2] }}
+          aria-hidden="true"
+        />
+      )}
+    </button>
+  );
+
+  /* Legenda Titik Hotspot di atas logo Copernicus — di lapisan Aerosol lewat
+     slotAtasLogo PetaAsap (ikut ke mana pun logonya pindah), di lapisan Angin
+     di atas logo dalam iframe Windy. Hanya muncul saat lapisannya menyala dan
+     peta dalam mode selayar — di bingkai kecil beranda ruangnya terlalu sempit
+     (titiknya tetap tampil). Sakelarnya ada di panel Lapisan, jadi status
+     muat/gagal dikabarkan di sini. */
+  const legendaHotspot = hotspotAktif && isPenuh ? (
+    <div
+      role="status"
+      className="w-52 rounded-xl bg-white/90 border border-black/[0.08] px-2.5 py-2 text-tinta shadow-sm backdrop-blur-md dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:ring-1 dark:ring-white/15"
+    >
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold">
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${statusHotspot === "memuat" ? "animate-pulse" : ""}`}
+          style={{ background: WARNA_HOTSPOT[2], boxShadow: `0 0 6px ${WARNA_HOTSPOT[2]}` }}
+          aria-hidden="true"
+        />
+        Titik Hotspot
+      </div>
+      {statusHotspot === "memuat" && (
+        <p className="mt-1 text-[10.5px] text-tinta/60 dark:text-white/55">Memuat data satelit NASA FIRMS…</p>
+      )}
+      {statusHotspot === "galat" && (
+        <p className="mt-1 text-[10.5px] leading-snug text-amber-700 dark:text-amber-400">
+          Data belum bisa dimuat. Matikan lalu nyalakan lagi lewat tombol Lapisan.
+        </p>
+      )}
+      {statusHotspot === "siap" && dataHotspot && perKepercayaan && (
+        <>
+          <div className="mt-1.5">
+            {([2, 1, 0] as const).map((k) => (
+              <div key={k} className="flex items-center gap-2 py-px text-[10.5px]">
+                <span className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/20" style={{ background: WARNA_HOTSPOT[k] }} />
+                <span className="text-tinta/70 dark:text-white/70">Kepercayaan {LABEL_KEPERCAYAAN[k].toLowerCase()}</span>
+                <span className="ml-auto font-semibold tabular-nums">{perKepercayaan[k].toLocaleString("id-ID")}</span>
+              </div>
+            ))}
+          </div>
+          {dataHotspot.diperbarui && (
+            <p className="mt-1 text-[10px] leading-snug text-tinta/50 dark:text-white/45">
+              24 jam terakhir, terbaru {formatWib(Date.parse(dataHotspot.diperbarui))}
+              {dataHotspot.basi ? " (data tersimpan)" : ""}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div
@@ -474,47 +938,88 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     >
       {/* Tombol Alih Mode Layer Peta & Info Perbedaan */}
       <div className={`pointer-events-auto absolute left-4 z-[450] flex items-center gap-1.5 sm:gap-2 sm:left-6 ${tombolRapat ? "top-4" : "top-20"}`}>
-        <div className="flex items-center gap-1 rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:shadow-2xl dark:ring-1 dark:ring-white/20 p-1 backdrop-blur-md">
-          <button
-            type="button"
-            onClick={() => handlePilihMode("asap")}
-            style={
-              mode === "asap"
-                ? {
-                    background:
-                      "linear-gradient(to right, #49006a 0%, #86198f 35%, #b90d84 65%, #f472b6 90%, #fce7f3 100%)",
-                  }
-                : undefined
-            }
-            className={`${kelasPil} ${
-              mode === "asap"
-                ? "text-white shadow-md shadow-purple-950/50 ring-1 ring-fuchsia-400/40 [text-shadow:_0_1px_2px_rgb(0_0_0_/_70%)]"
-                : "text-tinta/75 hover:bg-black/[0.05] hover:text-tinta dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
-            }`}
-          >
-            <span className="text-xs sm:text-sm leading-none">🔥</span>
-            <span><span className="hidden sm:inline">Aerosol </span>Karhutla</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handlePilihMode("windy")}
-            style={
-              mode === "windy"
-                ? {
-                    background:
-                      "linear-gradient(to right, #047857 0%, #059669 40%, #10b981 75%, #84cc16 100%)",
-                  }
-                : undefined
-            }
-            className={`${kelasPil} ${
-              mode === "windy"
-                ? "text-white shadow-md shadow-emerald-950/50 ring-1 ring-emerald-400/40 [text-shadow:_0_1px_2px_rgb(0_0_0_/_70%)]"
-                : "text-tinta/75 hover:bg-black/[0.05] hover:text-tinta dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
-            }`}
-          >
-            <span className="text-xs sm:text-sm leading-none">💨</span>
-            <span>Angin<span className="hidden sm:inline"> dan Kualitas Udara</span></span>
-          </button>
+        {/* Dropdown peta dasar — pemicunya pil lapisan aktif (gradien yang sama
+            dengan pil alih mode sebelumnya). Lapisan tambahan (hotspot) ada di
+            panel tombol Lapisan, kolom kendali kanan. */}
+        <div ref={pilihanRef} className="relative">
+          <div className="flex items-center rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:shadow-2xl dark:ring-1 dark:ring-white/20 p-1 backdrop-blur-md">
+            <button
+              ref={pemicuPilihanRef}
+              type="button"
+              onClick={() => setBukaPilihan((b) => !b)}
+              aria-haspopup="menu"
+              aria-expanded={bukaPilihan}
+              aria-label={`Peta dasar: ${lapisanAktif.label}`}
+              style={{ background: lapisanAktif.latar }}
+              className={`${kelasPil} text-white shadow-md ring-1 ${lapisanAktif.kelasAktif} [text-shadow:_0_1px_2px_rgb(0_0_0_/_70%)]`}
+            >
+              <span className="text-xs sm:text-sm leading-none">{lapisanAktif.ikon}</span>
+              <span>
+                <span className="sm:hidden">{lapisanAktif.labelPendek}</span>
+                <span className="hidden sm:inline">{lapisanAktif.label}</span>
+              </span>
+              <svg
+                viewBox="0 0 24 24"
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`shrink-0 transition-transform duration-150 ${bukaPilihan ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          </div>
+
+          {bukaPilihan && (
+            <div
+              ref={menuPilihanRef}
+              role="menu"
+              aria-label="Pilih peta dasar"
+              onKeyDown={gerakFokusPilihan}
+              className="absolute left-0 top-full z-[460] mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-2xl bg-white/95 border border-black/[0.08] p-1.5 text-tinta shadow-xl dark:bg-pantau-konsol/95 dark:border-white/10 dark:text-white dark:shadow-2xl dark:ring-1 dark:ring-white/15 backdrop-blur-md"
+            >
+              {LAPISAN.map((l) => {
+                const terpilih = l.mode === mode;
+                return (
+                  <button
+                    key={l.mode}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={terpilih}
+                    onClick={() => {
+                      setBukaPilihan(false);
+                      handlePilihMode(l.mode);
+                    }}
+                    className={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-api ${
+                      terpilih ? "bg-black/[0.05] dark:bg-white/10" : "hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <span
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm leading-none shadow-sm"
+                      style={{ background: l.latar }}
+                      aria-hidden="true"
+                    >
+                      {l.ikon}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold text-tinta dark:text-white">{l.label}</span>
+                      <span className="block text-[10.5px] leading-snug text-tinta/60 dark:text-white/55">{l.keterangan}</span>
+                    </span>
+                    {terpilih && (
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-api" aria-hidden="true">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Tombol Buka Panduan Sains & Data */}
@@ -546,6 +1051,58 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           </svg>
         </button>
       </div>
+
+      {/* Panel Lapisan peta — lihat panelLapisan. Berisi lapisan tambahan
+          yang ditumpangkan di peta dasar mana pun; peta dasarnya sendiri
+          dipilih lewat dropdown kiri atas. */}
+      {panelTampil && panelLapisan && (
+        /* Rel tak kasatmata dari 8px di bawah tepi atas sampai dasar tombol:
+           panel rata dasar tombol, tapi bila tak muat (kolom Windy lebih
+           pendek tanpa tombol sinkron) `safe` menjatuhkannya ke awal rel —
+           tak pernah terpotong tepi atas bingkai. */
+        <div
+          style={{ right: panelLapisan.kanan, bottom: panelLapisan.bawah }}
+          className="pointer-events-none absolute top-2 z-[460] flex flex-col [justify-content:safe_flex-end]"
+        >
+        <div
+          ref={panelLapisanRef}
+          role="dialog"
+          aria-label="Lapisan peta"
+          className="pointer-events-auto w-64 max-w-[calc(100vw-5rem)] rounded-2xl bg-white/95 border border-black/[0.08] p-2.5 text-tinta shadow-xl backdrop-blur-md dark:bg-pantau-konsol/95 dark:border-white/10 dark:text-white dark:shadow-2xl dark:ring-1 dark:ring-white/15"
+        >
+          <p className="px-1 pb-1.5 text-xs font-semibold">Lapisan peta</p>
+
+          {/* Lapisan tambahan — sakelar, bukan pilihan: panel tetap terbuka
+              supaya titiknya langsung terlihat muncul di peta. */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={hotspotAktif}
+            onClick={alihHotspot}
+            className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl p-1 text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-api"
+          >
+            <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-[#0b2440] ring-1 ring-black/[0.06] dark:ring-white/10" aria-hidden="true">
+              <span className="absolute left-[6px] top-[8px] h-1.5 w-1.5 rounded-full" style={{ background: WARNA_HOTSPOT[1] }} />
+              <span className="absolute left-[15px] top-[13px] h-2 w-2 rounded-full" style={{ background: WARNA_HOTSPOT[2], boxShadow: `0 0 5px ${WARNA_HOTSPOT[2]}` }} />
+              <span className="absolute left-[9px] top-[20px] h-1.5 w-1.5 rounded-full" style={{ background: WARNA_HOTSPOT[0] }} />
+              <span className="absolute left-[21px] top-[22px] h-1.5 w-1.5 rounded-full" style={{ background: WARNA_HOTSPOT[1] }} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] font-semibold leading-tight">Titik Hotspot</span>
+              <span className="block text-[10px] leading-snug text-tinta/55 dark:text-white/50">
+                {hotspotAktif && statusHotspot === "memuat" ? "Memuat data satelit…" : "Titik panas 24 jam terakhir"}
+              </span>
+            </span>
+            <span
+              className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${hotspotAktif ? "bg-api" : "bg-black/20 dark:bg-white/25"}`}
+              aria-hidden="true"
+            >
+              <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-[left] duration-150 ${hotspotAktif ? "left-3.5" : "left-0.5"}`} />
+            </span>
+          </button>
+        </div>
+        </div>
+      )}
 
       {/* Modal Dialog: Sematkan Peta — pola portal yang sama dengan Panduan. */}
       {semat && createPortal(
@@ -686,19 +1243,61 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Data</span>
                       <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Indeks Kualitas Udara (<strong className="text-tinta dark:text-white font-medium">AQI</strong>) berbasis model atmosfer <strong className="text-tinta dark:text-white font-medium">Copernicus CAMS</strong>, dipadukan hembusan angin model <strong className="text-tinta dark:text-white font-medium">ECMWF IFS</strong>.
+                        Indeks Kualitas Udara (<strong className="text-tinta dark:text-white font-medium">AQI</strong>, standar US EPA) dihitung dari konsentrasi <strong className="text-tinta dark:text-white font-medium">PM2.5</strong> model <strong className="text-tinta dark:text-white font-medium">Copernicus CAMS</strong>. Partikel bergerak menunjukkan angin 10 m dari run model CAMS/IFS yang sama.
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Skala AQI</span>
+                      <p className="mt-0.5 text-[11px] leading-relaxed">
+                        Baik 0–50 · Sedang 51–100 · Tidak sehat bagi kelompok sensitif 101–150 · Tidak sehat 151–200 · Sangat tidak sehat 201–300 · Berbahaya 301+.
                       </p>
                     </div>
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Cakupan Waktu</span>
                       <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Near real-time (menggunakan data aktual yang paling mendekati waktu saat ini).
+                        Riwayat 7 hari ke belakang hingga prakiraan 3 hari ke depan (tiap 3 jam), sama dengan lapisan Aerosol.
                       </p>
                     </div>
                     <div>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Atribusi & Penyedia</span>
                       <p className="mt-0.5 text-[10.5px] leading-relaxed text-tinta/65 dark:text-white/65">
-                        Disajikan melalui <a href="https://www.windy.com" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">Windy.com</a> dengan integrasi model Copernicus CAMS & ECMWF IFS.
+                        Contains modified <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">Copernicus Atmosphere Monitoring Service</a> information 2026. Peta dasar dari <a href="https://www.windy.com" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">Windy.com</a>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kolom 3: Titik Hotspot (lapisan tambahan) — selebar dua kolom di atas. */}
+              <div className="rounded-xl border border-black/[0.08] bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03] p-3.5 flex flex-col justify-between sm:col-span-2">
+                <div>
+                  <div className="flex items-center justify-between border-b border-black/[0.08] dark:border-white/10 pb-2">
+                    <span className="font-medium text-tinta dark:text-white text-xs">Titik Hotspot</span>
+                    <span className="text-[10px] text-tinta/45 dark:text-white/40">Lapisan tambahan</span>
+                  </div>
+                  <div className="mt-2.5 space-y-2.5 text-tinta/75 dark:text-white/75">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Data</span>
+                      <p className="mt-0.5 text-[11px] leading-relaxed">
+                        Titik anomali panas (<strong className="text-tinta dark:text-white font-medium">hotspot</strong>) satelit <strong className="text-tinta dark:text-white font-medium">VIIRS 375 m</strong> (S-NPP, NOAA-20, NOAA-21) dari NASA FIRMS, diwarnai menurut tingkat kepercayaan deteksinya. Menyala sejak peta dibuka, di atas peta Aerosol maupun Angin; matikan lewat tombol Lapisan di kolom kanan peta.
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Cakupan Waktu</span>
+                      <p className="mt-0.5 text-[11px] leading-relaxed">
+                        24 jam terakhir, near real-time (tersedia ±3 jam setelah satelit melintas).
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Catatan</span>
+                      <p className="mt-0.5 text-[11px] leading-relaxed">
+                        Hotspot adalah indikasi titik panas, belum tentu kebakaran — perlu verifikasi lapangan.
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Atribusi & Penyedia</span>
+                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-tinta/65 dark:text-white/65">
+                        Data dari <a href="https://firms.modaps.eosdis.nasa.gov/" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">NASA FIRMS</a> (Fire Information for Resource Management System), bagian dari NASA ESDIS.
                       </p>
                     </div>
                   </div>
@@ -751,6 +1350,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             onExpand={onExpand}
             expandLabel={expandLabel}
             isPenuh={isPenuh}
+            hotspot={hotspotTampil}
+            slotAtasLogo={mode === "asap" ? legendaHotspot : null}
+            slotKendali={tombolLapisan}
           />
         )}
       </div>
@@ -776,7 +1378,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
               if (iframeReadyRef.current && pendingJumlahRef.current) {
                 kirimData({ type: "SET_JUMLAH", jumlahLaporan: pendingJumlahRef.current });
               }
-              kirimData({ type: "WINDY_ACTIVE" });
+              // load bisa tiba sesudah FORECASTING_READY — jangan hidupkan
+              // animasi iframe yang sedang tersembunyi di balik Aerosol.
+              kirimData({ type: modeRef.current === "windy" ? "WINDY_ACTIVE" : "WINDY_NONAKTIF" });
               setTimeout(() => setMemuatWindy(false), 1500);
             }}
           />
@@ -805,6 +1409,174 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
                 />
               </svg>
               <span>Memuat peta angin dan kualitas udara Windy…</span>
+            </div>
+          </div>
+        )}
+        {/* Legenda hotspot di atas logo Copernicus dalam iframe Windy — puncak
+            logo itu 58px dari dasar iframe (x 20px), 80px di layar < 640px. */}
+        {mode === "windy" && legendaHotspot && (
+          <div
+            className={`pointer-events-none absolute left-5 z-[5] ${adaLinimasaWindy && legendaWindyBawah !== null ? "" : "bottom-[88px] sm:bottom-[66px]"}`}
+            style={adaLinimasaWindy && legendaWindyBawah !== null ? { bottom: legendaWindyBawah } : undefined}
+          >
+            {legendaHotspot}
+          </div>
+        )}
+
+        {/* Bilah waktu lapisan Angin — markup & kelas sama persis dengan bilah
+            waktu PetaAsap; slidernya memakai .timeline-slider dari <style jsx
+            global> PetaAsap (selalu terpasang sebelum Windy bisa dibuka).
+            Bedanya hanya letak: di atas bilah warna AQI dan logo Windy yang
+            menempati dasar iframe (66px dari dasar; 88px di layar < 640px). */}
+        {adaLinimasaWindy && linimasaWindy && (
+          <div
+            ref={linimasaWindyRef}
+            className={`pointer-events-auto absolute bottom-[88px] sm:bottom-[66px] z-[6] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-black/[0.08] bg-white/95 text-tinta shadow-xl dark:border-white/[0.1] dark:bg-pantau-konsol/90 dark:text-white dark:shadow-2xl backdrop-blur-xl ${
+              legendaRingkas
+                ? "inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[330px] sm:max-w-[calc(100%-1.5rem)] p-1.5 sm:px-2.5 sm:py-1.5"
+                : "inset-x-3 sm:inset-x-0 sm:mx-auto w-auto sm:w-[520px] p-2 sm:px-4 sm:py-3"
+            }`}
+          >
+            <div className={`flex flex-col ${legendaRingkas ? "gap-1" : "gap-1.5 sm:gap-2"}`}>
+              {/* Baris Atas: Tombol Putar, Navigasi, Info Waktu & Status */}
+              <div className="flex items-center justify-between gap-1 sm:gap-2.5">
+                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={alihPutarWindy}
+                    className={`cursor-pointer flex items-center justify-center rounded-full bg-gradient-to-r from-[#047857] to-[#10b981] text-white shadow-md shadow-emerald-950/60 ring-1 ring-emerald-400/40 hover:brightness-110 active:scale-95 transition-all ${
+                      legendaRingkas ? "h-6 w-6 min-w-[24px]" : "h-7 w-7 min-w-[28px] sm:h-8 sm:w-8 sm:min-w-[32px]"
+                    }`}
+                    aria-label={statusWindy.memutar ? "Jeda animasi angin dan kualitas udara" : "Putar animasi angin dan kualitas udara"}
+                  >
+                    {statusWindy.memutar ? (
+                      <svg viewBox="0 0 24 24" width={legendaRingkas ? "11" : "13"} height={legendaRingkas ? "11" : "13"} fill="currentColor" className="pointer-events-none">
+                        <rect x="6" y="5" width="4" height="14" rx="1.5" />
+                        <rect x="14" y="5" width="4" height="14" rx="1.5" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width={legendaRingkas ? "11" : "13"} height={legendaRingkas ? "11" : "13"} fill="currentColor" className="ml-0.5 pointer-events-none">
+                        <polygon points="6 4 20 12 6 20" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </button>
+
+                  {([-1, 1] as const).map((arah) => (
+                    <button
+                      key={arah}
+                      type="button"
+                      onClick={() => lompatWindy(arah)}
+                      aria-label={arah === -1 ? "Titik waktu sebelumnya" : "Titik waktu berikutnya"}
+                      title={arah === -1 ? "Waktu sebelumnya" : "Waktu berikutnya"}
+                      className={`cursor-pointer flex items-center justify-center rounded-lg text-neutral-600 hover:text-tinta hover:bg-black/[0.06] dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.08] active:scale-95 transition-all ${
+                        legendaRingkas ? "h-6 w-6 min-w-[24px]" : "h-7 w-7 min-w-[28px] sm:h-8 sm:w-8 sm:min-w-[32px]"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" width={legendaRingkas ? "13" : "15"} height={legendaRingkas ? "13" : "15"} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="pointer-events-none">
+                        <path d={arah === -1 ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
+                      </svg>
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={alihLajuWindy}
+                    title="Kecepatan putar"
+                    className={`cursor-pointer flex items-center justify-center rounded-md font-mono font-medium text-neutral-700 hover:text-neutral-900 bg-black/[0.04] hover:bg-black/[0.08] border border-black/[0.08] dark:text-zinc-400 dark:hover:text-zinc-200 dark:bg-white/[0.05] dark:hover:bg-white/[0.1] dark:border-white/[0.08] transition-all ${
+                      legendaRingkas ? "h-6 min-w-[24px] px-1 text-[10px]" : "h-7 min-w-[28px] px-1.5 text-[11px] sm:h-8 sm:min-w-[32px] sm:px-2"
+                    }`}
+                  >
+                    {lajuWindy}×
+                  </button>
+                </div>
+
+                {/* Label Waktu Aktif & Status */}
+                <div className="flex flex-col items-end justify-center min-w-0">
+                  <div className="flex items-center gap-1.5 text-right min-w-0 justify-end">
+                    {statusWindy.persenUnduh < 100 && !legendaRingkas && (
+                      <span className="hidden sm:inline-block rounded bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-mono tabular-nums text-neutral-600 border border-black/[0.08] dark:bg-white/[0.06] dark:text-zinc-400 dark:border-white/[0.06]">
+                        {statusWindy.persenUnduh}%
+                      </span>
+                    )}
+                    {statusWindy.menunggu && (
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="12"
+                        height="12"
+                        fill="none"
+                        className="shrink-0 animate-spin text-neutral-500 dark:text-zinc-400"
+                        role="img"
+                        aria-label="Memuat data waktu berikutnya"
+                      >
+                        <title>Memuat data waktu berikutnya…</title>
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                      </svg>
+                    )}
+                    {/* Isinya ditulis tampilkanWaktuWindy (DOM langsung). */}
+                    <span
+                      ref={labelWindyRef}
+                      className={`font-semibold tracking-tight text-tinta dark:text-white tabular-nums truncate ${legendaRingkas ? "text-[11px]" : "text-xs sm:text-sm"}`}
+                    />
+
+                    <span
+                      title={
+                        prediksiWindy
+                          ? linimasaWindy.modelRunWib
+                            ? `Prakiraan model ECMWF CAMS diinisialisasi dari siklus model ${linimasaWindy.modelRunWib}`
+                            : "Prakiraan model ECMWF CAMS"
+                          : "Analisis model CAMS (kondisi teramati)"
+                      }
+                      className={`inline-flex items-center gap-1 rounded-full border shrink-0 transition-colors ${
+                        legendaRingkas ? "px-1.5 py-0.2 text-[8.5px]" : "px-1.5 sm:px-2 py-0.5 text-[10px]"
+                      } ${
+                        prediksiWindy
+                          ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                          : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30"
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${prediksiWindy ? "bg-amber-500 animate-pulse dark:bg-amber-400" : "bg-sky-500 dark:bg-sky-400"}`} />
+                      <span>{prediksiWindy ? "Prediksi" : "Analisis"}</span>
+                    </span>
+                  </div>
+                  <div className={`text-[9.5px] leading-tight text-neutral-500 dark:text-zinc-400/90 font-mono tracking-tight mt-0.5 truncate max-w-[210px] sm:max-w-[320px] ${legendaRingkas ? "hidden" : "hidden sm:block"}`}>
+                    {prediksiWindy ? (
+                      <span className="flex items-center gap-1 justify-end">
+                        <span className="text-amber-600 dark:text-amber-400/80 font-sans font-medium text-[9px]">Basis Model:</span>
+                        <span className="text-neutral-700 dark:text-zinc-300">{linimasaWindy.modelRunWib || "ECMWF CAMS"}</span>
+                      </span>
+                    ) : (
+                      <span className="text-neutral-500 dark:text-zinc-500 font-sans text-[9px]">Analisis model CAMS</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Baris Bawah: Slider Linimasa */}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className={`font-medium text-neutral-500 dark:text-zinc-400/80 tabular-nums select-none shrink-0 ${legendaRingkas ? "text-[9px] min-w-[26px]" : "text-[10px] min-w-[32px] sm:min-w-[34px]"}`}>
+                  {linimasaWindy.langkah[0]?.labelWib.split(",")[0]}
+                </span>
+                <div className="relative flex-1 flex items-center">
+                  {/* Tak terkendali React: posisinya ditulis tampilkanWaktuWindy. */}
+                  <input
+                    ref={sliderWindyRef}
+                    type="range"
+                    min={0}
+                    max={linimasaWindy.langkah.length - 1}
+                    step={0.01}
+                    defaultValue={0}
+                    onPointerDown={mulaiGeserWindy}
+                    onChange={(e) => setelProgresWindy(Number(e.target.value))}
+                    aria-label="Geser linimasa waktu angin dan kualitas udara"
+                    className="timeline-slider cursor-pointer"
+                    style={JEJAK_SLIDER_ANGIN}
+                  />
+                </div>
+                <span className={`font-medium text-neutral-500 dark:text-zinc-400/80 tabular-nums select-none shrink-0 text-right ${legendaRingkas ? "text-[9px] min-w-[26px]" : "text-[10px] min-w-[32px] sm:min-w-[34px]"}`}>
+                  {linimasaWindy.langkah[linimasaWindy.langkah.length - 1]?.labelWib.split(",")[0]}
+                </span>
+              </div>
             </div>
           </div>
         )}

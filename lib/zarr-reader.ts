@@ -7,9 +7,13 @@ const ZARR_BASE_URL =
 const ZARR_TOKEN =
   process.env.CAMS_ZARR_TOKEN || "fire-watch-827a2651-8e26-4bc1-ac44-9351fcb916af";
 
-// Global geospatial grid dimensions for ECMWF CAMS ARCO Zarr (omaod550)
-// Lat: 90°N -> -90°S (step 0.4°, 451 rows)
-// Lon: -180° -> +180° (step 0.4°, 900 cols, shifted from raw 0..360°)
+// Global geospatial grid dimensions for ECMWF CAMS ARCO Zarr (omaod550, pm2p5, u10, v10, …)
+// Lat: -90°S -> +90°N (step 0.4°, 451 rows; baris 0 = kutub selatan)
+// Lon: -180° -> +179.6° (step 0.4°, 900 cols)
+// Atribut GRIB_* di store masih menyebut 90→-90 dan 0→359.6 (sisa GRIB asal),
+// tapi array koordinat `latitude`/`longitude` beserta datanya sudah diurutkan
+// ulang oleh ARCO — terverifikasi dari data: angin baratan Samudra Selatan
+// muncul di baris ~100 (-50°), PM2.5 Delhi/Beijing di kolom bujur timur.
 export const ZARR_GLOBAL_GRID = {
   rows: 451,
   cols: 900,
@@ -57,6 +61,76 @@ let lastCleanupTime = Date.now();
 let cachedMetadata: { data: ZarrMetadataResponse; expiresAt: number } | null = null;
 const frameCache = new Map<string, { buffer: Uint8Array; expiresAt: number }>();
 const bloscCodec = Blosc.fromConfig({ id: "blosc" });
+
+/** Jumlah float32 per chunk variabel: shape chunk [2 run, 1 step, 451, 900]. */
+const NILAI_PER_CHUNK = 2 * ZARR_GLOBAL_GRID.totalPoints;
+
+/**
+ * Galat dari hulu ECMWF (HTTP non-2xx, jaringan putus, chunk rusak) —
+ * kelas tersendiri supaya rute bisa menjawab 502 alih-alih 500.
+ */
+export class GalatHuluZarr extends Error {
+  status: number | null;
+
+  constructor(pesan: string, status: number | null = null) {
+    super(pesan);
+    this.name = "GalatHuluZarr";
+    this.status = status;
+  }
+}
+
+/**
+ * Mengunduh satu objek Zarr dari ARCO lalu mendekompresi Blosc-nya.
+ * `jalur` relatif terhadap akar store, mis. "pm2p5/162.0.0.0" atau "latitude/0".
+ * Token sengaja tidak ikut dalam pesan galat: pesan itu diteruskan rute ke
+ * klien sebagai JSON 500/502.
+ */
+async function ambilObjekZarr(jalur: string): Promise<Uint8Array> {
+  let res: Response;
+  try {
+    res = await fetch(`${ZARR_BASE_URL}/${jalur}?_fet=${ZARR_TOKEN}`);
+  } catch (e) {
+    throw new GalatHuluZarr(`Failed to fetch Zarr chunk ${jalur}: ${e instanceof Error ? e.message : e}`);
+  }
+  if (!res.ok) {
+    throw new GalatHuluZarr(`Failed to fetch Zarr chunk ${jalur}: ${res.status} ${res.statusText}`, res.status);
+  }
+  try {
+    const terkompresi = new Uint8Array(await res.arrayBuffer());
+    return await bloscCodec.decode(terkompresi);
+  } catch (e) {
+    throw new GalatHuluZarr(`Gagal membaca/dekompresi chunk Zarr ${jalur}: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+/** Typed array butuh byteOffset kelipatan ukuran elemen — salin bila tidak. */
+function selaraskan(data: Uint8Array, ukuranElemen: number): Uint8Array {
+  return data.byteOffset % ukuranElemen === 0 ? data : data.slice();
+}
+
+/**
+ * Mengunduh + mendekompresi satu chunk variabel permukaan (omaod550, pm2p5,
+ * u10, v10, …) untuk (timeChunk, step). Hasilnya SELURUH chunk: 2 run
+ * (timeInner 0 dan 1) × 451 × 900 float32, urutan C — irisan timeInner
+ * dimulai di `timeInner * ZARR_GLOBAL_GRID.totalPoints`. Dikembalikan utuh
+ * karena kedua run analisis berbagi chunk yang sama, jadi pemanggil bisa
+ * memakai keduanya dari satu unduhan.
+ */
+export async function ambilChunkZarr(variabel: string, timeChunk: number, step: number): Promise<Float32Array> {
+  const jalur = `${variabel}/${timeChunk}.${step}.0.0`;
+  const data = selaraskan(await ambilObjekZarr(jalur), 4);
+  const floats = new Float32Array(data.buffer, data.byteOffset, Math.floor(data.byteLength / 4));
+  if (floats.length !== NILAI_PER_CHUNK) {
+    throw new GalatHuluZarr(`Chunk Zarr ${jalur} berukuran tak terduga: ${floats.length} nilai (harap ${NILAI_PER_CHUNK})`);
+  }
+  return floats;
+}
+
+/** Array koordinat 1-D (float64, satu chunk) — "latitude" atau "longitude". */
+export async function ambilKoordinatZarr(nama: "latitude" | "longitude"): Promise<Float64Array> {
+  const data = selaraskan(await ambilObjekZarr(`${nama}/0`), 8);
+  return new Float64Array(data.buffer, data.byteOffset, Math.floor(data.byteLength / 8));
+}
 
 /**
  * Membersihkan entri frame cache dan metadata yang sudah kedaluwarsa dari memori server.
@@ -328,7 +402,7 @@ export async function getZarrMetadata(forceRefresh: boolean = false): Promise<Za
 /**
  * Fetch and decode a specific frame chunk for the full global grid.
  * Returns a Uint8Array of 405,900 bytes (451 rows x 900 cols), values 0..255 representing 0..2.0 AOD.
- * Longitude is re-centered to [-180° .. +180°] for standard Web Mercator alignment.
+ * Urutan grid diteruskan apa adanya dari store: baris 0 = -90°, kolom 0 = -180°.
  */
 export async function getZarrFrame(timeChunk: number, step: number, timeInner: number = 0): Promise<Uint8Array> {
   const cacheKey = `${timeChunk}_${step}_${timeInner}`;
@@ -360,15 +434,7 @@ export async function getZarrFrame(timeChunk: number, step: number, timeInner: n
   }
 
   // 3. L3: Ambil dari sumber ECMWF ARCO Zarr (Eropa) & dekompresi Blosc
-  const chunkUrl = `${ZARR_BASE_URL}/omaod550/${timeChunk}.${step}.0.0?_fet=${ZARR_TOKEN}`;
-  const res = await fetch(chunkUrl);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch Zarr chunk ${chunkUrl}: ${res.status} ${res.statusText}`);
-  }
-
-  const compressedBuffer = new Uint8Array(await res.arrayBuffer());
-  const decompressed = await bloscCodec.decode(compressedBuffer);
-  const floats = new Float32Array(decompressed.buffer, decompressed.byteOffset, decompressed.byteLength / 4);
+  const floats = await ambilChunkZarr("omaod550", timeChunk, step);
 
   // Chunk shape is [2, 1, 451, 900]
   // Offset for timeInner (0 or 1):
