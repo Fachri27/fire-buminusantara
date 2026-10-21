@@ -80,6 +80,9 @@ export function getMinioClient(): S3Client {
     // MinIO mengabaikan region, tapi SDK v3 mewajibkan isinya untuk tanda tangan v4.
     region: "us-east-1",
     forcePathStyle: true,
+    // Tanpa batas ini, MinIO yang tak menjawab membuat /media menggantung
+    // selamanya alih-alih jatuh ke cadangan lokal.
+    requestHandler: { connectionTimeout: 3000 },
     credentials: { accessKeyId: cfg.accessKey, secretAccessKey: cfg.secretKey },
   });
   

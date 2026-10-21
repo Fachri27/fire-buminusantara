@@ -29,10 +29,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
   const ifNoneMatch = req.headers.get("if-none-match");
   const ifModifiedSince = req.headers.get("if-modified-since");
 
-  return (
-    (await lewatMinio(bagian.join("/"), rentang, ifNoneMatch, ifModifiedSince)) ??
-    (await lewatLokal(bagian, rentang, ifNoneMatch, ifModifiedSince))
-  );
+  const res =
+    (await lewatMinio(bagian.join("/"), rentang, ifNoneMatch, ifModifiedSince, req.signal)) ??
+    (await lewatLokal(bagian, rentang, ifNoneMatch, ifModifiedSince));
+
+  // HEAD dijalankan Next lewat GET lalu badannya dibuang tanpa ditutup — soket
+  // MinIO (atau fd lokal) di baliknya bocor sampai kolam 50 soket penuh.
+  if (req.method === "HEAD") {
+    await res.body?.cancel();
+    return new Response(null, { status: res.status, headers: res.headers });
+  }
+  return res;
 }
 
 async function lewatMinio(
@@ -40,6 +47,7 @@ async function lewatMinio(
   rentang: string | null,
   ifNoneMatch: string | null,
   ifModifiedSince: string | null,
+  batal: AbortSignal,
 ): Promise<Response | null> {
   const cfg = getConfig();
   const klien = getMinioClient();
@@ -57,8 +65,12 @@ async function lewatMinio(
         IfNoneMatch: ifNoneMatch || undefined,
         IfModifiedSince: ifModifiedSince ? new Date(ifModifiedSince) : undefined,
       }),
+      // Browser rajin membatalkan permintaan rentang video; tanpa ini soketnya
+      // tak pernah dilepas dan kolam soket SDK (50) penuh → semua /media macet.
+      { abortSignal: batal },
     );
   } catch (galat: unknown) {
+    if (batal.aborted) return new Response(null, { status: 499 });
     const status = (galat as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
 
     // 304 Not Modified dari S3
