@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import * as maplibregl from "maplibre-gl";
@@ -15,6 +15,15 @@ import { PUSAT_WILAYAH } from "@/lib/pusat-wilayah";
 import { BATAS_NUSANTARA, selaNusantara } from "@/lib/kamera-nusantara";
 import type { ZarrTimestepMeta, ZarrMetadataResponse } from "@/lib/zarr-reader";
 import type { Berita } from "@/lib/events";
+import {
+  dariSentuhan,
+  hotspotDiTitik,
+  kartuHotspot,
+  pasangLapisanHotspot,
+  setelDataHotspot,
+  ZOOM_KETUK_HOTSPOT,
+  type DataHotspot,
+} from "@/lib/lapisan-hotspot";
 
 type Props = {
   jumlahLaporan: Record<string, number>;
@@ -49,6 +58,13 @@ type Props = {
   expandLabel?: string;
   /** Status apakah peta sedang ditampilkan dalam mode selayar penuh */
   isPenuh?: boolean;
+  /** Lapisan tambahan Titik Hotspot (lib/lapisan-hotspot.ts) — null = mati. */
+  hotspot?: DataHotspot | null;
+  /** Kendali yang ditaruh tepat di atas logo Copernicus (legenda hotspot
+   *  peta.tsx) — ikut ke mana pun logonya berpindah. */
+  slotAtasLogo?: ReactNode;
+  /** Kendali di ujung kolom tombol kanan (tombol Lapisan peta.tsx). */
+  slotKendali?: ReactNode;
 };
 
 // GLSL Vertex Shader: Quad koordinat Mercator dunia [0, 1] dikalikan matriks proyeksi MapLibre GL
@@ -318,9 +334,10 @@ let globalZarrMetadata: ZarrMetadataResponse | null = null;
 const globalFrameCache: Record<string, Uint8Array> = {};
 let globalSyncSelesai = false;
 
-export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt = "Lapor Karhutla", onExpand = null, expandLabel = "Buka peta selayar", isPenuh = false }: Props) {
+export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt = "Lapor Karhutla", onExpand = null, expandLabel = "Buka peta selayar", isPenuh = false, hotspot = null, slotAtasLogo = null, slotKendali = null }: Props) {
   const wadahPetaRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  const hotspotRef = useRef(hotspot);
   const onPilihRef = useRef(onPilihWilayah);
   const onBukaRincianRef = useRef(onBukaRincian);
   const beritaRef = useRef(berita);
@@ -438,6 +455,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
      logo pindah ke kiri atas supaya tak tertimpa bilah waktu. */
   const AMBANG_SEMPIT = 800;
   const [bingkaiSempit, setBingkaiSempit] = useState(false);
+  /* Bingkai ringkas yang lebar (peta kecil landing di desktop, sematan):
+     landing memperkecilnya dengan transform:scale ~0,6, jadi tombol bentang
+     selayar — ajakan utama membuka peta besar — dibesarkan di sini supaya
+     tetap mudah terlihat. Tombol navigasi lain sengaja tetap ukurannya.
+     Route /api/forecasting (lapisan Windy) memakai ambang yang sama. */
+  const bentangBesar = legendaRingkas && !bingkaiSempit;
   /* Skala hamparan mengikuti lebar bingkai apa adanya setiap frame —
      tanpa pembulatan dan tanpa tunda. Pembulatan (mis. ke 0,05) membuat
      legenda melompat-lompat saat rel dilipat, penundaan membuatnya
@@ -665,6 +688,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   useEffect(() => {
     onPilihRef.current = onPilihWilayah;
   }, [onPilihWilayah]);
+
+  // Lapisan tambahan Titik Hotspot: isi ulang saat dinyalakan/dimatikan atau
+  // datanya diperbarui. Sebelum peta "load", handler load yang memasangnya.
+  useEffect(() => {
+    hotspotRef.current = hotspot;
+    if (mapRef.current) setelDataHotspot(mapRef.current, hotspot);
+  }, [hotspot]);
 
   // Upload data buffer ke tekstur WebGL (900 cols x 451 rows) dengan hardware bilinear interpolation
   const uploadTextureBuffer = useCallback(
@@ -1311,6 +1341,37 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         },
       });
 
+      // 3. Lapisan tambahan Titik Hotspot di atas batas provinsi — kosong
+      //    sampai dinyalakan dari menu lapisan (prop hotspot).
+      pasangLapisanHotspot(map);
+      setelDataHotspot(map, hotspotRef.current);
+
+      /* Info hotspot lewat tooltip mengambang yang sama dengan nama provinsi —
+         bukan pop-up klik — supaya klik/ketuk ke provinsi tak pernah terhalang
+         (di zoom Nusantara titiknya rapat menutupi provinsi). Mouse: selama
+         kursor di atas titik, tooltip berisi kartu hotspot. Layar sentuh: ketukan
+         pada titik membuka kartunya hanya mulai ZOOM_KETUK_HOTSPOT; selain itu
+         ketukan memilih provinsi seperti biasa. */
+      const tampilkanTooltip = (isi: string | HTMLElement, clientX: number, clientY: number) => {
+        const kotak = tooltipElRef.current;
+        if (!kotak) return;
+        if (typeof isi === "string") kotak.innerHTML = isi;
+        else kotak.replaceChildren(isi);
+        kotak.style.display = "block";
+        /* Ikut kursor + 14px, tapi dijepit agar tidak keluar viewport —
+           bingkai peta konsol sempit, tooltip di tepi kanan-bawahnya
+           mudah meluber. */
+        const x = Math.min(clientX + 14, window.innerWidth - kotak.offsetWidth - 8);
+        const y = Math.min(clientY + 14, window.innerHeight - kotak.offsetHeight - 8);
+        kotak.style.left = `${Math.max(8, x)}px`;
+        kotak.style.top = `${Math.max(8, y)}px`;
+      };
+      const sembunyikanTooltip = () => {
+        if (tooltipElRef.current) tooltipElRef.current.style.display = "none";
+      };
+      // Kartu hasil ketukan tak ikut kursor — tutup begitu peta digeser.
+      map.on("movestart", sembunyikanTooltip);
+
       let hoveredId: string | number | null = null;
 
       map.on("mousemove", "batas-provinsi-fill", (e) => {
@@ -1331,25 +1392,23 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           }
           map.getCanvas().style.cursor = "pointer";
 
+          const { clientX, clientY } = e.originalEvent;
+          const data = hotspotRef.current;
+          const titik = data ? hotspotDiTitik(map, data, e.point) : null;
           const nama = feat.properties?.nama as string;
-          if (nama && tooltipElRef.current) {
+          if (data && titik) {
+            tampilkanTooltip(kartuHotspot(data, titik), clientX, clientY);
+          } else if (nama) {
             const jml = jumlahLaporanRef.current[nama];
             const teksJml =
               typeof jml === "number" && jml > 0
                 ? `<span style="color:#ef4444;font-weight:700;">${jml.toLocaleString("id-ID")} laporan karhutla</span>`
                 : `<span style="color:rgba(255,255,255,0.65);">Tidak ada laporan karhutla</span>`;
-            tooltipElRef.current.innerHTML = `<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">${nama}</div><div style="font-size:11px;">${teksJml}</div>`;
-            tooltipElRef.current.style.display = "block";
-            /* Ikut kursor + 14px, tapi dijepit agar tidak keluar viewport —
-               bingkai peta konsol sempit, tooltip di tepi kanan-bawahnya
-               mudah meluber. */
-            const kotak = tooltipElRef.current;
-            const lb = kotak.offsetWidth;
-            const tg = kotak.offsetHeight;
-            const x = Math.min(e.originalEvent.clientX + 14, window.innerWidth - lb - 8);
-            const y = Math.min(e.originalEvent.clientY + 14, window.innerHeight - tg - 8);
-            tooltipElRef.current.style.left = `${Math.max(8, x)}px`;
-            tooltipElRef.current.style.top = `${Math.max(8, y)}px`;
+            tampilkanTooltip(
+              `<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">${nama}</div><div style="font-size:11px;">${teksJml}</div>`,
+              clientX,
+              clientY,
+            );
           }
         }
       });
@@ -1369,6 +1428,17 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       });
 
       map.on("click", "batas-provinsi-fill", (e) => {
+        // Layar sentuh, peta sudah diperbesar, ketukan tepat di titik hotspot:
+        // tampilkan kartunya alih-alih memilih provinsi. Mouse selalu memilih
+        // provinsi — info titiknya sudah tampil saat kursor di atasnya.
+        const data = hotspotRef.current;
+        if (data && dariSentuhan(e.originalEvent) && map.getZoom() >= ZOOM_KETUK_HOTSPOT) {
+          const titik = hotspotDiTitik(map, data, e.point, 12);
+          if (titik) {
+            tampilkanTooltip(kartuHotspot(data, titik), e.originalEvent.clientX, e.originalEvent.clientY);
+            return;
+          }
+        }
         if (e.features && e.features.length > 0) {
           const feat = e.features[0];
           const nama = feat.properties?.nama as string;
@@ -1704,26 +1774,29 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         )}
 
       {/* Kontrol Navigasi Peta (Kanan Atas) — rapat ke atas di bingkai dasbor.
-          items-end: tombol bentang selayar SELALU ukuran default (h-9 w-9)
-          sementara tombol lain bisa h-7 w-7 (legendaRingkas) — tanpa ini
-          semua tombol rata kiri kolom dan tepi kanannya gerigi. */}
-      <div className={`absolute right-3 z-[400] flex flex-col items-end gap-2 sm:right-4 ${legendaRingkas ? "top-4" : "top-20"}`}>
+          items-end: tombol bentang selayar lebih besar (h-11 w-11, h-10 w-10
+          di bingkai ringkas lebar) sementara tombol lain h-9 w-9 atau h-7 w-7
+          (legendaRingkas) — tanpa ini semua tombol rata kiri kolom dan tepi
+          kanannya gerigi. Di bingkai ringkas jaraknya gap-1.5: di peta kecil
+          landing (403px logis) kolom berikut tombol Lapisan harus selesai
+          di atas panel legenda (~235px) supaya panel tetap rapat ke kanan. */}
+      <div className={`absolute right-3 z-[400] flex flex-col items-end sm:right-4 ${legendaRingkas ? "top-4 gap-1.5" : "top-20 gap-2"}`}>
         {/* Tombol Bentang Selayar — anak pertama tumpukan supaya selalu
-            sejajar dengan tombol lain. Ukurannya SELALU default (h-9 w-9,
-            ikon 16) — tidak ikut versi rapat legendaRingkas, karena di
-            landing karhutla tombol ini sudah mengecil dua lapis oleh
-            wrapper transform:scale; mengecilkan lagi di sini membuatnya
-            tinggal ~16px tampak dan sulit disentuh. */}
+            sejajar dengan tombol lain. Ukurannya tidak ikut versi rapat
+            legendaRingkas: ini ajakan utama membuka peta besar, dan di
+            landing karhutla tombol ini sudah mengecil dua lapis oleh wrapper
+            transform:scale. h-11 w-11, dan h-10 w-10 di bingkai ringkas lebar
+            (tetap lebih besar dari tombol rapat h-7 di sebelahnya). */}
         {onExpand && (
           <button
             type="button"
             onClick={onExpand}
             aria-label={expandLabel}
             title={expandLabel}
-            className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-xl bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-transform active:scale-90"
+            className={`cursor-pointer flex ${bentangBesar ? "h-10 w-10" : "h-11 w-11"} items-center justify-center rounded-xl bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:ring-1 dark:ring-white/15 backdrop-blur-md transition-transform active:scale-90`}
           >
-            <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+            <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
             </svg>
           </button>
         )}
@@ -1804,6 +1877,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
           </svg>
         </button>
+
+        {slotKendali}
       </div>
 
       {/* Cip legenda — pola ponsel, plus bingkai sempit konsol: panel selalu
@@ -1989,8 +2064,14 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           menyempit ke tengah (max-w), jadi logo sejajar bilah. Di ponsel
           (< sm) bilah melebar penuh (inset-x-2) sehingga sudut kiri bawah
           tertutup bilah — logo dipindah ke kiri atas di bawah pil mode.
-          Bingkai sempit konsol ikut pola ponsel: bilahnya selebar bingkai. */}
-      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex items-center ${legendaRingkas ? (bingkaiSempit ? "top-[68px] sm:left-5" : "top-[68px] sm:top-auto sm:bottom-[calc(var(--sela-bawah,0px)+1rem)] sm:left-5") : "bottom-24 xl:bottom-4 xl:left-5"}`}>
+          Bingkai sempit konsol ikut pola ponsel: bilahnya selebar bingkai.
+          slotAtasLogo (sakelar hotspot) menumpuk tepat di atasnya. */}
+      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex flex-col items-start gap-2 ${legendaRingkas ? (bingkaiSempit ? "top-[68px] sm:left-5" : "top-[68px] sm:top-auto sm:bottom-[calc(var(--sela-bawah,0px)+1rem)] sm:left-5") : "bottom-24 xl:bottom-4 xl:left-5"}`}>
+        {slotAtasLogo && (
+          /* Kendali dari luar tak ikut diperkecil skalaHamparan (zoom wadah
+             ini) — ukurannya sama dengan kendali peta lain, mis. pil lapisan. */
+          <div style={legendaRingkas ? { zoom: 1 / skalaHamparan } : undefined}>{slotAtasLogo}</div>
+        )}
         <a
           href="https://atmosphere.copernicus.eu/"
           target="_blank"
@@ -2321,6 +2402,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
       {/* CSS Khusus Badge Angka Laporan & Peta */}
       <style jsx global>{`
+        /* Warna jejak & jempol slider bisa ditimpa per lapisan lewat
+           --jejak-awal / --jejak-akhir / --jejak-cincin (bilah waktu
+           lapisan Angin di peta.tsx memakai hijau). Bawaan: magenta Aerosol. */
         .timeline-slider {
           -webkit-appearance: none;
           appearance: none;
@@ -2333,8 +2417,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           background-color: transparent;
           background-image: linear-gradient(
             to right,
-            #86198f 0%,
-            #b90d84 var(--progress-percent, 0%),
+            var(--jejak-awal, #86198f) 0%,
+            var(--jejak-akhir, #b90d84) var(--progress-percent, 0%),
             rgba(0, 0, 0, 0.12) var(--progress-percent, 0%),
             rgba(0, 0, 0, 0.12) 100%
           );
@@ -2345,8 +2429,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         .dark .timeline-slider {
           background-image: linear-gradient(
             to right,
-            #86198f 0%,
-            #b90d84 var(--progress-percent, 0%),
+            var(--jejak-awal, #86198f) 0%,
+            var(--jejak-akhir, #b90d84) var(--progress-percent, 0%),
             rgba(255, 255, 255, 0.15) var(--progress-percent, 0%),
             rgba(255, 255, 255, 0.15) 100%
           );
@@ -2362,7 +2446,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           height: 14px;
           border-radius: 50%;
           background: #ffffff;
-          border: 2px solid #b90d84;
+          border: 2px solid var(--jejak-akhir, #b90d84);
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
           cursor: grab;
           margin-top: -4.5px;
@@ -2374,7 +2458,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         .timeline-slider:active::-webkit-slider-thumb {
           cursor: grabbing;
           transform: scale(1.25);
-          box-shadow: 0 0 0 4px rgba(185, 13, 132, 0.4);
+          box-shadow: 0 0 0 4px var(--jejak-cincin, rgba(185, 13, 132, 0.4));
         }
         @media (prefers-reduced-motion: reduce) {
           .timeline-slider::-webkit-slider-thumb,
@@ -2387,7 +2471,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           height: 14px;
           border-radius: 50%;
           background: #ffffff;
-          border: 2px solid #b90d84;
+          border: 2px solid var(--jejak-akhir, #b90d84);
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
           cursor: grab;
         }
@@ -2403,7 +2487,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         .timeline-slider::-moz-range-progress {
           height: 5px;
           border-radius: 9999px;
-          background: linear-gradient(to right, #86198f, #b90d84);
+          background: linear-gradient(to right, var(--jejak-awal, #86198f), var(--jejak-akhir, #b90d84));
         }
         .peta-angka {
           width: 0;

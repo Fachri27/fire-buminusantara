@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     },
     // openGraph SENGAJA disetel di sini, bukan diwarisi dari root layout: tanpa
     // ini pratinjau bagikan halaman lapor memakai judul & deskripsi beranda
-    // yang generik. Gambar tetap logo (og-fire.jpg) — halaman form tidak punya
+    // yang generik. Gambar tetap logo (og-lapor.jpg) — halaman form tidak punya
     // gambar sendiri.
     openGraph: {
       title: judul,
@@ -49,13 +49,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: "Fire",
       locale: locale === "en" ? "en_US" : "id_ID",
       type: "website",
-      images: [{ url: "/assets/img/og-fire.jpg", width: 1200, height: 630, alt: "Fire" }],
+      images: [{ url: "/assets/img/og-lapor.jpg", width: 1200, height: 630, alt: "Lapor Karhutla" }],
     },
     twitter: {
       card: "summary_large_image",
       title: judul,
       description: teks.catatan,
-      images: ["/assets/img/og-fire.jpg"],
+      images: ["/assets/img/og-lapor.jpg"],
     },
   };
 }

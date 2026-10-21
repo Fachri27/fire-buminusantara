@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     locale: "id_ID",
     type: "website",
     images: [
-      { url: "/assets/img/og-fire.jpg", width: 1200, height: 630, alt: "Fire — Pantauan Karhutla Indonesia" },
+      { url: "/assets/img/og-lapor.jpg", width: 1200, height: 630, alt: "Lapor Karhutla" },
     ],
   },
   twitter: {
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     title: "Fire — Pantauan Karhutla Indonesia",
     description:
       "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
-    images: ["/assets/img/og-fire.jpg"],
+    images: ["/assets/img/og-lapor.jpg"],
   },
   verification: {
     google: "NzkMjQ1QkQYyfTyYyBcGWMy22JqcQcGd0WZ-42W9FbU",
