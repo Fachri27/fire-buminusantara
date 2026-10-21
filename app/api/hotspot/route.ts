@@ -189,14 +189,30 @@ function hasil(w: Penampung, lengkap: boolean): DataHotspot {
   };
 }
 
+/** CSV terakhir yang berhasil per satelit (memori, lalu Redis bila server baru
+ *  menyala). Satelit yang gagal diambil memakai salinan ini — tanpanya satu
+ *  berkas yang time-out menghapus seluruh titik satelit itu dari peta DAN dari
+ *  salinan Redis sampai penyegaran berikutnya berhasil. */
+const csvTerakhir: (string | null)[] = BERKAS.map(() => null);
+const kunciCsv = (s: number) => `firms:csv:v1:${s}`;
+
 async function ambilFirms(): Promise<DataHotspot | null> {
-  const semua = await Promise.all(BERKAS.map((b) => ambilCsv(b.jalur)));
-  if (semua.every((t) => t === null)) return null;
+  const baru = await Promise.all(BERKAS.map((b) => ambilCsv(b.jalur)));
+  if (baru.every((t) => t === null)) return null;
+  const semua = await Promise.all(
+    baru.map(async (csv, s) => {
+      if (csv === null) return (csvTerakhir[s] ??= await redisGet(kunciCsv(s)));
+      csvTerakhir[s] = csv;
+      void redisSet(kunciCsv(s), csv, TTL_REDIS_DETIK);
+      return csv;
+    }),
+  );
   const w = penampungBaru();
   semua.forEach((csv, s) => {
     if (csv) urai(csv, s, w);
   });
-  return hasil(w, semua.every((t) => t !== null));
+  // Tetap "tak lengkap" bila ada satelit dari salinan — dicoba lagi lebih cepat.
+  return hasil(w, baru.every((t) => t !== null));
 }
 
 async function ambil(): Promise<DataHotspot> {
