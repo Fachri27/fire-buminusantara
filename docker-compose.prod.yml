@@ -24,13 +24,12 @@ services:
       retries: 3
       start_period: 30s
 
-  # Penghangat cache tiap 15 menit: sebaran asap + udara (CAMS) lewat
-  # /api/cron/warm-asap, lalu hotspot FIRMS langsung (penghangatan hotspot di
-  # warm-asap fire-and-forget — gagalnya senyap). Tanpa ini data hanya
-  # disegarkan saat ada pengunjung. Sengaja tanpa `condition: service_healthy`:
-  # web yang tak sehat akan menggagalkan `compose up` sebelum rollback
-  # remote-deploy.sh sempat jalan. Secret lewat stdin (-K -), bukan argumen:
-  # tidak muncul di `ps` host. Log: docker compose logs cron.
+  # Penyegar data tiap 15 menit lewat /api/cron/warm-asap: sebaran asap +
+  # udara (CAMS) dan hotspot FIRMS ditulis ke Redis; rute publik hanya membaca
+  # salinan itu. Sengaja tanpa `condition: service_healthy`: web yang tak
+  # sehat akan menggagalkan `compose up` sebelum rollback remote-deploy.sh
+  # sempat jalan. Secret lewat stdin (-K -), bukan argumen: tidak muncul di
+  # `ps` host. Log (satu baris JSON hasil per putaran): docker compose logs cron.
   cron:
     image: curlimages/curl:8.11.1
     restart: unless-stopped
@@ -42,9 +41,9 @@ services:
       - |
         sleep 60
         while :; do
+          printf '[cron] '
           printf 'header = "Authorization: Bearer %s"\n' "$$CRON_SECRET" \
-            | curl -sS -K - -X POST -m 600 -o /dev/null -w '[cron] warm-asap %{http_code} %{time_total}s\n' http://web:3000/api/cron/warm-asap
-          curl -sS -m 120 -o /dev/null -w '[cron] hotspot %{http_code} %{time_total}s\n' http://web:3000/api/hotspot
+            | curl -sS -K - -X POST -m 600 -w ' [%{http_code} %{time_total}s]\n' http://web:3000/api/cron/warm-asap
           sleep 900
         done
 

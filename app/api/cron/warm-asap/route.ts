@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { hangatkanSemuaFrame } from "@/lib/zarr-reader";
 import { hangatkanSemuaFrameUdara } from "@/lib/udara-reader";
+import { segarkanHotspot } from "@/lib/hotspot-firms";
 
 export const maxDuration = 60; // Timeout 60 detik untuk pre-warm background
 
@@ -72,13 +73,19 @@ async function prosesPrewarm(req: NextRequest) {
     );
   }
 
-  try {
-    // Titik hotspot (NASA FIRMS) ikut dihangatkan: memanggil rutenya sendiri
-    // memicu pengambilan pertama atau penyegaran di latar (stale-while-
-    // revalidate), jadi pengunjung tak menunggu pengambilan ±1 menit. Tidak
-    // ditunggu — berjalan bersamaan dengan pemanasan frame di bawah.
-    void fetch(new URL("/api/hotspot", req.url), { cache: "no-store" }).catch(() => {});
+  // Titik hotspot (NASA FIRMS): ambil & tulis Redis di sini — /api/hotspot
+  // hanya membaca salinan itu. Berjalan bersamaan dengan pemanasan frame di
+  // bawah (hulu berbeda: NASA vs ECMWF); gagalnya tidak menggagalkan asap, dan
+  // hasilnya tetap tercatat walau asap gagal. Janji ini tak pernah menolak.
+  const hotspot = segarkanHotspot().then(
+    (d) => ({ titik: d.titik.length, lengkap: d.lengkap, diperbarui: d.diperbarui }),
+    (err: unknown) => {
+      console.error("[Cron warm-asap] Gagal menyegarkan hotspot:", err);
+      return { error: err instanceof Error ? err.message : "Gagal menyegarkan hotspot" };
+    },
+  );
 
+  try {
     const hasil = await hangatkanSemuaFrame();
 
     // Lapisan udara (AQI + angin) memakai store & linimasa yang sama, jadi
@@ -99,6 +106,7 @@ async function prosesPrewarm(req: NextRequest) {
       message: `Berhasil menghangatkan ${hasil.berhasil}/${hasil.total} frame sebaran asap ke memori server`,
       ...hasil,
       udara,
+      hotspot: await hotspot,
       timestamp: new Date().toISOString(),
     });
   } catch (err) {
@@ -107,6 +115,7 @@ async function prosesPrewarm(req: NextRequest) {
       {
         success: false,
         error: err instanceof Error ? err.message : "Gagal menghangatkan cache sebaran asap",
+        hotspot: await hotspot,
       },
       { status: 500 }
     );

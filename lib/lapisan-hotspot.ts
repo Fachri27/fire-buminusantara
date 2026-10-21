@@ -2,7 +2,7 @@ import type * as maplibregl from "maplibre-gl";
 
 /**
  * Lapisan tambahan titik anomali panas (hotspot) 24 jam terakhir dari NASA
- * FIRMS (app/api/hotspot/route.ts), ditumpangkan di atas peta dasar yang
+ * FIRMS (lib/hotspot-firms.ts, lewat /api/hotspot), ditumpangkan di atas peta dasar yang
  * sedang tampil. Satu data, empat sakelar di panel Lapisan peta.tsx:
  *
  * - "Titik Hotspot" (bawaan mati): bulatan kuning/oranye/merah per tingkat
@@ -28,11 +28,9 @@ export type DataHotspot = {
   satelit: string[];
   /** false bila sebagian berkas satelit gagal diambil. */
   lengkap: boolean;
-  /** true bila FIRMS tak terjangkau dan yang dilayani data terakhir. */
+  /** true bila salinan lebih tua dari BATAS_BASI_MS — penyegaran cron gagal
+   *  (FIRMS tak terjangkau) atau cron tak berjalan. */
   basi?: boolean;
-  /** true bila data ini sudah lewat umurnya dan server sedang menyegarkannya
-   *  di latar — minta lagi sebentar kemudian. */
-  menyegarkan?: boolean;
   provinsi: string[];
   /** [lng, lat, kepercayaan, FRP (MW), waktu (menit epoch UTC), indeks
    *  satelit, indeks provinsi, malam (0/1)] */
@@ -46,7 +44,7 @@ export const WARNA_SIPONGI = ["#4caf50", "#fbc02d", "#f01e1e"] as const;
 export const LABEL_KEPERCAYAAN = ["Rendah", "Sedang", "Tinggi"] as const;
 
 /**
- * Satelit per indeks `s` di data — app/api/hotspot/route.ts membaca berkas
+ * Satelit per indeks `s` di data — lib/hotspot-firms.ts membaca berkas
  * FIRMS dengan urutan yang sama. `sisi` = bentuk penanda lapisan SiPongi-nya:
  * 5 segi lima, 6 segi enam, 0 bintang. NOAA-21 tak punya lapisan SiPongi —
  * titiknya hanya tampil di lapisan Titik Hotspot.
