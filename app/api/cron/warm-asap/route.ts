@@ -73,6 +73,12 @@ async function prosesPrewarm(req: NextRequest) {
   }
 
   try {
+    // Titik hotspot (NASA FIRMS) ikut dihangatkan: memanggil rutenya sendiri
+    // memicu pengambilan pertama atau penyegaran di latar (stale-while-
+    // revalidate), jadi pengunjung tak menunggu pengambilan ±1 menit. Tidak
+    // ditunggu — berjalan bersamaan dengan pemanasan frame di bawah.
+    void fetch(new URL("/api/hotspot", req.url), { cache: "no-store" }).catch(() => {});
+
     const hasil = await hangatkanSemuaFrame();
 
     // Lapisan udara (AQI + angin) memakai store & linimasa yang sama, jadi

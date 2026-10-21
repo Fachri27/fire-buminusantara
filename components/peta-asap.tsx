@@ -16,11 +16,12 @@ import { BATAS_NUSANTARA, selaNusantara } from "@/lib/kamera-nusantara";
 import type { ZarrTimestepMeta, ZarrMetadataResponse } from "@/lib/zarr-reader";
 import type { Berita } from "@/lib/events";
 import {
+  dariSentuhan,
   hotspotDiTitik,
-  isiPopupHotspot,
-  KELAS_POPUP_HOTSPOT,
+  kartuHotspot,
   pasangLapisanHotspot,
   setelDataHotspot,
+  ZOOM_KETUK_HOTSPOT,
   type DataHotspot,
 } from "@/lib/lapisan-hotspot";
 
@@ -337,7 +338,6 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const wadahPetaRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const hotspotRef = useRef(hotspot);
-  const popupHotspotRef = useRef<maplibregl.Popup | null>(null);
   const onPilihRef = useRef(onPilihWilayah);
   const onBukaRincianRef = useRef(onBukaRincian);
   const beritaRef = useRef(berita);
@@ -693,7 +693,6 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   // datanya diperbarui. Sebelum peta "load", handler load yang memasangnya.
   useEffect(() => {
     hotspotRef.current = hotspot;
-    if (!hotspot) popupHotspotRef.current?.remove();
     if (mapRef.current) setelDataHotspot(mapRef.current, hotspot);
   }, [hotspot]);
 
@@ -1346,23 +1345,32 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       //    sampai dinyalakan dari menu lapisan (prop hotspot).
       pasangLapisanHotspot(map);
       setelDataHotspot(map, hotspotRef.current);
-      const popupHotspot = new maplibregl.Popup({
-        closeButton: false,
-        maxWidth: "260px",
-        offset: 10,
-        className: KELAS_POPUP_HOTSPOT,
-      });
-      popupHotspotRef.current = popupHotspot;
-      map.on("click", (e) => {
-        const data = hotspotRef.current;
-        const fitur = data ? hotspotDiTitik(map, e.point) : null;
-        if (!data || !fitur) {
-          popupHotspot.remove();
-          return;
-        }
-        const [lng, lat] = (fitur.geometry as GeoJSON.Point).coordinates;
-        popupHotspot.setLngLat([lng, lat]).setDOMContent(isiPopupHotspot(data, fitur.properties)).addTo(map);
-      });
+
+      /* Info hotspot lewat tooltip mengambang yang sama dengan nama provinsi —
+         bukan pop-up klik — supaya klik/ketuk ke provinsi tak pernah terhalang
+         (di zoom Nusantara titiknya rapat menutupi provinsi). Mouse: selama
+         kursor di atas titik, tooltip berisi kartu hotspot. Layar sentuh: ketukan
+         pada titik membuka kartunya hanya mulai ZOOM_KETUK_HOTSPOT; selain itu
+         ketukan memilih provinsi seperti biasa. */
+      const tampilkanTooltip = (isi: string | HTMLElement, clientX: number, clientY: number) => {
+        const kotak = tooltipElRef.current;
+        if (!kotak) return;
+        if (typeof isi === "string") kotak.innerHTML = isi;
+        else kotak.replaceChildren(isi);
+        kotak.style.display = "block";
+        /* Ikut kursor + 14px, tapi dijepit agar tidak keluar viewport —
+           bingkai peta konsol sempit, tooltip di tepi kanan-bawahnya
+           mudah meluber. */
+        const x = Math.min(clientX + 14, window.innerWidth - kotak.offsetWidth - 8);
+        const y = Math.min(clientY + 14, window.innerHeight - kotak.offsetHeight - 8);
+        kotak.style.left = `${Math.max(8, x)}px`;
+        kotak.style.top = `${Math.max(8, y)}px`;
+      };
+      const sembunyikanTooltip = () => {
+        if (tooltipElRef.current) tooltipElRef.current.style.display = "none";
+      };
+      // Kartu hasil ketukan tak ikut kursor — tutup begitu peta digeser.
+      map.on("movestart", sembunyikanTooltip);
 
       let hoveredId: string | number | null = null;
 
@@ -1384,25 +1392,23 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           }
           map.getCanvas().style.cursor = "pointer";
 
+          const { clientX, clientY } = e.originalEvent;
+          const data = hotspotRef.current;
+          const titik = data ? hotspotDiTitik(map, data, e.point) : null;
           const nama = feat.properties?.nama as string;
-          if (nama && tooltipElRef.current) {
+          if (data && titik) {
+            tampilkanTooltip(kartuHotspot(data, titik), clientX, clientY);
+          } else if (nama) {
             const jml = jumlahLaporanRef.current[nama];
             const teksJml =
               typeof jml === "number" && jml > 0
                 ? `<span style="color:#ef4444;font-weight:700;">${jml.toLocaleString("id-ID")} laporan karhutla</span>`
                 : `<span style="color:rgba(255,255,255,0.65);">Tidak ada laporan karhutla</span>`;
-            tooltipElRef.current.innerHTML = `<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">${nama}</div><div style="font-size:11px;">${teksJml}</div>`;
-            tooltipElRef.current.style.display = "block";
-            /* Ikut kursor + 14px, tapi dijepit agar tidak keluar viewport —
-               bingkai peta konsol sempit, tooltip di tepi kanan-bawahnya
-               mudah meluber. */
-            const kotak = tooltipElRef.current;
-            const lb = kotak.offsetWidth;
-            const tg = kotak.offsetHeight;
-            const x = Math.min(e.originalEvent.clientX + 14, window.innerWidth - lb - 8);
-            const y = Math.min(e.originalEvent.clientY + 14, window.innerHeight - tg - 8);
-            tooltipElRef.current.style.left = `${Math.max(8, x)}px`;
-            tooltipElRef.current.style.top = `${Math.max(8, y)}px`;
+            tampilkanTooltip(
+              `<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">${nama}</div><div style="font-size:11px;">${teksJml}</div>`,
+              clientX,
+              clientY,
+            );
           }
         }
       });
@@ -1422,8 +1428,17 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       });
 
       map.on("click", "batas-provinsi-fill", (e) => {
-        // Klik pada titik hotspot membuka pop-up hotspot, bukan provinsi.
-        if (hotspotRef.current && hotspotDiTitik(map, e.point)) return;
+        // Layar sentuh, peta sudah diperbesar, ketukan tepat di titik hotspot:
+        // tampilkan kartunya alih-alih memilih provinsi. Mouse selalu memilih
+        // provinsi — info titiknya sudah tampil saat kursor di atasnya.
+        const data = hotspotRef.current;
+        if (data && dariSentuhan(e.originalEvent) && map.getZoom() >= ZOOM_KETUK_HOTSPOT) {
+          const titik = hotspotDiTitik(map, data, e.point, 12);
+          if (titik) {
+            tampilkanTooltip(kartuHotspot(data, titik), e.originalEvent.clientX, e.originalEvent.clientY);
+            return;
+          }
+        }
         if (e.features && e.features.length > 0) {
           const feat = e.features[0];
           const nama = feat.properties?.nama as string;

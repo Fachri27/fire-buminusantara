@@ -287,6 +287,33 @@ export async function GET(req: NextRequest) {
             }
           });
 
+          // E2. Artikel & promo Windy ("Baru di Windy…", ajakan Premium). Selain
+          // diblokir lewat broadcast (D), Windy bisa membukanya langsung lewat
+          // plugin.open() — yang tak melewati broadcast. Begitu W.plugins ada,
+          // open() ketiganya diganti no-op dan yang terlanjur terbuka ditutup;
+          // CSS di bawah (#plugin-articles dkk.) menyembunyikannya sebagai pengaman.
+          var PLUGIN_ARTIKEL = ['articles', 'startup-articles', 'startup-promos'];
+          var cobaArtikel = 0;
+          var penjagaArtikel = setInterval(function() {
+            cobaArtikel++;
+            var pl = window.W && window.W.plugins;
+            var selesai = !!pl;
+            if (pl) {
+              PLUGIN_ARTIKEL.forEach(function(n) {
+                var p = pl[n];
+                if (!p) { selesai = false; return; }
+                if (p.__dimatikan) return;
+                try {
+                  if (p.isOpen && typeof p.close === 'function') p.close();
+                  p.open = function() { return Promise.resolve(); };
+                  p.__dimatikan = true;
+                } catch (e) { selesai = false; }
+              });
+            }
+            // Berhenti setelah semuanya terpasang, atau menyerah setelah ±60 dtk.
+            if (selesai || cobaArtikel > 150) clearInterval(penjagaArtikel);
+          }, 400);
+
           // F. Disable context menu / right click completely
           window.addEventListener('contextmenu', function(e) {
             e.preventDefault();
@@ -342,6 +369,12 @@ export async function GET(req: NextRequest) {
         #plugin-search-input,
         #search,
         .search,
+        #plugin-articles,
+        [data-plugin="articles"],
+        #plugin-startup-articles,
+        [data-plugin="startup-articles"],
+        #plugin-startup-promos,
+        [data-plugin="startup-promos"],
         [data-plugin="startup-weather"],
         #plugin-startup-weather,
         .plugin-startup-weather,
@@ -1877,21 +1910,21 @@ ${ringkas ? `
             const peta = petaUdara;
             if (!peta) return;
             try {
-              const adaDasar = !!peta.getLayer('raster-basemap');
+              // Tepat di bawah 'raster-basemap'; bila tak ada, paling atas —
+              // tapi tetap di bawah lapisan hotspot (jagaLapisanHotspot).
+              const sebelum = peta.getLayer('raster-basemap') ? 'raster-basemap'
+                : peta.getLayer(ID_PENDAR_HOTSPOT) ? ID_PENDAR_HOTSPOT : undefined;
               if (!peta.getLayer('udara')) {
-                peta.addLayer(lapisUdara, adaDasar ? 'raster-basemap' : undefined);
+                peta.addLayer(lapisUdara, sebelum);
               } else if (typeof peta.getLayersOrder === 'function') {
                 // Windy bisa memasang lapisannya SESUDAH kita (lapisan kita lalu
-                // terkubur di bawah 'alpha_clear' yang menghapus kanvas): harus
-                // tepat di bawah 'raster-basemap', atau paling atas bila tak ada.
+                // terkubur di bawah 'alpha_clear' yang menghapus kanvas).
                 const urut = peta.getLayersOrder();
-                const iU = urut.indexOf('udara');
-                const iB = urut.indexOf('raster-basemap');
-                if (adaDasar ? urut[iB - 1] !== 'udara' : iU !== urut.length - 1) {
-                  peta.moveLayer('udara', adaDasar ? 'raster-basemap' : undefined);
-                }
+                const iS = sebelum ? urut.indexOf(sebelum) : urut.length;
+                if (urut.indexOf('udara') !== iS - 1) peta.moveLayer('udara', sebelum);
               }
             } catch (e) {}
+            jagaLapisanHotspot();
             if (udaraSiap) {
               try {
                 if (window.W.store.get('particlesAnim') !== 'off') window.W.store.set('particlesAnim', 'off');
@@ -1922,37 +1955,302 @@ ${ringkas ? `
             } catch (e) {}
           }
 
-          // Lapisan tambahan Titik Hotspot (pesan SET_HOTSPOT dari peta.tsx) —
-          // padanan lib/lapisan-hotspot.ts di lapisan Aerosol, warnanya sama.
-          // Titik [lng, lat, kepercayaan] digambar di kanvas pada pane sendiri
-          // yang tak menangkap klik, supaya klik provinsi di bawahnya tetap
-          // jalan. Pesan yang tiba sebelum peta siap disimpan dulu.
-          const WARNA_HOTSPOT = ['#facc15', '#f97316', '#ef4444'];
-          const JARI_HOTSPOT = [1.8, 2.4, 3.4];
+          // Lapisan tambahan hotspot (pesan SET_HOTSPOT dari peta.tsx) — padanan
+          // lib/lapisan-hotspot.ts di lapisan Aerosol. Tiap baris [lng, lat,
+          // kepercayaan, satelit, gaya]: gaya 0 = bulatan lapisan Titik Hotspot
+          // (kuning/oranye/merah), gaya 1 = penanda lapisan satelit ala SiPongi
+          // (segi lima Terra/Aqua, segi enam SNPP, bintang NOAA-20; hijau/kuning/
+          // merah). Warna, bentuk & ukurannya disamakan dengan konstanta di sana.
+          //
+          // Pendar bulatan berkepercayaan tinggi = lapisan lingkaran di MapLibre
+          // milik Windy. Penandanya digambar sendiri di kanvas 2D tepat di atas
+          // kanvas peta: lapisan simbol MapLibre tidak pernah tergambar di peta
+          // Windy (tahap penempatan simbolnya tak jalan), padahal bentuklah yang
+          // membedakan satelit. Kanvasnya tak menangkap klik dan berada di bawah
+          // pane Leaflet (batas provinsi, angka laporan). Digambar ulang hanya
+          // bila kamera, ukuran, atau data berubah — bukan tiap frame animasi
+          // udara. Pesan yang tiba sebelum peta siap disimpan dulu.
+          const WARNA_SIPONGI = ['#4caf50', '#fbc02d', '#f01e1e'];
+          const WARNA_TITIK = ['#facc15', '#f97316', '#ef4444'];
+          // Jari bulatan Titik Hotspot (px CSS, tetap di semua zoom — seperti semula).
+          const JARI_TITIK = [1.8, 2.4, 3.4];
+          const SISI_HOTSPOT = [5, 6, 0]; // 0 = bintang lima
+          const ID_PENDAR_HOTSPOT = 'hotspot-pendar';
+          // Ukuran penanda (px CSS) per zoom — sama dengan icon-size lib (13 px × faktor).
+          const UKURAN_HOTSPOT = [[3, 7.8], [6, 11], [9, 15], [12, 20.8]];
           let hotspotTertunda = null;
-          let lapisHotspot = null;
-          function gambarHotspot(map, titik) {
-            if (lapisHotspot) {
-              try { map.removeLayer(lapisHotspot); } catch (e) {}
-              lapisHotspot = null;
+          let hotspotUrut = [];        // baris urut gambar — indeksnya = indeks hotspotMerc
+          let provinsiHotspot = [];    // nama provinsi untuk kartu info (indeks = kolom ke-9)
+          let hotspotMerc = null;      // Float64Array [x, y] Mercator 0..1 per titik, urut gaya lalu kepercayaan
+          let hotspotKelas = null;     // Uint8Array: penanda s * 3 + k, bulatan 9 + k
+          let kanvasHotspot = null;
+          let kunciKameraHotspot = '';
+          let spriteHotspot = null;    // [kelas] → kanvas, digambar ulang bila DPR berubah
+          let dprSprite = 0;
+          function jalurBentukHotspot(s, c, r) {
+            const sisi = SISI_HOTSPOT[s] === undefined ? 5 : SISI_HOTSPOT[s];
+            const n = sisi || 10;
+            const luar = sisi ? r : r * 1.12;
+            const titik = [];
+            for (let i = 0; i < n; i++) {
+              const sudut = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+              const jari = !sisi && i % 2 ? luar * 0.45 : luar;
+              titik.push((c + jari * Math.cos(sudut)).toFixed(2) + ',' + (c + jari * Math.sin(sudut)).toFixed(2));
             }
-            if (!titik || !titik.length || typeof L === 'undefined' || !map.getPane('hotspotPane')) return;
-            const penggambar = L.canvas({ pane: 'hotspotPane', padding: 0.5 });
-            // Kepercayaan tinggi digambar terakhir (paling atas).
-            const urut = titik.slice().sort(function(a, b) { return a[2] - b[2]; });
-            lapisHotspot = L.layerGroup(urut.map(function(t) {
-              const k = t[2];
-              return L.circleMarker([t[1], t[0]], {
-                renderer: penggambar,
-                pane: 'hotspotPane',
-                interactive: false,
-                radius: JARI_HOTSPOT[k] || JARI_HOTSPOT[0],
-                weight: 0.6,
-                color: 'rgba(0, 0, 0, 0.55)',
-                fillColor: WARNA_HOTSPOT[k] || WARNA_HOTSPOT[0],
-                fillOpacity: k === 0 ? 0.75 : 0.95
-              });
-            })).addTo(map);
+            return 'M' + titik.join('L') + 'Z';
+          }
+          // Penanda pada ukuran terbesar (20,8 px CSS) × DPR; diperkecil saat digambar.
+          function siapkanSpriteHotspot(dpr) {
+            if (spriteHotspot && dprSprite === dpr) return;
+            dprSprite = dpr;
+            spriteHotspot = [];
+            const sisi = Math.ceil(21 * dpr);
+            for (let s = 0; s < SISI_HOTSPOT.length; s++) {
+              for (let k = 0; k < 3; k++) {
+                const kv = document.createElement('canvas');
+                kv.width = kv.height = sisi;
+                const ctx = kv.getContext('2d');
+                const tepi = 1.6 * dpr;
+                const jalur = new Path2D(jalurBentukHotspot(s, sisi / 2, sisi / 2 - tepi));
+                ctx.fillStyle = WARNA_SIPONGI[k];
+                ctx.fill(jalur);
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = tepi;
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+                ctx.stroke(jalur);
+                spriteHotspot[s * 3 + k] = kv;
+              }
+            }
+            // Bulatan Titik Hotspot pada ukuran aslinya (jari + garis tepi 0,6 px).
+            for (let k = 0; k < 3; k++) {
+              const kv = document.createElement('canvas');
+              const sisiB = Math.ceil((JARI_TITIK[k] + 0.6) * 2 * dpr);
+              kv.width = kv.height = sisiB;
+              const ctx = kv.getContext('2d');
+              ctx.beginPath();
+              ctx.arc(sisiB / 2, sisiB / 2, JARI_TITIK[k] * dpr, 0, Math.PI * 2);
+              ctx.globalAlpha = k === 0 ? 0.75 : 0.95;
+              ctx.fillStyle = WARNA_TITIK[k];
+              ctx.fill();
+              ctx.globalAlpha = 1;
+              ctx.lineWidth = 0.6 * dpr;
+              ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+              ctx.stroke();
+              spriteHotspot[9 + k] = kv;
+            }
+          }
+          function ukuranHotspot(zoom) {
+            const u = UKURAN_HOTSPOT;
+            if (zoom <= u[0][0]) return u[0][1];
+            for (let i = 1; i < u.length; i++) {
+              if (zoom <= u[i][0]) {
+                const f = (zoom - u[i - 1][0]) / (u[i][0] - u[i - 1][0]);
+                return u[i - 1][1] + (u[i][1] - u[i - 1][1]) * f;
+              }
+            }
+            return u[u.length - 1][1];
+          }
+          function geoJsonHotspot(titik) {
+            return {
+              type: 'FeatureCollection',
+              features: (titik || []).filter(function(t) { return t[2] === 2 && t[4] === 0; }).map(function(t) {
+                return { type: 'Feature', geometry: { type: 'Point', coordinates: [t[0], t[1]] }, properties: { k: 2 } };
+              })
+            };
+          }
+          function gambarKanvasHotspot(paksa) {
+            const peta = petaMapLibreWindy();
+            if (!peta) return;
+            const wadah = peta.getCanvasContainer();
+            const kanvasPeta = peta.getCanvas();
+            if (!kanvasHotspot || kanvasHotspot.parentNode !== wadah) {
+              kanvasHotspot = document.createElement('canvas');
+              kanvasHotspot.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;';
+              kanvasPeta.insertAdjacentElement('afterend', kanvasHotspot);
+              paksa = true;
+            }
+            const lebar = kanvasPeta.clientWidth;
+            const tinggi = kanvasPeta.clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+            const pusat = peta.getCenter();
+            const zoom = peta.getZoom();
+            const kunci = [pusat.lng.toFixed(6), pusat.lat.toFixed(6), zoom.toFixed(4), lebar, tinggi, dpr].join(',');
+            if (!paksa && kunci === kunciKameraHotspot) return;
+            kunciKameraHotspot = kunci;
+            if (kanvasHotspot.width !== Math.round(lebar * dpr) || kanvasHotspot.height !== Math.round(tinggi * dpr)) {
+              kanvasHotspot.width = Math.round(lebar * dpr);
+              kanvasHotspot.height = Math.round(tinggi * dpr);
+              kanvasHotspot.style.width = lebar + 'px';
+              kanvasHotspot.style.height = tinggi + 'px';
+            }
+            const ctx = kanvasHotspot.getContext('2d');
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, kanvasHotspot.width, kanvasHotspot.height);
+            if (!hotspotMerc || !hotspotMerc.length) return;
+            siapkanSpriteHotspot(dpr);
+            // Proyeksi Mercator sendiri (peta Windy tanpa rotasi/kemiringan):
+            // jauh lebih cepat daripada peta.project() untuk puluhan ribu titik.
+            const dunia = 512 * Math.pow(2, zoom) * dpr;
+            const cx = (pusat.lng + 180) / 360;
+            const sinPusat = Math.sin((pusat.lat * Math.PI) / 180);
+            const cy = 0.5 - Math.log((1 + sinPusat) / (1 - sinPusat)) / (4 * Math.PI);
+            const ox = (lebar * dpr) / 2 - cx * dunia;
+            const oy = (tinggi * dpr) / 2 - cy * dunia;
+            const uk = ukuranHotspot(zoom) * dpr;
+            const setengah = uk / 2;
+            const W = kanvasHotspot.width + uk;
+            const H = kanvasHotspot.height + uk;
+            let alfa = -1;
+            for (let i = 0, n = hotspotKelas.length; i < n; i++) {
+              const x = hotspotMerc[i * 2] * dunia + ox;
+              const y = hotspotMerc[i * 2 + 1] * dunia + oy;
+              if (x < -setengah || y < -setengah || x > W || y > H) continue;
+              const kelas = hotspotKelas[i];
+              if (kelas >= 9) {
+                // Bulatan Titik Hotspot: ukuran tetap, transparansinya sudah di sprite.
+                if (alfa !== 1) { ctx.globalAlpha = 1; alfa = 1; }
+                const b = spriteHotspot[kelas];
+                ctx.drawImage(b, x - b.width / 2, y - b.height / 2);
+                continue;
+              }
+              const a = kelas % 3 === 0 ? 0.85 : 1;
+              if (a !== alfa) { ctx.globalAlpha = a; alfa = a; }
+              ctx.drawImage(spriteHotspot[kelas], x - setengah, y - setengah, uk, uk);
+            }
+            ctx.globalAlpha = 1;
+          }
+          // Pasang sumber + lapisan pendar bila belum ada dan jaga di puncak —
+          // Windy bisa memasang lapisan sesudahnya. Kanvas penanda ikut dijaga.
+          let kameraHotspotTerpasang = false;
+          function jagaLapisanHotspot() {
+            const peta = petaMapLibreWindy();
+            if (!peta) return;
+            try {
+              if (!peta.getSource('hotspot')) {
+                peta.addSource('hotspot', { type: 'geojson', data: geoJsonHotspot(hotspotTertunda) });
+              }
+              if (!peta.getLayer(ID_PENDAR_HOTSPOT)) {
+                peta.addLayer({
+                  id: ID_PENDAR_HOTSPOT,
+                  type: 'circle',
+                  source: 'hotspot',
+                  paint: {
+                    'circle-color': WARNA_TITIK[2],
+                    'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 6, 8, 16, 12, 28],
+                    'circle-blur': 1,
+                    'circle-opacity': 0.45
+                  }
+                });
+              } else if (typeof peta.getLayersOrder === 'function') {
+                const urut = peta.getLayersOrder();
+                if (urut[urut.length - 1] !== ID_PENDAR_HOTSPOT) peta.moveLayer(ID_PENDAR_HOTSPOT);
+              }
+              if (!kameraHotspotTerpasang) {
+                kameraHotspotTerpasang = true;
+                peta.on('render', function() { gambarKanvasHotspot(false); });
+                peta.on('resize', function() { gambarKanvasHotspot(true); });
+              }
+            } catch (e) {}
+          }
+          // ── Info titik hotspot (padanan kartuHotspot lib/lapisan-hotspot.ts) ──
+          // Lewat tooltip mengambang yang sama dengan nama provinsi, bukan
+          // pop-up klik — klik/ketuk ke provinsi tak pernah terhalang. Mouse:
+          // selama kursor di atas titik, tooltip berisi kartu hotspot. Layar
+          // sentuh: ketukan pada titik membuka kartunya hanya mulai
+          // ZOOM_KETUK_HOTSPOT; di zoom lebih jauh titiknya rapat menutupi
+          // provinsi, jadi ketukan selalu memilih provinsi.
+          const ZOOM_KETUK_HOTSPOT = 7;
+          const NAMA_SATELIT = ['NASA-TERRA/AQUA (MODIS)', 'NASA-SNPP (VIIRS)', 'NASA-NOAA20 (VIIRS)', 'NASA-NOAA21 (VIIRS)'];
+          const LABEL_KEPERCAYAAN = ['rendah', 'sedang', 'tinggi'];
+          const BULAN_WIB = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+          function formatWib(ms) {
+            const d = new Date(ms + 7 * 3600 * 1000);
+            const jj = String(d.getUTCHours()).padStart(2, '0');
+            const mm = String(d.getUTCMinutes()).padStart(2, '0');
+            return d.getUTCDate() + ' ' + BULAN_WIB[d.getUTCMonth()] + ', ' + jj + ':' + mm + ' WIB';
+          }
+          function lolosHtml(t) {
+            return String(t).replace(/[&<>"]/g, function(c) {
+              return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+            });
+          }
+          // t = [lng, lat, kepercayaan, satelit, gaya, FRP, waktu, malam, provinsi]
+          function kartuHotspot(t) {
+            const k = t[2];
+            const bulatan = t[4] === 0;
+            const jalur = bulatan ? 'M1,6a5,5 0 1,0 10,0a5,5 0 1,0 -10,0' : jalurBentukHotspot(t[3], 6, 5);
+            const warna = (bulatan ? WARNA_TITIK : WARNA_SIPONGI)[k] || WARNA_SIPONGI[0];
+            function baris(label, isi) {
+              return '<span style="color:rgba(255,255,255,0.6);">' + label + '</span><span style="text-align:right;">' + lolosHtml(isi) + '</span>';
+            }
+            return '<div style="min-width:190px;">' +
+              '<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">' + lolosHtml(provinsiHotspot[t[8]] || '-') + '</div>' +
+              '<div style="display:flex;align-items:center;gap:6px;font-size:11px;">' +
+              '<svg viewBox="0 0 12 12" width="11" height="11"><path d="' + jalur + '" fill="' + warna + '" stroke="rgba(0,0,0,0.6)" stroke-linejoin="round"/></svg>' +
+              'Hotspot · kepercayaan ' + (LABEL_KEPERCAYAAN[k] || '-') + '</div>' +
+              '<div style="display:grid;grid-template-columns:auto 1fr;gap:1px 12px;margin-top:5px;font-size:11px;font-weight:500;">' +
+              baris('Waktu', formatWib(t[6] * 60000) + (t[7] ? ' (malam)' : '')) +
+              baris('Satelit', NAMA_SATELIT[t[3]] || '-') +
+              baris('FRP', Number(t[5]).toLocaleString('id-ID') + ' MW') +
+              '</div></div>';
+          }
+          // Titik dalam ±jari px dari (clientX, clientY) — proyeksi sama dengan
+          // gambarKanvasHotspot; bila beberapa, kepercayaan tertinggi lalu terdekat.
+          function hotspotDiLayar(clientX, clientY, jari) {
+            const peta = petaMapLibreWindy();
+            if (!peta || !hotspotMerc || !hotspotMerc.length) return null;
+            const kotak = peta.getCanvas().getBoundingClientRect();
+            const px = clientX - kotak.left;
+            const py = clientY - kotak.top;
+            if (px < 0 || py < 0 || px > kotak.width || py > kotak.height) return null;
+            const pusat = peta.getCenter();
+            const dunia = 512 * Math.pow(2, peta.getZoom());
+            const sinPusat = Math.sin((pusat.lat * Math.PI) / 180);
+            const ox = kotak.width / 2 - ((pusat.lng + 180) / 360) * dunia;
+            const oy = kotak.height / 2 - (0.5 - Math.log((1 + sinPusat) / (1 - sinPusat)) / (4 * Math.PI)) * dunia;
+            let terbaik = -1, kTerbaik = -1, dTerbaik = Infinity;
+            for (let i = 0, n = hotspotUrut.length; i < n; i++) {
+              const dx = hotspotMerc[i * 2] * dunia + ox - px;
+              if (dx > jari || dx < -jari) continue;
+              const dy = hotspotMerc[i * 2 + 1] * dunia + oy - py;
+              if (dy > jari || dy < -jari) continue;
+              const k = hotspotUrut[i][2];
+              const d = dx * dx + dy * dy;
+              if (k > kTerbaik || (k === kTerbaik && d < dTerbaik)) {
+                terbaik = i;
+                kTerbaik = k;
+                dTerbaik = d;
+              }
+            }
+            return terbaik >= 0 ? hotspotUrut[terbaik] : null;
+          }
+          function dariSentuhan(e) {
+            if (e.pointerType) return e.pointerType !== 'mouse';
+            return !!(window.matchMedia && window.matchMedia('(hover: none)').matches);
+          }
+
+          function gambarHotspot(titik) {
+            hotspotTertunda = titik;
+            // Bulatan dulu lalu penanda SiPongi; dalam tiap gaya kepercayaan
+            // rendah dulu → tinggi digambar paling atas.
+            const urut = (titik || []).slice().sort(function(a, b) { return (a[4] - b[4]) || (a[2] - b[2]); });
+            hotspotUrut = urut;
+            hotspotMerc = new Float64Array(urut.length * 2);
+            hotspotKelas = new Uint8Array(urut.length);
+            urut.forEach(function(t, i) {
+              const sinLat = Math.sin((Math.max(-85, Math.min(85, t[1])) * Math.PI) / 180);
+              hotspotMerc[i * 2] = (t[0] + 180) / 360;
+              hotspotMerc[i * 2 + 1] = 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
+              hotspotKelas[i] = t[4] === 0 ? 9 + t[2] : (t[3] || 0) * 3 + t[2];
+            });
+            const peta = petaMapLibreWindy();
+            if (!peta) return;
+            jagaLapisanHotspot();
+            try {
+              const sumber = peta.getSource('hotspot');
+              if (sumber) sumber.setData(geoJsonHotspot(titik));
+            } catch (e) {}
+            gambarKanvasHotspot(true);
           }
           // Tampilan awal peta: disinkronkan dengan zoom/center asli Windy sampai pengguna berinteraksi
           // Konsol /peta: roda memperbesar peta, dan zoom awalnya pecahan (hasil
@@ -2294,13 +2592,6 @@ ${ringkas ? `
                 p.style.zIndex = '460';
                 p.style.pointerEvents = 'none';
               }
-              // Titik hotspot: di atas poligon provinsi, di bawah angka laporan.
-              if (!map.getPane('hotspotPane')) {
-                map.createPane('hotspotPane');
-                const ph = map.getPane('hotspotPane');
-                ph.style.zIndex = '440';
-                ph.style.pointerEvents = 'none';
-              }
             } catch (e) {}
 
             // Buat elemen tooltip mengambang khusus
@@ -2308,6 +2599,38 @@ ${ringkas ? `
             tooltipEl.id = 'provinsi-tooltip';
             tooltipEl.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:9999;background:rgba(20,16,15,0.94);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.6);font-family:system-ui,-apple-system,sans-serif;';
             document.body.appendChild(tooltipEl);
+            // Tooltip sedang berisi kartu hotspot (bukan nama provinsi).
+            let tooltipHotspot = false;
+            let titikTooltip = null;
+            // Ikut kursor + 14px, dijepit agar tak keluar bingkai.
+            function tampilkanTooltip(html, x, y) {
+              tooltipEl.innerHTML = html;
+              tooltipEl.style.display = 'block';
+              posisikanTooltip(x, y);
+            }
+            function posisikanTooltip(x, y) {
+              const lb = tooltipEl.offsetWidth;
+              const tg = tooltipEl.offsetHeight;
+              tooltipEl.style.left = Math.max(8, Math.min(x + 14, window.innerWidth - lb - 8)) + 'px';
+              tooltipEl.style.top = Math.max(8, Math.min(y + 14, window.innerHeight - tg - 8)) + 'px';
+            }
+            function htmlProvinsi(nama) {
+              const jml = currentJumlahLaporan[nama];
+              const teksJml = typeof jml === 'number' && jml > 0
+                ? '<span style="color:#ef4444;font-weight:700;">' + jml.toLocaleString('id-ID') + ' laporan karhutla</span>'
+                : '<span style="color:rgba(255,255,255,0.65);">Tidak ada laporan karhutla</span>';
+              return '<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">' + nama + '</div><div style="font-size:11px;">' + teksJml + '</div>';
+            }
+            // Kartu hasil ketukan tak ikut kursor — tutup begitu peta digeser.
+            try {
+              const pml = petaMapLibreWindy();
+              if (pml) pml.on('movestart', function() {
+                if (tooltipHotspot) {
+                  tooltipHotspot = false;
+                  tooltipEl.style.display = 'none';
+                }
+              });
+            } catch (e) {}
 
             // Cegah error internal Leaflet di Windy terkait tooltips
             try {
@@ -2381,6 +2704,22 @@ ${ringkas ? `
 
             // Document-level capturing click listener guarantees click capture across all browser pointer engines
             document.addEventListener('click', function(e) {
+              // Layar sentuh, peta sudah diperbesar, ketukan tepat di titik
+              // hotspot (di atas provinsi atau kanvas peta, bukan tombol):
+              // tampilkan kartunya alih-alih memilih provinsi. Mouse selalu
+              // memilih provinsi — info titiknya sudah tampil saat kursor di atasnya.
+              const diPeta = e.target && e.target.closest && (e.target.closest('path[data-nama]') || e.target.tagName === 'CANVAS');
+              const pml = petaMapLibreWindy();
+              if (diPeta && pml && dariSentuhan(e) && pml.getZoom() >= ZOOM_KETUK_HOTSPOT) {
+                const titik = hotspotDiLayar(e.clientX, e.clientY, 12);
+                if (titik) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  tooltipHotspot = true;
+                  tampilkanTooltip(kartuHotspot(titik), e.clientX, e.clientY);
+                  return;
+                }
+              }
               const path = e.target && e.target.closest ? e.target.closest('path[data-nama], .provinsi-layer') : null;
               if (!path) return;
               const nama = path.getAttribute('data-nama');
@@ -2407,28 +2746,37 @@ ${ringkas ? `
               const path = e.target && e.target.closest ? e.target.closest('path[data-nama], .provinsi-layer') : null;
               if (!path) return;
               const nama = path.getAttribute('data-nama');
-              if (!nama || !tooltipEl) return;
-
-              const jml = currentJumlahLaporan[nama];
-              const teksJml = typeof jml === 'number' && jml > 0
-                ? '<span style="color:#ef4444;font-weight:700;">' + jml.toLocaleString('id-ID') + ' laporan karhutla</span>'
-                : '<span style="color:rgba(255,255,255,0.65);">Tidak ada laporan karhutla</span>';
-              tooltipEl.innerHTML = '<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">' + nama + '</div><div style="font-size:11px;">' + teksJml + '</div>';
-              tooltipEl.style.display = 'block';
-              tooltipEl.style.left = (e.clientX + 14) + 'px';
-              tooltipEl.style.top = (e.clientY + 14) + 'px';
+              if (!nama || !tooltipEl || tooltipHotspot) return;
+              tampilkanTooltip(htmlProvinsi(nama), e.clientX, e.clientY);
             }, true);
 
+            // Kursor di atas titik hotspot: tooltip berisi kartunya; lepas dari
+            // titik: kembali ke nama provinsi di bawah kursor (bila ada).
             document.addEventListener('mousemove', function(e) {
-              if (tooltipEl && tooltipEl.style.display === 'block') {
-                tooltipEl.style.left = (e.clientX + 14) + 'px';
-                tooltipEl.style.top = (e.clientY + 14) + 'px';
+              if (!tooltipEl) return;
+              const titik = dariSentuhan(e) ? null : hotspotDiLayar(e.clientX, e.clientY, 6);
+              if (titik) {
+                tooltipHotspot = true;
+                if (titik !== titikTooltip) tampilkanTooltip(kartuHotspot(titik), e.clientX, e.clientY);
+                else posisikanTooltip(e.clientX, e.clientY);
+                titikTooltip = titik;
+                return;
               }
+              titikTooltip = null;
+              if (tooltipHotspot) {
+                tooltipHotspot = false;
+                const path = e.target && e.target.closest ? e.target.closest('path[data-nama]') : null;
+                const nama = path && path.getAttribute('data-nama');
+                if (nama) tampilkanTooltip(htmlProvinsi(nama), e.clientX, e.clientY);
+                else tooltipEl.style.display = 'none';
+                return;
+              }
+              if (tooltipEl.style.display === 'block') posisikanTooltip(e.clientX, e.clientY);
             }, true);
 
             document.addEventListener('mouseout', function(e) {
               const fromPath = e.target && e.target.closest ? e.target.closest('path[data-nama], .provinsi-layer') : null;
-              if (!fromPath || !tooltipEl) return;
+              if (!fromPath || !tooltipEl || tooltipHotspot) return;
               const toPath = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('path[data-nama], .provinsi-layer') : null;
               // Jika kursor masih di dalam polygon provinsi yang sama, jangan sembunyikan tooltip
               if (fromPath === toPath) return;
@@ -2442,7 +2790,7 @@ ${ringkas ? `
             });
 
             mapInitialized = true;
-            if (hotspotTertunda) gambarHotspot(map, hotspotTertunda);
+            if (hotspotTertunda) gambarHotspot(hotspotTertunda);
 
             // Pastikan logo Copernicus & logo Windy selalu hadir di DOM dan tampil
             function pastikanSemuaLogo() {
@@ -2492,6 +2840,25 @@ ${ringkas ? `
 
             pastikanSemuaLogo();
             setInterval(pastikanSemuaLogo, 500);
+
+            // Tinggi bilah legenda AQI selebar layar (#legend-mobile) di dasar
+            // iframe — hanya ada saat Windy memakai tampilan mobile/tablet; di
+            // desktop legendanya kotak kecil kanan-bawah, jadi 0. Induk memakai
+            // angka ini agar bilah waktunya duduk tepat di atas bilah tersebut.
+            var selaLegendaTerkirim = -1;
+            function kirimSelaLegenda() {
+              var lm = document.getElementById('legend-mobile');
+              var tinggi = 0;
+              if (lm) {
+                var r = lm.getBoundingClientRect();
+                if (r.height > 0 && r.top < window.innerHeight) tinggi = Math.round(window.innerHeight - r.top);
+              }
+              if (tinggi === selaLegendaTerkirim || !window.parent) return;
+              selaLegendaTerkirim = tinggi;
+              window.parent.postMessage({ type: 'SELA_LEGENDA', tinggi: tinggi }, '*');
+            }
+            kirimSelaLegenda();
+            setInterval(kirimSelaLegenda, 500);
 
             // Beri tahu parent bahwa map forecasting sudah siap
             if (window.parent) {
@@ -2592,10 +2959,9 @@ ${ringkas ? `
               }
             } else if (data.type === 'SET_HOTSPOT') {
               hotspotTertunda = Array.isArray(data.titik) ? data.titik : null;
+              provinsiHotspot = Array.isArray(data.provinsi) ? data.provinsi : [];
               document.getElementById('btn-lapisan')?.classList.toggle('ada-hotspot', !!hotspotTertunda);
-              if (mapInitialized && window.W && window.W.map && window.W.map.map) {
-                gambarHotspot(window.W.map.map, hotspotTertunda);
-              }
+              if (mapInitialized) gambarHotspot(hotspotTertunda);
             } else if (data.type === 'SET_TEMA') {
               const zb = document.getElementById('custom-zoom-controls');
               if (zb) {
