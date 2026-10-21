@@ -9,14 +9,11 @@ import { LandingKarhutla } from "@/components/landing-karhutla";
 import { ambilSorotan } from "@/lib/statistik-sorotan";
 import { ambilKolomUmpanAwal } from "@/lib/perangkat";
 import { adaBahasa, type Bahasa } from "@/lib/bahasa";
+import { NAMA_SITUS, URL_SITUS } from "@/lib/situs";
 
 // Halaman rincian kejadian dengan slug dinamis dari database (dibuat di CMS kapan saja).
 // Diizinkan blocking (instant = false) agar tidak memblokir prerender build.
 export const instant = false;
-
-// Basis absolut yang sama dengan fallback og:video di bawah — JSON-LD wajib
-// URL absolut, sementara metadataBase hanya me-resolve kolom Metadata.
-const DASAR_SITUS = process.env.NEXT_PUBLIC_SITE_URL || "https://fire.nusantara.earth";
 
 // Kolom SEO mentah (EN + tanggal) belum ada di tipe Berita lib/events.ts —
 // diambil langsung di sini supaya tak menyentuh berkas milik agen lain.
@@ -109,7 +106,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       // Tanpa og:url yang absolut, sebagian crawler memperlakukan tautan yang
       // dibagikan (dengan prefiks /id/ dst.) dan kanoniknya sebagai dua halaman.
       url: `/${locale}/fire/${slug}`,
-      siteName: "Fire",
+      siteName: NAMA_SITUS,
       locale: locale === "en" ? "en_US" : "id_ID",
       images: gambar ? [{ url: gambar, alt: judulSeo }] : [],
       // og:video: WhatsApp/Twitter kadang memutar mp4 langsung dari pratinjau.
@@ -117,7 +114,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       // andal di semua perangkat. URL-nya dibuat absolut sendiri: tidak seperti
       // images, metadataBase TIDAK me-resolve og:video di versi Next ini.
       videos: video
-        ? [{ url: new URL(video, process.env.NEXT_PUBLIC_SITE_URL || "https://fire.nusantara.earth").toString() }]
+        ? [{ url: new URL(video, URL_SITUS).toString() }]
         : [],
       type: "article",
     },
@@ -140,11 +137,11 @@ function bangunDataLd(
   slug: string,
 ) {
   const { judul: judulSeo, deskripsi: deskripsiSeo } = teksSeo(seo, kejadian, bahasa);
-  const urlHalaman = new URL(`/${bahasa}/fire/${slug}`, DASAR_SITUS).toString();
-  const gambarAbsolut = kejadian.poster ? new URL(kejadian.poster, DASAR_SITUS).toString() : null;
+  const urlHalaman = new URL(`/${bahasa}/fire/${slug}`, URL_SITUS).toString();
+  const gambarAbsolut = kejadian.poster ? new URL(kejadian.poster, URL_SITUS).toString() : null;
   const terbit = seo?.event_date?.toISOString() ?? null;
   const diubah = seo?.updated_at?.toISOString() ?? terbit;
-  const organisasi = { "@type": "Organization", name: "Fire", url: DASAR_SITUS };
+  const organisasi = { "@type": "Organization", name: NAMA_SITUS, url: URL_SITUS };
   const beritaLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
@@ -160,7 +157,7 @@ function bangunDataLd(
       ...organisasi,
       logo: {
         "@type": "ImageObject",
-        url: new URL("/assets/img/logo-lapor.png", DASAR_SITUS).toString(),
+        url: new URL("/assets/img/logo-lapor.png", URL_SITUS).toString(),
       },
     },
   };
@@ -172,7 +169,7 @@ function bangunDataLd(
         "@type": "ListItem",
         position: 1,
         name: bahasa === "en" ? "Home" : "Beranda",
-        item: `${DASAR_SITUS}/${bahasa}`,
+        item: `${URL_SITUS}/${bahasa}`,
       },
       {
         "@type": "ListItem",

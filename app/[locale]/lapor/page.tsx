@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BAHASA, TEKS_LAPOR, TEKS_NAV, adaBahasa, type Bahasa } from "@/lib/bahasa";
+import { DESKRIPSI_SITUS, JUDUL_SITUS, NAMA_SITUS } from "@/lib/situs";
 import { FormLaporan } from "./form-laporan";
 import { SakelarTema } from "@/components/sakelar-tema";
 
@@ -15,15 +16,10 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   if (!adaBahasa(locale)) return {};
-  const teks = TEKS_LAPOR[locale];
-
-  // Judul meta ringkas: "Lapor | Karhutla" (id) / "Report | Wildfire" (en) —
-  // dipakai untuk <title> tab, hasil pencarian, dan judul pratinjau bagikan.
-  const judul = locale === "en" ? "Report | Wildfire" : "Lapor | Karhutla";
 
   return {
-    title: judul,
-    description: teks.catatan,
+    title: JUDUL_SITUS,
+    description: DESKRIPSI_SITUS,
     // Halaman kiriman: tidak ada isi yang perlu diindeks, dan tautan ke form
     // terbuka di hasil pencarian hanya mengundang bot.
     robots: { index: false, follow: true },
@@ -39,22 +35,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       "content-language": locale,
     },
     // openGraph SENGAJA disetel di sini, bukan diwarisi dari root layout: tanpa
-    // ini pratinjau bagikan halaman lapor memakai judul & deskripsi beranda
-    // yang generik. Gambar tetap logo (og-lapor.jpg) — halaman form tidak punya
-    // gambar sendiri.
+    // ini og:url pratinjau bagikan menunjuk beranda. Gambar tetap logo
+    // (og-lapor.jpg) — halaman form tidak punya gambar sendiri.
     openGraph: {
-      title: judul,
-      description: teks.catatan,
+      title: JUDUL_SITUS,
+      description: DESKRIPSI_SITUS,
       url: `/${locale}/lapor`,
-      siteName: "Fire",
+      siteName: NAMA_SITUS,
       locale: locale === "en" ? "en_US" : "id_ID",
       type: "website",
       images: [{ url: "/assets/img/og-lapor.jpg", width: 1200, height: 630, alt: "Lapor Karhutla" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: judul,
-      description: teks.catatan,
+      title: JUDUL_SITUS,
+      description: DESKRIPSI_SITUS,
       images: ["/assets/img/og-lapor.jpg"],
     },
   };

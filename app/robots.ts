@@ -1,9 +1,8 @@
 import type { MetadataRoute } from "next";
+import { URL_SITUS } from "@/lib/situs";
 
 // Basis sama dengan sitemap supaya robots menunjuk ke host kanonis yang benar.
-const BASE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://fire.nusantara.earth"
-).replace(/\/$/, "");
+const BASE_URL = URL_SITUS;
 
 export default function robots(): MetadataRoute.Robots {
   return {

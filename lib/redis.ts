@@ -58,21 +58,32 @@ if (typeof ruang.__redisKlien === "undefined") {
 
 redisKlien = ruang.__redisKlien;
 
+let tungguSiap: Promise<boolean> | null = null;
+
 /**
  * Memastikan koneksi Redis sudah terhubung sebelum menjalankan perintah.
+ * Satu penantian bersama: ioredis menolak connect() kedua selama
+ * "connecting" ("already connecting"), jadi tanpa ini request yang datang
+ * bersamaan saat server baru menyala membaca null — dan mengunduh ulang dari
+ * hulu data yang sebenarnya ada di Redis.
  */
 async function pastikanTerhubung(): Promise<Redis | null> {
-  if (!redisKlien) return null;
-  if (redisKlien.status === "ready") return redisKlien;
-  if (redisKlien.status === "wait" || redisKlien.status === "connecting" || redisKlien.status === "connect") {
-    try {
-      await redisKlien.connect();
-      return redisKlien;
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  const k = redisKlien;
+  if (!k) return null;
+  if (k.status === "ready") return k;
+  if (k.status === "wait") k.connect().catch(() => {}); // galatnya datang lewat event di bawah
+  if (k.status !== "connecting" && k.status !== "connect") return null;
+  tungguSiap ??= new Promise<boolean>((resolve) => {
+    const selesai = (ok: boolean) => () => {
+      k.off("ready", ya).off("error", tidak).off("close", tidak);
+      tungguSiap = null;
+      resolve(ok);
+    };
+    const ya = selesai(true);
+    const tidak = selesai(false);
+    k.once("ready", ya).once("error", tidak).once("close", tidak);
+  });
+  return (await tungguSiap) ? k : null;
 }
 
 /**

@@ -1,13 +1,12 @@
 import type { MetadataRoute } from "next";
+import { URL_SITUS } from "@/lib/situs";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TAYANG } from "@/lib/events";
 import { urlMedia } from "@/lib/media";
 
 // Base URL terpusat supaya sitemap selalu absolut — crawler menolak URL relatif.
-const BASE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://fire.nusantara.earth"
-).replace(/\/$/, "");
+const BASE_URL = URL_SITUS;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   await connection();

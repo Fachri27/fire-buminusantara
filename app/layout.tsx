@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { Poppins } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DESKRIPSI_SITUS, JUDUL_SITUS, NAMA_SITUS, URL_SITUS } from "@/lib/situs";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -14,19 +15,17 @@ export const metadata: Metadata = {
   // Tanpa ini, og:image kebit sebagai path relatif (/media/...) yang tidak
   // bisa diambil crawler WhatsApp/Twitter — pratinjau bagikan tautan jadi
   // kosong. Diambil dari env supaya instance staging bisa menimpanya.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://fire.nusantara.earth"),
-  title: "Fire — Pantauan Karhutla Indonesia",
-  description:
-    "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
+  metadataBase: new URL(URL_SITUS),
+  title: JUDUL_SITUS,
+  description: DESKRIPSI_SITUS,
   // Gambar bagikan (WhatsApp/Twitter/Facebook). URL relatif diselesaikan
   // absolut lewat metadataBase di atas. Halaman /fire/<slug> menimpanya dengan
   // poster kejadiannya sendiri lewat generateMetadata.
   openGraph: {
-    title: "Fire — Pantauan Karhutla Indonesia",
-    description:
-      "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
+    title: JUDUL_SITUS,
+    description: DESKRIPSI_SITUS,
     url: "/",
-    siteName: "Fire",
+    siteName: NAMA_SITUS,
     locale: "id_ID",
     type: "website",
     images: [
@@ -35,9 +34,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Fire — Pantauan Karhutla Indonesia",
-    description:
-      "Pantauan kebakaran hutan dan lahan di Indonesia — berita terkini, statistik harian, dan peta sebaran wilayah rawan.",
+    title: JUDUL_SITUS,
+    description: DESKRIPSI_SITUS,
     images: ["/assets/img/og-lapor.jpg"],
   },
   verification: {

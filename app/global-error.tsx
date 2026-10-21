@@ -20,7 +20,7 @@ export default function GlobalError({
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>500 — Gangguan Sistem Kritis | Fire</title>
+        <title>500 — Gangguan Sistem Kritis | LAPORIN</title>
         <meta name="robots" content="noindex, nofollow" />
       </head>
       <body

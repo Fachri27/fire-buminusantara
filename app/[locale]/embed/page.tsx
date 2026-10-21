@@ -7,7 +7,7 @@ import { PetaSemat } from "./peta-semat";
 
 /**
  * Peta sematan untuk situs lain:
- *   <iframe src="https://fire.nusantara.earth/id/embed" width="100%" height="720"
+ *   <iframe src="https://laporin.app/id/embed" width="100%" height="720"
  *           style="border:0" loading="lazy" allowfullscreen></iframe>
  * Header frame-ancestors-nya dilonggarkan di next.config.ts.
  */

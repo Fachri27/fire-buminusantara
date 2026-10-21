@@ -108,7 +108,7 @@ const LAPISAN: {
   },
 ];
 
-/** Data hotspot dianggap basi setelah ini — sama dengan cache server. */
+/** Umur data hotspot di klien sebelum diminta ulang (server disegarkan cron tiap 15 menit). */
 const UMUR_DATA_HOTSPOT = 30 * 60 * 1000;
 /** Data hotspot yang diambil pada `waktuAmbil` (ms) sudah perlu diambil ulang. */
 function hotspotBasi(waktuAmbil: number): boolean {
@@ -291,17 +291,16 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   // FIRMS tak terjangkau: coba lagi tiap menit selama lapisannya menyala —
   // pengunjung tak perlu mematikan lalu menyalakan sakelarnya. Bila server
   // melayani data tersimpan (basi), coba tiap 2 menit supaya data baru
-  // langsung menggantikannya begitu FIRMS pulih. Data lama yang sedang
-  // disegarkan server di latar (menyegarkan) diminta lagi ±75 dtk kemudian.
+  // langsung menggantikannya begitu FIRMS pulih.
   useEffect(() => {
     if (!hotspotAktif) return;
     const gagal = statusHotspot === "galat";
     const siap = statusHotspot === "siap";
-    if (!gagal && !(siap && (dataHotspot?.basi || dataHotspot?.menyegarkan))) return;
+    if (!gagal && !(siap && dataHotspot?.basi)) return;
     const penunda = setTimeout(() => {
       if (gagal) setStatusHotspot("memuat");
       ambilHotspot();
-    }, gagal ? 60_000 : dataHotspot?.basi ? 120_000 : 75_000);
+    }, gagal ? 60_000 : 120_000);
     return () => clearTimeout(penunda);
   }, [statusHotspot, hotspotAktif, dataHotspot, ambilHotspot]);
   /** `kunci`: "titik" untuk Titik Hotspot, atau indeks SATELIT_SIPONGI. */
