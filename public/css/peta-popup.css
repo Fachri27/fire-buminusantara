@@ -58,55 +58,60 @@ body:has(.peta-popup) iframe[src*="forecasting"] {
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Penyesuaian elemen internal .peta-popup saat mode terang (tanpa kelas .dark) */
-:not(.dark) .peta-popup [class*="border-white/10"],
-:not(.dark) .peta-popup [class*="border-white/15"] {
+/* Penyesuaian elemen internal .peta-popup saat mode terang (tanpa kelas .dark).
+   Wajib berjangkar html: ":not(.dark) .peta-popup" saja juga cocok di tema
+   gelap karena <body> & leluhur lain tak pernah berkelas .dark. */
+html:not(.dark) .peta-popup [class*="border-white/10"],
+html:not(.dark) .peta-popup [class*="border-white/15"] {
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
-:not(.dark) .peta-popup select#pilih-wilayah-pulau,
-:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] {
+html:not(.dark) .peta-popup select#pilih-wilayah-pulau,
+html:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] {
   background-color: #f4f4f5 !important;
   color: #1a1919 !important;
   border-color: rgba(0, 0, 0, 0.1) !important;
 }
 
-:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button {
+html:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button {
   color: #52525b !important;
 }
 
-:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button.bg-white\/20,
-:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button[class*="bg-white"] {
+html:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button.bg-white\/20,
+html:not(.dark) .peta-popup div[role="group"][aria-label="Mode tampilan berita"] button[class*="bg-white"] {
   background-color: #ffffff !important;
   color: #1a1919 !important;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
 }
 
-:not(.dark) .peta-popup button[class*="border-white/15"] {
+html:not(.dark) .peta-popup button[class*="border-white/15"] {
   border-color: rgba(0, 0, 0, 0.1) !important;
   background-color: rgba(0, 0, 0, 0.05) !important;
   color: #1a1919 !important;
 }
 
-:not(.dark) .peta-popup .bg-pantau-malam {
+html:not(.dark) .peta-popup .bg-pantau-malam {
   background-color: #ffffff !important;
   border-color: rgba(0, 0, 0, 0.08) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
 
-:not(.dark) .peta-popup .text-white {
+/* Teks putih hanya digelapkan bila elemennya tak mengatur warna gelapnya
+   sendiri: yang punya dark:text-* sudah sadar tema, dan putihnya di tema
+   terang memang disengaja (mis. nomor halaman aktif putih di atas bg-tinta). */
+html:not(.dark) .peta-popup .text-white:not([class*="dark:text-"]) {
   color: #1a1919 !important;
 }
 
-:not(.dark) .peta-popup .text-white\/70,
-:not(.dark) .peta-popup .text-white\/60,
-:not(.dark) .peta-popup .text-white\/55,
-:not(.dark) .peta-popup .text-white\/50 {
+html:not(.dark) .peta-popup .text-white\/70:not([class*="dark:text-"]),
+html:not(.dark) .peta-popup .text-white\/60:not([class*="dark:text-"]),
+html:not(.dark) .peta-popup .text-white\/55:not([class*="dark:text-"]),
+html:not(.dark) .peta-popup .text-white\/50:not([class*="dark:text-"]) {
   color: #52525b !important;
 }
 
-:not(.dark) .peta-popup .text-white\/40,
-:not(.dark) .peta-popup .text-white\/30 {
+html:not(.dark) .peta-popup .text-white\/40:not([class*="dark:text-"]),
+html:not(.dark) .peta-popup .text-white\/30:not([class*="dark:text-"]) {
   color: #71717a !important;
 }
 
