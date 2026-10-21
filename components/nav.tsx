@@ -247,11 +247,9 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
       <div className={`mx-auto flex h-full items-center justify-between gap-4 ${
         gelap ? "max-w-7xl px-4 sm:px-6" : "max-w-7xl px-[var(--pias)]"
       }`}>
-        {/* Logo + wordmark — tautan ke halaman utama (konsol peta) dalam
-            bahasa aktif, di pojok kiri bilah. Ikon sendirian terlihat kecil
-            & sepi; dipasangkan teks "Fire" jadi kesatuan merek yang mengisi
-            ruang. Di ponsel "Lapor" pindah ke cluster kanan supaya logo ini
-            punya tempat. */}
+        {/* Logo LAPOR — tautan ke halaman utama (konsol peta) dalam bahasa
+            aktif, di pojok kiri bilah. Di ponsel "Lapor" pindah ke cluster
+            kanan supaya logo ini punya tempat. */}
         <Link href={`/${bahasa}`}
            onClick={(e) => {
              // SELALU ditangani di sini, tidak pernah lewat navigasi <Link>.
@@ -264,27 +262,19 @@ export function Nav({ bahasa, gelap = false, cari }: Props) {
              keBagian(e, BAGIAN[0]);
            }}
            className="flex shrink-0 cursor-pointer items-center gap-2">
-          {/* Aset statis lokal berdimensi tetap — satu-satunya gambar di app ini
-              yang next/image bisa optimasi sepenuhnya. priority: logo ada di bilah
-              lengket yang selalu terlihat, jadi tidak boleh lazy-load. */}
-          <Image src="/assets/img/logo-fire.png" alt="" aria-hidden="true"
-                 width={99} height={160} priority className="h-9 w-auto sm:h-11" />
-          {gelap ? (
-            <>
-              {/* Merek penuh tak muat di 360px berdampingan Lapor + ID/EN —
-                  di ponsel cukup nama pendeknya yang dikenal publik. */}
-              <span className={`font-bold leading-none tracking-tight text-xl sm:hidden ${temaGelap ? "text-white" : "text-tinta"}`}>
-                {bahasa === "en" ? "Wildfire" : "Karhutla"}
-              </span>
-              <span className={`hidden font-bold leading-none tracking-tight sm:inline sm:text-2xl ${temaGelap ? "text-white" : "text-tinta"}`}>
-                {teks.merek}
-              </span>
-            </>
-          ) : (
-          <span className={`font-bold leading-none tracking-tight text-[16px] sm:text-[22px] ${temaGelap ? "text-white" : "text-tinta"}`}>
-            Fire
-          </span>
-          )}
+          {/* Dua varian yang sama persis kecuali warna huruf L-A-P-R: tinta di
+              tema terang, putih di tema gelap; gelembung merahnya tetap. Dipilih
+              lewat kelas .dark (dipasang next-themes sebelum cat pertama), bukan
+              temaGelap, supaya tak berkedip ke varian salah sebelum mount.
+              loading="eager": logo ada di bilah lengket yang selalu terlihat.
+              Ekor gelembung menjulur di bawah garis dasar huruf, jadi gambar
+              diturunkan sedikit supaya hurufnya yang tampak di tengah bilah. */}
+          <Image src="/assets/img/logo-lapor.png" alt={teks.merek}
+                 width={1000} height={276} loading="eager"
+                 className="h-8 w-auto translate-y-[12%] sm:h-10 dark:hidden" />
+          <Image src="/assets/img/logo-lapor-gelap.png" alt={teks.merek}
+                 width={1000} height={276} loading="eager"
+                 className="hidden h-8 w-auto translate-y-[12%] sm:h-10 dark:block" />
         </Link>
 
         {/* Kolom pencarian — SATU markup, dua rupa, dan SELALU terpasang.

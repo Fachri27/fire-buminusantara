@@ -54,13 +54,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       siteName: "Fire",
       locale: teks.ogLocale,
       type: "website",
-      images: [{ url: "/assets/img/og-fire.jpg", width: 1200, height: 630, alt: "Fire" }],
+      images: [{ url: "/assets/img/og-lapor.jpg", width: 1200, height: 630, alt: "Lapor Karhutla" }],
     },
     twitter: {
       card: "summary_large_image",
       title: teks.judul,
       description: teks.deskripsi,
-      images: ["/assets/img/og-fire.jpg"],
+      images: ["/assets/img/og-lapor.jpg"],
     },
   };
 }
