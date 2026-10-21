@@ -6,6 +6,7 @@ import { ambilSorotan } from "@/lib/statistik-sorotan";
 import { ambilKolomUmpanAwal } from "@/lib/perangkat";
 import { LandingKarhutla } from "@/components/landing-karhutla";
 import { BAHASA, adaBahasa, type Bahasa } from "@/lib/bahasa";
+import { DESKRIPSI_SITUS, JUDUL_SITUS, NAMA_SITUS } from "@/lib/situs";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -15,28 +16,12 @@ export function generateStaticParams() {
 
 export const instant = false;
 
-const TEKS_META: Record<Bahasa, { judul: string; deskripsi: string; ogLocale: string }> = {
-  id: {
-    judul: "Kebakaran Hutan dan Lahan — Lapor Karhutla",
-    deskripsi:
-      "Pantau situasi karhutla — hotspot, api aktif, lahan terbakar — dan laporkan apa yang kamu lihat.",
-    ogLocale: "id_ID",
-  },
-  en: {
-    judul: "Forest and Land Fires — Lapor Karhutla",
-    deskripsi:
-      "Track the wildfire situation — hotspots, active fires, burned land — and report what you see.",
-    ogLocale: "en_US",
-  },
-};
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const bahasa: Bahasa = adaBahasa(locale) ? locale : "id";
-  const teks = TEKS_META[bahasa];
   return {
-    title: teks.judul,
-    description: teks.deskripsi,
+    title: JUDUL_SITUS,
+    description: DESKRIPSI_SITUS,
     alternates: {
       canonical: `/${bahasa}`,
       languages: { id: "/id", en: "/en", "x-default": "/id" },
@@ -45,18 +30,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       "content-language": bahasa,
     },
     openGraph: {
-      title: teks.judul,
-      description: teks.deskripsi,
+      title: JUDUL_SITUS,
+      description: DESKRIPSI_SITUS,
       url: `/${bahasa}`,
-      siteName: "Fire",
-      locale: teks.ogLocale,
+      siteName: NAMA_SITUS,
+      locale: bahasa === "en" ? "en_US" : "id_ID",
       type: "website",
       images: [{ url: "/assets/img/og-lapor.jpg", width: 1200, height: 630, alt: "Lapor Karhutla" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: teks.judul,
-      description: teks.deskripsi,
+      title: JUDUL_SITUS,
+      description: DESKRIPSI_SITUS,
       images: ["/assets/img/og-lapor.jpg"],
     },
   };

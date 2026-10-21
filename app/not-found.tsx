@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "404 — Halaman Tidak Ditemukan | Fire",
+  title: "404 — Halaman Tidak Ditemukan | LAPORIN",
   description: "Halaman yang Anda cari tidak dapat ditemukan.",
   robots: { index: false, follow: false },
 };

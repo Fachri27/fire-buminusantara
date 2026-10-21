@@ -6,6 +6,7 @@ import { ambilSorotan } from "@/lib/statistik-sorotan";
 import { ambilKolomUmpanAwal } from "@/lib/perangkat";
 import { LandingKarhutla } from "@/components/landing-karhutla";
 import { BAHASA, adaBahasa, type Bahasa } from "@/lib/bahasa";
+import { DESKRIPSI_SITUS, JUDUL_SITUS, NAMA_SITUS } from "@/lib/situs";
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -18,28 +19,12 @@ export function generateStaticParams() {
 // dasbor (dua rel) — yang dipisah hanya seluler.
 export const instant = false;
 
-const TEKS_META: Record<Bahasa, { judul: string; deskripsi: string; ogLocale: string }> = {
-  id: {
-    judul: "Panel Situasi — Lapor Karhutla",
-    deskripsi:
-      "Panel situasi karhutla — peta sebaran, suhu, hotspot, api aktif, dan dampak.",
-    ogLocale: "id_ID",
-  },
-  en: {
-    judul: "Situation Panel — Lapor Karhutla",
-    deskripsi:
-      "Wildfire situation panel — spread map, temperature, hotspots, active fires, and impacts.",
-    ogLocale: "en_US",
-  },
-};
-
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const bahasa: Bahasa = adaBahasa(locale) ? locale : "id";
-  const teks = TEKS_META[bahasa];
   return {
-    title: teks.judul,
-    description: teks.deskripsi,
+    title: JUDUL_SITUS,
+    description: DESKRIPSI_SITUS,
     alternates: {
       canonical: `/${bahasa}/karhutla/panel`,
       languages: { id: "/id/karhutla/panel", en: "/en/karhutla/panel", "x-default": "/id/karhutla/panel" },
@@ -48,18 +33,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       "content-language": bahasa,
     },
     openGraph: {
-      title: teks.judul,
-      description: teks.deskripsi,
+      title: JUDUL_SITUS,
+      description: DESKRIPSI_SITUS,
       url: `/${bahasa}/karhutla/panel`,
-      siteName: "Fire",
-      locale: teks.ogLocale,
+      siteName: NAMA_SITUS,
+      locale: bahasa === "en" ? "en_US" : "id_ID",
       type: "website",
       images: [{ url: "/assets/img/og-lapor.jpg", width: 1200, height: 630, alt: "Lapor Karhutla" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: teks.judul,
-      description: teks.deskripsi,
+      title: JUDUL_SITUS,
+      description: DESKRIPSI_SITUS,
       images: ["/assets/img/og-lapor.jpg"],
     },
   };
