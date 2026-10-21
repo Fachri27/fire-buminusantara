@@ -112,7 +112,7 @@ jobs:
           # Box menjalankan skrip deploy dari repo-nya sendiri — logika deploy
           # terverSI bersama kode. reset --hard: box tidak boleh punya keadaan
           # lokal yang menyimpang dari main.
-          printf '%s' "$GHCR_TOKEN" | ssh -v -o BatchMode=yes \
+          printf '%s' "$GHCR_TOKEN" | ssh -o BatchMode=yes \
             -i ~/.ssh/deploy_key \
             -o IdentitiesOnly=yes \
             -o KexAlgorithms=curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group14-sha256 \
