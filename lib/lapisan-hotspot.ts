@@ -33,7 +33,8 @@ export type DataHotspot = {
   basi?: boolean;
   provinsi: string[];
   /** [lng, lat, kepercayaan, FRP (MW), waktu (menit epoch UTC), indeks
-   *  satelit, indeks provinsi, malam (0/1)] */
+   *  satelit, indeks provinsi, malam (0/1)]; baris susunTitikTampil menambah
+   *  gaya (kolom ke-9) dan id tampil (kolom ke-10). */
   titik: number[][];
 };
 
@@ -63,22 +64,24 @@ export type LapisanHotspot = { titik: boolean; satelit: readonly boolean[] };
 /** Gaya baris tampil (kolom ke-9): bulatan Titik Hotspot atau penanda SiPongi. */
 export const GAYA_TITIK = 0;
 export const GAYA_SIPONGI = 1;
+/** Banyaknya gaya — pengali id baris tampil; naikkan bila menambah gaya. */
+const JUMLAH_GAYA = 2;
 
 /**
  * Baris yang digambar menurut sakelar yang menyala: titik VIIRS untuk Titik
  * Hotspot, titik tiap satelit SiPongi yang menyala untuk lapisannya — satu
  * titik bisa muncul dua kali dengan gaya berbeda. Kolom ke-9 = gaya, kolom
  * ke-10 = id baris tampil: unik, dan tetap sama walau sakelar lain diganti
- * (indeks titik × 2 + gaya) — promoteId sumber peta, lihat pasangLapisanHotspot.
+ * (indeks titik × JUMLAH_GAYA + gaya) — promoteId sumber peta, lihat pasangLapisanHotspot.
  */
 export function susunTitikTampil(data: DataHotspot, lapisan: LapisanHotspot): number[][] {
   const hasil: number[][] = [];
   for (let n = 0; n < data.titik.length; n++) {
     const t = data.titik[n];
     const s = t[5];
-    if (lapisan.titik && SATELIT_HOTSPOT[s]?.sensor === "VIIRS") hasil.push([...t.slice(0, 8), GAYA_TITIK, n * 2 + GAYA_TITIK]);
+    if (lapisan.titik && SATELIT_HOTSPOT[s]?.sensor === "VIIRS") hasil.push([...t.slice(0, 8), GAYA_TITIK, n * JUMLAH_GAYA + GAYA_TITIK]);
     const i = (SATELIT_SIPONGI as readonly number[]).indexOf(s);
-    if (i >= 0 && lapisan.satelit[i]) hasil.push([...t.slice(0, 8), GAYA_SIPONGI, n * 2 + GAYA_SIPONGI]);
+    if (i >= 0 && lapisan.satelit[i]) hasil.push([...t.slice(0, 8), GAYA_SIPONGI, n * JUMLAH_GAYA + GAYA_SIPONGI]);
   }
   return hasil;
 }

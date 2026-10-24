@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { GAYA_SIPONGI, GAYA_TITIK, susunTitikTampil, type DataHotspot } from "./lapisan-hotspot.ts";
+import type * as maplibregl from "maplibre-gl";
+
+import { GAYA_SIPONGI, GAYA_TITIK, setelDataHotspot, susunTitikTampil, type DataHotspot } from "./lapisan-hotspot.ts";
 
 /** Satu titik per satelit (indeks s 0..3) — kolom = DataHotspot.titik. */
 const data: DataHotspot = {
@@ -31,4 +33,12 @@ test("id baris tampil tetap saat sakelar lain diganti (promoteId sumber peta)", 
   const semua = susunTitikTampil(data, { titik: true, satelit: [true, true, true] });
   const idSipongi = id(semua.filter((t) => t[8] === GAYA_SIPONGI));
   assert.deepEqual(id(sipongi), idSipongi);
+});
+
+test("fitur peta membawa id baris tampil di properti id (promoteId sumber)", () => {
+  let terkirim: GeoJSON.FeatureCollection | undefined;
+  const peta = { getSource: () => ({ setData: (d: GeoJSON.FeatureCollection) => (terkirim = d) }) };
+  const titik = susunTitikTampil(data, { titik: true, satelit: [true, true, true] });
+  setelDataHotspot(peta as unknown as maplibregl.Map, { ...data, titik });
+  assert.deepEqual(terkirim?.features.map((f) => f.properties?.id), id(titik));
 });
