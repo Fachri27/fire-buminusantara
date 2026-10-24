@@ -67,15 +67,18 @@ export const GAYA_SIPONGI = 1;
 /**
  * Baris yang digambar menurut sakelar yang menyala: titik VIIRS untuk Titik
  * Hotspot, titik tiap satelit SiPongi yang menyala untuk lapisannya — satu
- * titik bisa muncul dua kali dengan gaya berbeda. Kolom ke-9 = gaya.
+ * titik bisa muncul dua kali dengan gaya berbeda. Kolom ke-9 = gaya, kolom
+ * ke-10 = id baris tampil: unik, dan tetap sama walau sakelar lain diganti
+ * (indeks titik × 2 + gaya) — promoteId sumber peta, lihat pasangLapisanHotspot.
  */
 export function susunTitikTampil(data: DataHotspot, lapisan: LapisanHotspot): number[][] {
   const hasil: number[][] = [];
-  for (const t of data.titik) {
+  for (let n = 0; n < data.titik.length; n++) {
+    const t = data.titik[n];
     const s = t[5];
-    if (lapisan.titik && SATELIT_HOTSPOT[s]?.sensor === "VIIRS") hasil.push([...t.slice(0, 8), GAYA_TITIK]);
+    if (lapisan.titik && SATELIT_HOTSPOT[s]?.sensor === "VIIRS") hasil.push([...t.slice(0, 8), GAYA_TITIK, n * 2 + GAYA_TITIK]);
     const i = (SATELIT_SIPONGI as readonly number[]).indexOf(s);
-    if (i >= 0 && lapisan.satelit[i]) hasil.push([...t.slice(0, 8), GAYA_SIPONGI]);
+    if (i >= 0 && lapisan.satelit[i]) hasil.push([...t.slice(0, 8), GAYA_SIPONGI, n * 2 + GAYA_SIPONGI]);
   }
   return hasil;
 }
@@ -123,10 +126,11 @@ export function hitungPerSatelit(data: DataHotspot): number[][] {
 function keGeoJson(data: DataHotspot | null): GeoJSON.FeatureCollection<GeoJSON.Point> {
   return {
     type: "FeatureCollection",
-    features: (data?.titik ?? []).map(([lng, lat, k, frp, waktu, s, p, malam, g = GAYA_SIPONGI]) => ({
+    features: (data?.titik ?? []).map(([lng, lat, k, frp, waktu, s, p, malam, g = GAYA_SIPONGI, id], i) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [lng, lat] },
-      properties: { k, frp, waktu, s, p, malam, g },
+      // id: kolom ke-10 susunTitikTampil; baris tanpa kolom itu memakai urutannya.
+      properties: { k, frp, waktu, s, p, malam, g, id: id ?? i },
     })),
   };
 }
@@ -165,7 +169,13 @@ export function pasangLapisanHotspot(map: maplibregl.Map) {
     }
   });
   if (map.getSource(SUMBER)) return;
-  map.addSource(SUMBER, { type: "geojson", data: keGeoJson(null) });
+  // promoteId wajib (MapLibre >= 6.11): kunci pencocokan simbol antar-ubin
+  // (CrossTileSymbolIndex) lalu memuat id titik. Tanpa itu semua penanda
+  // SiPongi — simbol tanpa teks — berbagi satu kunci, dan tiap ubin baru
+  // (sakelar, zoom, bentang selayar) dicocokkan dengan ratusan sampai ribuan
+  // titik di sekitarnya: puluhan juta perbandingan untuk ~19 ribu titik, di
+  // main thread, sekaligus — peta macet berdetik-detik di laptop lemah.
+  map.addSource(SUMBER, { type: "geojson", data: keGeoJson(null), promoteId: "id" });
   // Pendar di bawah bulatan Titik Hotspot berkepercayaan tinggi — kesan bara,
   // murah karena jumlahnya hanya sebagian kecil dari seluruh titik.
   map.addLayer({
