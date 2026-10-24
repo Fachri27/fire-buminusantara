@@ -83,9 +83,9 @@ export function PetaLokasi({ lat, lng, onPilih }: Props) {
     let batal = false;
 
     (async () => {
-      let maplibregl: typeof import("maplibre-gl");
+      let maplibregl: typeof import("@/lib/maplibre");
       try {
-        maplibregl = await import("maplibre-gl");
+        maplibregl = await import("@/lib/maplibre");
       } catch {
         if (!batal) setGagal("Pustaka peta gagal diunduh. Periksa koneksi lalu ulangi.");
         return;

@@ -3,16 +3,8 @@
 import { useEffect, useRef, useState, useCallback, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import * as maplibregl from "maplibre-gl";
+import * as maplibregl from "@/lib/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-
-/* Worker salinan dist maplibre-gl di public/ — HARUS sama versinya dengan
-   pustaka ini (perbarui berkasnya setiap maplibre-gl naik versi). ?v= karena
-   berkas public/ di-cache peramban sehari (+ seminggu stale-while-revalidate):
-   tanpa itu pengunjung lama memasangkan worker versi lama dengan pustaka baru. */
-if (typeof window !== "undefined") {
-  maplibregl.setWorkerUrl(`/assets/vendor/maplibre/maplibre-gl-worker.mjs?v=${maplibregl.getVersion()}`);
-}
 
 import { inferPulau, PROVINSI_KE_PULAU } from "@/lib/wilayah";
 import { PUSAT_WILAYAH } from "@/lib/pusat-wilayah";
