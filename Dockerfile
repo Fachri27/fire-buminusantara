@@ -49,6 +49,9 @@ RUN mkdir -p /opt/prisma && cd /opt/prisma \
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+# Node 22 memberi tiap alamat hanya 250 ms (happy eyeballs); NASA FIRMS butuh
+# ~300 ms+ dari server, dan jaringan Docker tanpa IPv6 → fetch ETIMEDOUT ~7/10.
+ENV NODE_OPTIONS=--network-family-autoselection-attempt-timeout=2000
 
 # ffmpeg dipakai bingkaiVideo() untuk membuat poster (bingkai pertama) tiap
 # video yang diunggah. Tanpa ini di image runtime, poster tidak pernah dibuat:
