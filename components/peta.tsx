@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type KeyboardEvent as KeyboardEventReact, type PointerEvent as PointerEventReact } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type ReactNode, type KeyboardEvent as KeyboardEventReact, type PointerEvent as PointerEventReact } from "react";
+import { createPortal, flushSync } from "react-dom";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 
@@ -21,18 +21,19 @@ import { BATAS_NUSANTARA, selaNusantara } from "@/lib/kamera-nusantara";
 // Hanya konstanta & tipe — modul ini mengimpor maplibre-gl sebatas tipe,
 // jadi peta.tsx tetap tak ikut menarik maplibre-gl ke bundelnya.
 import {
-  formatWib,
-  GAYA_SIPONGI,
+  hariWib,
   hitungPerSatelit,
   jalurBentukHotspot,
-  LABEL_KEPERCAYAAN,
   SATELIT_HOTSPOT,
-  SATELIT_SIPONGI,
   susunTitikTampil,
   WARNA_SIPONGI,
-  WARNA_TITIK_HOTSPOT,
   type DataHotspot,
 } from "@/lib/lapisan-hotspot";
+import type { LapisanAsap } from "./peta-asap";
+import { PanelPeringkatHotspot, RelPeringkatHotspot } from "./panel-peringkat-hotspot";
+import { formatHariPeta, LOCALE, TEKS_PETA } from "./teks-peta";
+import type { Bahasa } from "@/lib/bahasa";
+import { useKurangiGerak, useMediaQuery } from "@/hooks/use-media-query";
 
 /** Bagian peta MapLibre lapisan Aerosol yang dibaca untuk menyamakan kamera
  *  Windy — diakses lewat window supaya peta.tsx tak mengimpor maplibre-gl. */
@@ -44,16 +45,25 @@ type PetaAerosol = {
   ) => { center: { lng: number; lat: number } | [number, number]; zoom?: number } | undefined;
 };
 
+/** Selisih bujur pusat iframe Windy ke pusat yang tampak: iframe melebar
+ *  ke bawah kolom peringkat, `kolom` px tertutup panel (tutupKiri di Peta), jadi
+ *  pusatnya kolom/2 px di barat pusat yang tampak. Zoom skala Leaflet (256 px). */
+function geserBujurWindy(kolom: number, zoomWindy: number): number {
+  return ((kolom / 2) * 360) / (256 * 2 ** zoomWindy);
+}
+
 /** Kamera Windy yang sama dengan kamera Nusantara lapisan Aerosol, atau null
  *  bila peta Aerosol belum siap. Zoom Windy (skala Leaflet) = zoom MapLibre + 1
  *  — lihat catatan tombol rumah di app/api/forecasting/route.ts. */
-function kameraWindyNusantara(isPenuh?: boolean): { lat: number; lon: number; zoom: number } | null {
+function kameraWindyNusantara(isPenuh: boolean | undefined, kolom: number): { lat: number; lon: number; zoom: number } | null {
   const peta = (window as unknown as { _maplibreMap?: PetaAerosol })._maplibreMap;
   if (!peta) return null;
-  const kamera = peta.cameraForBounds(BATAS_NUSANTARA, { padding: selaNusantara(peta.getContainer(), isPenuh) });
+  // Wadah MapLibre melebar ke bawah kolom peringkat; induknya (akar PetaAsap) = kotak yang tampak.
+  const wadah = peta.getContainer();
+  const kamera = peta.cameraForBounds(BATAS_NUSANTARA, { padding: selaNusantara(wadah.parentElement ?? wadah, isPenuh) });
   if (!kamera || kamera.zoom === undefined) return null;
   const [lon, lat] = Array.isArray(kamera.center) ? kamera.center : [kamera.center.lng, kamera.center.lat];
-  return { lat, lon, zoom: kamera.zoom + 1 };
+  return { lat, lon: lon - geserBujurWindy(kolom, kamera.zoom + 1), zoom: kamera.zoom + 1 };
 }
 
 /** Bagian peta Leaflet milik Windy di dalam iframe (satu origin dengan
@@ -64,13 +74,14 @@ type PetaWindy = {
 };
 
 /** Kamera lapisan Aerosol saat ini dalam skala zoom Windy (+1), atau null. */
-function kameraAerosolKini(): { lat: number; lon: number; zoom: number } | null {
+function kameraAerosolKini(kolom: number): { lat: number; lon: number; zoom: number } | null {
   const peta = (window as unknown as {
     _maplibreMap?: { getCenter: () => { lat: number; lng: number }; getZoom: () => number };
   })._maplibreMap;
   if (!peta) return null;
   const c = peta.getCenter();
-  return { lat: c.lat, lon: c.lng, zoom: peta.getZoom() + 1 };
+  const zoom = peta.getZoom() + 1;
+  return { lat: c.lat, lon: c.lng - geserBujurWindy(kolom, zoom), zoom };
 }
 
 /** Mode lapisan peta — diangkat ke luar supaya konsol /peta bisa
@@ -108,7 +119,10 @@ const LAPISAN: {
   },
 ];
 
-/** Umur data hotspot di klien sebelum diminta ulang (server disegarkan cron tiap 15 menit). */
+/** Lama luncur panel peringkat (ms) — lihat kolomPenuh di Peta. */
+const LAMA_LUNCUR = 300;
+
+/** Umur data hotspot di klien sebelum diminta ulang (server disegarkan cron tiap 30 menit). */
 const UMUR_DATA_HOTSPOT = 30 * 60 * 1000;
 /** Data hotspot yang diambil pada `waktuAmbil` (ms) sudah perlu diambil ulang. */
 function hotspotBasi(waktuAmbil: number): boolean {
@@ -132,9 +146,93 @@ function IkonHotspot({ s, k }: { s: number; k: number }) {
   );
 }
 
+/** Satu baris sakelar di panel Lapisan peta. Panel tetap terbuka saat
+ *  diklik supaya lapisannya langsung terlihat muncul/hilang di peta. */
+function SakelarLapisan({ ikon, label, keterangan, aktif, onAlih }: { ikon: ReactNode; label: string; keterangan: string; aktif: boolean; onAlih: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={aktif}
+      onClick={onAlih}
+      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl p-1 text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-api"
+    >
+      {ikon}
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] font-semibold leading-tight">{label}</span>
+        <span className="block text-[10px] leading-snug text-tinta/55 dark:text-white/50">{keterangan}</span>
+      </span>
+      {/* Sakelar: bola dipusatkan flex (bukan top/left absolut) dan
+          bayangannya merata — bayangan jatuh ke bawah membuat bola
+          tampak tak di tengah trek. */}
+      <span
+        className={`flex h-[18px] w-8 shrink-0 items-center rounded-full p-0.5 transition-colors ${aktif ? "bg-api" : "bg-black/20 dark:bg-white/25"}`}
+        aria-hidden="true"
+      >
+        <span
+          className={`h-3.5 w-3.5 rounded-full bg-white shadow-[0_0_2px_rgba(0,0,0,0.3)] transition-transform duration-150 motion-reduce:transition-none ${aktif ? "translate-x-3.5" : "translate-x-0"}`}
+        />
+      </span>
+    </button>
+  );
+}
+
+/** Satu bagian Panduan Peta (di dalam <dl>). */
+function BagianPanduan({ judul, children }: { judul: string; children: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-[12px] font-semibold text-tinta dark:text-white">{judul}</dt>
+      <dd className="mt-0.5 text-[12px] leading-relaxed text-tinta/70 dark:text-white/70">{children}</dd>
+    </div>
+  );
+}
+
+const kelasTautan = "font-medium text-tinta underline underline-offset-2 dark:text-white";
+
+type TabPanduan = "aerosol" | "angin" | "hotspot" | "peringkat";
+
+/** Urutan topik Panduan Peta; teksnya di TEKS_PETA.panduan.topik. */
+const TOPIK_PANDUAN = ["aerosol", "angin", "hotspot", "peringkat"] as const;
+
+/** Skala AQI US EPA — warna baku EPA, juga dipakai legenda Windy; labelnya
+ *  TEKS_PETA.panduan.angin.aqi dengan urutan sama. */
+const SKALA_AQI = [
+  { warna: "#00e400", rentang: "0–50" },
+  { warna: "#ffff00", rentang: "51–100" },
+  { warna: "#ff7e00", rentang: "101–150" },
+  { warna: "#ff0000", rentang: "151–200" },
+  { warna: "#8f3f97", rentang: "201–300" },
+  { warna: "#7e0023", rentang: "301+" },
+];
+
+/** Kunci visual topik — sama dengan ikon baris panel Lapisan, jadi daftar
+ *  topik sekaligus mengingatkan rupa lapisannya di peta. */
+function KunciTopik({ kunci }: { kunci: TabPanduan }) {
+  const kotak = "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-black/[0.06] dark:ring-white/10";
+  if (kunci === "aerosol" || kunci === "angin") {
+    return <span className={kotak} style={{ background: LAPISAN[kunci === "aerosol" ? 0 : 1].latar }} aria-hidden="true" />;
+  }
+  if (kunci === "hotspot") {
+    return (
+      <span className={`${kotak} gap-px bg-[#0b2440]`} aria-hidden="true">
+        {SATELIT_HOTSPOT.map((_, s) => (
+          <IkonHotspot key={s} s={s} k={2} />
+        ))}
+      </span>
+    );
+  }
+  return (
+    <span className={`${kotak} flex-col items-start gap-[3px] bg-[#0b2440] pl-[7px]`} aria-hidden="true">
+      {[18, 13, 8].map((w) => (
+        <span key={w} className="h-[3px] rounded-full bg-api-peta" style={{ width: w }} />
+      ))}
+    </span>
+  );
+}
+
 /** Satu titik waktu lapisan Angin — dikirim iframe (LINIMASA_UDARA) dari
  *  metadata /api/udara, langkahnya sama dengan lapisan Aerosol. */
-type LangkahUdara = { labelWib: string; adalahPrediksi: boolean };
+type LangkahUdara = { labelWib: string; adalahPrediksi: boolean; waktu: number | null };
 
 type Props = {
   jumlahLaporan: Record<string, number>;
@@ -165,9 +263,13 @@ type Props = {
   expandLabel?: string;
   /** Status mode peta selayar penuh */
   isPenuh?: boolean;
+  /** Bahasa teks hotspot, peringkat, dan Panduan Peta (TEKS_PETA). */
+  bahasa?: Bahasa;
 };
 
-export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt, onExpand = null, expandLabel, isPenuh = false }: Props) {
+export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, legendaRingkas = false, tombolRapat = false, muatNusantara = false, mode: modeLuar, onModeChange, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt, onExpand = null, expandLabel, isPenuh = false, bahasa = "id" }: Props) {
+  const t = TEKS_PETA[bahasa];
+  const angka = (n: number) => n.toLocaleString(LOCALE[bahasa]);
   const [modeDalam, setModeDalam] = useState<ModePeta>("asap");
   // Terkendali kalau induk mengisi prop mode (+ onModeChange) — kalau tidak,
   // fallback ke state dalam supaya pemakaian lama (beranda) tak berubah.
@@ -265,85 +367,186 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   /* Lapisan tambahan hotspot (lib/lapisan-hotspot.ts) — dinyalakan dari panel
      Lapisan dan ditumpangkan di peta dasar mana pun yang tampil: PetaAsap
      lewat prop, iframe Windy lewat pesan SET_HOTSPOT. Data diambil sekali di
-     sini lalu dibagi ke keduanya. Empat sakelar: Titik Hotspot (bulatan VIIRS,
-     bawaan mati) dan tiga lapisan satelit SiPongi (bawaan menyala, jadi
+     sini lalu dibagi ke keduanya. Tiga sakelar satelit (bawaan menyala, jadi
      datanya langsung diambil saat terpasang). */
-  const [titikAktif, setTitikAktif] = useState(false);
-  const [satelitAktif, setSatelitAktif] = useState<boolean[]>(() => SATELIT_SIPONGI.map(() => true));
-  const hotspotAktif = titikAktif || satelitAktif.some(Boolean);
+  // Lapisan bawaan (sakelar teratas panel Lapisan): animasi per peta dasar,
+  // batas provinsi & angka dipakai bersama. Windy menerimanya lewat SET_LAPISAN.
+  const [lapisan, setLapisan] = useState<LapisanAsap & { angin: boolean }>({ aerosol: true, angin: true, poligon: true, angka: true });
+  const lapisanRef = useRef(lapisan);
+  useEffect(() => {
+    lapisanRef.current = lapisan;
+    if (iframeReadyRef.current) kirimData({ type: "SET_LAPISAN", ...lapisan });
+  }, [lapisan, kirimData]);
+  const [satelitAktif, setSatelitAktif] = useState<boolean[]>(() => SATELIT_HOTSPOT.map(() => true));
+  const hotspotAktif = satelitAktif.some(Boolean);
   const [dataHotspot, setDataHotspot] = useState<DataHotspot | null>(null);
+  // Hari langkah bilah waktu Aerosol (PetaAsap onWaktu). Sebelum ia melapor:
+  // hari ini — bilah waktunya memang mulai dari "sekarang", jadi permintaan
+  // pertama sudah hari yang benar dan tak diulang begitu laporannya tiba.
+  // Disimpan sebagai hari, bukan ms: langkah 3-jam di hari yang sama tak
+  // me-render ulang Peta.
+  const [hariAsap, setHariAsap] = useState(() => hariWib(Date.now()));
   const [statusHotspot, setStatusHotspot] = useState<"diam" | "memuat" | "siap" | "galat">("memuat");
   const waktuAmbilHotspotRef = useRef(0);
-  const ambilHotspot = useCallback(() => {
-    // ?v=2: format satelit baru (MODIS + bentuk SiPongi) — lewati tembolok lama.
-    fetch("/api/hotspot?v=2")
+  // Hari (WIB) yang diminta — hariTerpilih di bawah; null = hari terbaru.
+  const hariHotspotRef = useRef<string | null>(null);
+  // Jawaban per hari (kunci = hari diminta, juga hari jawabannya): bilah waktu
+  // yang berputar kembali ke hari yang sama tak mengunduh & mengurai ulang
+  // ~1 MB tiap putaran. Entri basi tak pernah dipakai lagi, jadi dibuang —
+  // tab yang lama terbuka tak menimbun satu hari untuk tiap tanggal.
+  const simpananHotspotRef = useRef(new Map<string, { data: DataHotspot; waktu: number }>());
+  // Unduhan yang sedang berjalan, satu per hari. Tak dibatalkan saat bilah
+  // waktu pindah hari: di jaringan lambat putar otomatis lebih cepat dari
+  // unduhannya, jadi tiap unduhan dibiarkan selesai dan masuk simpanan.
+  const unduhanHotspotRef = useRef(new Map<string, AbortController>());
+  useEffect(() => {
+    const unduhan = unduhanHotspotRef.current;
+    return () => {
+      unduhan.forEach((p) => p.abort());
+      unduhan.clear();
+    };
+  }, []);
+  /** `paksa`: lewati simpanan — coba ulang saat galat/basi. */
+  const ambilHotspot = useCallback((paksa = false) => {
+    const kunci = hariHotspotRef.current ?? "";
+    const simpan = simpananHotspotRef.current.get(kunci);
+    if (simpan && !paksa && !hotspotBasi(simpan.waktu)) {
+      waktuAmbilHotspotRef.current = simpan.waktu;
+      setDataHotspot(simpan.data);
+      setStatusHotspot("siap");
+      return;
+    }
+    const unduhan = unduhanHotspotRef.current;
+    if (unduhan.has(kunci)) return; // hasilnya tampil begitu tiba
+    const pengendali = new AbortController();
+    unduhan.set(kunci, pengendali);
+    // ?v=3: data per hari + kolom kabupaten — lewati tembolok lama.
+    fetch(`/api/hotspot?v=3${kunci ? `&hari=${kunci}` : ""}`, { signal: pengendali.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((d: DataHotspot) => {
-        waktuAmbilHotspotRef.current = Date.now();
+        const simpanan = simpananHotspotRef.current;
+        simpanan.forEach((v, k) => {
+          if (hotspotBasi(v.waktu)) simpanan.delete(k);
+        });
+        const isi = { data: d, waktu: Date.now() };
+        simpanan.set(kunci, isi).set(d.hari, isi);
+        // Bilah waktu sudah pindah hari: cukup disimpan.
+        const kini = hariHotspotRef.current ?? "";
+        if (kini !== kunci && kini !== d.hari) return;
+        waktuAmbilHotspotRef.current = isi.waktu;
         setDataHotspot(d);
         setStatusHotspot("siap");
       })
-      .catch(() => setStatusHotspot("galat"));
+      .catch(() => {
+        if (!pengendali.signal.aborted && (hariHotspotRef.current ?? "") === kunci) setStatusHotspot("galat");
+      })
+      .finally(() => {
+        // Sesudah unmount (StrictMode/Activity) kuncinya bisa milik unduhan baru.
+        if (unduhan.get(kunci) === pengendali) unduhan.delete(kunci);
+      });
   }, []);
+  /* Panel Peringkat Hotspot: kolom kiri peta (layar ≥ lg) atau lembar penuh
+     menutupi peta (ponsel). Hanya di selayar — bingkai kecil landing & semat
+     diperkecil, tabelnya tak terbaca. Bawaan terbuka di layar lebar. */
+  const layarLebar = useMediaQuery("(min-width: 1024px)");
+  const [alihPeringkat, setAlihPeringkat] = useState<boolean | null>(null);
+  const peringkatBuka = !!isPenuh && (alihPeringkat ?? layarLebar);
+  // Tujuan fokus saat panel dibentang/diciutkan — lihat onBuka & onTutup.
+  const panelPeringkatRef = useRef<HTMLDivElement>(null);
+  const tombolPeringkatRef = useRef<HTMLButtonElement>(null);
+  /* Ciut/bentang mulus (≥ lg): panel MELUNCUR (transform, GPU) di atas peta;
+     lebar kolom tata letak berganti SEKALI — di akhir luncur masuk, di awal
+     luncur keluar — saat tepinya tertutup panel. Menganimasikan lebar kolom
+     berarti peta MapLibre (kanvas WebGL + lapisan asap) dan hamparannya
+     di-resize tiap frame: itulah yang patah-patah. */
+  const kurangiGerak = useKurangiGerak();
+  const [kolomPenuh, setKolomPenuh] = useState(peringkatBuka);
+  if (!peringkatBuka && kolomPenuh) setKolomPenuh(false); // diciutkan: kolom menyempit seketika
   useEffect(() => {
-    ambilHotspot();
-  }, [ambilHotspot]);
+    if (!peringkatBuka || kolomPenuh) return;
+    const tunda = setTimeout(() => setKolomPenuh(true), kurangiGerak ? 0 : LAMA_LUNCUR);
+    return () => clearTimeout(tunda);
+  }, [peringkatBuka, kolomPenuh, kurangiGerak]);
+  // Masuk/keluar selayar: kolom langsung di ukuran akhirnya (tanpa jeda luncur),
+  // supaya fitBounds selayar PetaAsap sudah memakai padding kiri yang benar.
+  const [penuhLalu, setPenuhLalu] = useState(isPenuh);
+  if (penuhLalu !== isPenuh) {
+    setPenuhLalu(isPenuh);
+    setKolomPenuh(peringkatBuka);
+  }
+  const kolomLebar = peringkatBuka && kolomPenuh;
+  /** Lebar kolom di kiri kotak peta (px) — PetaAsap melebarkan kanvasnya sejauh
+   *  ini ke bawah kolom, jadi ciut/bentang tak pernah me-resize peta. */
+  const lebarKolom = isPenuh && layarLebar ? (kolomLebar ? 300 : 44) : 0;
+  /** Yang ditutup panel/bilahnya dari kiri peta pada keadaan AKHIRNYA — berganti
+   *  saat tombol ditekan (lebarKolom baru menyusul di akhir luncur masuk). Kanvas
+   *  & iframe selalu mulai di tepi kiri layar, jadi ini padding kiri kamera:
+   *  kedua peta meluncur ke tengah ruang yang tampak bersama panel. */
+  const tutupKiri = isPenuh && layarLebar ? (peringkatBuka ? 300 : 44) : 0;
+  // Iframe Windy: logo atribusinya digeser keluar dari balik panel dan
+  // petanya digeser ke tengah (SET_KOLOM); kameranya lewat geserBujurWindy.
+  const tutupKiriRef = useRef(tutupKiri);
+  useEffect(() => {
+    tutupKiriRef.current = tutupKiri;
+    if (iframeReadyRef.current) kirimData({ type: "SET_KOLOM", kiri: tutupKiri });
+  }, [tutupKiri, kirimData]);
   // FIRMS tak terjangkau: coba lagi tiap menit selama lapisannya menyala —
   // pengunjung tak perlu mematikan lalu menyalakan sakelarnya. Bila server
   // melayani data tersimpan (basi), coba tiap 2 menit supaya data baru
   // langsung menggantikannya begitu FIRMS pulih.
+  // Ada yang menampilkan data hotspot: lapisan satelit atau panel peringkat.
+  const perluHotspot = hotspotAktif || peringkatBuka;
   useEffect(() => {
-    if (!hotspotAktif) return;
+    if (!perluHotspot) return;
     const gagal = statusHotspot === "galat";
     const siap = statusHotspot === "siap";
     if (!gagal && !(siap && dataHotspot?.basi)) return;
     const penunda = setTimeout(() => {
       if (gagal) setStatusHotspot("memuat");
-      ambilHotspot();
+      ambilHotspot(true);
     }, gagal ? 60_000 : 120_000);
     return () => clearTimeout(penunda);
-  }, [statusHotspot, hotspotAktif, dataHotspot, ambilHotspot]);
-  /** `kunci`: "titik" untuk Titik Hotspot, atau indeks SATELIT_SIPONGI. */
-  const alihLapisanHotspot = (kunci: "titik" | number) => {
-    const nyala = kunci === "titik" ? !titikAktif : !satelitAktif[kunci];
-    if (kunci === "titik") setTitikAktif(nyala);
-    else setSatelitAktif((aktif) => aktif.map((v, i) => (i === kunci ? nyala : v)));
+  }, [statusHotspot, perluHotspot, dataHotspot, ambilHotspot]);
+  /** `s`: indeks SATELIT_HOTSPOT. */
+  const alihLapisanHotspot = (s: number) => {
+    const nyala = !satelitAktif[s];
+    setSatelitAktif((aktif) => aktif.map((v, i) => (i === s ? nyala : v)));
     const basi = hotspotBasi(waktuAmbilHotspotRef.current);
-    if (!nyala || statusHotspot === "memuat" || (statusHotspot === "siap" && !basi)) return;
+    // !perluHotspot: menyalakan lapisan pertama memicu efek hari di bawah.
+    if (!nyala || !perluHotspot || statusHotspot === "memuat" || (statusHotspot === "siap" && !basi)) return;
     setStatusHotspot("memuat");
     ambilHotspot();
   };
-  // Baris yang digambar menurut sakelar yang menyala (kolom ke-9 = gaya).
-  // Dimemo: kedua peta mengisi ulang sumbernya (dan Windy menerima ulang
-  // puluhan ribu titik) tiap nilainya berganti.
+  // Baris yang digambar menurut sakelar yang menyala. Dimemo: kedua peta
+  // mengisi ulang sumbernya (dan Windy menerima ulang puluhan ribu titik) tiap
+  // nilainya berganti.
   const hotspotTampil = useMemo(() => {
-    if (!dataHotspot || !(titikAktif || satelitAktif.some(Boolean))) return null;
-    return { ...dataHotspot, titik: susunTitikTampil(dataHotspot, { titik: titikAktif, satelit: satelitAktif }) };
-  }, [dataHotspot, titikAktif, satelitAktif]);
+    if (!dataHotspot || !satelitAktif.some(Boolean)) return null;
+    return { ...dataHotspot, titik: susunTitikTampil(dataHotspot, satelitAktif) };
+  }, [dataHotspot, satelitAktif]);
   const perSatelit = useMemo(() => (dataHotspot ? hitungPerSatelit(dataHotspot) : null), [dataHotspot]);
-  // Jumlah lapisan Titik Hotspot per kepercayaan: seluruh satelit VIIRS.
-  const perKepercayaanViirs = perSatelit
-    ? [0, 1, 2].map((k) => perSatelit.reduce((n, baris, s) => (SATELIT_HOTSPOT[s]?.sensor === "VIIRS" ? n + baris[k] : n), 0))
-    : null;
 
-  // Iframe Windy menerima [lng, lat, kepercayaan, satelit, gaya, FRP, waktu,
-  // malam, indeks provinsi] + daftar provinsi (gambar & kartu info titik);
-  // disimpan juga untuk dikirim ulang setiap iframe (ulang) siap.
+  // Iframe Windy menerima [lng, lat, kepercayaan, satelit, FRP, waktu, malam,
+  // indeks provinsi] + daftar provinsi (gambar & kartu info titik); disimpan
+  // juga untuk dikirim ulang setiap iframe (ulang) siap. Hanya selama Windy
+  // tampil: di balik Aerosol tiap ganti hari mengirim puluhan ribu titik yang
+  // lalu diurut & diproyeksikan ulang percuma. Kembali ke Windy mengirimnya.
   const hotspotWindyRef = useRef<{ type: "SET_HOTSPOT"; titik: number[][] | null; provinsi: string[] }>({
     type: "SET_HOTSPOT",
     titik: null,
     provinsi: [],
   });
   useEffect(() => {
+    if (mode !== "windy") return;
     hotspotWindyRef.current = {
       type: "SET_HOTSPOT",
       titik: hotspotTampil
-        ? hotspotTampil.titik.map((t) => [t[0], t[1], t[2], t[5], t[8] ?? GAYA_SIPONGI, t[3], t[4], t[7], t[6]])
+        ? hotspotTampil.titik.map((t) => [t[0], t[1], t[2], t[5], t[3], t[4], t[7], t[6]])
         : null,
       provinsi: hotspotTampil?.provinsi ?? [],
     };
     if (iframeReadyRef.current) kirimData(hotspotWindyRef.current);
-  }, [hotspotTampil, kirimData]);
+  }, [hotspotTampil, mode, kirimData]);
 
   /* Bilah waktu lapisan Angin — tampilannya di sini (rupa sama persis dengan
      bilah waktu Aerosol), mesinnya di iframe: progres pecahan, frame AQI +
@@ -411,7 +614,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
     if (m === "windy") {
       // Konsol / beranda: samakan kamera dan tingkat zoom persis dengan lapisan Aerosol
-      const kamera = kameraAerosolKini() ?? (muatNusantara ? kameraWindyNusantara(isPenuh) : null);
+      const kamera = kameraAerosolKini(tutupKiriRef.current) ?? (muatNusantara ? kameraWindyNusantara(isPenuh, tutupKiriRef.current) : null);
       if (kamera) {
         kameraTertundaRef.current = kamera;
         if (iframeReadyRef.current) kirimData({ type: "SET_KAMERA", ...kamera });
@@ -456,7 +659,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           const z = typeof windy._maplibreMap?.getZoom === "function"
             ? windy._maplibreMap.getZoom()
             : windy.getZoom() - 1;
-          aerosol.jumpTo({ center: [c.lng, c.lat], zoom: z });
+          aerosol.jumpTo({ center: [c.lng + geserBujurWindy(tutupKiriRef.current, z + 1), c.lat], zoom: z });
         }
       } catch {
         // Iframe belum siap atau tak terjangkau — biarkan kamera Aerosol apa adanya.
@@ -496,10 +699,12 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         if (resolvedTheme) {
           kirimData({ type: "SET_TEMA", tema: resolvedTheme });
         }
-        const kamera = kameraTertundaRef.current ?? (isPenuh ? kameraWindyNusantara(true) : kameraAerosolKini());
+        const kamera =
+          kameraTertundaRef.current ?? (isPenuh ? kameraWindyNusantara(true, tutupKiriRef.current) : kameraAerosolKini(tutupKiriRef.current));
         if (kamera) {
           kirimData({ type: "SET_KAMERA", ...kamera });
         }
+        kirimData({ type: "SET_KOLOM", kiri: tutupKiriRef.current });
         // Kuras data jumlah laporan dan kejadian yang tertunda saat inisialisasi awal
         if (pendingJumlahRef.current) {
           kirimData({
@@ -513,9 +718,11 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             events: berita,
           });
         }
-        if (hotspotWindyRef.current.titik) {
+        // Di balik Aerosol isi ref basi — efek hotspot mengirimnya saat Windy tampil.
+        if (modeRef.current === "windy" && hotspotWindyRef.current.titik) {
           kirimData(hotspotWindyRef.current);
         }
+        kirimData({ type: "SET_LAPISAN", ...lapisanRef.current });
         // Iframe dimuat ulang (masuk/keluar selayar): lanjutkan dari posisi
         // terakhir. Pembukaan pertama (linimasa belum pernah diterima) dibiarkan
         // iframe mulai dari langkah terdekat dengan sekarang, seperti Aerosol.
@@ -541,9 +748,10 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       } else if (data.type === "LINIMASA_UDARA") {
         // Daftar langkah dari metadata /api/udara — sekali per siklus model.
         if (!Array.isArray(data.langkah)) return;
-        const langkah: LangkahUdara[] = data.langkah.map((l: { labelWib?: unknown; adalahPrediksi?: unknown }) => ({
+        const langkah: LangkahUdara[] = data.langkah.map((l: { labelWib?: unknown; adalahPrediksi?: unknown; waktu?: unknown }) => ({
           labelWib: typeof l?.labelWib === "string" ? l.labelWib : "",
           adalahPrediksi: Boolean(l?.adalahPrediksi),
+          waktu: typeof l?.waktu === "number" && isFinite(l.waktu) ? l.waktu : null,
         }));
         langkahWindyRef.current = langkah;
         setLinimasaWindy({ langkah, modelRunWib: typeof data.modelRunWib === "string" ? data.modelRunWib : null });
@@ -571,18 +779,19 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         );
       } else if (data.type === "ALIH_LAPISAN") {
         // Tombol Lapisan di kolom kendali iframe Windy. Kotaknya dalam
-        // koordinat iframe — sama dengan koordinat logis akar, karena lapisan
-        // Windy menempel di sudut kiri-atas akar.
+        // koordinat logis iframe; iframe mulai offsetLeft bentangnya (−lebar
+        // kolom peringkat) dari kiri akar, atasnya sejajar akar.
         if (Date.now() - ditutupBlurRef.current < 400) return; // klik inilah yang menutupnya
         const akar = akarRef.current;
         const k = data.kotak;
         if (!akar || !k || !isFinite(k.left) || !isFinite(k.bottom)) return;
+        const kiri = k.left + (bentangWindyRef.current?.offsetLeft ?? 0);
         // Alih menurut panel yang TAMPIL — state basi dari bingkai lain
         // (sebelum masuk/keluar selayar) tersembunyi, jadi dibuka ulang.
         setPanelLapisan((p) =>
           p && p.asal === "windy" && p.penuh === isPenuh
             ? null
-            : { kanan: akar.offsetWidth - k.left + 8, bawah: akar.offsetHeight - k.bottom, asal: "windy", penuh: isPenuh },
+            : { kanan: akar.offsetWidth - kiri + 8, bawah: akar.offsetHeight - k.bottom, asal: "windy", penuh: isPenuh },
         );
       } else if (data.type === "BUKA_RINCIAN_KEJADIAN") {
         const ketemu = berita?.find((b) => b.id === data.eventId || b.slug === data.slug);
@@ -645,7 +854,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     // Satu frame: wadah MapLibre adalah acuan selaNusantara, jadi ia harus
     // sudah memakai ukuran barunya sebelum kameranya dihitung.
     const frameId = requestAnimationFrame(() => {
-      const kamera = kameraWindyNusantara(isPenuh);
+      const kamera = kameraWindyNusantara(isPenuh, tutupKiriRef.current);
       if (!kamera) return;
       kameraTertundaRef.current = kamera;
       if (iframeReadyRef.current) kirimData({ type: "SET_KAMERA", ...kamera });
@@ -657,7 +866,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   useEffect(() => {
     if (!isPenuh || mode !== "windy") return;
     const penanganResize = () => {
-      const kamera = kameraWindyNusantara(true);
+      const kamera = kameraWindyNusantara(true, tutupKiriRef.current);
       if (kamera && iframeReadyRef.current) {
         kirimData({ type: "SET_KAMERA", ...kamera });
       }
@@ -672,10 +881,13 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
      dikunci di ukuran lama dan hanya diskalakan (transform, ringan; rasio
      bingkai tetap jadi tak gepeng). Begitu ukuran diam, iframe dilepas ke
      ukuran baru sekali, dan zoom Windy digeser log2(lebar baru/lama) supaya
-     wilayahnya tetap sama persis. */
+     wilayahnya tetap sama persis. Yang diamati bentang iframe (lebar tetap
+     saat kolom peringkat diciutkan/dibentang), bukan lapisnya: ciut/bentang
+     tak pernah sampai ke sini. */
   const lapisWindyRef = useRef<HTMLDivElement | null>(null);
+  const bentangWindyRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const lapis = lapisWindyRef.current;
+    const lapis = bentangWindyRef.current;
     if (!zoomRoda || !hasOpenedWindy || !lapis) return;
     let ukuran = { w: lapis.clientWidth, h: lapis.clientHeight };
     let penunda: ReturnType<typeof setTimeout> | undefined;
@@ -728,6 +940,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   }, [zoomRoda, hasOpenedWindy, kirimData]);
 
   const [bukaInfoPerbedaan, setBukaInfoPerbedaan] = useState(false);
+  const [tabPanduan, setTabPanduan] = useState<TabPanduan>("aerosol");
 
   /* Bagikan peta sematan (app/[locale]/embed). URL dirangkai saat tombol
      ditekan — butuh window.location untuk origin + bahasa aktif. */
@@ -848,9 +1061,38 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
   /* Bilah waktu lapisan Angin — lihat linimasaWindy. Legenda hotspot di atas logo
      Windy naik ke atas bilah ini bila bilahnya melebar sampai sisi kiri
-     (ponsel, bingkai sempit); di layar lega keduanya berdampingan. */
+     (ponsel, bingkai sempit); di layar lega keduanya berdampingan. Tetap tampil
+     walau sakelar Angin mati: hari hotspot & panel peringkat mengikutinya. */
   const adaLinimasaWindy = mode === "windy" && linimasaWindy !== null && linimasaWindy.langkah.length > 1;
   const langkahWindyKini = linimasaWindy?.langkah[statusWindy.indeks];
+  // Hari data hotspot = hari (WIB) langkah bilah waktu peta dasar yang tampil.
+  // Bilah waktu belum melapor → hari terbaru. Server mengganti hari tanpa data
+  // (prakiraan, > 7 hari lalu) dengan hari tersedia terdekat.
+  const waktuWindy = adaLinimasaWindy ? langkahWindyKini?.waktu : null;
+  const hariTerpilih = mode === "asap" ? hariAsap : waktuWindy != null ? hariWib(waktuWindy) : null;
+  // Tanpa lapisan hotspot & panel peringkat tak ada yang diunduh; menyalakan
+  // salah satunya mengambil hari yang sedang tampil.
+  useEffect(() => {
+    hariHotspotRef.current = hariTerpilih;
+    if (perluHotspot) ambilHotspot();
+  }, [hariTerpilih, perluHotspot, ambilHotspot]);
+  // Bilah waktu diam di satu hari & tab lama terbuka: tak ada pergantian hari
+  // yang memicu efek di atas. Tanya ulang tiap UMUR_DATA_HOTSPOT selama tab
+  // terlihat (selaras cron 30 menit); kembali ke tab → salinan basi diambil ulang.
+  useEffect(() => {
+    if (!perluHotspot) return;
+    const tiap = setInterval(() => {
+      if (!document.hidden) ambilHotspot(true);
+    }, UMUR_DATA_HOTSPOT);
+    const saatTerlihat = () => {
+      if (!document.hidden) ambilHotspot();
+    };
+    document.addEventListener("visibilitychange", saatTerlihat);
+    return () => {
+      clearInterval(tiap);
+      document.removeEventListener("visibilitychange", saatTerlihat);
+    };
+  }, [perluHotspot, ambilHotspot]);
   const prediksiWindy = Boolean(langkahWindyKini?.adalahPrediksi);
   const linimasaWindyRef = useRef<HTMLDivElement | null>(null);
   // null = jarak bawaan di atas logo Windy (kelas bottom-[88px] sm:bottom-[66px]).
@@ -947,95 +1189,112 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     </button>
   );
 
-  /* Legenda hotspot di atas logo Copernicus — di lapisan Aerosol lewat
-     slotAtasLogo PetaAsap (ikut ke mana pun logonya pindah), di lapisan Angin
-     di atas logo dalam iframe Windy. Hanya muncul saat ada lapisan hotspot yang
-     menyala dan peta dalam mode selayar — di bingkai kecil beranda ruangnya
-     terlalu sempit (titiknya tetap tampil). Sakelarnya ada di panel Lapisan,
-     jadi status muat/gagal dikabarkan di sini. Isinya per lapisan yang
-     menyala: Titik Hotspot (jumlah per kepercayaan) lalu satelit SiPongi. */
-  const adaSipongi = satelitAktif.some(Boolean);
+  /* Legenda hotspot ringkas — di lapisan Aerosol jadi bagian kartu legenda
+     Aerosol (slotLegenda PetaAsap, satu tempat), di lapisan Angin kartu
+     sendiri di atas logo dalam iframe Windy. Hanya saat ada lapisan hotspot
+     yang menyala dan peta selayar — di bingkai kecil beranda ruangnya terlalu
+     sempit (titiknya tetap tampil). Sakelarnya ada di panel Lapisan, jadi
+     status muat/gagal dikabarkan di sini. */
   const legendaHotspot = hotspotAktif && isPenuh ? (
-    <div
-      role="status"
-      className="w-60 rounded-xl bg-white/90 border border-black/[0.08] px-2.5 py-2 text-tinta shadow-sm backdrop-blur-md dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:ring-1 dark:ring-white/15"
-    >
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold">
+    <div role="status" className="text-[10.5px]">
+      <div className="flex items-center gap-1.5 font-medium text-tinta/60 dark:text-white/50">
         <span
-          className={`h-2 w-2 shrink-0 rounded-full ${statusHotspot === "memuat" ? "animate-pulse" : ""}`}
-          style={{ background: WARNA_SIPONGI[2], boxShadow: `0 0 6px ${WARNA_SIPONGI[2]}` }}
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${statusHotspot === "memuat" ? "animate-pulse" : ""}`}
+          style={{ background: WARNA_SIPONGI[2] }}
           aria-hidden="true"
         />
-        Hotspot NASA FIRMS
+        {t.hotspotFirms}{dataHotspot ? `, ${formatHariPeta(dataHotspot.hari, bahasa)}` : ""}
       </div>
-      {statusHotspot === "memuat" && (
-        <p className="mt-1 text-[10.5px] text-tinta/60 dark:text-white/55">Memuat data satelit NASA FIRMS…</p>
-      )}
-      {statusHotspot === "galat" && (
-        <p className="mt-1 text-[10.5px] leading-snug text-amber-700 dark:text-amber-400">
-          Server NASA FIRMS sedang tak terjangkau. Dicoba lagi otomatis tiap menit.
-        </p>
-      )}
-      {statusHotspot === "siap" && dataHotspot && perSatelit && perKepercayaanViirs && (
+      {statusHotspot === "memuat" && !dataHotspot && <p className="mt-1 text-tinta/60 dark:text-white/55">{t.memuatSatelit}</p>}
+      {statusHotspot === "galat" && <p className="mt-1 leading-snug text-amber-700 dark:text-amber-400">{t.firmsGagal}</p>}
+      {dataHotspot && perSatelit && (
         <>
-          {titikAktif && (
-            <div className="mt-1.5">
-              <div className="text-[10px] font-medium tracking-tight text-tinta/75 dark:text-white/70">Titik Hotspot · VIIRS</div>
-              {([2, 1, 0] as const).map((k) => (
-                <div key={k} className="flex items-center gap-2 py-px text-[10.5px]">
-                  <span className="h-2 w-2 shrink-0 rounded-full ring-1 ring-black/20" style={{ background: WARNA_TITIK_HOTSPOT[k] }} />
-                  <span className="text-tinta/70 dark:text-white/70">Kepercayaan {LABEL_KEPERCAYAAN[k].toLowerCase()}</span>
-                  <span className="ml-auto font-semibold tabular-nums">{perKepercayaanViirs[k].toLocaleString("id-ID")}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {adaSipongi && (
-            /* Susunan legenda SiPongi: per satelit, jumlah per tingkat
-               kepercayaan (warna) lalu totalnya. Judul kolom menjelaskan warna. */
-            <div className={titikAktif ? "mt-2 border-t border-black/[0.08] pt-1.5 dark:border-white/10" : "mt-1.5"}>
-              <div className="grid grid-cols-4 gap-x-1 text-[9.5px] text-tinta/55 dark:text-white/50" aria-hidden="true">
-                {LABEL_KEPERCAYAAN.map((label) => (
-                  <span key={label}>{label}</span>
+          {SATELIT_HOTSPOT.map((satelit, s) => satelitAktif[s] && (
+            <div key={s} className="mt-1 flex items-center gap-1.5 tabular-nums">
+              <span className="flex shrink-0 gap-px" aria-hidden="true">
+                {[0, 1, 2].map((k) => (
+                  <IkonHotspot key={k} s={s} k={k} />
                 ))}
-                <span className="text-right">Jumlah</span>
-              </div>
-              {SATELIT_SIPONGI.map((s, i) => satelitAktif[i] && (
-                <div key={s} className="mt-1">
-                  <div className="text-[10px] font-medium tracking-tight text-tinta/75 dark:text-white/70">{SATELIT_HOTSPOT[s].label}</div>
-                  <div className="grid grid-cols-4 items-center gap-x-1 text-[10.5px] tabular-nums">
-                    {perSatelit[s].map((jumlah, k) => (
-                      <span key={k} className="flex items-center gap-1">
-                        <IkonHotspot s={s} k={k} />
-                        {jumlah.toLocaleString("id-ID")}
-                        <span className="sr-only"> kepercayaan {LABEL_KEPERCAYAAN[k].toLowerCase()},</span>
-                      </span>
-                    ))}
-                    <span className="text-right font-semibold">
-                      <span className="sr-only">jumlah </span>
-                      {perSatelit[s].reduce((a, b) => a + b, 0).toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                </div>
-              ))}
+              </span>
+              <span className="text-tinta/75 dark:text-white/70">{satelit.label.replace("NASA-", "")}</span>
+              <span className="ml-auto font-semibold">{angka(perSatelit[s].reduce((a, b) => a + b, 0))}</span>
             </div>
-          )}
-          {dataHotspot.diperbarui && (
-            <p className="mt-1 text-[10px] leading-snug text-tinta/50 dark:text-white/45">
-              24 jam terakhir, terbaru {formatWib(Date.parse(dataHotspot.diperbarui))}
-              {dataHotspot.basi ? " — data tersimpan, FIRMS sedang tak terjangkau" : ""}
-            </p>
-          )}
+          ))}
+          {/* Warna = tingkat kepercayaan, sama untuk semua bentuk. */}
+          <div className="mt-1 flex gap-2.5 text-[10px] text-tinta/55 dark:text-white/50">
+            {t.kepercayaan.map((label, k) => (
+              <span key={label} className="flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: WARNA_SIPONGI[k] }} aria-hidden="true" />
+                {label}
+              </span>
+            ))}
+          </div>
+          {dataHotspot.basi && <p className="mt-1 text-amber-700 dark:text-amber-400">{t.dataTersimpan}</p>}
         </>
       )}
     </div>
   ) : null;
 
   return (
+    // isolate: z-index panel peringkat (480) & kendali peta (≤ 500) tak bersaing
+    // dengan tetangga peta — pop-up provinsi landing (z-44/45, di overlay
+    // selayar yang sama) harus tampil di atas seluruh peta, panel termasuk.
+    <div className="relative isolate flex h-full w-full overflow-hidden bg-black">
+      {isPenuh && (
+        <>
+          {/* Kolom tata letak (≥ lg) — 300px hanya saat panel terbentang penuh,
+              selain itu bilah tipis RelPeringkatHotspot (tertutup panel saat meluncur). */}
+          <div
+            className={`hidden shrink-0 border-r border-black/10 dark:border-white/10 lg:block ${kolomLebar ? "lg:w-[300px]" : "lg:w-11"}`}
+          >
+            {!kolomLebar && (
+              <RelPeringkatHotspot
+                bahasa={bahasa}
+                onBuka={() => {
+                  // Bilah ini hilang begitu kolom membentang: fokus pindah ke panel
+                  // (flushSync: panel harus sudah tak inert saat difokus).
+                  flushSync(() => setAlihPeringkat(true));
+                  panelPeringkatRef.current?.focus({ preventScroll: true });
+                }}
+              />
+            )}
+          </div>
+          {/* Panel selalu terpasang (bentang tak membangun ulang daftarnya);
+              tertutup = keluar ke kiri & inert. Ponsel: lembar menutupi peta,
+              berhenti di atas laci konsol (--sela-bawah) seperti lapisan Windy. */}
+          <div
+            ref={panelPeringkatRef}
+            id="panel-peringkat-hotspot"
+            role="region"
+            aria-label={t.peringkat}
+            tabIndex={-1}
+            inert={!peringkatBuka}
+            style={{ transitionDuration: `${LAMA_LUNCUR}ms` }}
+            className={`absolute inset-x-0 top-0 bottom-[var(--sela-bawah,0px)] z-[480] outline-none transition-transform ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform motion-reduce:transition-none lg:bottom-0 lg:right-auto lg:w-[300px] lg:border-r lg:border-black/10 lg:dark:border-white/10 ${
+              peringkatBuka ? "translate-x-0" : "-translate-x-full"
+            } ${peringkatBuka && !kolomLebar ? "lg:shadow-2xl" : ""}`}
+          >
+            <PanelPeringkatHotspot
+              bahasa={bahasa}
+              data={dataHotspot}
+              status={statusHotspot}
+              onTutup={() => {
+                // Panel jadi inert: fokus kembali ke tombol peringkat di peta, tak jatuh ke <body>.
+                tombolPeringkatRef.current?.focus({ preventScroll: true });
+                setAlihPeringkat(false);
+              }}
+            />
+          </div>
+        </>
+      )}
+    {/* akarRef di kotak peta, bukan di kerangka: koordinat panel Lapisan dan
+        pesan iframe Windy relatif ke peta, tak bergeser oleh kolom panel. */}
     <div
       ref={akarRef}
       onContextMenu={(e) => e.preventDefault()}
-      className="relative h-full w-full overflow-hidden bg-black"
+      // @container: hamparan PetaAsap & bilah waktu Windy menakar lebar kotak
+      // peta, bukan viewport — kolom peringkat memakan 300px darinya.
+      className="@container relative h-full min-w-0 flex-1 overflow-hidden bg-black"
     >
       {/* Tombol Alih Mode Layer Peta & Info Perbedaan */}
       <div className={`pointer-events-auto absolute left-4 z-[450] flex items-center gap-1.5 sm:gap-2 sm:left-6 ${tombolRapat ? "top-4" : "top-20"}`}>
@@ -1126,10 +1385,14 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         {/* Tombol Buka Panduan Sains & Data */}
         <button
           type="button"
-          onClick={() => setBukaInfoPerbedaan(true)}
+          onClick={() => {
+            // Panduan dibuka di tab peta dasar yang sedang tampil.
+            setTabPanduan(mode === "windy" ? "angin" : "aerosol");
+            setBukaInfoPerbedaan(true);
+          }}
           className={kelasInfo}
-          aria-label="Panduan Peta"
-          title="Panduan Peta"
+          aria-label={t.panduan.judul}
+          title={t.panduan.judul}
         >
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5">
             <circle cx="12" cy="12" r="10" />
@@ -1151,7 +1414,42 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             <polyline points="8 6 2 12 8 18" />
           </svg>
         </button>
+
+        {/* Tombol Panel Peringkat Hotspot — hanya selayar, seperti panelnya. */}
+        {isPenuh && (
+          <button
+            ref={tombolPeringkatRef}
+            type="button"
+            onClick={() => setAlihPeringkat(!peringkatBuka)}
+            className={`${kelasInfo}${peringkatBuka ? " ring-2 ring-api-peta dark:ring-api-peta!" : ""}`}
+            aria-label={t.peringkat}
+            aria-expanded={peringkatBuka}
+            aria-controls="panel-peringkat-hotspot"
+            title={t.peringkat}
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M8 6h13M8 12h9M8 18h5M3 6h.01M3 12h.01M3 18h.01" />
+            </svg>
+          </button>
+        )}
       </div>
+
+      {/* Lencana hari hotspot: muncul sebentar di tengah atas tiap hari
+          berganti (key = hari memutar ulang animasinya), supaya pergantian
+          hari saat bilah waktu berputar terasa. Pengurang gerak: tak tampil —
+          tanggalnya tetap ada di legenda & panel peringkat. */}
+      {dataHotspot && (hotspotAktif || peringkatBuka) && (
+        <div className="pointer-events-none absolute inset-x-0 top-4 z-[440] flex justify-center" aria-hidden="true">
+          <div
+            key={dataHotspot.hari}
+            className="flex items-center gap-2 rounded-full border border-black/[0.08] bg-white/95 px-3 py-1.5 text-[12px] text-tinta opacity-0 shadow-lg backdrop-blur-md motion-safe:animate-[hari-sorot_2400ms_ease-out_forwards] dark:border-white/10 dark:bg-pantau-konsol/95 dark:text-white"
+          >
+            <span className="h-2 w-2 rounded-full bg-api-peta" />
+            <span className="text-tinta/60 dark:text-white/55">Hotspot</span>
+            <span className="font-semibold tabular-nums">{formatHariPeta(dataHotspot.hari, bahasa)}</span>
+          </div>
+        </div>
+      )}
 
       {/* Panel Lapisan peta — lihat panelLapisan. Berisi lapisan tambahan
           yang ditumpangkan di peta dasar mana pun; peta dasarnya sendiri
@@ -1173,32 +1471,59 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         >
           <p className="px-1 pb-1.5 text-xs font-semibold">Lapisan peta</p>
 
+          {/* Lapisan bawaan — baris pertama animasi peta dasar yang tampil. */}
+          <div className="mb-1.5 border-b border-black/[0.08] pb-1.5 dark:border-white/10">
+            {[
+              {
+                kunci: mode === "asap" ? ("aerosol" as const) : ("angin" as const),
+                label: lapisanAktif.label,
+                keterangan: lapisanAktif.keterangan,
+                ikon: <span className="h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/[0.06] dark:ring-white/10" style={{ background: lapisanAktif.latar }} aria-hidden="true" />,
+              },
+              {
+                kunci: "poligon" as const,
+                label: "Batas Provinsi",
+                keterangan: "Garis batas wilayah",
+                ikon: (
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0b2440] ring-1 ring-black/[0.06] dark:ring-white/10" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width={18} height={18} fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" strokeLinejoin="round">
+                      <path d="M4 8 10 4l9 3 1 8-6 5-9-3z" />
+                    </svg>
+                  </span>
+                ),
+              },
+              {
+                kunci: "angka" as const,
+                label: "Jumlah Laporan",
+                keterangan: "Angka laporan per provinsi",
+                ikon: (
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0b2440] text-xs font-bold tabular-nums text-white ring-1 ring-black/[0.06] dark:ring-white/10" aria-hidden="true">
+                    12
+                  </span>
+                ),
+              },
+            ].map((l) => (
+              <SakelarLapisan
+                key={l.kunci}
+                ikon={l.ikon}
+                label={l.label}
+                keterangan={l.keterangan}
+                aktif={lapisan[l.kunci]}
+                onAlih={() => setLapisan((s) => ({ ...s, [l.kunci]: !s[l.kunci] }))}
+              />
+            ))}
+          </div>
+
           {/* Lapisan tambahan — sakelar, bukan pilihan: panel tetap terbuka
               supaya titiknya langsung terlihat muncul/hilang di peta. */}
           <p className="px-1 pb-1 text-[10px] text-tinta/55 dark:text-white/50">
-            Hotspot NASA FIRMS · 24 jam terakhir{statusHotspot === "memuat" && hotspotAktif ? " · memuat…" : ""}
+            {t.hotspotFirms}, {dataHotspot ? formatHariPeta(dataHotspot.hari, bahasa) : t.perHari}{statusHotspot === "memuat" && hotspotAktif ? `, ${t.memuat}` : ""}
           </p>
-          {[
-            {
-              kunci: "titik" as const,
-              label: "Titik Hotspot",
-              sensor: "VIIRS",
-              aktif: titikAktif,
-              jumlah: perKepercayaanViirs?.reduce((a, b) => a + b, 0),
-              ikon: (
-                <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-[#0b2440] ring-1 ring-black/[0.06] dark:ring-white/10" aria-hidden="true">
-                  <span className="absolute left-[6px] top-[8px] h-1.5 w-1.5 rounded-full" style={{ background: WARNA_TITIK_HOTSPOT[1] }} />
-                  <span className="absolute left-[15px] top-[13px] h-2 w-2 rounded-full" style={{ background: WARNA_TITIK_HOTSPOT[2], boxShadow: `0 0 5px ${WARNA_TITIK_HOTSPOT[2]}` }} />
-                  <span className="absolute left-[9px] top-[20px] h-1.5 w-1.5 rounded-full" style={{ background: WARNA_TITIK_HOTSPOT[0] }} />
-                  <span className="absolute left-[21px] top-[22px] h-1.5 w-1.5 rounded-full" style={{ background: WARNA_TITIK_HOTSPOT[1] }} />
-                </span>
-              ),
-            },
-            ...SATELIT_SIPONGI.map((s, i) => ({
-              kunci: i,
-              label: SATELIT_HOTSPOT[s].label,
-              sensor: SATELIT_HOTSPOT[s].sensor,
-              aktif: satelitAktif[i],
+          {SATELIT_HOTSPOT.map((satelit, s) => ({
+              kunci: s,
+              label: satelit.label,
+              sensor: satelit.sensor,
+              aktif: satelitAktif[s],
               jumlah: perSatelit?.[s]?.reduce((a, b) => a + b, 0),
               // Penanda satelit ini dalam tiga warna kepercayaan.
               ikon: (
@@ -1208,37 +1533,15 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
                   ))}
                 </span>
               ),
-            })),
-          ].map((lapis) => (
-            <button
+            })).map((lapis) => (
+            <SakelarLapisan
               key={lapis.label}
-              type="button"
-              role="switch"
-              aria-checked={lapis.aktif}
-              onClick={() => alihLapisanHotspot(lapis.kunci)}
-              className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl p-1 text-left transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-api"
-            >
-              {lapis.ikon}
-              <span className="min-w-0 flex-1">
-                <span className="block text-[11px] font-semibold leading-tight">{lapis.label}</span>
-                <span className="block text-[10px] leading-snug text-tinta/55 dark:text-white/50">
-                  {lapis.sensor}
-                  {statusHotspot === "siap" && lapis.jumlah !== undefined ? ` · ${lapis.jumlah.toLocaleString("id-ID")} titik` : ""}
-                  {statusHotspot === "galat" ? " · FIRMS tak terjangkau" : ""}
-                </span>
-              </span>
-              {/* Sakelar: bola dipusatkan flex (bukan top/left absolut) dan
-                  bayangannya merata — bayangan jatuh ke bawah membuat bola
-                  tampak tak di tengah trek. */}
-              <span
-                className={`flex h-[18px] w-8 shrink-0 items-center rounded-full p-0.5 transition-colors ${lapis.aktif ? "bg-api" : "bg-black/20 dark:bg-white/25"}`}
-                aria-hidden="true"
-              >
-                <span
-                  className={`h-3.5 w-3.5 rounded-full bg-white shadow-[0_0_2px_rgba(0,0,0,0.3)] transition-transform duration-150 motion-reduce:transition-none ${lapis.aktif ? "translate-x-3.5" : "translate-x-0"}`}
-                />
-              </span>
-            </button>
+              ikon={lapis.ikon}
+              label={lapis.label}
+              aktif={lapis.aktif}
+              onAlih={() => alihLapisanHotspot(lapis.kunci)}
+              keterangan={`${lapis.sensor}${statusHotspot === "siap" && lapis.jumlah !== undefined ? ` · ${angka(lapis.jumlah)} ${t.titik}` : ""}${statusHotspot === "galat" ? ` · ${t.firmsGagalSingkat}` : ""}`}
+            />
           ))}
         </div>
         </div>
@@ -1316,22 +1619,19 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           onClick={() => setBukaInfoPerbedaan(false)}
         >
           <div
-            className="relative w-full max-w-lg max-h-[calc(100svh-2rem)] flex cursor-default flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-white text-tinta dark:border-white/10 dark:bg-pantau-konsol dark:text-white p-4 sm:p-5 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="judul-panduan-peta"
+            className="relative flex w-full max-w-2xl max-h-[calc(100svh-2rem)] cursor-default flex-col overflow-hidden rounded-2xl border border-black/[0.08] bg-white text-tinta shadow-2xl dark:border-white/10 dark:bg-pantau-konsol dark:text-white"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-black/[0.08] dark:border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-tinta/60 dark:bg-white/60" />
-                <h3 className="text-sm font-semibold tracking-wide text-tinta dark:text-white">
-                  Panduan Data
-                </h3>
-              </div>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-black/[0.08] px-5 py-3 dark:border-white/10">
+              <h3 id="judul-panduan-peta" className="text-sm font-semibold">{t.panduan.judul}</h3>
               <button
                 type="button"
                 onClick={() => setBukaInfoPerbedaan(false)}
                 className="rounded-lg cursor-pointer p-1.5 text-tinta/50 hover:bg-black/[0.06] hover:text-tinta dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white transition-colors"
-                aria-label="Tutup panduan"
+                aria-label={t.panduan.tutup}
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M18 6 6 18M6 6l12 12" />
@@ -1339,121 +1639,139 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
               </button>
             </div>
 
-            {/* List Indikator Data */}
-            <div className="mt-3.5 grid min-h-0 flex-1 gap-3 overflow-y-auto overscroll-contain pr-1 sm:grid-cols-2 text-xs">
-              {/* Kolom 1: Aerosol Karhutla */}
-              <div className="rounded-xl border border-black/[0.08] bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03] p-3.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between border-b border-black/[0.08] dark:border-white/10 pb-2">
-                    <span className="font-medium text-tinta dark:text-white text-xs">Aerosol Karhutla</span>
-                  </div>
-                  <div className="mt-2.5 space-y-2.5 text-tinta/75 dark:text-white/75">
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Data</span>
-                      <p className="mt-0.5 text-[11px] leading-relaxed">
-                        <strong className="text-tinta dark:text-white font-medium">OMAOD 550nm</strong> (Organic Matter AOD) dari CAMS global, mengukur kepekatan partikel asap biomassa.
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Cakupan Waktu</span>
-                      <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Riwayat 7 hari ke belakang hingga proyeksi gerak asap 3 hari ke depan (tiap 3 jam).
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Atribusi & Lisensi</span>
-                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-tinta/65 dark:text-white/65">
-                        Contains modified <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">Copernicus Atmosphere Monitoring Service</a> information 2026.
-                      </p>
-                      <p className="mt-1 text-[9.5px] leading-normal text-tinta/45 dark:text-white/45 italic">
-                        Baik Komisi Eropa maupun ECMWF tidak bertanggung jawab atas penggunaan data atau informasi yang disajikan.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Kolom 2: Angin dan Kualitas Udara */}
-              <div className="rounded-xl border border-black/[0.08] bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03] p-3.5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between border-b border-black/[0.08] dark:border-white/10 pb-2">
-                    <span className="font-medium text-tinta dark:text-white text-xs">Angin dan Kualitas Udara</span>
-                  </div>
-                  <div className="mt-2.5 space-y-2.5 text-tinta/75 dark:text-white/75">
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Data</span>
-                      <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Indeks Kualitas Udara (<strong className="text-tinta dark:text-white font-medium">AQI</strong>, standar US EPA) dihitung dari konsentrasi <strong className="text-tinta dark:text-white font-medium">PM2.5</strong> model <strong className="text-tinta dark:text-white font-medium">Copernicus CAMS</strong>. Partikel bergerak menunjukkan angin 10 m dari run model CAMS/IFS yang sama.
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Skala AQI</span>
-                      <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Baik 0–50 · Sedang 51–100 · Tidak sehat bagi kelompok sensitif 101–150 · Tidak sehat 151–200 · Sangat tidak sehat 201–300 · Berbahaya 301+.
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Cakupan Waktu</span>
-                      <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Riwayat 7 hari ke belakang hingga prakiraan 3 hari ke depan (tiap 3 jam), sama dengan lapisan Aerosol.
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Atribusi & Penyedia</span>
-                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-tinta/65 dark:text-white/65">
-                        Contains modified <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">Copernicus Atmosphere Monitoring Service</a> information 2026. Peta dasar dari <a href="https://www.windy.com" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">Windy.com</a>.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Kolom 3: Titik Hotspot (lapisan tambahan) — selebar dua kolom di atas. */}
-              <div className="rounded-xl border border-black/[0.08] bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03] p-3.5 flex flex-col justify-between sm:col-span-2">
-                <div>
-                  <div className="flex items-center justify-between border-b border-black/[0.08] dark:border-white/10 pb-2">
-                    <span className="font-medium text-tinta dark:text-white text-xs">Titik Hotspot</span>
-                    <span className="text-[10px] text-tinta/45 dark:text-white/40">Lapisan tambahan</span>
-                  </div>
-                  <div className="mt-2.5 space-y-2.5 text-tinta/75 dark:text-white/75">
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Data</span>
-                      <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Titik anomali panas (<strong className="text-tinta dark:text-white font-medium">hotspot</strong>) satelit <strong className="text-tinta dark:text-white font-medium">MODIS</strong> (Terra/Aqua) dan <strong className="text-tinta dark:text-white font-medium">VIIRS</strong> (S-NPP, NOAA-20, NOAA-21) dari NASA FIRMS. Lapisan NASA-TERRA/AQUA, NASA-SNPP, dan NASA-NOAA20 tampil seperti SiPongi KLHK — bentuk penanda menunjukkan satelitnya, warnanya tingkat kepercayaan deteksi (hijau rendah, kuning sedang, merah tinggi) — dan menyala sejak peta dibuka. Lapisan Titik Hotspot (bulatan kuning–merah, seluruh satelit VIIRS) bisa dinyalakan tambahan. Semuanya diatur lewat tombol Lapisan di kolom kanan peta, di atas peta Aerosol maupun Angin.
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Cakupan Waktu</span>
-                      <p className="mt-0.5 text-[11px] leading-relaxed">
-                        24 jam terakhir, near real-time (tersedia ±3 jam setelah satelit melintas).
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Catatan</span>
-                      <p className="mt-0.5 text-[11px] leading-relaxed">
-                        Hotspot adalah indikasi titik panas, belum tentu kebakaran — perlu verifikasi lapangan.
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-tinta/45 dark:text-white/40 block">Atribusi & Penyedia</span>
-                      <p className="mt-0.5 text-[10.5px] leading-relaxed text-tinta/65 dark:text-white/65">
-                        Data dari <a href="https://firms.modaps.eosdis.nasa.gov/" target="_blank" rel="noopener noreferrer" className="text-tinta dark:text-white font-medium underline underline-offset-2">NASA FIRMS</a> (Fire Information for Resource Management System), bagian dari NASA ESDIS.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setBukaInfoPerbedaan(false)}
-                className="rounded-lg border border-black/[0.08] bg-black/[0.04] text-tinta/80 hover:bg-black/[0.08] hover:text-tinta dark:border-white/10 dark:bg-white/5 px-3.5 py-1.5 text-xs font-medium dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white transition-colors"
+            <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+              {/* Daftar topik: kolom kiri di layar lebar, baris bergulir di ponsel. */}
+              <div
+                role="tablist"
+                aria-label={t.panduan.topikLabel}
+                className="flex shrink-0 gap-1 overflow-x-auto border-b border-black/[0.08] p-2 dark:border-white/10 sm:w-56 sm:flex-col sm:overflow-visible sm:border-b-0 sm:border-r sm:bg-black/[0.02] dark:sm:bg-white/[0.02]"
               >
-                Tutup
-              </button>
+                {TOPIK_PANDUAN.map((kunci) => {
+                  const aktif = kunci === tabPanduan;
+                  const topik = t.panduan.topik[kunci];
+                  return (
+                    <button
+                      key={kunci}
+                      type="button"
+                      role="tab"
+                      id={`tab-panduan-${kunci}`}
+                      aria-selected={aktif}
+                      aria-controls="isi-panduan"
+                      onClick={() => setTabPanduan(kunci)}
+                      className={`flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl p-1.5 pr-3 text-left transition-colors ${
+                        aktif ? "bg-white shadow-sm ring-1 ring-black/[0.08] dark:bg-white/10 dark:ring-white/10" : "hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      <KunciTopik kunci={kunci} />
+                      <span className="min-w-0">
+                        <span className={`block whitespace-nowrap text-[12px] font-semibold ${aktif ? "" : "text-tinta/70 dark:text-white/70"}`}>{topik.label}</span>
+                        <span className="hidden text-[10.5px] text-tinta/50 dark:text-white/45 sm:block">{topik.ringkas}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tinggi tetap di layar lebar supaya modal tak melompat saat ganti topik. */}
+              <div
+                id="isi-panduan"
+                role="tabpanel"
+                aria-labelledby={`tab-panduan-${tabPanduan}`}
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:h-[27rem]"
+              >
+                <h4 className="text-[15px] font-semibold">{t.panduan.topik[tabPanduan].label}</h4>
+                <p className="mt-1 text-[13px] leading-relaxed text-tinta/75 dark:text-white/75">
+                  {t.panduan.topik[tabPanduan].pembuka}
+                </p>
+                <dl className="mt-4 space-y-3.5">
+                  {tabPanduan === "aerosol" && (
+                    <>
+                      <BagianPanduan judul={t.panduan.bagian.data}>{t.panduan.aerosol.data}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.caraBaca}>{t.panduan.aerosol.caraBaca}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.rentang}>{t.panduan.aerosol.rentang}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.lapisan}>{t.panduan.aerosol.lapisan}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.sumber}>
+                        Contains modified{" "}
+                        <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" className={kelasTautan}>
+                          Copernicus Atmosphere Monitoring Service
+                        </a>{" "}
+                        information 2026. {t.panduan.aerosol.sumberLanjut}
+                      </BagianPanduan>
+                    </>
+                  )}
+                  {tabPanduan === "angin" && (
+                    <>
+                      <BagianPanduan judul={t.panduan.bagian.data}>{t.panduan.angin.data}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.skalaAqi}>
+                        <span className="mt-1 grid gap-1">
+                          {SKALA_AQI.map((tingkat, i) => (
+                            <span key={tingkat.warna} className="flex items-center gap-2">
+                              <span className="h-2.5 w-5 shrink-0 rounded-sm ring-1 ring-black/10" style={{ background: tingkat.warna }} aria-hidden="true" />
+                              <span className="flex-1">{t.panduan.angin.aqi[i]}</span>
+                              <span className="tabular-nums text-tinta/55 dark:text-white/50">{tingkat.rentang}</span>
+                            </span>
+                          ))}
+                        </span>
+                      </BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.rentang}>{t.panduan.angin.rentang}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.lapisan}>{t.panduan.angin.lapisan}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.sumber}>
+                        Contains modified{" "}
+                        <a href="https://atmosphere.copernicus.eu/" target="_blank" rel="noopener noreferrer" className={kelasTautan}>
+                          Copernicus Atmosphere Monitoring Service
+                        </a>{" "}
+                        information 2026. {t.panduan.angin.petaDasar}{" "}
+                        <a href="https://www.windy.com" target="_blank" rel="noopener noreferrer" className={kelasTautan}>
+                          Windy.com
+                        </a>
+                        .
+                      </BagianPanduan>
+                    </>
+                  )}
+                  {tabPanduan === "hotspot" && (
+                    <>
+                      <BagianPanduan judul={t.panduan.bagian.satelit}>
+                        <span className="mt-1 grid gap-1">
+                          {t.panduan.hotspot.satelit.map((teks, s) => (
+                            <span key={s} className="flex items-center gap-2">
+                              <IkonHotspot s={s} k={2} />
+                              {teks}
+                            </span>
+                          ))}
+                        </span>
+                      </BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.warna}>
+                        <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                          {t.panduan.hotspot.kepercayaan.map((label, k) => (
+                            <span key={label} className="flex items-center gap-1.5">
+                              <span className="h-2 w-2 rounded-full" style={{ background: WARNA_SIPONGI[k] }} aria-hidden="true" />
+                              {label}
+                            </span>
+                          ))}
+                        </span>
+                        <span className="mt-1 block">{t.panduan.hotspot.warna}</span>
+                      </BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.rentang}>{t.panduan.hotspot.rentang}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.detailTitik}>{t.panduan.hotspot.detail}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.catatan}>{t.panduan.hotspot.catatan}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.sumber}>
+                        <a href="https://firms.modaps.eosdis.nasa.gov/" target="_blank" rel="noopener noreferrer" className={kelasTautan}>
+                          NASA FIRMS
+                        </a>{" "}
+                        {t.panduan.hotspot.sumberLanjut}
+                      </BagianPanduan>
+                    </>
+                  )}
+                  {tabPanduan === "peringkat" && (
+                    <>
+                      <BagianPanduan judul={t.panduan.bagian.dihitung}>{t.panduan.peringkat.dihitung}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.caraBaca}>{t.panduan.peringkat.caraBaca}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.membuka}>{t.panduan.peringkat.membuka}</BagianPanduan>
+                      <BagianPanduan judul={t.panduan.bagian.batas}>{t.panduan.peringkat.batas}</BagianPanduan>
+                    </>
+                  )}
+                </dl>
+              </div>
             </div>
           </div>
         </div>,
@@ -1480,7 +1798,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             onPilihWilayah={onPilihWilayah}
             berita={berita}
             onBukaRincian={onBukaRincian}
+            // Tanpa lapisan.aerosol: bilah waktu tetap berputar saat asapnya disembunyikan.
             aktif={mode === "asap"}
+            lapisan={lapisan}
             onSyncChange={setSedangSyncAsap}
             legendaRingkas={legendaRingkas}
             muatNusantara={muatNusantara}
@@ -1491,7 +1811,10 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             expandLabel={expandLabel}
             isPenuh={isPenuh}
             hotspot={hotspotTampil}
-            slotAtasLogo={mode === "asap" ? legendaHotspot : null}
+            onWaktu={(ms) => setHariAsap(hariWib(ms))}
+            kolomKiri={lebarKolom}
+            tutupKiri={tutupKiri}
+            slotLegenda={mode === "asap" ? legendaHotspot : null}
             slotKendali={tombolLapisan}
           />
         )}
@@ -1507,23 +1830,28 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         }`}
       >
         {hasOpenedWindy && (
-          <iframe
-            ref={iframeRef}
-            src={windySrc}
-            title="Peta Sebaran Angin dan Kualitas Udara"
-            className="h-full w-full border-0"
-            allow="geolocation"
-            onContextMenu={(e) => e.preventDefault()}
-            onLoad={() => {
-              if (iframeReadyRef.current && pendingJumlahRef.current) {
-                kirimData({ type: "SET_JUMLAH", jumlahLaporan: pendingJumlahRef.current });
-              }
-              // load bisa tiba sesudah FORECASTING_READY — jangan hidupkan
-              // animasi iframe yang sedang tersembunyi di balik Aerosol.
-              kirimData({ type: modeRef.current === "windy" ? "WINDY_ACTIVE" : "WINDY_NONAKTIF" });
-              setTimeout(() => setMemuatWindy(false), 1500);
-            }}
-          />
+          /* Rata kanan, melebar lebarKolom ke bawah kolom peringkat (terpotong
+             overflow kotak peta): lebarnya tetap saat kolom diciutkan/dibentang,
+             jadi iframe tak di-resize — sama dengan kanvas PetaAsap (kolomKiri). */
+          <div ref={bentangWindyRef} className="absolute inset-y-0 right-0" style={{ width: `calc(100% + ${lebarKolom}px)` }}>
+            <iframe
+              ref={iframeRef}
+              src={windySrc}
+              title="Peta Sebaran Angin dan Kualitas Udara"
+              className="h-full w-full border-0"
+              allow="geolocation"
+              onContextMenu={(e) => e.preventDefault()}
+              onLoad={() => {
+                if (iframeReadyRef.current && pendingJumlahRef.current) {
+                  kirimData({ type: "SET_JUMLAH", jumlahLaporan: pendingJumlahRef.current });
+                }
+                // load bisa tiba sesudah FORECASTING_READY — jangan hidupkan
+                // animasi iframe yang sedang tersembunyi di balik Aerosol.
+                kirimData({ type: modeRef.current === "windy" ? "WINDY_ACTIVE" : "WINDY_NONAKTIF" });
+                setTimeout(() => setMemuatWindy(false), 1500);
+              }}
+            />
+          </div>
         )}
         {mode === "windy" && memuatWindy && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-black/85 transition-opacity duration-500">
@@ -1559,7 +1887,9 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
             className={`pointer-events-none absolute left-5 z-[5] ${adaLinimasaWindy && legendaWindyBawah !== null ? "" : "bottom-[88px] sm:bottom-[66px]"}`}
             style={adaLinimasaWindy && legendaWindyBawah !== null ? { bottom: legendaWindyBawah } : undefined}
           >
-            {legendaHotspot}
+            <div className="w-52 rounded-xl border border-black/[0.08] bg-white/90 px-2.5 py-2 text-tinta shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-pantau-konsol/90 dark:text-white dark:ring-1 dark:ring-white/15">
+              {legendaHotspot}
+            </div>
           </div>
         )}
 
@@ -1584,7 +1914,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
               legendaRingkas
                 ? "inset-x-3 sm:inset-x-0 sm:mx-auto sm:w-[330px] sm:max-w-[calc(100%-1.5rem)] p-1.5 sm:px-2.5 sm:py-1.5"
                 : `inset-x-3 sm:inset-x-0 sm:mx-auto w-auto sm:w-[520px] p-2 sm:px-4 sm:py-3 ${
-                    selaLegendaWindy > 0 ? "min-[68.75rem]:bottom-[var(--dasar-linimasa)]" : "min-[76rem]:bottom-4"
+                    selaLegendaWindy > 0 ? "@min-[68.75rem]:bottom-[var(--dasar-linimasa)]" : "@min-[76rem]:bottom-4"
                   }`
             }`}
             style={selaLegendaWindy > 0 ? ({ "--dasar-linimasa": `${selaLegendaWindy + 8}px` } as CSSProperties) : undefined}
@@ -1733,6 +2063,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

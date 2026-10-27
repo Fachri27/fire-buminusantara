@@ -11,18 +11,27 @@
               teksnya tak terbaca.
    aliran   — tata letak mengalir untuk layar sempit atau pendek. Kebalikan
               persis dari panggung.
-   pendek   — layar yang tingginya mepet; dipakai melepas hero dari sticky.
+   pendek   — layar aliran yang tingginya mepet; dipakai melepas hero dari
+              sticky. Panggung (kini mulai 560px) tak pernah pendek.
 
-   Nilainya disalin dari build lama (public/dist/style.css di Pasopati) yang
-   sumber konfigurasinya tidak pernah ikut ke repo. Sekarang sumbernya di sini. */
-@custom-variant panggung (@media (min-width: 1100px) and (min-height: 640px));
+   Ambang awal (1100×640, dari build lama Pasopati) melempar layar umum ke
+   aliran: jendela selebar 1080, dan laptop 1080p berskala 150% yang
+   viewport-nya ±1280×600 setelah bilah peramban. Kini 1024×560; rel kiri
+   menggulir di layar pendek (landing-karhutla.css). */
+@custom-variant panggung (@media (min-width: 1024px) and (min-height: 560px));
 /* Ditulis sebagai negasi, BUKAN "(max-width: …), (max-height: …)". Tailwind v4
    tidak memecah media query list ber-koma di @custom-variant: separuh keduanya
-   bocor keluar jadi bagian selector — `.aliran\:hidden (max-height: 639.98px) {`
+   bocor keluar jadi bagian selector — `.aliran\:hidden (max-height: 559.98px) {`
    — dan seluruh berkas gagal diparse. `not all and (…)` menyatakan hal yang
    sama persis tanpa koma. */
-@custom-variant aliran (@media not all and (min-width: 1100px) and (min-height: 640px));
-@custom-variant pendek (@media (max-height: 620px));
+@custom-variant aliran (@media not all and (min-width: 1024px) and (min-height: 560px));
+@custom-variant pendek {
+  @media not all and (min-width: 1024px) and (min-height: 560px) {
+    @media (max-height: 620px) {
+      @slot;
+    }
+  }
+}
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -123,7 +132,7 @@
   --ukuran-rincian-nama: clamp(19px, 5.2vw, 24px);
 }
 
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   :root {
     --kartu-lebar: 526px;
     --kartu-tinggi: 594px;
@@ -162,7 +171,7 @@
    mengalir. */
 :root { --mode: "aliran"; }
 
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   :root { --mode: "panggung"; }
 }
 
@@ -324,6 +333,19 @@ html.lenis body {
   }
 }
 
+/* Ganti hari hotspot: isi baru panel peringkat masuk, dan lencana hari di
+   peta muncul sebentar lalu hilang (peta.tsx). */
+@keyframes hari-masuk {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hari-sorot {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  12% { opacity: 1; transform: none; }
+  78% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
 /* Tab lipat rel /peta (TabRel) — apung pelan naik-turun. Dipasang lewat
    motion-safe:, jadi pengurang gerak tak pernah menjalankannya. */
 @keyframes tab-rel-apung {
@@ -341,7 +363,7 @@ html.lenis body {
    pecahan kanvas itu — hasilnya proporsi dan letak yang identik dengan
    isi asli, tanpa penskalaan transform. Di luar media query ini kerangka
    memakai tata letak aliran yang utilitasnya sudah benar. */
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   .kerangka-beranda__kanvas {
     --kb-lebar: min(100vw, calc(100vh * 16 / 9));
     --kb-tinggi: min(100vh, calc(100vw * 9 / 16));

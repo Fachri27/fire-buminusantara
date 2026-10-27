@@ -16,6 +16,7 @@ export function PetaSemat({ bahasa, jumlahLaporan }: { bahasa: Bahasa; jumlahLap
       muatNusantara
       onExpand={buka}
       expandLabel={bahasa === "en" ? "Open on Fire" : "Buka di Fire"}
+      bahasa={bahasa}
     />
   );
 }

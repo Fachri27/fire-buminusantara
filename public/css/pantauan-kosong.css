@@ -11,7 +11,7 @@
  * (--kartu-lebar/--kartu-tinggi/--kartu-sela/--kartu-pias), jadi "rak kosong"
  * ini menempati geometri yang sama persis dengan korsel berisi — baik di mode
  * aliran maupun panggung. Ambang mode disalin dari :root pada build
- * (min-width:1100px dan min-height:640px).
+ * (min-width:1024px dan min-height:560px).
  */
 
 .pantauan-kosong {
@@ -262,15 +262,17 @@
 /* Layar pendek: kartu tinggal ~230px, dan bingkai foto yang ikut memipih jadi
    terbaca sebagai kolom isian kosong, bukan tempat foto. Lebih baik dibuang —
    isi kartu naik mengisi ruangnya. Ambang disamakan dengan varian "pendek"
-   pada build (max-height:620px). */
-@media (max-height: 620px) {
-  .pantauan-kosong__bingkai {
-    display: none;
-  }
+   di app/globals.css (aliran dan max-height:620px). */
+@media not all and (min-width: 1024px) and (min-height: 560px) {
+  @media (max-height: 620px) {
+    .pantauan-kosong__bingkai {
+      display: none;
+    }
 
-  .pantauan-kosong__isi {
-    flex: 1;
-    justify-content: center;
+    .pantauan-kosong__isi {
+      flex: 1;
+      justify-content: center;
+    }
   }
 }
 
@@ -279,7 +281,7 @@
    dalamnya, jadi rak kosong dipasang di y=180 dengan tinggi kartu (594px).
    Tiga slot 526px + dua sela 76px = 1730px, muat utuh di lebar 1780px —
    tidak ada yang terpotong, sama seperti korsel berisi. */
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   .pantauan-kosong {
     --kosong-mono: 13px;
 

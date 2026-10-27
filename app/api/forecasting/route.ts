@@ -504,10 +504,13 @@ export async function GET(req: NextRequest) {
           pointer-events: none !important;
         }
 
+        /* --kolom-kiri (SET_KOLOM): lebar kolom peringkat induk yang menutupi
+           tepi kiri iframe — iframe melebar ke bawahnya supaya tak di-resize
+           saat kolom diciutkan (peta.tsx), jadi logo kiri digeser keluar. */
         .rhpane__bottom-messages {
           position: fixed !important;
           bottom: 16px !important;
-          left: 20px !important;
+          left: calc(20px + var(--kolom-kiri, 0px)) !important;
           right: auto !important;
           top: auto !important;
           z-index: 1000 !important;
@@ -564,7 +567,7 @@ export async function GET(req: NextRequest) {
           top: auto !important;
           right: auto !important;
           bottom: 16px !important;
-          left: 151px !important;
+          left: calc(151px + var(--kolom-kiri, 0px)) !important;
           z-index: 1000 !important;
           transform: scale(0.8) !important;
           transform-origin: bottom left !important;
@@ -726,6 +729,14 @@ export async function GET(req: NextRequest) {
           overflow: hidden !important;
           background-color: #000000 !important;
         }
+        /* Plugin artikel Windy kadang lolos dari penjaga E2 (open() terpanggil
+           sebelum penjaga terpasang, lalu selesai dimuat sesudahnya). CSS-nya
+           menggeser peta (body.onarticles: -250px desktop, -200px tablet,
+           scale 0.93 ponsel) walau panenya tersembunyi — batalkan di sini. */
+        .onarticles #map-container {
+          transform: none !important;
+          border-radius: 0 !important;
+        }
 
         /* I. Administrative Polygon Styling */
         .leaflet-pane.leaflet-wilayah-pane svg {
@@ -824,8 +835,44 @@ export async function GET(req: NextRequest) {
           100% { transform: scale(2.2); opacity: 0; }
         }
 
-        .peta-angka--bertumpuk {
+        .peta-angka--bertumpuk,
+        .angka-mati .peta-angka,
+        .udara-mati #plugin-rhbottom,
+        .udara-mati #legend-mobile {
           display: none !important;
+        }
+        /* Angin mati = basemap satelit EOX tampil (jagaLapisanUdara) dan legenda
+           AQI di atas sembunyi: kredit wajib lisensinya mengisi sudut legenda itu. */
+        #atribusi-eox {
+          display: none;
+          position: fixed;
+          right: 20px;
+          bottom: 16px;
+          z-index: 1000;
+          padding: 2px 6px;
+          border-radius: 4px;
+          background: rgba(20, 16, 15, 0.6);
+          color: rgba(255, 255, 255, 0.8);
+          font: 500 10px/1.4 system-ui, -apple-system, sans-serif;
+        }
+        #atribusi-eox a {
+          color: inherit;
+        }
+        .udara-mati #atribusi-eox {
+          display: block;
+        }
+        @media (max-width: 640px) {
+          #atribusi-eox {
+            right: 12px;
+            bottom: 12px;
+          }
+        }
+        /* Batas provinsi dimatikan (SET_LAPISAN): poligon hanya dibeningkan
+           supaya hover/klik provinsi tetap jalan, sama dengan lapisan Aerosol. */
+        .poligon-mati path.provinsi-layer,
+        .poligon-mati path.provinsi-layer:hover {
+          stroke-opacity: 0 !important;
+          fill-opacity: 0 !important;
         }
 
         /* Tooltip custom styling.
@@ -1000,6 +1047,7 @@ ${ringkas ? `
     const pulauJson = JSON.stringify(PROVINSI_PULAU);
 
     const customScript = `
+      <div id="atribusi-eox">&copy; <a href="https://s2maps.eu" target="_blank" rel="noopener noreferrer">EOX IT Services GmbH</a> (Sentinel-2 cloudless)</div>
       <script>
         (function() {
           document.documentElement.classList.add('${temaAwal}');
@@ -1063,6 +1111,7 @@ ${ringkas ? `
           let udaraLaju = 1;
           let udaraGeser = false;        // slider induk sedang digeser
           let udaraAktif = true;         // lapisan Angin sedang ditampilkan induk
+          let udaraTampil = true;        // sakelar Angin di panel Lapisan induk (SET_LAPISAN)
           let udaraTerlihat = true;      // iframe berada di viewport halaman induk
           let udaraSiap = false;         // frame pertama tergambar → lapisan Windy disembunyikan
           let udaraSiapDijadwalkan = false;
@@ -1071,6 +1120,7 @@ ${ringkas ? `
           let udaraWaktuLalu = 0;
           const mqKurangiGerak = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
           function kurangiGerak() { return !!(mqKurangiGerak && mqKurangiGerak.matches); }
+          let kolomKiri = 0;             // panel peringkat induk menutupi tepi kiri (SET_KOLOM)
 
           function kunciUdara(m) { return m.timeChunk + '_' + m.step + '_' + m.timeInner; }
           function kirimInduk(pesan) {
@@ -1222,7 +1272,7 @@ ${ringkas ? `
             kirimInduk({
               type: 'LINIMASA_UDARA',
               langkah: udaraLangkah.map(function(m) {
-                return { labelWib: m.labelWib, adalahPrediksi: !!m.adalahPrediksi };
+                return { labelWib: m.labelWib, adalahPrediksi: !!m.adalahPrediksi, waktu: m.waktu };
               }),
               modelRunWib: d.latestModelRunWib || null
             });
@@ -1262,6 +1312,8 @@ ${ringkas ? `
 
           // Loop 60 FPS — semantik renderLoop Aerosol. Peta digambar ulang tiap
           // frame selama berputar/digeser, atau selama partikel angin hidup.
+          // Sakelar Angin mati: waktu tetap berjalan (bilah waktu induk & hari
+          // hotspot mengikutinya), hanya penggambarannya yang berhenti.
           function putaranUdara(t) {
             udaraRaf = 0;
             if (!udaraAktif || !udaraTerlihat || document.hidden) {
@@ -1294,9 +1346,9 @@ ${ringkas ? `
               pastikanFrameUdara((jA + 2) % n);
               if (udaraMemutar || udaraGeser) laporWaktuUdara();
             }
-            const partikelHidup = udaraSiap && !kurangiGerak();
+            const partikelHidup = udaraTampil && udaraSiap && !kurangiGerak();
             if ((n > 1 && (udaraMemutar || udaraGeser)) || partikelHidup) {
-              if (petaUdara) petaUdara.triggerRepaint();
+              if (petaUdara && udaraTampil) petaUdara.triggerRepaint();
               udaraRaf = requestAnimationFrame(putaranUdara);
             } else {
               udaraWaktuLalu = 0;
@@ -1923,6 +1975,38 @@ ${ringkas ? `
                 const iS = sebelum ? urut.indexOf(sebelum) : urut.length;
                 if (urut.indexOf('udara') !== iS - 1) peta.moveLayer('udara', sebelum);
               }
+              // Sakelar Angin mati: basemap satelit lapisan Aerosol (peta-asap.tsx)
+              // menggantikan basemap abu-abu Windy — dipasang saat pertama
+              // dibutuhkan, di atas 'raster-basemap' dan di bawah hotspot.
+              const diBawahHotspot = peta.getLayer(ID_PENDAR_HOTSPOT) ? ID_PENDAR_HOTSPOT : undefined;
+              if (!udaraTampil && !peta.getLayer('satelit')) {
+                if (!peta.getSource('satelit')) {
+                  peta.addSource('satelit', {
+                    type: 'raster',
+                    tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpeg'],
+                    tileSize: 256,
+                    attribution: 'Sentinel-2 cloudless by EOX IT Services GmbH',
+                    maxzoom: 14
+                  });
+                }
+                peta.addLayer({
+                  id: 'satelit',
+                  type: 'raster',
+                  source: 'satelit',
+                  paint: { 'raster-brightness-max': 0.85, 'raster-contrast': 0.15, 'raster-saturation': -0.1 }
+                }, diBawahHotspot);
+              } else if (peta.getLayer('satelit') && typeof peta.getLayersOrder === 'function') {
+                const urut = peta.getLayersOrder();
+                if (urut.indexOf('satelit') < urut.indexOf('raster-basemap')) peta.moveLayer('satelit', diBawahHotspot);
+              }
+              // Lapisan kita dan AQI Windy ('tileLayer') di bawahnya ikut
+              // sakelar — tanpa yang kedua warna AQI tetap tembus. Hanya
+              // disetel saat berbeda: setLayoutProperty memicu 'styledata'.
+              [['udara', udaraTampil], ['tileLayer', udaraTampil], ['satelit', !udaraTampil]].forEach(function(l) {
+                if (peta.getLayer(l[0]) && (peta.getLayoutProperty(l[0], 'visibility') === 'none') === l[1]) {
+                  peta.setLayoutProperty(l[0], 'visibility', l[1] ? 'visible' : 'none');
+                }
+              });
             } catch (e) {}
             jagaLapisanHotspot();
             if (udaraSiap) {
@@ -1957,32 +2041,29 @@ ${ringkas ? `
 
           // Lapisan tambahan hotspot (pesan SET_HOTSPOT dari peta.tsx) — padanan
           // lib/lapisan-hotspot.ts di lapisan Aerosol. Tiap baris [lng, lat,
-          // kepercayaan, satelit, gaya]: gaya 0 = bulatan lapisan Titik Hotspot
-          // (kuning/oranye/merah), gaya 1 = penanda lapisan satelit ala SiPongi
-          // (segi lima Terra/Aqua, segi enam SNPP, bintang NOAA-20; hijau/kuning/
-          // merah). Warna, bentuk & ukurannya disamakan dengan konstanta di sana.
+          // kepercayaan, satelit, FRP, waktu, malam, provinsi] digambar sebagai
+          // penanda lapisan satelit ala SiPongi (segi lima Terra/Aqua, segi enam
+          // SNPP, bintang NOAA-20; hijau/kuning/merah). Warna, bentuk & ukurannya
+          // disamakan dengan konstanta di sana.
           //
-          // Pendar bulatan berkepercayaan tinggi = lapisan lingkaran di MapLibre
-          // milik Windy. Penandanya digambar sendiri di kanvas 2D tepat di atas
-          // kanvas peta: lapisan simbol MapLibre tidak pernah tergambar di peta
+          // Penandanya digambar sendiri di kanvas 2D tepat di atas kanvas peta:
+          // lapisan simbol MapLibre tidak pernah tergambar di peta
           // Windy (tahap penempatan simbolnya tak jalan), padahal bentuklah yang
           // membedakan satelit. Kanvasnya tak menangkap klik dan berada di bawah
           // pane Leaflet (batas provinsi, angka laporan). Digambar ulang hanya
           // bila kamera, ukuran, atau data berubah — bukan tiap frame animasi
           // udara. Pesan yang tiba sebelum peta siap disimpan dulu.
           const WARNA_SIPONGI = ['#4caf50', '#fbc02d', '#f01e1e'];
-          const WARNA_TITIK = ['#facc15', '#f97316', '#ef4444'];
-          // Jari bulatan Titik Hotspot (px CSS, tetap di semua zoom — seperti semula).
-          const JARI_TITIK = [1.8, 2.4, 3.4];
           const SISI_HOTSPOT = [5, 6, 0]; // 0 = bintang lima
+          // Lapisan kosong di puncak tumpukan — jangkar urutan jagaLapisanUdara.
           const ID_PENDAR_HOTSPOT = 'hotspot-pendar';
           // Ukuran penanda (px CSS) per zoom — sama dengan icon-size lib (13 px × faktor).
           const UKURAN_HOTSPOT = [[3, 7.8], [6, 11], [9, 15], [12, 20.8]];
           let hotspotTertunda = null;
           let hotspotUrut = [];        // baris urut gambar — indeksnya = indeks hotspotMerc
-          let provinsiHotspot = [];    // nama provinsi untuk kartu info (indeks = kolom ke-9)
-          let hotspotMerc = null;      // Float64Array [x, y] Mercator 0..1 per titik, urut gaya lalu kepercayaan
-          let hotspotKelas = null;     // Uint8Array: penanda s * 3 + k, bulatan 9 + k
+          let provinsiHotspot = [];    // nama provinsi untuk kartu info (indeks = kolom ke-8)
+          let hotspotMerc = null;      // Float64Array [x, y] Mercator 0..1 per titik, urut kepercayaan
+          let hotspotKelas = null;     // Uint8Array: penanda s * 3 + k
           let kanvasHotspot = null;
           let kunciKameraHotspot = '';
           let spriteHotspot = null;    // [kelas] → kanvas, digambar ulang bila DPR berubah
@@ -2021,23 +2102,6 @@ ${ringkas ? `
                 spriteHotspot[s * 3 + k] = kv;
               }
             }
-            // Bulatan Titik Hotspot pada ukuran aslinya (jari + garis tepi 0,6 px).
-            for (let k = 0; k < 3; k++) {
-              const kv = document.createElement('canvas');
-              const sisiB = Math.ceil((JARI_TITIK[k] + 0.6) * 2 * dpr);
-              kv.width = kv.height = sisiB;
-              const ctx = kv.getContext('2d');
-              ctx.beginPath();
-              ctx.arc(sisiB / 2, sisiB / 2, JARI_TITIK[k] * dpr, 0, Math.PI * 2);
-              ctx.globalAlpha = k === 0 ? 0.75 : 0.95;
-              ctx.fillStyle = WARNA_TITIK[k];
-              ctx.fill();
-              ctx.globalAlpha = 1;
-              ctx.lineWidth = 0.6 * dpr;
-              ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-              ctx.stroke();
-              spriteHotspot[9 + k] = kv;
-            }
           }
           function ukuranHotspot(zoom) {
             const u = UKURAN_HOTSPOT;
@@ -2049,14 +2113,6 @@ ${ringkas ? `
               }
             }
             return u[u.length - 1][1];
-          }
-          function geoJsonHotspot(titik) {
-            return {
-              type: 'FeatureCollection',
-              features: (titik || []).filter(function(t) { return t[2] === 2 && t[4] === 0; }).map(function(t) {
-                return { type: 'Feature', geometry: { type: 'Point', coordinates: [t[0], t[1]] }, properties: { k: 2 } };
-              })
-            };
           }
           function gambarKanvasHotspot(paksa) {
             const peta = petaMapLibreWindy();
@@ -2106,20 +2162,13 @@ ${ringkas ? `
               const y = hotspotMerc[i * 2 + 1] * dunia + oy;
               if (x < -setengah || y < -setengah || x > W || y > H) continue;
               const kelas = hotspotKelas[i];
-              if (kelas >= 9) {
-                // Bulatan Titik Hotspot: ukuran tetap, transparansinya sudah di sprite.
-                if (alfa !== 1) { ctx.globalAlpha = 1; alfa = 1; }
-                const b = spriteHotspot[kelas];
-                ctx.drawImage(b, x - b.width / 2, y - b.height / 2);
-                continue;
-              }
               const a = kelas % 3 === 0 ? 0.85 : 1;
               if (a !== alfa) { ctx.globalAlpha = a; alfa = a; }
               ctx.drawImage(spriteHotspot[kelas], x - setengah, y - setengah, uk, uk);
             }
             ctx.globalAlpha = 1;
           }
-          // Pasang sumber + lapisan pendar bila belum ada dan jaga di puncak —
+          // Pasang lapisan jangkar (kosong) bila belum ada dan jaga di puncak —
           // Windy bisa memasang lapisan sesudahnya. Kanvas penanda ikut dijaga.
           let kameraHotspotTerpasang = false;
           function jagaLapisanHotspot() {
@@ -2127,20 +2176,10 @@ ${ringkas ? `
             if (!peta) return;
             try {
               if (!peta.getSource('hotspot')) {
-                peta.addSource('hotspot', { type: 'geojson', data: geoJsonHotspot(hotspotTertunda) });
+                peta.addSource('hotspot', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
               }
               if (!peta.getLayer(ID_PENDAR_HOTSPOT)) {
-                peta.addLayer({
-                  id: ID_PENDAR_HOTSPOT,
-                  type: 'circle',
-                  source: 'hotspot',
-                  paint: {
-                    'circle-color': WARNA_TITIK[2],
-                    'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 6, 8, 16, 12, 28],
-                    'circle-blur': 1,
-                    'circle-opacity': 0.45
-                  }
-                });
+                peta.addLayer({ id: ID_PENDAR_HOTSPOT, type: 'circle', source: 'hotspot' });
               } else if (typeof peta.getLayersOrder === 'function') {
                 const urut = peta.getLayersOrder();
                 if (urut[urut.length - 1] !== ID_PENDAR_HOTSPOT) peta.moveLayer(ID_PENDAR_HOTSPOT);
@@ -2174,24 +2213,23 @@ ${ringkas ? `
               return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
             });
           }
-          // t = [lng, lat, kepercayaan, satelit, gaya, FRP, waktu, malam, provinsi]
+          // t = [lng, lat, kepercayaan, satelit, FRP, waktu, malam, provinsi]
           function kartuHotspot(t) {
             const k = t[2];
-            const bulatan = t[4] === 0;
-            const jalur = bulatan ? 'M1,6a5,5 0 1,0 10,0a5,5 0 1,0 -10,0' : jalurBentukHotspot(t[3], 6, 5);
-            const warna = (bulatan ? WARNA_TITIK : WARNA_SIPONGI)[k] || WARNA_SIPONGI[0];
+            const jalur = jalurBentukHotspot(t[3], 6, 5);
+            const warna = WARNA_SIPONGI[k] || WARNA_SIPONGI[0];
             function baris(label, isi) {
               return '<span style="color:rgba(255,255,255,0.6);">' + label + '</span><span style="text-align:right;">' + lolosHtml(isi) + '</span>';
             }
             return '<div style="min-width:190px;">' +
-              '<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">' + lolosHtml(provinsiHotspot[t[8]] || '-') + '</div>' +
+              '<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">' + lolosHtml(provinsiHotspot[t[7]] || '-') + '</div>' +
               '<div style="display:flex;align-items:center;gap:6px;font-size:11px;">' +
               '<svg viewBox="0 0 12 12" width="11" height="11"><path d="' + jalur + '" fill="' + warna + '" stroke="rgba(0,0,0,0.6)" stroke-linejoin="round"/></svg>' +
               'Hotspot · kepercayaan ' + (LABEL_KEPERCAYAAN[k] || '-') + '</div>' +
               '<div style="display:grid;grid-template-columns:auto 1fr;gap:1px 12px;margin-top:5px;font-size:11px;font-weight:500;">' +
-              baris('Waktu', formatWib(t[6] * 60000) + (t[7] ? ' (malam)' : '')) +
+              baris('Waktu', formatWib(t[5] * 60000) + (t[6] ? ' (malam)' : '')) +
               baris('Satelit', NAMA_SATELIT[t[3]] || '-') +
-              baris('FRP', Number(t[5]).toLocaleString('id-ID') + ' MW') +
+              baris('FRP', Number(t[4]).toLocaleString('id-ID') + ' MW') +
               '</div></div>';
           }
           // Titik dalam ±jari px dari (clientX, clientY) — proyeksi sama dengan
@@ -2231,9 +2269,8 @@ ${ringkas ? `
 
           function gambarHotspot(titik) {
             hotspotTertunda = titik;
-            // Bulatan dulu lalu penanda SiPongi; dalam tiap gaya kepercayaan
-            // rendah dulu → tinggi digambar paling atas.
-            const urut = (titik || []).slice().sort(function(a, b) { return (a[4] - b[4]) || (a[2] - b[2]); });
+            // Kepercayaan rendah dulu → tinggi digambar paling atas.
+            const urut = (titik || []).slice().sort(function(a, b) { return a[2] - b[2]; });
             hotspotUrut = urut;
             hotspotMerc = new Float64Array(urut.length * 2);
             hotspotKelas = new Uint8Array(urut.length);
@@ -2241,15 +2278,10 @@ ${ringkas ? `
               const sinLat = Math.sin((Math.max(-85, Math.min(85, t[1])) * Math.PI) / 180);
               hotspotMerc[i * 2] = (t[0] + 180) / 360;
               hotspotMerc[i * 2 + 1] = 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
-              hotspotKelas[i] = t[4] === 0 ? 9 + t[2] : (t[3] || 0) * 3 + t[2];
+              hotspotKelas[i] = (t[3] || 0) * 3 + t[2];
             });
-            const peta = petaMapLibreWindy();
-            if (!peta) return;
+            if (!petaMapLibreWindy()) return;
             jagaLapisanHotspot();
-            try {
-              const sumber = peta.getSource('hotspot');
-              if (sumber) sumber.setData(geoJsonHotspot(titik));
-            } catch (e) {}
             gambarKanvasHotspot(true);
           }
           // Tampilan awal peta: disinkronkan dengan zoom/center asli Windy sampai pengguna berinteraksi
@@ -2898,6 +2930,37 @@ ${ringkas ? `
                 clearTimeout(penundaDelta);
                 penundaDelta = setTimeout(terapkanDeltaTertunda, 300);
               }
+            } else if (data.type === 'SET_KOLOM') {
+              // shortcut: tombol zoom (zoomIn/zoomOut) tetap berpusat di tengah iframe,
+              // kolom/2 px di barat tengah yang tampak; pakai setZoomAround bila terasa meleset.
+              const kiri = Number(data.kiri) || 0;
+              document.documentElement.style.setProperty('--kolom-kiri', kiri + 'px');
+              // Panel dibentang/diciutkan: peta meluncur setengah selisihnya supaya
+              // pusatnya tetap di tengah ruang yang tampak, bersama luncuran panel
+              // (lapisan Aerosol: tutupKiri PetaAsap). Masuk/keluar selayar (0 ↔
+              // kolom) tidak — kameranya datang lewat SET_KAMERA.
+              if (kolomKiri && kiri && kiri !== kolomKiri) {
+                const dx = (kolomKiri - kiri) / 2;
+                // Kamera yang diterapkan ulang (penjaga awal sampai disentuh, tombol
+                // rumah) ikut bergeser — tanpa ini ia menarik peta balik ke tengah lama.
+                const geser = function(k) {
+                  return k && { pusat: [k.pusat[0], k.pusat[1] + (dx * 360) / (256 * Math.pow(2, k.zoom))], zoom: k.zoom };
+                };
+                kameraTarget = geser(kameraTarget);
+                tampilanAwal = geser(tampilanAwal);
+                const m = window.W && window.W.map && window.W.map.map;
+                // MapLibre di balik Leaflet Windy langsung: panBy pembungkusnya
+                // meneruskan duration (detik) ke MapLibre (ms), jadi petanya melompat.
+                const mml = m && m._maplibreMap;
+                try {
+                  if (mml && typeof mml.panBy === 'function') {
+                    mml.panBy([dx, 0], { duration: kurangiGerak() ? 0 : 300, easing: function(t) { return 1 - Math.pow(1 - t, 4); } });
+                  } else if (m) {
+                    m.panBy([dx, 0], { animate: false });
+                  }
+                } catch (e) {}
+              }
+              kolomKiri = kiri;
             } else if (data.type === 'SET_KAMERA') {
               // Samakan kamera dengan lapisan Aerosol / Nusantara saat beralih mode atau masuk selayar.
               // Zoom sudah dalam skala Windy (Aerosol + 1).
@@ -2962,6 +3025,15 @@ ${ringkas ? `
               provinsiHotspot = Array.isArray(data.provinsi) ? data.provinsi : [];
               document.getElementById('btn-lapisan')?.classList.toggle('ada-hotspot', !!hotspotTertunda);
               if (mapInitialized) gambarHotspot(hotspotTertunda);
+            } else if (data.type === 'SET_LAPISAN') {
+              // Sakelar panel Lapisan induk; kelas di <html> karena Windy menimpa kelas <body>.
+              udaraTampil = data.angin !== false;
+              const akar = document.documentElement.classList;
+              akar.toggle('udara-mati', !udaraTampil);
+              akar.toggle('poligon-mati', data.poligon === false);
+              akar.toggle('angka-mati', data.angka === false);
+              jagaLapisanUdara();
+              mintaGambarUdara();
             } else if (data.type === 'SET_TEMA') {
               const zb = document.getElementById('custom-zoom-controls');
               if (zb) {

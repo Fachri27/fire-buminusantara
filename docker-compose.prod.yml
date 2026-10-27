@@ -24,7 +24,7 @@ services:
       retries: 3
       start_period: 30s
 
-  # Penyegar data tiap 15 menit lewat /api/cron/warm-asap: sebaran asap +
+  # Penyegar data tiap 30 menit lewat /api/cron/warm-asap: sebaran asap +
   # udara (CAMS) dan hotspot FIRMS ditulis ke Redis; rute publik hanya membaca
   # salinan itu. Sengaja tanpa `condition: service_healthy`: web yang tak
   # sehat akan menggagalkan `compose up` sebelum rollback remote-deploy.sh
@@ -44,7 +44,9 @@ services:
           printf '[cron] '
           printf 'header = "Authorization: Bearer %s"\n' "$$CRON_SECRET" \
             | curl -sS -K - -X POST -m 600 -w ' [%{http_code} %{time_total}s]\n' http://web:3000/api/cron/warm-asap
-          sleep 900
+          # 30 menit: FIRMS memperbarui berkasnya tiap 60 menit, CAMS dua run
+          # sehari — 15 menit dulu sebagian besar mengunduh berkas yang sama.
+          sleep 1800
         done
 
 networks:

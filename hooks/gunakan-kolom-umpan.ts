@@ -29,7 +29,7 @@ export function gunakanKolomUmpan(relKiriTerbuka = true, kolomAwal?: number): nu
   // Aliran (satu kolom menumpuk): wadah = layar - pias grid - padding rel.
   // Seluler pun 2 kolom seperti rujukan (grid foto ganda ala X) — 1 kolom
   // hanya untuk layar sangat sempit.
-  if (lebar < 1100) return lebar >= 360 ? 2 : 1;
+  if (lebar < 1024) return lebar >= 360 ? 2 : 1;
   const relKiri = Math.min(680, Math.max(340, lebar * 0.335));
   const wadah = relKiriTerbuka ? lebar - relKiri - 56 : lebar - 56;
   /* Tingkat keempat digerbangi keadaan rel, bukan lebar semata. Dengan ambang

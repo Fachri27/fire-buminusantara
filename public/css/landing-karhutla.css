@@ -156,7 +156,7 @@
 
    Padding 3px memberi ruang bagi cincin fokus kolom — tanpa itu ia terpotong
    oleh overflow:hidden yang justru dipakai untuk melipatnya. */
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   .lk-bingkai header #nav-panel-cari {
     flex-grow: 1;
     padding: 3px;
@@ -174,7 +174,7 @@
 
 /* Aliran: turun dari balik bilah alih-alih melipat — di sini ia sudah keluar
    dari baris, jadi lebarnya tak punya apa pun untuk didorong. */
-@media not all and (min-width: 1100px) and (min-height: 640px) {
+@media not all and (min-width: 1024px) and (min-height: 560px) {
   .lk-bingkai header #nav-panel-cari[data-buka="0"] {
     transform: translateY(-0.5rem);
   }
@@ -224,7 +224,7 @@
    viewport, rel KIRI terkunci (tak ikut menggulir), dan hanya rel KANAN yang
    menggulir sendiri. Di layar aliran (satu kolom menumpuk) semuanya kembali
    menjadi halaman biasa yang menggulir normal. */
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   .lk-bingkai {
     display: flex;
     flex-direction: column;
@@ -266,7 +266,7 @@
      Pecahan vw = nilai_di_1920 / 19,2, pola yang sama dengan angka statistik
      yang sudah terukur pas 0,800. Lantai clamp sengaja di bawah sasaran 1536
      (mis. judul 15,2px) supaya tidak justru mengunci nilainya; ia hanya
-     menahan di ujung sempit panggung (~1100px). Ukuran ponsel tak tersentuh:
+     menahan di ujung sempit panggung (~1024px). Ukuran ponsel tak tersentuh:
      seluruh blok ini terkurung di media query panggung, dan sasaran 1536
      memang lebih kecil daripada lantai ponselnya sendiri sehingga satu clamp
      tunggal mustahil melayani keduanya. */
@@ -458,7 +458,7 @@
 /* Panggung yang pendek: isi rel kiri bisa lebih tinggi dari viewport. Supaya
    kaki halaman tak terpotong, rel kiri boleh menggulir DARURAT — bilahnya
    disembunyikan agar tetap terbaca sebagai panel yang terkunci. */
-@media (min-width: 1100px) and (min-height: 640px) and (max-height: 899px) {
+@media (min-width: 1024px) and (min-height: 560px) and (max-height: 899px) {
   .lk-kiri {
     overflow-y: auto;
     scrollbar-width: none;
@@ -546,7 +546,7 @@
   gap: 1rem;
 }
 
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   .lk-kartu-teks {
     order: 1;
   }
@@ -561,7 +561,7 @@
   }
 }
 
-@media not all and (min-width: 1100px) and (min-height: 640px) {
+@media not all and (min-width: 1024px) and (min-height: 560px) {
   /* Selokan tepi seluler. Grid induk cuma memberi p-2 (8px), sementara jarak
      antar-kolom 12px dan antar-kartu 16px — tepi layar jadi LEBIH rapat
      daripada celah di dalam umpannya sendiri, dan itulah yang terbaca mepet.
@@ -1381,7 +1381,7 @@ button.lk-postingan-komentar {
   pointer-events: none;
 }
 
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   .lk-kredit {
     display: none;
   }
@@ -1395,7 +1395,7 @@ button.lk-postingan-komentar {
   display: none;
 }
 
-@media not all and (min-width: 1100px) and (min-height: 640px) {
+@media not all and (min-width: 1024px) and (min-height: 560px) {
   .lk-tabbar {
     position: fixed;
     inset-inline: 0;
@@ -1517,7 +1517,7 @@ html.dark .lk-bingkai-peta {
    aturan tema yang ber-!important ikut berlaku di seluler, dan umpan ponsel
    terbungkus kotak abu-abu — padahal di sana kartunya harus berdiri langsung
    di atas latar halaman (lihat .lk-kanan di blok panggung atas). */
-@media (min-width: 1100px) and (min-height: 640px) {
+@media (min-width: 1024px) and (min-height: 560px) {
   html:not(.dark) .lk-kanan {
     background-color: #ffffff !important;
     border: 1px solid rgba(0, 0, 0, 0.08) !important;

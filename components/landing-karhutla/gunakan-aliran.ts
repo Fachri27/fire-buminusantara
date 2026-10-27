@@ -9,11 +9,11 @@ import { useSyncExternalStore } from "react";
 export function useAliran(): boolean {
   return useSyncExternalStore(
     (ubah) => {
-      const mq = window.matchMedia("not all and (min-width: 1100px) and (min-height: 640px)");
+      const mq = window.matchMedia("not all and (min-width: 1024px) and (min-height: 560px)");
       mq.addEventListener("change", ubah);
       return () => mq.removeEventListener("change", ubah);
     },
-    () => window.matchMedia("not all and (min-width: 1100px) and (min-height: 640px)").matches,
+    () => window.matchMedia("not all and (min-width: 1024px) and (min-height: 560px)").matches,
     () => false,
   );
 }

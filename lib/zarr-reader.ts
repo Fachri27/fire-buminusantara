@@ -1,5 +1,6 @@
 import Blosc from "numcodecs/blosc";
 import { redisGet, redisSet, redisGetBuffer, redisSetBuffer } from "./redis.ts";
+import { awalRiwayat } from "./lapisan-hotspot.ts";
 
 const ZARR_BASE_URL =
   process.env.CAMS_ZARR_BASE_URL ||
@@ -58,6 +59,10 @@ export const MAX_FRAME_CACHE_ENTRIES = 150; // Menampung seluruh ~81 frame sebar
 export const CLEANUP_INTERVAL_MS = 15 * 60 * 1000; // Siklus pembersihan tiap 15 menit
 let lastCleanupTime = Date.now();
 
+/** Umur metadata (linimasa) di memori & Redis. Cron warm-asap memaksa segar
+ *  tiap 30 menit (docker-compose.prod.yml); sedikit lebih lama dari itu
+ *  supaya pengunjung tak pernah memicu ambil ulang ke ECMWF di antara putaran. */
+const UMUR_METADATA_MS = 35 * 60 * 1000;
 let cachedMetadata: { data: ZarrMetadataResponse; expiresAt: number } | null = null;
 const frameCache = new Map<string, { buffer: Uint8Array; expiresAt: number }>();
 const bloscCodec = Blosc.fromConfig({ id: "blosc" });
@@ -215,9 +220,22 @@ function buatMetaLangkah(
 }
 
 /**
- * Fetch and parse Zarr metadata to identify available timesteps.
+ * Linimasa yang dipakai peta: riwayat dipotong ke HARI_RIWAYAT hari WIB
+ * (awalRiwayat) supaya Aerosol, Angin, dan hotspot mundur sejauh yang sama —
+ * store CAMS sendiri menyimpan 14 run (±7,5 hari). Dipotong saat dibaca, bukan
+ * saat dibangun: metadata tersimpan (memori/Redis) bisa melewati tengah malam.
+ * Frame diambil lewat timeChunk/step/timeInner, jadi `index` aman dinomori ulang.
  */
 export async function getZarrMetadata(forceRefresh: boolean = false): Promise<ZarrMetadataResponse> {
+  const meta = await ambilZarrMetadata(forceRefresh);
+  const awal = awalRiwayat();
+  return { ...meta, timesteps: meta.timesteps.filter((m) => m.waktu >= awal).map((m, index) => ({ ...m, index })) };
+}
+
+/**
+ * Fetch and parse Zarr metadata to identify available timesteps.
+ */
+async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataResponse> {
   const now = Date.now();
   // 1. Cek L1 in-memory cache (RAM lokal)
   if (!forceRefresh && cachedMetadata && cachedMetadata.expiresAt > now) {
@@ -239,7 +257,7 @@ export async function getZarrMetadata(forceRefresh: boolean = false): Promise<Za
         if (parsed?.timesteps?.length > 0) {
           cachedMetadata = {
             data: parsed,
-            expiresAt: now + 15 * 60 * 1000,
+            expiresAt: now + UMUR_METADATA_MS,
           };
           return {
             ...parsed,
@@ -385,11 +403,11 @@ export async function getZarrMetadata(forceRefresh: boolean = false): Promise<Za
 
     cachedMetadata = {
       data: result,
-      expiresAt: now + 15 * 60 * 1000, // cache for 15 minutes
+      expiresAt: now + UMUR_METADATA_MS,
     };
 
-    // Simpan ke L2 Redis (TTL 15 menit)
-    redisSet(REDIS_KEY_META, JSON.stringify(result), 15 * 60).catch(() => {});
+    // Simpan ke L2 Redis (TTL sama)
+    redisSet(REDIS_KEY_META, JSON.stringify(result), UMUR_METADATA_MS / 1000).catch(() => {});
 
     return result;
   } catch (error) {

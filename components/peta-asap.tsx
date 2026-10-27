@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import * as maplibregl from "@/lib/maplibre";
@@ -56,12 +56,44 @@ type Props = {
   isPenuh?: boolean;
   /** Lapisan tambahan Titik Hotspot (lib/lapisan-hotspot.ts) — null = mati. */
   hotspot?: DataHotspot | null;
-  /** Kendali yang ditaruh tepat di atas logo Copernicus (legenda hotspot
-   *  peta.tsx) — ikut ke mana pun logonya berpindah. */
-  slotAtasLogo?: ReactNode;
+  /** Waktu (ms epoch) langkah bilah waktu yang tampil — peta.tsx memilih hari
+   *  data hotspot darinya. */
+  onWaktu?: (ms: number) => void;
+  /** Bagian tambahan kartu legenda Aerosol (legenda hotspot peta.tsx) —
+   *  satu tempat untuk seluruh legenda peta. */
+  slotLegenda?: ReactNode;
   /** Kendali di ujung kolom tombol kanan (tombol Lapisan peta.tsx). */
   slotKendali?: ReactNode;
+  /** Lebar kolom peringkat peta.tsx di kiri kotak peta (px). Kanvas MapLibre
+   *  melebar sejauh itu ke bawah kolom, jadi lebarnya TETAP saat kolom dibentang/
+   *  diciutkan — tanpa resize buffer WebGL (mahal di layar retina) — dan padding
+   *  kiri kamera menjaga "tengah" & fitBounds di bagian yang tampak. */
+  kolomKiri?: number;
+  /** Lebar yang ditutup panel peringkat/bilahnya dari kiri kanvas pada keadaan
+   *  akhirnya (px) = padding kiri kamera. Berganti saat tombol ditekan, sebelum
+   *  kolomKiri menyusul: pusat peta meluncur ke tengah ruang yang tampak
+   *  bersama luncuran panel. */
+  tutupKiri?: number;
+  /** Sakelar lapisan bawaan dari panel Lapisan peta.tsx. Bawaan: semua menyala. */
+  lapisan?: LapisanAsap;
 };
+
+export type LapisanAsap = { aerosol: boolean; poligon: boolean; angka: boolean };
+const LAPISAN_PENUH: LapisanAsap = { aerosol: true, poligon: true, angka: true };
+/** Lama luncur pusat peta saat panel peringkat dibentang/diciutkan (ms) — sama
+ *  dengan LAMA_LUNCUR panel di peta.tsx. */
+const LUNCUR_KOLOM = 300;
+/** Tab terbuka: tanya ulang linimasa tiap ini (ms) — selaras cron warm-asap 30 menit. */
+const PERIKSA_ULANG_MS = 30 * 60 * 1000;
+const OPASITAS_PROVINSI: maplibregl.ExpressionSpecification = ["case", ["boolean", ["feature-state", "hover"], false], 0.2, 0.04];
+
+function terapkanLapisan(map: maplibregl.Map, l: LapisanAsap) {
+  map.setLayoutProperty("smoke-layer", "visibility", l.aerosol ? "visible" : "none");
+  map.setLayoutProperty("batas-provinsi-garis", "visibility", l.poligon ? "visible" : "none");
+  // Isian provinsi hanya dibeningkan, tak disembunyikan: hover/klik provinsi
+  // dan kartu hotspot membaca fitur dari lapisan ini.
+  map.setPaintProperty("batas-provinsi-fill", "fill-opacity", l.poligon ? OPASITAS_PROVINSI : 0);
+}
 
 // GLSL Vertex Shader: Quad koordinat Mercator dunia [0, 1] dikalikan matriks proyeksi MapLibre GL
 const VS_SOURCE = `
@@ -247,9 +279,8 @@ function buatLinimasaDefault(): ZarrTimestepMeta[] {
 /** Titik waktu terdekat dengan sekarang. Rentang linimasa membentang dari
  *  riwayat 7 hari ke belakang sampai prakiraan 3 hari ke depan — pengunjung
  *  baru harus melihat kondisi hari ini, bukan awal rentang. */
-function indeksWaktuKini(langkah: ZarrTimestepMeta[]): number {
+function indeksWaktuKini(langkah: ZarrTimestepMeta[], kini = Date.now()): number {
   if (langkah.length === 0) return 0;
-  const kini = Date.now();
   let terbaik = 0;
   let selisihTerbaik = Infinity;
   for (let i = 0; i < langkah.length; i++) {
@@ -330,10 +361,12 @@ let globalZarrMetadata: ZarrMetadataResponse | null = null;
 const globalFrameCache: Record<string, Uint8Array> = {};
 let globalSyncSelesai = false;
 
-export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt = "Lapor Karhutla", onExpand = null, expandLabel = "Buka peta selayar", isPenuh = false, hotspot = null, slotAtasLogo = null, slotKendali = null }: Props) {
+export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, aktif = true, onSyncChange, legendaRingkas = false, muatNusantara = false, zoomRoda = false, logoSelulerSrc = null, logoSelulerAlt = "Lapor Karhutla", onExpand = null, expandLabel = "Buka peta selayar", isPenuh = false, hotspot = null, onWaktu, slotLegenda = null, slotKendali = null, lapisan = LAPISAN_PENUH, kolomKiri = 0, tutupKiri = 0 }: Props) {
   const wadahPetaRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const hotspotRef = useRef(hotspot);
+  const kolomKiriRef = useRef(kolomKiri);
+  const tutupKiriRef = useRef(tutupKiri);
   const onPilihRef = useRef(onPilihWilayah);
   const onBukaRincianRef = useRef(onBukaRincian);
   const beritaRef = useRef(berita);
@@ -395,12 +428,12 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       map.resize();
       if (isPenuh) {
         map.fitBounds(BATAS_NUSANTARA, {
-          padding: selaNusantara(map.getContainer(), true),
+          padding: selaNusantara(akarRef.current ?? map.getContainer(), true),
           duration: 350,
         });
       } else if (muatNusantaraRef.current) {
         map.fitBounds(BATAS_NUSANTARA, {
-          padding: selaNusantara(map.getContainer(), false),
+          padding: selaNusantara(akarRef.current ?? map.getContainer(), false),
           duration: 350,
         });
       }
@@ -430,7 +463,10 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     if (sesi?.latestModelRunIso) return formatIsoKeWib(sesi.latestModelRunIso);
     return "";
   });
-  const [indeksAktif, setIndeksAktif] = useState(0);
+  // Mulai di langkah terdekat dengan sekarang, bukan 0: linimasa dari tembolok
+  // sesi mulai 6 hari lalu, dan onWaktu langsung melaporkannya — peta.tsx
+  // lalu meminta hotspot hari tertua dulu sebelum mulaiDariSekarang menyusul.
+  const [indeksAktif, setIndeksAktif] = useState(() => indeksWaktuKini(linimasa));
   const [memutar, setMemutar] = useState(true);
   const [kecepatan, setKecepatan] = useState<1 | 2>(1);
   const [jumlahFrameTerunduh, setJumlahFrameTerunduh] = useState(() => Object.keys(globalFrameCache).length);
@@ -487,6 +523,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     const akar = akarRef.current;
     if (!muatNusantara || !akar) return;
     let ukuran = { w: akar.clientWidth, h: akar.clientHeight };
+    // kolomKiri saat `ukuran` dicatat — lihat cabang kolom di bawah.
+    let kolomUkur = kolomKiriRef.current;
     let penunda: ReturnType<typeof setTimeout> | undefined;
     const amati = new ResizeObserver(() => {
       const map = mapRef.current;
@@ -495,12 +533,27 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       if (!map || !w || !h) return;
       if (!ukuran.w || !ukuran.h) {
         ukuran = { w, h };
+        kolomUkur = kolomKiriRef.current;
         map.resize();
         return;
       }
+      /* Kolom peringkat peta.tsx dibentang/diciutkan: kotak ini berubah tepat
+         sebesar kebalikan perubahan kolomKiri, dan kanvas (lebar 100% +
+         kolomKiri) tetap. Tak ada yang di-resize — tanpa skala sementara dan
+         tanpa fitBounds yang mereset zoom & geser pengunjung; padding kamera
+         diurus efek tutupKiri. Ukuran tata letak (clientWidth), bukan posisi
+         layar: animasi buka selayar memakai transform. */
+      const selisihKolom = kolomKiriRef.current - kolomUkur;
+      if (selisihKolom !== 0 && h === ukuran.h && w - ukuran.w === -selisihKolom) {
+        ukuran = { w, h };
+        kolomUkur = kolomKiriRef.current;
+        return;
+      }
       const wadahKanvas = map.getCanvasContainer();
+      const skala = w / ukuran.w;
       wadahKanvas.style.transformOrigin = "0 0";
-      wadahKanvas.style.transform = `scale(${w / ukuran.w})`;
+      // Bagian tampak kanvas mulai di x = kolomUkur; kotak ini kini mulai di x = kolomKiri wadah.
+      wadahKanvas.style.transform = `translateX(${kolomKiriRef.current - skala * kolomUkur}px) scale(${skala})`;
       clearTimeout(penunda);
       /* Bingkai sedang dilipat habis (kolom peta ditutup): berhenti di sini.
          Transform tetap diperbarui — murah, dan animasi menyusutnya sama
@@ -537,6 +590,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           wadahKanvas.style.transform = "";
           wadahKanvas.style.transformOrigin = "";
           ukuran = { w: wBaru, h: hBaru };
+          kolomUkur = kolomKiriRef.current;
         });
       }, 160);
     });
@@ -596,7 +650,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const frameCacheRef = useRef<Record<string, Uint8Array>>(globalFrameCache);
 
   // Animation loop timing
-  const progressRef = useRef<number>(0);
+  const progressRef = useRef<number>(indeksAktif);
   const lastTimeRef = useRef<number>(0);
   const rafIdRef = useRef<number | null>(null);
   const startLoopRef = useRef<(() => void) | null>(null);
@@ -606,8 +660,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
      model baru), bilah waktu mulai dari titik terdekat dengan sekarang.
      progressRef ikut ditulis supaya loop animasi melanjutkan dari titik itu,
      dan nilai slider disetel langsung karena slider tak dikendalikan React. */
-  const mulaiDariSekarang = useCallback((langkah: ZarrTimestepMeta[]) => {
-    const idx = indeksWaktuKini(langkah);
+  const mulaiDariSekarang = useCallback((langkah: ZarrTimestepMeta[], waktu?: number) => {
+    const idx = indeksWaktuKini(langkah, waktu);
     progressRef.current = idx;
     setIndeksAktif(idx);
     const el = sliderInputRef.current;
@@ -685,12 +739,65 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     onPilihRef.current = onPilihWilayah;
   }, [onPilihWilayah]);
 
+  const onWaktuRef = useRef(onWaktu);
+  useEffect(() => {
+    onWaktuRef.current = onWaktu;
+  }, [onWaktu]);
+  const waktuLangkah = linimasa[indeksAktif]?.waktu;
+  useEffect(() => {
+    if (waktuLangkah !== undefined) onWaktuRef.current?.(waktuLangkah);
+  }, [waktuLangkah]);
+
+  // Sebelum ResizeObserver di atas membaca kolomKiriRef (cabang kolom).
+  useLayoutEffect(() => {
+    kolomKiriRef.current = kolomKiri;
+  }, [kolomKiri]);
+
+  /* Panel dibentang/diciutkan: pusat peta meluncur ke tengah ruang yang tampak,
+     bersama luncuran panel. Padding langsung di nilai akhirnya (pusat digeser
+     setengah selisihnya, isi diam), lalu easeTo kembali ke pusat semula —
+     bila disela seretan pengunjung, paddingnya tetap benar. Masuk/keluar
+     selayar (0 ↔ kolom) langsung: fitBounds selayar menyusul. MapLibre
+     melewati animasi bila prefers-reduced-motion. */
+  useLayoutEffect(() => {
+    const lalu = tutupKiriRef.current;
+    tutupKiriRef.current = tutupKiri;
+    const map = mapRef.current;
+    if (!map || lalu === tutupKiri) return;
+    const pusat = map.getCenter();
+    const padding = { ...map.getPadding(), left: tutupKiri };
+    if (!lalu || !tutupKiri) {
+      map.jumpTo({ center: pusat, padding });
+      return;
+    }
+    const px = map.project(pusat);
+    map.jumpTo({ center: map.unproject([px.x + (tutupKiri - lalu) / 2, px.y]), padding });
+    map.easeTo({ center: pusat, duration: LUNCUR_KOLOM, easing: (t) => 1 - (1 - t) ** 4 });
+  }, [tutupKiri]);
+
   // Lapisan tambahan Titik Hotspot: isi ulang saat dinyalakan/dimatikan atau
   // datanya diperbarui. Sebelum peta "load", handler load yang memasangnya.
+
+  const hariHotspotRef = useRef<string | null>(null);
   useEffect(() => {
     hotspotRef.current = hotspot;
-    if (mapRef.current) setelDataHotspot(mapRef.current, hotspot);
+    const hari = hotspot?.hari ?? null;
+    const pudar =
+      hari !== null && hariHotspotRef.current !== null && hari !== hariHotspotRef.current &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (hari !== null) hariHotspotRef.current = hari;
+    if (mapRef.current) setelDataHotspot(mapRef.current, hotspot, pudar);
   }, [hotspot]);
+
+  // Sakelar lapisan bawaan. Sebelum peta "load", handler load yang menerapkannya.
+  const lapisanRef = useRef(lapisan);
+  useEffect(() => {
+    lapisanRef.current = lapisan;
+    const map = mapRef.current;
+    if (map?.getLayer("smoke-layer")) terapkanLapisan(map, lapisan);
+    // Lewat kelas wadah, bukan per penanda: renderAngka membuat ulang penandanya.
+    wadahPetaRef.current?.classList.toggle("angka-mati", !lapisan.angka);
+  }, [lapisan]);
 
   // Upload data buffer ke tekstur WebGL (900 cols x 451 rows) dengan hardware bilinear interpolation
   const uploadTextureBuffer = useCallback(
@@ -778,6 +885,79 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     muatFrameRef.current = muatFrame;
   }, [muatFrame]);
 
+  /* Linimasa di tab ini ketinggalan server? Siklus model CAMS baru (±17.00 &
+     05.00 WIB) atau langkah pertama yang maju lewat tengah malam (riwayat
+     dipotong per hari WIB di getZarrMetadata) → pasang linimasa baru, muat
+     frame aktifnya, sisanya di latar. Posisi bilah waktu mengikuti WAKTU
+     langkah yang sedang tampil, bukan lompat ke sekarang: tab yang lama
+     terbuka bisa sedang di hari lain. Tanpa _ts (force): tembolok server
+     disegarkan cron warm-asap, pengunjung tak memicu ambil ke ECMWF. */
+  const perbaruiLinimasa = useCallback(
+    async () => {
+      try {
+        const res = await fetch("/api/sebaran-asap?mode=metadata");
+        if (!res.ok) return;
+        const metaBaru: ZarrMetadataResponse = await res.json();
+        if (!metaBaru.timesteps || metaBaru.timesteps.length === 0) return;
+
+        const lama = globalZarrMetadata;
+        const runBaru = metaBaru.latestModelRunIso;
+        const awalBergeser = metaBaru.timesteps[0]?.waktu !== lama?.timesteps[0]?.waktu;
+        if (!((runBaru && runBaru !== lama?.latestModelRunIso) || awalBergeser)) return;
+
+        const waktuTampil = lama?.timesteps[Math.floor(progressRef.current)]?.waktu;
+        globalZarrMetadata = metaBaru;
+        try {
+          sessionStorage.setItem(SINKRON_SELESAI_KEY, "true");
+          sessionStorage.setItem(METADATA_CACHE_KEY, JSON.stringify(metaBaru));
+        } catch {}
+
+        const runWibBaru =
+          metaBaru.latestModelRunWib || (metaBaru.latestModelRunIso ? formatIsoKeWib(metaBaru.latestModelRunIso) : "");
+        if (runWibBaru) setModelRunWib(runWibBaru);
+        setLinimasa(metaBaru.timesteps);
+
+        const curActiveIndex = mulaiDariSekarang(metaBaru.timesteps, waktuTampil);
+        const curStep = metaBaru.timesteps[curActiveIndex] || metaBaru.timesteps[0];
+        if (curStep) {
+          await muatFrame(curStep);
+          mapRef.current?.triggerRepaint();
+        }
+
+        // Unduh frame baru sisa di latar belakang
+        const totalNew = metaBaru.timesteps.length;
+        let nextNewIdx = 0;
+        const workerNew = async () => {
+          while (nextNewIdx < totalNew) {
+            const st = metaBaru.timesteps[nextNewIdx++];
+            if (st && !frameCacheRef.current[`${st.timeChunk}_${st.step}_${st.timeInner}`]) await muatFrame(st);
+          }
+        };
+        Promise.all(Array.from({ length: Math.min(4, totalNew) }, () => workerNew())).catch(() => {});
+      } catch {
+        // Hening: gagal revalidasi tak mengganggu peta yang sedang tampil.
+      }
+    },
+    [muatFrame, mulaiDariSekarang],
+  );
+
+  // Tab yang lama terbuka: tanya ulang tiap 30 menit selama terlihat (selaras
+  // cron warm-asap), dan begitu tab kembali terlihat setelah lebih lama dari itu.
+  useEffect(() => {
+    let terakhir = Date.now();
+    const periksa = () => {
+      if (document.hidden || !globalSyncSelesai || Date.now() - terakhir < PERIKSA_ULANG_MS - 1000) return;
+      terakhir = Date.now();
+      void perbaruiLinimasa();
+    };
+    const tiap = setInterval(periksa, PERIKSA_ULANG_MS);
+    document.addEventListener("visibilitychange", periksa);
+    return () => {
+      clearInterval(tiap);
+      document.removeEventListener("visibilitychange", periksa);
+    };
+  }, [perbaruiLinimasa]);
+
   // Sinkronisasi data sebaran asap: memuat metadata dan frame linimasa
   const sinkronkanSebaranAsap = useCallback(
     async (paksaRefresh = false) => {
@@ -810,9 +990,11 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           setSedangSync(false);
           setProgresSync(100);
 
-          // Muat frame aktif jika belum ada di memori WebGL — titik waktu
-          // sekarang, bukan posisi terakhir sesi sebelumnya.
-          const activeIndex = mulaiDariSekarang(cachedMeta.timesteps);
+          // Muat frame aktif jika belum ada di memori WebGL. Jalur ini juga
+          // jalan tiap focus & 10 menit: posisi bilah waktu (hari hotspot,
+          // panel peringkat) dipertahankan — pemasangan sudah mulai di sekarang.
+          const waktuTampil = linimasaRef.current[Math.floor(progressRef.current)]?.waktu;
+          const activeIndex = mulaiDariSekarang(cachedMeta.timesteps, waktuTampil);
           const activeStep = cachedMeta.timesteps[activeIndex] || cachedMeta.timesteps[0];
           if (activeStep) {
             await muatFrame(activeStep);
@@ -839,65 +1021,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           };
           Promise.all(Array.from({ length: Math.min(CONCURRENCY, totalFrames) }, () => workerBg())).catch(() => {});
 
-          // Revalidasi hening di latar belakang (Stale-While-Revalidate):
-          // Cek apakah server sudah memiliki siklus model CAMS yang lebih baru
-          const revalidasiLatarBelakang = async () => {
-            try {
-              const res = await fetch(`/api/sebaran-asap?mode=metadata&_ts=${Date.now()}`);
-              if (!res.ok) return;
-              const metaBaru: ZarrMetadataResponse = await res.json();
-              if (!metaBaru.timesteps || metaBaru.timesteps.length === 0) return;
-
-              const runLama = cachedMeta.latestModelRunIso;
-              const runBaru = metaBaru.latestModelRunIso;
-
-              if (runBaru && runBaru !== runLama) {
-                globalZarrMetadata = metaBaru;
-                try {
-                  sessionStorage.setItem(SINKRON_SELESAI_KEY, "true");
-                  sessionStorage.setItem(METADATA_CACHE_KEY, JSON.stringify(metaBaru));
-                } catch {}
-
-                const runWibBaru =
-                  metaBaru.latestModelRunWib ||
-                  (metaBaru.latestModelRunIso ? formatIsoKeWib(metaBaru.latestModelRunIso) : "");
-                if (runWibBaru) setModelRunWib(runWibBaru);
-                setLinimasa(metaBaru.timesteps);
-
-                // Muat frame aktif untuk siklus model baru, dari titik sekarang
-                const curActiveIndex = mulaiDariSekarang(metaBaru.timesteps);
-                const curStep = metaBaru.timesteps[curActiveIndex] || metaBaru.timesteps[0];
-                if (curStep) {
-                  await muatFrame(curStep);
-                  if (mapRef.current) {
-                    mapRef.current.triggerRepaint();
-                  }
-                }
-
-                // Unduh frame baru sisa di latar belakang
-                const totalNew = metaBaru.timesteps.length;
-                let nextNewIdx = 0;
-                const workerNew = async () => {
-                  while (nextNewIdx < totalNew) {
-                    const idx = nextNewIdx++;
-                    const st = metaBaru.timesteps[idx];
-                    if (st) {
-                      const k = `${st.timeChunk}_${st.step}_${st.timeInner}`;
-                      if (!frameCacheRef.current[k]) {
-                        await muatFrame(st);
-                      }
-                    }
-                  }
-                };
-                Promise.all(Array.from({ length: Math.min(CONCURRENCY, totalNew) }, () => workerNew())).catch(
-                  () => {}
-                );
-              }
-            } catch {
-              // Hening jika gagal revalidasi latar belakang agar UX tidak terganggu
-            }
-          };
-          revalidasiLatarBelakang();
+          // Revalidasi hening: siklus model baru di server sejak sesi ini menyimpannya.
+          void perbaruiLinimasa();
 
           return;
         }
@@ -986,7 +1111,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         syncRunningRef.current = false;
       }
     },
-    [muatFrame, mulaiDariSekarang]
+    [muatFrame, mulaiDariSekarang, perbaruiLinimasa]
   );
 
   // Jalankan sinkronisasi saat komponen terpasang, saat window kembali aktif (focus), dan berkala tiap 10 menit
@@ -1100,10 +1225,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     // Zoom roda bawaan MapLibre (halus, berpusat di kursor) untuk konsol /peta.
     if (zoomRodaRef.current) map.scrollZoom.enable();
 
+    map.setPadding({ ...map.getPadding(), left: tutupKiriRef.current });
     // Mode Nusantara: bingkai sempit langsung memuat Sabang–Merauke, dihitung
     // dari ukuran wadah yang sebenarnya (bukan zoom tebakan).
+    // Sela diukur di kotak yang tampak (akar), bukan wadah MapLibre yang melebar
+    // kolomKiri ke bawah kolom peringkat — padding kiri kamera sudah menguranginya.
     if (muatNusantaraRef.current) {
-      map.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(map.getContainer(), sedangPenuhRef.current), duration: 0 });
+      map.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(akarRef.current ?? map.getContainer(), sedangPenuhRef.current), duration: 0 });
     }
 
     // Custom WebGL Layer untuk Asap Karhutla CAMS Global
@@ -1318,12 +1446,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         source: "batas-provinsi",
         paint: {
           "fill-color": "#ffffff",
-          "fill-opacity": [
-            "case",
-            ["boolean", ["feature-state", "hover"], false],
-            0.20,
-            0.04,
-          ],
+          "fill-opacity": OPASITAS_PROVINSI,
         },
       });
 
@@ -1341,6 +1464,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       //    sampai dinyalakan dari menu lapisan (prop hotspot).
       pasangLapisanHotspot(map);
       setelDataHotspot(map, hotspotRef.current);
+      terapkanLapisan(map, lapisanRef.current);
 
       /* Info hotspot lewat tooltip mengambang yang sama dengan nama provinsi —
          bukan pop-up klik — supaya klik/ketuk ke provinsi tak pernah terhalang
@@ -1615,7 +1739,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         }
 
         // Picu repaint MapLibre GL pada vsync 60 FPS hanya jika sedang memutar atau scrubbing aktif
-        if ((memutarRef.current && aktifRef.current && !document.hidden) || isScrubbing) {
+        if (lapisanRef.current.aerosol && ((memutarRef.current && aktifRef.current && !document.hidden) || isScrubbing)) {
           map.triggerRepaint();
         }
 
@@ -1741,7 +1865,9 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   return (
     <div ref={akarRef} className="relative h-full w-full select-none overflow-hidden bg-black">
       {/* Wadah Peta MapLibre GL */}
-      <div ref={wadahPetaRef} className="absolute inset-0 h-full w-full" />
+      {/* Rata kanan, melebar kolomKiri ke kiri (terpotong overflow akar) — lihat kolomKiri.
+          Posisi lewat style, bukan kelas: CSS MapLibre (.maplibregl-map) memaksa position: relative. */}
+      <div ref={wadahPetaRef} style={{ position: "absolute", top: 0, bottom: 0, right: 0, width: `calc(100% + ${kolomKiri}px)` }} />
 
       {/* Tooltip Mengambang Provinsi (Persis Kualitas Udara) — di-portal ke
           document.body; lihat komentar di wadahTooltip di atas. */}
@@ -1827,7 +1953,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           onClick={() => {
             if (muatNusantaraRef.current) {
               if (mapRef.current) {
-                mapRef.current.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(mapRef.current.getContainer(), isPenuh), duration: 800 });
+                mapRef.current.fitBounds(BATAS_NUSANTARA, { padding: selaNusantara(akarRef.current ?? mapRef.current.getContainer(), isPenuh), duration: 800 });
               }
               return;
             }
@@ -1887,13 +2013,13 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
         type="button"
         onClick={() => setLegendaTerbuka(true)}
         className={`cursor-pointer pointer-events-auto absolute bottom-[calc(var(--sela-bawah,0px)+6rem)] right-3 z-[400] items-center gap-1.5 rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:shadow-2xl dark:ring-1 dark:ring-white/15 px-3 py-1.5 text-xs font-semibold backdrop-blur-md transition-all active:scale-95 ${
-          legendaTerbuka ? "hidden" : legendaRingkas ? (bingkaiSempit ? "flex sm:bottom-[calc(var(--sela-bawah,0px)+7rem)]" : "flex sm:hidden") : "flex xl:hidden"
+          legendaTerbuka ? "hidden" : legendaRingkas ? (bingkaiSempit ? "flex sm:bottom-[calc(var(--sela-bawah,0px)+7rem)]" : "flex sm:hidden") : "flex @min-[68rem]:hidden"
         }`}
       >
-        <span className={`text-sm leading-none ${gayaVisual === "copernicus" ? "text-fuchsia-600 dark:text-fuchsia-400" : "text-amber-600 dark:text-amber-400"}`}>🔥</span>
-        <span>Aerosol Karhutla</span>
-        <span className="text-tinta/40 dark:text-white/40">·</span>
-        <span className={`text-[11px] font-medium ${
+        <span hidden={!lapisan.aerosol && !slotLegenda} className={`text-sm leading-none ${gayaVisual === "copernicus" ? "text-fuchsia-600 dark:text-fuchsia-400" : "text-amber-600 dark:text-amber-400"}`}>🔥</span>
+        <span>{lapisan.aerosol ? "Aerosol Karhutla" : slotLegenda ? "Hotspot" : "Peta dasar"}</span>
+        <span hidden={!lapisan.aerosol} className="text-tinta/40 dark:text-white/40">·</span>
+        <span hidden={!lapisan.aerosol} className={`text-[11px] font-medium ${
           gayaVisual === "copernicus"
             ? "text-fuchsia-600 dark:text-fuchsia-400"
             : gayaVisual === "sh_Oranges_aod"
@@ -1937,18 +2063,21 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           legendaRingkas
             ? /* --sela-bawah: tinggi laci konsol ponsel yang menutup dasar
                  bingkai (0 di panggung) — hamparan bawah naik di atasnya. */
-              `bottom-[calc(var(--sela-bawah,0px)+6rem)] w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs sm:right-5${bingkaiSempit ? " max-h-[calc(100%-8rem-var(--sela-bawah,0px))] overflow-y-auto sm:bottom-[calc(var(--sela-bawah,0px)+7rem)]" : " sm:bottom-[calc(var(--sela-bawah,0px)+1rem)]"}`
-            : "bottom-24 w-80 max-w-[calc(100vw-2rem)] p-3.5 text-xs xl:bottom-4 xl:right-5"
+              `bottom-[calc(var(--sela-bawah,0px)+6rem)] w-64 max-w-[calc(100vw-2rem)] p-3 text-xs sm:right-5${bingkaiSempit ? " max-h-[calc(100%-8rem-var(--sela-bawah,0px))] overflow-y-auto sm:bottom-[calc(var(--sela-bawah,0px)+7rem)]" : " sm:bottom-[calc(var(--sela-bawah,0px)+1rem)]"}`
+            : /* @min-[68rem] (1088px, lebar kotak peta): kartu 256px + sela 20px di
+                 kedua sisi bilah waktu 520px yang di tengah muat tanpa bertumpuk —
+                 juga saat kolom peringkat 300px terbuka di layar 1440. */
+              "bottom-24 w-64 max-w-[calc(100vw-2rem)] p-3 text-xs @min-[68rem]:bottom-4 @min-[68rem]:right-5"
         } ${
           legendaTerbuka
             ? "block"
             : legendaRingkas
               ? bingkaiSempit ? "hidden" : "hidden sm:block"
-              : "hidden xl:block"
+              : "hidden @min-[68rem]:block"
         }`}
       >
-        <div className="flex items-center justify-between gap-2 pb-2 border-b border-black/[0.08] dark:border-white/10">
-          <div className="flex items-center gap-1.5 font-semibold text-tinta dark:text-white">
+        <div className="flex items-center justify-between gap-2">
+          <div hidden={!lapisan.aerosol} className="flex items-center gap-1.5 font-semibold text-tinta dark:text-white">
             <span className={`text-sm leading-none shrink-0 ${gayaVisual === "copernicus" ? "text-fuchsia-600 dark:text-fuchsia-400" : "text-amber-600 dark:text-amber-400"}`}>🔥</span>
             <span className="text-xs">Aerosol Karhutla</span>
           </div>
@@ -1958,7 +2087,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           <button
             type="button"
             onClick={() => setLegendaTerbuka(false)}
-            className={`cursor-pointer shrink-0 items-center justify-center rounded-full bg-black/[0.06] text-tinta/70 hover:bg-black/[0.12] hover:text-tinta dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/20 dark:hover:text-white transition-colors flex h-5 w-5 ${legendaRingkas ? (bingkaiSempit ? "" : "sm:hidden") : "xl:hidden"}`}
+            className={`cursor-pointer shrink-0 items-center justify-center rounded-full bg-black/[0.06] text-tinta/70 hover:bg-black/[0.12] hover:text-tinta dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/20 dark:hover:text-white transition-colors ml-auto flex h-5 w-5 ${legendaRingkas ? (bingkaiSempit ? "" : "sm:hidden") : "@min-[68rem]:hidden"}`}
             aria-label="Tutup legenda"
           >
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -1967,12 +2096,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           </button>
         </div>
 
-        <p className="mt-2 text-[11px] leading-relaxed text-tinta/70 dark:text-white/70">
-          Aerosol asap kebakaran hutan dan lahan <span className="italic font-normal">(wildfire)</span> OMAOD 550nm . Organic Matter AOD
-        </p>
-
-        {/* Pita Gradien Warna */}
-        <div className="mt-2.5 flex flex-col gap-1.5">
+        {/* Pita Gradien Warna — penjelasan datanya di Panduan Peta. */}
+        <div hidden={!lapisan.aerosol} className="mt-2 flex flex-col gap-1">
           <div className="flex items-center justify-between text-[10px] text-tinta/60 dark:text-white/50 font-medium">
             <span>Tingkat Kepekatan</span>
             <button
@@ -2003,7 +2128,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           </div>
 
           <div
-            className="h-2.5 w-full rounded-full shadow-inner ring-1 ring-black/[0.08] dark:ring-white/10"
+            className="h-2 w-full rounded-full shadow-inner ring-1 ring-black/[0.08] dark:ring-white/10"
             style={{
               background:
                 gayaVisual === "copernicus"
@@ -2021,15 +2146,18 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           </div>
         </div>
 
-        {/* Atribusi Resmi & Lisensi Data */}
-        <div className="mt-3 pt-2.5 border-t border-black/[0.08] dark:border-white/10 text-[10px] leading-relaxed text-tinta/60 dark:text-white/50 space-y-1.5">
-          {modelRunWib && (
-            <div className="flex items-center justify-between pb-1 border-b border-black/[0.05] dark:border-white/[0.06] text-tinta/80 dark:text-white/70">
-              <span className="text-[10px] text-neutral-500 dark:text-zinc-400">Siklus Model CAMS:</span>
-              <span className="font-mono text-[10px] text-amber-600 dark:text-amber-300 font-medium">{modelRunWib}</span>
+        {slotLegenda && <div className={lapisan.aerosol ? "mt-2.5 border-t border-black/[0.08] pt-2 dark:border-white/10" : ""}>{slotLegenda}</div>}
+
+        {/* Atribusi Resmi & Lisensi Data — kalimat CAMS & EOX wajib menurut lisensinya;
+            karena itu kartu ini tetap ada walau Aerosol & hotspot mati (peta dasar tetap tampil). */}
+        <div className={`${lapisan.aerosol || slotLegenda ? "mt-2.5 pt-2 border-t border-black/[0.08] dark:border-white/10 " : ""}text-[9.5px] leading-snug text-tinta/55 dark:text-white/45 space-y-1`}>
+          {modelRunWib && lapisan.aerosol && (
+            <div className="flex items-center justify-between text-[10px]">
+              <span>Siklus model CAMS</span>
+              <span className="font-mono font-medium text-amber-600 dark:text-amber-300">{modelRunWib}</span>
             </div>
           )}
-          <p>
+          <p hidden={!lapisan.aerosol}>
             Contains modified{" "}
             <a
               href="https://atmosphere.copernicus.eu/"
@@ -2041,7 +2169,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             </a>{" "}
             information 2026.
           </p>
-          <p className="text-tinta/45 dark:text-white/40 text-[9.5px]">
+          <p>
             Peta dasar: &copy;{" "}
             <a
               href="https://s2maps.eu"
@@ -2060,28 +2188,24 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           menyempit ke tengah (max-w), jadi logo sejajar bilah. Di ponsel
           (< sm) bilah melebar penuh (inset-x-2) sehingga sudut kiri bawah
           tertutup bilah — logo dipindah ke kiri atas di bawah pil mode.
-          Bingkai sempit konsol ikut pola ponsel: bilahnya selebar bingkai.
-          slotAtasLogo (sakelar hotspot) menumpuk tepat di atasnya. */}
-      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex flex-col items-start gap-2 ${legendaRingkas ? (bingkaiSempit ? "top-[68px] sm:left-5" : "top-[68px] sm:top-auto sm:bottom-[calc(var(--sela-bawah,0px)+1rem)] sm:left-5") : "bottom-24 xl:bottom-4 xl:left-5"}`}>
-        {slotAtasLogo && (
-          /* Kendali dari luar tak ikut diperkecil skalaHamparan (zoom wadah
-             ini) — ukurannya sama dengan kendali peta lain, mis. pil lapisan. */
-          <div style={legendaRingkas ? { zoom: 1 / skalaHamparan } : undefined}>{slotAtasLogo}</div>
-        )}
+          Bingkai sempit konsol ikut pola ponsel: bilahnya selebar bingkai. */}
+      <div style={gayaHamparan} className={`pointer-events-auto absolute left-3 z-[500] flex flex-col items-start gap-2 ${legendaRingkas ? (bingkaiSempit ? "top-[68px] sm:left-5" : "top-[68px] sm:top-auto sm:bottom-[calc(var(--sela-bawah,0px)+1rem)] sm:left-5") : "bottom-24 @min-[68rem]:bottom-4 @min-[68rem]:left-5"}`}>
         <a
           href="https://atmosphere.copernicus.eu/"
           target="_blank"
           rel="noopener noreferrer"
           title="Copernicus Atmosphere Monitoring Service"
           aria-label="Copernicus Atmosphere Monitoring Service"
-          className="group flex items-center gap-2 rounded-xl bg-white/90 border border-black/[0.08] px-2.5 py-1.5 shadow-sm hover:bg-white dark:bg-black/75 dark:border-white/10 dark:ring-1 dark:ring-white/15 dark:shadow-xl backdrop-blur-md transition-all dark:hover:bg-black dark:hover:ring-white/30 active:scale-95"
+          className="group flex items-center gap-2 transition-transform active:scale-95"
         >
+          {/* Sama dengan logo Copernicus di iframe Windy (forecasting/route.ts):
+              putih polos 115px berbayang, tanpa kartu. */}
           <Image
             src="/assets/img/copernicus-white.svg"
             alt="Copernicus Atmosphere Monitoring Service"
-            width={120}
-            height={44}
-            className={`h-5 sm:h-6 w-auto opacity-90 transition-opacity group-hover:opacity-100 invert dark:invert-0 drop-shadow-[0_1px_2px_rgba(0,0,0,0.1)] dark:drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]${logoSelulerSrc ? " aliran:hidden" : ""}`}
+            width={115}
+            height={42}
+            className={`h-auto w-[115px] opacity-95 transition-opacity group-hover:opacity-100 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]${logoSelulerSrc ? " aliran:hidden" : ""}`}
           />
           {logoSelulerSrc && (
             <Image
@@ -2100,7 +2224,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
           supaya interaksi klik/sentuh selalu akurat dan tombol mudah ditekan. */}
       {/* Kontrol Linimasa Animasi — di tengah bawah bingkai.
           Ukurannya dipusatkan dan responsif selebar bingkai tanpa zoom artifisial
-          supaya interaksi klik/sentuh selalu akurat dan tombol mudah ditekan. */}
+          supaya interaksi klik/sentuh selalu akurat dan tombol mudah ditekan.
+          Tetap tampil walau sakelar Aerosol mati: hari hotspot mengikutinya. */}
       <div className={`pointer-events-auto absolute bottom-[calc(var(--sela-bawah,0px)+1rem)] z-[450] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-black/[0.08] bg-white/95 text-tinta shadow-xl dark:border-white/[0.1] dark:bg-pantau-konsol/90 dark:text-white dark:shadow-2xl backdrop-blur-xl ${
         legendaRingkas
           ? /* Dasbor/ringkas: sangat ramping dan terpusat supaya proporsional dan tidak mendominasi peta */
@@ -2519,7 +2644,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
             1px -1px 0 rgb(0 0 0 / 0.85),
             -1px -1px 0 rgb(0 0 0 / 0.85);
         }
-        .peta-angka--bertumpuk {
+        .peta-angka--bertumpuk,
+        .angka-mati .peta-angka {
           display: none;
         }
         .maplibregl-canvas {

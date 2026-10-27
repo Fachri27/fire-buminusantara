@@ -6,9 +6,9 @@ import { mediaLokal } from "@/lib/media";
 import type { Bahasa } from "@/lib/bahasa";
 import { IkonPutarBadge } from "./ikon";
 
-/* Lebar kartu umpan untuk srcset next/image: 2 kolom di bawah 1100px (1 kolom
+/* Lebar kartu umpan untuk srcset next/image: 2 kolom di bawah 1024px (1 kolom
    di layar sangat sempit), 3-4 kolom di panggung — 33vw batas atasnya. */
-export const UKURAN_FOTO_UMPAN = "(max-width: 359px) 100vw, (max-width: 1099px) 50vw, 33vw";
+export const UKURAN_FOTO_UMPAN = "(max-width: 359px) 100vw, (max-width: 1023px) 50vw, 33vw";
 
 /* Video kartu umpan — tidak autoplay otomatis; pratinjau putar bisu hanya saat kursor melayang (hover).
    Klik membuka modal rincian yang memuat pemutar video lengkap dengan kendali.

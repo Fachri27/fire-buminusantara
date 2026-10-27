@@ -1,5 +1,4 @@
-import { titikDalamGeometri } from "./geometri.ts";
-import { PUSAT_WILAYAH } from "./pusat-wilayah.ts";
+import { pencariFitur, type Geometri } from "./geometri.ts";
 // Relatif (bukan "@/...") + atribut JSON supaya modul ini tetap bisa diuji
 // lewat node:test mentah — lihat lib/provinsi-titik.test.ts.
 import petaProvinsi from "../public/data/peta-provinsi.json" with { type: "json" };
@@ -18,40 +17,26 @@ import { PROVINSI_PETA_NAMA, inferProvinsi } from "./wilayah.ts";
  */
 type FiturProvinsi = {
   properties: { nama?: unknown };
-  geometry: Parameters<typeof titikDalamGeometri>[2];
+  geometry: Geometri;
 };
+
+/** Provinsi kanonik; kotak pembatasnya meliputi SELURUH pulau (pencariFitur).
+ *  Bukan PUSAT_WILAYAH.kotak: itu hanya daratan terbesar (tempat angka peta),
+ *  sehingga titik di pulau lain — Alor, Belitung, Buru — ikut terbuang. */
+const cariProvinsi = pencariFitur(
+  (petaProvinsi as { features: FiturProvinsi[] }).features.flatMap((f) => {
+    const nama = f.properties?.nama;
+    // Nama poligon harus salah satu dari 34 kanonik — jangan kembalikan
+    // ejaan tak dikenal yang memecah hitungan peta.
+    if (typeof nama !== "string" || !(PROVINSI_PETA_NAMA as string[]).includes(nama) || !f?.geometry) return [];
+    return [{ nama, geometri: f.geometry }];
+  }),
+);
 
 export function provinsiDariTitik(lat: number, lng: number): string | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-
-  const fitur = (petaProvinsi as { features: FiturProvinsi[] }).features;
-  if (!Array.isArray(fitur)) return null;
-
-  for (const f of fitur) {
-    const nama = f.properties?.nama;
-    // Nama poligon harus salah satu dari 34 kanonik — jangan kembalikan
-    // ejaan tak dikenal yang memecah hitungan peta.
-    if (typeof nama !== "string" || !(PROVINSI_PETA_NAMA as string[]).includes(nama)) {
-      continue;
-    }
-
-    // Bounding-box early-exit pre-filter: lewati provinsi yang titiknya jelas
-    // berada di luar kotak pembatasnya untuk menghemat 90%+ kalkulasi titik sudut.
-    const kotak = PUSAT_WILAYAH[nama]?.kotak;
-    if (kotak && (lng < kotak[0] || lng > kotak[2] || lat < kotak[1] || lat > kotak[3])) {
-      continue;
-    }
-
-    try {
-      if (!f?.geometry || !titikDalamGeometri(lng, lat, f.geometry)) continue;
-    } catch {
-      continue; // Geometri rusak: lanjut ke provinsi berikut.
-    }
-
-    return nama;
-  }
-  return null;
+  return cariProvinsi(lng, lat);
 }
 
 /**

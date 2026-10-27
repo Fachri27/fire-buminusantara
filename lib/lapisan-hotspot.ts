@@ -1,19 +1,12 @@
 import type * as maplibregl from "maplibre-gl";
 
 /**
- * Lapisan tambahan titik anomali panas (hotspot) 24 jam terakhir dari NASA
- * FIRMS (lib/hotspot-firms.ts, lewat /api/hotspot), ditumpangkan di atas peta dasar yang
- * sedang tampil. Satu data, empat sakelar di panel Lapisan peta.tsx:
- *
- * - "Titik Hotspot" (bawaan mati): bulatan kuning/oranye/merah per tingkat
- *   kepercayaan dari satelit VIIRS (S-NPP, NOAA-20, NOAA-21).
- * - Tiga lapisan satelit ala legenda SiPongi KLHK (bawaan menyala):
- *   NASA-TERRA/AQUA segi lima, NASA-SNPP segi enam, NASA-NOAA20 bintang,
- *   diwarnai hijau/kuning/merah per tingkat kepercayaan.
- *
- * Sebuah titik bisa tampil di dua lapisan sekaligus (mis. titik SNPP di Titik
- * Hotspot dan di NASA-SNPP); susunTitikTampil menandai tiap baris dengan
- * gayanya.
+ * Lapisan tambahan titik anomali panas (hotspot) satu hari dari NASA FIRMS
+ * (lib/hotspot-firms.ts, lewat /api/hotspot), ditumpangkan di atas peta dasar
+ * yang sedang tampil. Satu data, tiga sakelar satelit ala legenda SiPongi KLHK
+ * di panel Lapisan peta.tsx (bawaan menyala): NASA-TERRA/AQUA segi lima,
+ * NASA-SNPP segi enam, NASA-NOAA20 bintang, diwarnai hijau/kuning/merah per
+ * tingkat kepercayaan.
  *
  * Modul ini memasangnya di peta MapLibre lapisan Aerosol (PetaAsap). Padanan
  * untuk iframe Windy ada di app/api/forecasting/route.ts, pesan SET_HOTSPOT —
@@ -21,7 +14,11 @@ import type * as maplibregl from "maplibre-gl";
  */
 
 export type DataHotspot = {
-  /** Waktu akuisisi satelit terbaru (ISO, UTC), null bila tak ada titik. */
+  /** Tanggal WIB (YYYY-MM-DD) titik-titik ini — satu hari, lihat hariWib. */
+  hari: string;
+  /** Tanggal WIB yang punya data di server, urut naik. */
+  hariTersedia: string[];
+  /** Waktu akuisisi satelit terbaru hari itu (ISO, UTC), null bila tak ada titik. */
   diperbarui: string | null;
   /** Waktu server mengambil berkas dari FIRMS (ISO). */
   diambil: string;
@@ -32,56 +29,53 @@ export type DataHotspot = {
    *  (FIRMS tak terjangkau) atau cron tak berjalan. */
   basi?: boolean;
   provinsi: string[];
+  kabupaten: string[];
   /** [lng, lat, kepercayaan, FRP (MW), waktu (menit epoch UTC), indeks
-   *  satelit, indeks provinsi, malam (0/1)]; baris susunTitikTampil menambah
-   *  gaya (kolom ke-9) dan id tampil (kolom ke-10). */
+   *  satelit, indeks provinsi, malam (0/1), indeks kabupaten (-1 = tak
+   *  ada)]; baris susunTitikTampil menambah id tampil (kolom ke-10). */
   titik: number[][];
 };
 
-/** Warna per tingkat kepercayaan (indeks 0 rendah, 1 sedang, 2 tinggi):
- *  lapisan Titik Hotspot dan lapisan satelit SiPongi. */
-export const WARNA_TITIK_HOTSPOT = ["#facc15", "#f97316", "#ef4444"] as const;
+/** Tanggal WIB "YYYY-MM-DD" dari milidetik epoch — satu "hari" hotspot. */
+export function hariWib(ms: number): string {
+  return new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/** Riwayat peta = hari ini + enam hari WIB sebelumnya, untuk bilah waktu
+ *  Aerosol & Angin (lib/zarr-reader.ts) DAN hotspot (lib/hotspot-firms.ts) —
+ *  sepanjang berkas 7 hari FIRMS, jadi ketiganya mundur sejauh yang sama. */
+export const HARI_RIWAYAT = 7;
+
+/** Awal riwayat: 00.00 WIB hari pertamanya, ms epoch. */
+export function awalRiwayat(ms = Date.now()): number {
+  return Date.parse(`${hariWib(ms - (HARI_RIWAYAT - 1) * 24 * 3600 * 1000)}T00:00:00+07:00`);
+}
+
+/** Warna per tingkat kepercayaan (indeks 0 rendah, 1 sedang, 2 tinggi). */
 export const WARNA_SIPONGI = ["#4caf50", "#fbc02d", "#f01e1e"] as const;
 export const LABEL_KEPERCAYAAN = ["Rendah", "Sedang", "Tinggi"] as const;
 
 /**
  * Satelit per indeks `s` di data — lib/hotspot-firms.ts membaca berkas
  * FIRMS dengan urutan yang sama. `sisi` = bentuk penanda lapisan SiPongi-nya:
- * 5 segi lima, 6 segi enam, 0 bintang. NOAA-21 tak punya lapisan SiPongi —
- * titiknya hanya tampil di lapisan Titik Hotspot.
+ * 5 segi lima, 6 segi enam, 0 bintang. Urutan = sakelar panel & legenda.
  */
 export const SATELIT_HOTSPOT = [
   { label: "NASA-TERRA/AQUA", sensor: "MODIS", sisi: 5 },
   { label: "NASA-SNPP", sensor: "VIIRS", sisi: 6 },
   { label: "NASA-NOAA20", sensor: "VIIRS", sisi: 0 },
-  { label: "NASA-NOAA21", sensor: "VIIRS", sisi: 5 },
 ] as const;
-/** Satelit (indeks `s`) yang punya lapisan SiPongi sendiri — urutan panel & legenda. */
-export const SATELIT_SIPONGI = [0, 1, 2] as const;
-
-/** Sakelar yang menyala: Titik Hotspot dan lapisan SiPongi per SATELIT_SIPONGI. */
-export type LapisanHotspot = { titik: boolean; satelit: readonly boolean[] };
-/** Gaya baris tampil (kolom ke-9): bulatan Titik Hotspot atau penanda SiPongi. */
-export const GAYA_TITIK = 0;
-export const GAYA_SIPONGI = 1;
-/** Banyaknya gaya — pengali id baris tampil; naikkan bila menambah gaya. */
-const JUMLAH_GAYA = 2;
 
 /**
- * Baris yang digambar menurut sakelar yang menyala: titik VIIRS untuk Titik
- * Hotspot, titik tiap satelit SiPongi yang menyala untuk lapisannya — satu
- * titik bisa muncul dua kali dengan gaya berbeda. Kolom ke-9 = gaya, kolom
- * ke-10 = id baris tampil: unik, dan tetap sama walau sakelar lain diganti
- * (indeks titik × JUMLAH_GAYA + gaya) — promoteId sumber peta, lihat pasangLapisanHotspot.
+ * Baris satelit yang sakelarnya menyala (`satelit[s]`). Kolom ke-10 = id baris
+ * tampil = indeks titik di data: tetap sama walau sakelar lain diganti —
+ * promoteId sumber peta, lihat pasangLapisanHotspot.
  */
-export function susunTitikTampil(data: DataHotspot, lapisan: LapisanHotspot): number[][] {
+export function susunTitikTampil(data: DataHotspot, satelit: readonly boolean[]): number[][] {
   const hasil: number[][] = [];
   for (let n = 0; n < data.titik.length; n++) {
     const t = data.titik[n];
-    const s = t[5];
-    if (lapisan.titik && SATELIT_HOTSPOT[s]?.sensor === "VIIRS") hasil.push([...t.slice(0, 8), GAYA_TITIK, n * JUMLAH_GAYA + GAYA_TITIK]);
-    const i = (SATELIT_SIPONGI as readonly number[]).indexOf(s);
-    if (i >= 0 && lapisan.satelit[i]) hasil.push([...t.slice(0, 8), GAYA_SIPONGI, n * JUMLAH_GAYA + GAYA_SIPONGI]);
+    if (satelit[t[5]]) hasil.push([...t.slice(0, 9), n]);
   }
   return hasil;
 }
@@ -105,8 +99,6 @@ export function jalurBentukHotspot(s: number, c: number, r: number): string {
 }
 
 const SUMBER = "hotspot";
-const LAPIS_TITIK = "hotspot-titik";
-const LAPIS_PENDAR = "hotspot-pendar";
 const LAPIS_SIPONGI = "hotspot-sipongi";
 
 const BULAN = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
@@ -126,14 +118,47 @@ export function hitungPerSatelit(data: DataHotspot): number[][] {
   return per;
 }
 
+/** Satelit (indeks `s`) yang dihitung peringkat wilayah: VIIRS S-NPP & NOAA-20. */
+export const SATELIT_PERINGKAT = [1, 2] as const;
+
+/** Rincian jumlah: `perSatelit` urut SATELIT_PERINGKAT, `perKepercayaan`
+ *  [rendah, sedang, tinggi], `malam` = deteksi lintasan malam. */
+export type BarisPeringkat = { nama: string; jumlah: number; perSatelit: number[]; perKepercayaan: number[]; malam: number };
+
+/** Peringkat provinsi & kabupaten menurut jumlah deteksi SATELIT_PERINGKAT.
+ *  Kedua satelit selintasan ±50 menit, jadi satu api sering terhitung dua
+ *  kali — angkanya deteksi, bukan banyaknya api. */
+export function peringkatHotspot(data: DataHotspot): { provinsi: BarisPeringkat[]; kabupaten: BarisPeringkat[] } {
+  const provinsi = new Map<string, BarisPeringkat>();
+  const kabupaten = new Map<string, BarisPeringkat>();
+  const tambah = (peta: Map<string, BarisPeringkat>, nama: string | undefined, j: number, t: number[]) => {
+    if (nama === undefined) return;
+    let b = peta.get(nama);
+    if (!b) peta.set(nama, (b = { nama, jumlah: 0, perSatelit: SATELIT_PERINGKAT.map(() => 0), perKepercayaan: [0, 0, 0], malam: 0 }));
+    b.jumlah++;
+    b.perSatelit[j]++;
+    b.perKepercayaan[t[2]]++;
+    b.malam += t[7];
+  };
+  for (const t of data.titik) {
+    const j = (SATELIT_PERINGKAT as readonly number[]).indexOf(t[5]);
+    if (j < 0) continue;
+    tambah(provinsi, data.provinsi[t[6]], j, t);
+    tambah(kabupaten, data.kabupaten[t[8]], j, t);
+  }
+  const urut = (peta: Map<string, BarisPeringkat>) =>
+    [...peta.values()].sort((a, b) => b.jumlah - a.jumlah || a.nama.localeCompare(b.nama, "id"));
+  return { provinsi: urut(provinsi), kabupaten: urut(kabupaten) };
+}
+
 function keGeoJson(data: DataHotspot | null): GeoJSON.FeatureCollection<GeoJSON.Point> {
   return {
     type: "FeatureCollection",
-    features: (data?.titik ?? []).map(([lng, lat, k, frp, waktu, s, p, malam, g = GAYA_SIPONGI, id], i) => ({
+    features: (data?.titik ?? []).map(([lng, lat, k, frp, waktu, s, p, malam, , id], i) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [lng, lat] },
       // id: kolom ke-10 susunTitikTampil; baris tanpa kolom itu memakai urutannya.
-      properties: { k, frp, waktu, s, p, malam, g, id: id ?? i },
+      properties: { k, frp, waktu, s, p, malam, id: id ?? i },
     })),
   };
 }
@@ -164,7 +189,7 @@ const idIkon = (s: number, k: number) => `hotspot-${s}-${k}`;
 
 /** Pasang sumber + lapisan hotspot (kosong) di atas lapisan yang sudah ada. */
 export function pasangLapisanHotspot(map: maplibregl.Map) {
-  SATELIT_SIPONGI.forEach((s) => {
+  SATELIT_HOTSPOT.forEach((_, s) => {
     for (let k = 0; k < 3; k++) {
       if (map.hasImage(idIkon(s, k))) continue;
       const ikon = gambarIkon(s, k);
@@ -179,45 +204,10 @@ export function pasangLapisanHotspot(map: maplibregl.Map) {
   // titik di sekitarnya: puluhan juta perbandingan untuk ~19 ribu titik, di
   // main thread, sekaligus — peta macet berdetik-detik di laptop lemah.
   map.addSource(SUMBER, { type: "geojson", data: keGeoJson(null), promoteId: "id" });
-  // Pendar di bawah bulatan Titik Hotspot berkepercayaan tinggi — kesan bara,
-  // murah karena jumlahnya hanya sebagian kecil dari seluruh titik.
-  map.addLayer({
-    id: LAPIS_PENDAR,
-    type: "circle",
-    source: SUMBER,
-    filter: ["all", ["==", ["get", "g"], GAYA_TITIK], ["==", ["get", "k"], 2]],
-    paint: {
-      "circle-color": WARNA_TITIK_HOTSPOT[2],
-      "circle-radius": ["interpolate", ["linear"], ["zoom"], 3, 6, 8, 16, 12, 28],
-      "circle-blur": 1,
-      "circle-opacity": 0.45,
-    },
-  });
-  map.addLayer({
-    id: LAPIS_TITIK,
-    type: "circle",
-    source: SUMBER,
-    filter: ["==", ["get", "g"], GAYA_TITIK],
-    // Kepercayaan tinggi digambar paling atas.
-    layout: { "circle-sort-key": ["get", "k"] },
-    paint: {
-      "circle-color": ["match", ["get", "k"], 2, WARNA_TITIK_HOTSPOT[2], 1, WARNA_TITIK_HOTSPOT[1], WARNA_TITIK_HOTSPOT[0]],
-      "circle-radius": [
-        "interpolate", ["linear"], ["zoom"],
-        3, ["match", ["get", "k"], 2, 2.6, 1, 2.1, 1.6],
-        7, ["match", ["get", "k"], 2, 4.5, 1, 3.6, 2.8],
-        12, ["match", ["get", "k"], 2, 9, 1, 7.5, 6],
-      ],
-      "circle-opacity": ["match", ["get", "k"], 0, 0.75, 0.95],
-      "circle-stroke-color": "rgba(0, 0, 0, 0.55)",
-      "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 4, 0, 7, 0.8],
-    },
-  });
   map.addLayer({
     id: LAPIS_SIPONGI,
     type: "symbol",
     source: SUMBER,
-    filter: ["==", ["get", "g"], GAYA_SIPONGI],
     layout: {
       "icon-image": ["concat", "hotspot-", ["to-string", ["get", "s"]], "-", ["to-string", ["get", "k"]]],
       "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.6, 6, 0.85, 9, 1.15, 12, 1.6],
@@ -226,14 +216,45 @@ export function pasangLapisanHotspot(map: maplibregl.Map) {
       "icon-ignore-placement": true,
       "symbol-sort-key": ["get", "k"],
     },
-    paint: { "icon-opacity": ["match", ["get", "k"], 0, 0.85, 1] },
+    // Opasitas konstan (bukan per kepercayaan): hanya nilai konstan yang bisa
+    // ditransisikan MapLibre — dipakai pudar ganti hari, lihat setelDataHotspot.
+    paint: { "icon-opacity": 1 },
   });
 }
 
-/** Isi lapisan hotspot dengan baris susunTitikTampil; null = matikan (kosongkan). */
-export function setelDataHotspot(map: maplibregl.Map, data: DataHotspot | null) {
+/** Lama pudar keluar & masuk (ms) saat hari hotspot berganti. */
+const PUDAR_KELUAR = 180;
+const PUDAR_MASUK = 420;
+const tundaPudar = new WeakMap<maplibregl.Map, ReturnType<typeof setTimeout>>();
+
+/**
+ * Isi lapisan hotspot dengan baris susunTitikTampil; null = matikan (kosongkan).
+ * `pudar` (hari berganti): titik lama memudar, data baru masuk, lalu muncul
+ * pelan — transisi paint MapLibre atas opasitas konstan, murah walau puluhan
+ * ribu titik. Pergantian beruntun (bilah waktu digeser) membatalkan yang lama.
+ */
+export function setelDataHotspot(map: maplibregl.Map, data: DataHotspot | null, pudar = false) {
   const sumber = map.getSource(SUMBER) as maplibregl.GeoJSONSource | undefined;
-  void sumber?.setData(keGeoJson(data));
+  if (!sumber) return;
+  clearTimeout(tundaPudar.get(map));
+  const lapis = map.getLayer(LAPIS_SIPONGI);
+  if (!pudar || !lapis) {
+    if (lapis) map.setPaintProperty(LAPIS_SIPONGI, "icon-opacity", 1);
+    void sumber.setData(keGeoJson(data));
+    return;
+  }
+  map.setPaintProperty(LAPIS_SIPONGI, "icon-opacity-transition", { duration: PUDAR_KELUAR, delay: 0 });
+  map.setPaintProperty(LAPIS_SIPONGI, "icon-opacity", 0);
+  // Sekali per peta: penunda yang masih jalan saat map.remove() menyentuh style yang sudah dibuang.
+  if (!tundaPudar.has(map)) map.once("remove", () => clearTimeout(tundaPudar.get(map)));
+  tundaPudar.set(
+    map,
+    setTimeout(() => {
+      void sumber.setData(keGeoJson(data));
+      map.setPaintProperty(LAPIS_SIPONGI, "icon-opacity-transition", { duration: PUDAR_MASUK, delay: 0 });
+      map.setPaintProperty(LAPIS_SIPONGI, "icon-opacity", 1);
+    }, PUDAR_KELUAR),
+  );
 }
 
 /** Mulai zoom ini titik hotspot bisa diketuk di layar sentuh. Di zoom lebih
@@ -281,12 +302,14 @@ export function hotspotDiTitik(
   const baris = data.titik;
   if (!baris.length) return null;
   const merc = mercator(baris);
-  const kanvas = map.getCanvas();
   const pusat = map.getCenter();
   const dunia = 512 * Math.pow(2, map.getZoom());
   const sinPusat = Math.sin((pusat.lat * Math.PI) / 180);
-  const ox = kanvas.clientWidth / 2 - ((pusat.lng + 180) / 360) * dunia;
-  const oy = kanvas.clientHeight / 2 - (0.5 - Math.log((1 + sinPusat) / (1 - sinPusat)) / (4 * Math.PI)) * dunia;
+  // Posisi layar pusat dari proyeksi, bukan tengah kanvas: padding kiri kamera
+  // (kolom peringkat, PetaAsap kolomKiri) menggeser pusat dari tengah kanvas.
+  const pusatPx = map.project(pusat);
+  const ox = pusatPx.x - ((pusat.lng + 180) / 360) * dunia;
+  const oy = pusatPx.y - (0.5 - Math.log((1 + sinPusat) / (1 - sinPusat)) / (4 * Math.PI)) * dunia;
   let terbaik = -1;
   let kTerbaik = -1;
   let dTerbaik = Infinity;
@@ -304,8 +327,8 @@ export function hotspotDiTitik(
     }
   }
   if (terbaik < 0) return null;
-  const [, , k, frp, waktu, s, p, malam, g = GAYA_SIPONGI] = baris[terbaik];
-  return { k, frp, waktu, s, p, malam, g };
+  const [, , k, frp, waktu, s, p, malam] = baris[terbaik];
+  return { k, frp, waktu, s, p, malam };
 }
 
 /**
@@ -318,7 +341,6 @@ export function hotspotDiTitik(
 export function kartuHotspot(data: DataHotspot, props: Record<string, unknown>): HTMLElement {
   const k = Number(props.k);
   const s = Number(props.s);
-  const bulatan = Number(props.g) === GAYA_TITIK;
   const akar = document.createElement("div");
   akar.style.minWidth = "190px";
 
@@ -334,8 +356,8 @@ export function kartuHotspot(data: DataHotspot, props: Record<string, unknown>):
   ikon.setAttribute("width", "11");
   ikon.setAttribute("height", "11");
   const bentuk = document.createElementNS(ns, "path");
-  bentuk.setAttribute("d", bulatan ? "M1,6a5,5 0 1,0 10,0a5,5 0 1,0 -10,0" : jalurBentukHotspot(s, 6, 5));
-  bentuk.setAttribute("fill", (bulatan ? WARNA_TITIK_HOTSPOT : WARNA_SIPONGI)[k] ?? WARNA_SIPONGI[0]);
+  bentuk.setAttribute("d", jalurBentukHotspot(s, 6, 5));
+  bentuk.setAttribute("fill", WARNA_SIPONGI[k] ?? WARNA_SIPONGI[0]);
   bentuk.setAttribute("stroke", "rgba(0, 0, 0, 0.6)");
   bentuk.setAttribute("stroke-linejoin", "round");
   ikon.append(bentuk);

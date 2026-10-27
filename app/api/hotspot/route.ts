@@ -1,9 +1,11 @@
-import { after, connection } from "next/server";
+import { after, connection, type NextRequest } from "next/server";
 import { BATAS_BASI_MS, bacaHotspot, segarkanHotspot } from "@/lib/hotspot-firms";
 import type { DataHotspot } from "@/lib/lapisan-hotspot";
 
 /**
- * Titik hotspot NASA FIRMS 24 jam terakhir (lib/hotspot-firms.ts). Hanya
+ * Titik hotspot NASA FIRMS satu hari WIB (lib/hotspot-firms.ts):
+ * ?hari=YYYY-MM-DD, tanpa itu hari terbaru; hari di luar 7 hari data diganti
+ * hari tersedia terdekat (lihat bacaHotspot — field `hari` jawabannya). Hanya
  * membaca salinan yang ditulis cron warm-asap ke Redis — pengunjung tidak
  * pernah menunggu FIRMS. Dua pengecualian: Redis masih kosong (request ikut
  * menunggu pengambilan pertama), dan salinan sudah basi karena cron tak
@@ -35,10 +37,12 @@ function galat() {
   );
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   await connection();
 
-  const data = await bacaHotspot();
+  const diminta = req.nextUrl.searchParams.get("hari");
+  const hari = diminta && /^\d{4}-\d{2}-\d{2}$/.test(diminta) ? diminta : null;
+  const data = await bacaHotspot(hari);
   if (data) {
     // Jaring pengaman bila cron mati — bukan jalur normal penyegaran.
     if (Date.now() - Date.parse(data.diambil) > BATAS_BASI_MS && Date.now() >= picuBerikut) {
@@ -51,9 +55,12 @@ export async function GET() {
   // Belum pernah ada salinan: terpaksa menunggu pengambilan pertama.
   if (Date.now() < picuBerikut) return galat();
   try {
-    return kirim(await segarkanHotspot());
+    await segarkanHotspot();
+    const baru = await bacaHotspot(hari);
+    if (baru) return kirim(baru);
   } catch {
-    picuBerikut = Date.now() + JEDA_PICU;
-    return galat();
+    // FIRMS tak terjangkau — galat di bawah.
   }
+  picuBerikut = Date.now() + JEDA_PICU;
+  return galat();
 }

@@ -146,7 +146,7 @@ function FotoKartu({
           src={src}
           alt={alt}
           fill
-          sizes="(max-width: 1099px) 78vw, 526px"
+          sizes="(max-width: 1023px) 78vw, 526px"
           loading={aktif ? "eager" : "lazy"}
           fetchPriority={aktif ? "high" : undefined}
           onLoad={() => setFotoSiap(true)}

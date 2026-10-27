@@ -78,7 +78,7 @@ async function prosesPrewarm(req: NextRequest) {
   // bawah (hulu berbeda: NASA vs ECMWF); gagalnya tidak menggagalkan asap, dan
   // hasilnya tetap tercatat walau asap gagal. Janji ini tak pernah menolak.
   const hotspot = segarkanHotspot().then(
-    (d) => ({ titik: d.titik.length, lengkap: d.lengkap, diperbarui: d.diperbarui }),
+    (i) => ({ hari: i.hari, lengkap: i.lengkap }),
     (err: unknown) => {
       console.error("[Cron warm-asap] Gagal menyegarkan hotspot:", err);
       return { error: err instanceof Error ? err.message : "Gagal menyegarkan hotspot" };

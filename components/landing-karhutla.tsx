@@ -353,7 +353,7 @@ export function LandingKarhutla(
   const router = useRouter();
   useEffect(() => {
     if (tampil !== "panel") return;
-    const panggung = window.matchMedia("(min-width: 1100px) and (min-height: 640px)").matches;
+    const panggung = window.matchMedia("(min-width: 1024px) and (min-height: 560px)").matches;
     if (panggung) {
       router.replace(`/${bahasa}`);
     }
@@ -527,7 +527,7 @@ export function LandingKarhutla(
        bukan sekadar sulit dibaca.
 
        Kuerinya sama persis dengan varian `panggung` di app/globals.css. */
-    const panggung = window.matchMedia("(min-width: 1100px) and (min-height: 640px)");
+    const panggung = window.matchMedia("(min-width: 1024px) and (min-height: 560px)");
     /* Gaya ditulis langsung ke elemen, bukan lewat state: menyetel state dari
        dalam effect dilarang `react-hooks/set-state-in-effect`, dan ini murni
        perkara tampilan yang tak perlu memicu render ulang. */
@@ -572,7 +572,7 @@ export function LandingKarhutla(
     const amati = new ResizeObserver(skalakan);
     amati.observe(bingkai);
     /* ResizeObserver saja buta terhadap perpindahan mode ini: melintasi ambang
-       min-height 640px bisa terjadi tanpa lebar bingkai bergeser sedikit pun,
+       min-height 560px bisa terjadi tanpa lebar bingkai bergeser sedikit pun,
        padahal perlintasan itulah yang menentukan modenya. */
     panggung.addEventListener("change", skalakan);
     return () => {
@@ -917,6 +917,7 @@ export function LandingKarhutla(
                   zoomRoda={petaPenuh}
                   onExpand={petaPenuh ? null : () => setPetaPenuh(true)}
                   expandLabel={t.bukaPetaSelayar}
+                  bahasa={bahasa}
                 />,
                 hostPeta,
               )

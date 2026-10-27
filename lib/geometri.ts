@@ -1,5 +1,5 @@
 type Cincin = [number, number][];
-type Geometri = { type: string; coordinates: unknown };
+export type Geometri = { type: string; coordinates: unknown };
 
 export function poligonFitur(g: Geometri): Cincin[][] {
   return (g.type === "Polygon" ? [g.coordinates] : g.coordinates) as Cincin[][];
@@ -55,6 +55,36 @@ export function titikDalamGeometri(lng: number, lat: number, g: Geometri): boole
     if (dalam) return true;
   }
   return false;
+}
+
+/** Pencari nama fitur yang menaungi titik (lng, lat). Kotak pembatas seluruh
+ *  poligonnya dihitung sekali sebagai pra-saring; geometri rusak dilewati —
+ *  tak menggagalkan pemuatan modul maupun pencarian. */
+export function pencariFitur(fitur: { nama: string; geometri: Geometri }[]): (lng: number, lat: number) => string | null {
+  const berkotak = fitur.flatMap((f) => {
+    let kotak = [Infinity, Infinity, -Infinity, -Infinity];
+    try {
+      for (const poligon of poligonFitur(f.geometri)) {
+        const [a, b, c, d] = kotakCincin(poligon[0]);
+        kotak = [Math.min(kotak[0], a), Math.min(kotak[1], b), Math.max(kotak[2], c), Math.max(kotak[3], d)];
+      }
+    } catch {
+      return []; // Geometri rusak: lewati fitur ini.
+    }
+    return [{ ...f, kotak }];
+  });
+  return (lng, lat) => {
+    for (const f of berkotak) {
+      const k = f.kotak;
+      if (lng < k[0] || lng > k[2] || lat < k[1] || lat > k[3]) continue;
+      try {
+        if (titikDalamGeometri(lng, lat, f.geometri)) return f.nama;
+      } catch {
+        // Geometri rusak: lanjut ke fitur berikut.
+      }
+    }
+    return null;
+  };
 }
 
 export type TempatAngka = { titik: [number, number]; kotak: [number, number, number, number] };
