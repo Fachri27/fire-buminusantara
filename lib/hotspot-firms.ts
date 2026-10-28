@@ -41,10 +41,11 @@ const BERKAS = [
 ].map((jalur, s) => ({ nama: SATELIT_HOTSPOT[s].label, jalur }));
 
 /** Satu tenggat (ms) untuk seluruh unduhan satu penyegaran — server cadangan
- *  hanya memakai sisanya. Cek HEAD 5 dtk + unduhan 40 dtk + urai beberapa
- *  dtk tetap di bawah batas 60 dtk cron warm-asap. Berkas 7 hari 1–7 MB per
- *  satelit (Okt 2026), bisa beberapa kali lipat di puncak kemarau. */
-const TENGGAT_UNDUH = 40_000;
+ *  hanya memakai sisanya. Berkas 7 hari VIIRS ~5 MB per satelit (Okt 2026),
+ *  bisa beberapa kali lipat di puncak kemarau, dan FIRMS kadang hanya mengirim
+ *  puluhan KB/dtk: tenggat 40 dtk dulu meloloskan MODIS (0,8 MB) saja — kedua
+ *  VIIRS nol di produksi 28 Okt. Cron curl memberi 600 dtk (docker-compose.prod.yml). */
+const TENGGAT_UNDUH = 240_000;
 /** Cron menyegarkan tiap 30 menit (docker-compose.prod.yml): lebih tua dari
  *  ini = dua putaran terlewat (60 menit + sela 10 menit). */
 export const BATAS_BASI_MS = 70 * 60 * 1000;
@@ -381,8 +382,9 @@ async function ambilFirms(): Promise<ReturnType<typeof hasil>> {
   if (baru.every((t) => t === null)) throw new Error("FIRMS tak terjangkau");
   // FIRMS tak menghormati If-Modified-Since, jadi unduhan tak terhindarkan —
   // tapi berkas yang sama persis tak perlu diurai ulang. Harinya tetap
-  // diturunkan ulang: jendela 24 jam hari ini maju tiap penyegaran.
-  if (penampungLalu && baru.every((csv, s) => csv === null || csv === csvTerakhir[s])) {
+  // diturunkan ulang: jendela 24 jam hari ini maju tiap penyegaran. Satelit
+  // gagal tanpa salinan memori tak lewat sini: salinan Redis-nya mungkin sudah ada.
+  if (penampungLalu && baru.every((csv, s) => csvTerakhir[s] !== null && (csv === null || csv === csvTerakhir[s]))) {
     return hasil(penampungLalu, baru.every((t) => t !== null));
   }
   const semua = await Promise.all(baru.map(async (csv, s) => csv ?? salinanCadangan(s)));

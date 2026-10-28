@@ -4,7 +4,8 @@ import { hangatkanSemuaFrame } from "@/lib/zarr-reader";
 import { hangatkanSemuaFrameUdara } from "@/lib/udara-reader";
 import { segarkanHotspot } from "@/lib/hotspot-firms";
 
-export const maxDuration = 60; // Timeout 60 detik untuk pre-warm background
+// Hanya platform deploy yang menegakkannya (Docker kita tidak); unduhan FIRMS saja boleh 240 dtk.
+export const maxDuration = 300;
 
 function timingSafeCompare(a: string, b: string): boolean {
   const hashA = crypto.createHash("sha256").update(a).digest();

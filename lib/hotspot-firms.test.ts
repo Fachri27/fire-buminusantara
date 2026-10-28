@@ -172,7 +172,7 @@ test("server utama menggantung: server cadangan dicoba sebelum tenggat habis", a
 
   const janji = segarkanHotspot();
   while (menggantung < 3) await new Promise((r) => setImmediate(r));
-  t.mock.timers.tick(10_000); // BATAS_JAWAB, jauh sebelum tenggat 40 dtk
+  t.mock.timers.tick(10_000); // BATAS_JAWAB, jauh sebelum tenggat 240 dtk
   const indeks = await janji;
   assert.equal(keCadangan.length, 3);
   assert.equal(indeks.lengkap, true);
@@ -392,4 +392,30 @@ test("salinan warisan v2 dipilih menurut isinya, bukan demi indeks kunci — ren
   for (let i = 0; i < 5 && !isi.has("firms:csv:v3:2"); i++) await new Promise((r) => setImmediate(r));
   assert.ok(isi.get("firms:csv:v3:2")!.includes(",N20,"), isi.get("firms:csv:v3:2")!.slice(0, 200));
   assert.equal(isi.get("firms:csv:v2:1"), csvSatelit("N20", "h", waktu));
+});
+
+test("satelit gagal tanpa salinan: berkas lain tak berubah tetap membaca salinan Redis yang baru ada", async (t) => {
+  const modulBaru = "./hotspot-firms.ts?tanpa-salinan";
+  const m = (await import(modulBaru)) as typeof import("./hotspot-firms.ts");
+  const isi = (redis.isi = new Map<string, string>());
+  t.after(() => {
+    redis.isi = null;
+  });
+  const waktu = new Date(Math.floor(Date.now() / 60000) * 60000 - 2 * 3600_000);
+  // NOAA-20 time-out di setiap penyegaran (produksi 28 Okt), dua berkas lain sama persis.
+  tiruFetch(t, (u) => {
+    if (u.includes("noaa-20")) throw new Error("time-out");
+    return csvSatelit(u.includes("MODIS") ? "T" : "N", "h", waktu);
+  });
+  const perSatelit = async () => {
+    const data = (await m.bacaHotspot(hariWib(waktu.getTime())))!;
+    return [0, 1, 2].map((s) => data.titik.filter((k) => k[5] === s).length);
+  };
+
+  await m.segarkanHotspot();
+  assert.deepEqual(await perSatelit(), [1, 1, 0]);
+  // Salinan muncul di Redis (mis. ditulis penyegaran salinan modul rute).
+  isi.set("firms:csv:v3:2", csvSatelit("N20", "h", waktu));
+  await m.segarkanHotspot();
+  assert.deepEqual(await perSatelit(), [1, 1, 1]);
 });
