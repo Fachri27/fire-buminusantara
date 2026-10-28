@@ -335,7 +335,43 @@ function hasil(w: Penampung, lengkap: boolean): { indeks: IndeksHotspot; hari: M
  *  berkas yang time-out menghapus seluruh titik satelit itu dari peta DAN dari
  *  salinan Redis sampai penyegaran berikutnya berhasil. */
 const csvTerakhir: (string | null)[] = BERKAS.map(() => null);
-const kunciCsv = (s: number) => `firms:csv:v2:${s}`; // v2: berkas 7 hari
+/** v3: tiga satelit [MODIS, S-NPP, NOAA-20]. v2 (kode sebelumnya) urutannya
+ *  [S-NPP, NOAA-20] — kunci v2 warisan TAK boleh dibaca demi indeksnya: indeks
+ *  berpindah saat MODIS masuk, dan unduhan yang gagal sesaat setelah deploy
+ *  menghapus titik satu satelit dari semua hari (insiden 28 Okt: NOAA-20 nol).
+ *  Salinan warisan dipilih menurut ISI berkasnya (satelitCsv) dan disalin ke
+ *  kunci v3 saat dipakai. Ia gugur sendiri ≤3 hari (TTL); sesudah itu hanya
+ *  ada kunci v3, yang hanya tertulis dari berkas sah satelitnya. */
+const kunciCsv = (s: number) => `firms:csv:v3:${s}`;
+const KUNCI_CSV_V2 = [0, 1, 2].map((i) => `firms:csv:v2:${i}`);
+
+/** Satelit (indeks BERKAS) dari kolom `satellite` baris terkepala satu isi
+ *  CSV FIRMS: "N20" = NOAA-20 (2), "N" = S-NPP (1), "T"/"A" = MODIS Terra/Aqua
+ *  (0). Kolom itu di indeks 7, format MODIS maupun VIIRS. -1 tak dikenal →
+ *  salinan dianggap tidak layak. */
+function satelitCsv(csv: string): number {
+  const satelit = csv.split("\n")[1]?.split(",")[7]?.trim();
+  if (!satelit) return -1;
+  return satelit === "N20" ? 2 : satelit === "N" ? 1 : /^[TA]$/.test(satelit) ? 0 : -1;
+}
+
+/** Salinan cadangan satelit `s` saat unduhannya gagal: memori, kunci versi
+ *  sekarang, lalu salinan warisan v2 yang isinya benar. `?:=` kunci Redis yang
+ *  belum ada ditulis `null` — dibaca ulang penyegaran berikutnya, kuncinya
+ *  bisa saja baru jadi (salinan warisan disalin, berkas mulai berhasil). */
+async function salinanCadangan(s: number): Promise<string | null> {
+  csvTerakhir[s] ??= await redisGet(kunciCsv(s));
+  if (csvTerakhir[s]) return csvTerakhir[s];
+  const warisan = await Promise.all(KUNCI_CSV_V2.map((k) => redisGet(k)));
+  for (const csv of warisan) {
+    if (csv && satelitCsv(csv) === s) {
+      csvTerakhir[s] = csv;
+      void redisSet(kunciCsv(s), csv, TTL_REDIS_DETIK);
+      return csv;
+    }
+  }
+  return null;
+}
 
 /** `lengkap` false bila ada satelit yang gagal diambil. */
 async function ambilFirms(): Promise<ReturnType<typeof hasil>> {
@@ -349,7 +385,7 @@ async function ambilFirms(): Promise<ReturnType<typeof hasil>> {
   if (penampungLalu && baru.every((csv, s) => csv === null || csv === csvTerakhir[s])) {
     return hasil(penampungLalu, baru.every((t) => t !== null));
   }
-  const semua = await Promise.all(baru.map(async (csv, s) => csv ?? (csvTerakhir[s] ??= await redisGet(kunciCsv(s)))));
+  const semua = await Promise.all(baru.map(async (csv, s) => csv ?? salinanCadangan(s)));
   const w = penampungBaru();
   semua.forEach((csv, s) => {
     if (csv) urai(csv, s, w);

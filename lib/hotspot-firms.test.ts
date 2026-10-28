@@ -341,3 +341,55 @@ test("hari ini = 24 jam terakhir, hari lain hari kalender; berkas tak berubah te
   assert.deepEqual(waktu(kalender), new Set([pagiIni.getTime()]));
   assert.deepEqual(waktu((await bacaHotspot(kemarin))!), waktu(lalu));
 });
+
+/** CSV berformat kepala FIRMS berisi kolom `satellite` (indeks 7) — berkas
+ *  nyata: kepala MODIS memakai `brightness`, VIIRS `bright_ti4`, keduanya
+ *  `satellite` di indeks yang sama. Dibaca salinanCadangan lewat satelitCsv. */
+function csvSatelit(satelit: string, kepercayaan: string, waktu: Date) {
+  const tanggal = waktu.toISOString().slice(0, 10);
+  const jam = waktu.toISOString().slice(11, 16).replace(":", "");
+  const kepala = "latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight";
+  return `${kepala}\n-6.2,106.8,330.0,0.4,0.6,${tanggal},${jam},${satelit},${kepercayaan},2.0NRT,292.0,2.5,D\n`;
+}
+
+test("salinan warisan v2 dipilih menurut isinya, bukan demi indeks kunci — renumerasi satelit tak menghapus, tak mencampur", async (t) => {
+  const modulWarisan = "./hotspot-firms.ts?warisan";
+  const m = (await import(modulWarisan)) as typeof import("./hotspot-firms.ts");
+  const isi = redis.isi = new Map<string, string>();
+  t.after(() => {
+    redis.isi = null;
+    redis.gagal = "";
+  });
+  const waktu = new Date(Math.floor(Date.now() / 60000) * 60000 - 2 * 3600_000);
+  // Kondisi produksi insiden 28 Okt: kode lama menulis [S-NPP di v2:0,
+  // NOAA-20 di v2:1], kode baru mengharapkan salinan NOAA-20 di v2:2.
+  isi.set("firms:csv:v2:0", csvSatelit("N", "n", waktu));
+  isi.set("firms:csv:v2:1", csvSatelit("N20", "h", waktu));
+  // Unduhan MODIS dan NOAA-20 gagal (kedua server), S-NPP berhasil.
+  const fetchAsli = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = fetchAsli;
+  });
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (init?.method === "HEAD") return new Response(null);
+    const u = String(url);
+    if (u.includes("MODIS") || u.includes("noaa-20")) throw new Error("time-out");
+    return new Response(csvSatelit("N", "l", waktu));
+  }) as typeof fetch;
+
+  const indeks = await m.segarkanHotspot();
+  const data = (await m.bacaHotspot(hariWib(waktu.getTime())))!;
+  assert.equal(indeks.lengkap, false);
+  const perSatelit = [0, 1, 2].map((s) => data.titik.filter((k) => k[5] === s).length);
+  // MODIS (indeks 0, tak punya salinan warisan) nol — BUKAN titik S-NPP salah
+  // takhta dari v2:0. NOAA-20 (indeks 2) hidup dari salinan warisan v2:1 yang
+  // isinya "N20". S-NPP (indeks 1) dari unduhan langsungnya.
+  assert.deepEqual(perSatelit, [0, 1, 1]);
+  assert.equal(data.kabupaten[data.titik.find((k) => k[5] === 2)![8]], "Kota Adm. Jakarta Barat");
+
+  // Salinan warisan yang dipakai disalin ke kunci versi sekarang (TTL baru); kode
+  // yang sama TAK menulis kunci v2 lagi — isinya tetap warisan tak tersentuh.
+  for (let i = 0; i < 5 && !isi.has("firms:csv:v3:2"); i++) await new Promise((r) => setImmediate(r));
+  assert.ok(isi.get("firms:csv:v3:2")!.includes(",N20,"), isi.get("firms:csv:v3:2")!.slice(0, 200));
+  assert.equal(isi.get("firms:csv:v2:1"), csvSatelit("N20", "h", waktu));
+});
