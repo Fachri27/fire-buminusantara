@@ -1,14 +1,15 @@
 import { redisGet, redisSet } from "./redis.ts";
 import { provinsiDariTitik } from "./provinsi-titik.ts";
-import { kabupatenDariTitik } from "./kabupaten-titik.ts";
+import { kabupatenDariTitik, provinsiDariKabupaten } from "./kabupaten-titik.ts";
 import { BATAS_NUSANTARA } from "./kamera-nusantara.ts";
 import { SATELIT_HOTSPOT, awalRiwayat, hariWib, type DataHotspot } from "./lapisan-hotspot.ts";
 
 /**
- * Titik hotspot (anomali panas) 7 hari terakhir, dikelompokkan per hari WIB,
- * untuk lapisan hotspot peta dan peringkat wilayahnya (lib/lapisan-hotspot.ts)
- * — peta mengikuti hari yang dipilih bilah waktu, yang mundur sampai
- * seminggu. Pola yang sama dengan sebaran asap:
+ * Titik hotspot (anomali panas) 7 hari terakhir, dikelompokkan per hari WIB
+ * (hari ini = 24 jam terakhir, seperti SiPongi), untuk lapisan hotspot peta
+ * dan peringkat wilayahnya (lib/lapisan-hotspot.ts) — peta mengikuti hari
+ * yang dipilih bilah waktu, yang mundur sampai seminggu. Pola yang sama
+ * dengan sebaran asap:
  * cron warm-asap (tiap 30 menit) memanggil segarkanHotspot() yang mengambil
  * FIRMS dan menulis Redis; rute /api/hotspot hanya membaca lewat
  * bacaHotspot(). Pengunjung tidak menunggu FIRMS, dan saat FIRMS mati salinan
@@ -19,8 +20,9 @@ import { SATELIT_HOTSPOT, awalRiwayat, hariWib, type DataHotspot } from "./lapis
  * 375 m (S-NPP, NOAA-20). Berkas wilayah ini tidak
  * butuh MAP_KEY (API area FIRMS butuh), dan diperbarui FIRMS beberapa kali
  * sehari mengikuti lintasan satelit. Titik disaring ke 34 provinsi lewat
- * provinsiDariTitik: titik di laut (suar gas lepas pantai) dan negara
- * tetangga terbuang, dan tiap titik membawa nama provinsi dan kabupatennya.
+ * provinsiDariTitik (yang meleset di pesisir/pulau kecil: provinsiDariKabupaten):
+ * titik di laut (suar gas lepas pantai) dan negara tetangga terbuang, dan
+ * tiap titik membawa nama provinsi dan kabupatennya.
  *
  * Musim kemarau bisa >20 ribu titik/hari, jadi data berupa larik ringkas,
  * bukan GeoJSON (~1 MB vs ~3,6 MB sebelum gzip); klien yang merangkainya.
@@ -51,7 +53,8 @@ export const BATAS_BASI_MS = 70 * 60 * 1000;
 const UMUR_MEMORI = 60 * 1000;
 
 /** Indeks hari tersedia; tiap hari di kunciHari. "v5": per hari WIB dari
- *  berkas 7 hari (v4 = 24 jam dalam satu kunci). */
+ *  berkas 7 hari (v4 = 24 jam dalam satu kunci). `sejak` (hari ini bergulir)
+ *  tak menaikkan versi: salinan tanpanya tetap hari kalender yang utuh. */
 const KUNCI_REDIS = "firms:hotspot:v5";
 const kunciHari = (hari: string) => `${KUNCI_REDIS}:${hari}`;
 const TTL_REDIS_DETIK = 3 * 24 * 3600;
@@ -87,6 +90,8 @@ type Penampung = {
  *  dan uji poligonnya ~3 dtk memblokir di puncak kemarau. Diganti tiap penguraian,
  *  jadi tak pernah lebih besar dari satu penyegaran. */
 let wilayahLalu: Penampung["wilayah"] = new Map();
+/** Penampung penguraian terakhir modul ini — jalur "tak berubah" menurunkan ulang harinya dari sini. */
+let penampungLalu: Penampung | null = null;
 
 function penampungBaru(): Penampung {
   // Batas = awal riwayat peta (00.00 WIB, enam hari sebelum hari ini) —
@@ -133,8 +138,9 @@ function tambahTitik(
   const kunci = `${lng},${lat}`;
   let wilayah = wilayahLalu.get(kunci);
   if (!wilayah) {
-    const provinsi = provinsiDariTitik(lat, lng);
-    wilayah = [provinsi, provinsi && kabupatenDariTitik(lat, lng)];
+    const kabupaten = kabupatenDariTitik(lat, lng);
+    // Poligon provinsi lebih kasar: titik pesisir/pulau kecil yang meleset darinya diberi provinsi kabupatennya.
+    wilayah = [provinsiDariTitik(lat, lng) ?? (kabupaten && provinsiDariKabupaten(kabupaten)), kabupaten];
   }
   w.wilayah.set(kunci, wilayah);
   const [nama, kabupaten] = wilayah;
@@ -212,6 +218,48 @@ async function ambilCsv(jalur: string, tenggat: number): Promise<string | null> 
   return null;
 }
 
+/** Baris CSV API yang belum ada di CSV wilayah (sama bila latitude, longitude,
+ *  acq_date, acq_time sama), disusun ulang mengikuti kolom kepala CSV wilayah. */
+function gabungCsv(wilayah: string, api: string): string {
+  const [kepala, ...barisWilayah] = wilayah.split("\n");
+  const [kepalaApi, ...barisApi] = api.split("\n");
+  const kolom = kepala.trim().split(",");
+  const kolomApi = kepalaApi.trim().split(",");
+  // Number() dan padStart: "-6.20"/"-6.2" dan "105"/"0105" dihitung sama.
+  const penanda = (daftar: string[]) => {
+    const [lat, lng, tanggal, jam] = ["latitude", "longitude", "acq_date", "acq_time"].map((n) => daftar.indexOf(n));
+    return (c: string[]) => `${Number(c[lat])},${Number(c[lng])},${c[tanggal]?.trim()},${c[jam]?.trim().padStart(4, "0")}`;
+  };
+  const [penandaWilayah, penandaApi] = [penanda(kolom), penanda(kolomApi)];
+  const ada = new Set(barisWilayah.map((b) => penandaWilayah(b.split(","))));
+  const urutan = kolom.map((nama) => kolomApi.indexOf(nama));
+  const tambahan: string[] = [];
+  for (const b of barisApi) {
+    const c = b.split(",");
+    const p = penandaApi(c);
+    if (c.length < kolomApi.length || ada.has(p)) continue;
+    ada.add(p);
+    tambahan.push(urutan.map((i) => c[i]?.trim() ?? "").join(","));
+  }
+  if (!tambahan.length) return wilayah;
+  return `${wilayah.endsWith("\n") ? wilayah : `${wilayah}\n`}${tambahan.join("\n")}\n`;
+}
+
+/** MODIS: berkas wilayah, ditambah API area FIRMS bila FIRMS_MAP_KEY disetel —
+ *  berkas wilayah tertinggal ~10 jam dari SiPongi (Okt 2026). API hanya
+ *  pelengkap: gagal = berkas wilayah saja, tetap "lengkap". Kunci ada di jalur
+ *  URL, jadi jalur itu tak boleh masuk log/galat — ambilCsv tak pernah mencatatnya. */
+async function ambilModis(jalur: string, tenggat: number): Promise<string | null> {
+  const kunci = process.env.FIRMS_MAP_KEY;
+  if (!kunci) return ambilCsv(jalur, tenggat);
+  const [wilayah, api] = await Promise.all([
+    ambilCsv(jalur, tenggat),
+    // DAY_RANGE 2 = hari ini & kemarin UTC (batas API 1–5): cukup menutup ketertinggalan berkas wilayah.
+    ambilCsv(`/api/area/csv/${kunci}/MODIS_NRT/${BATAS_NUSANTARA.flat().join(",")}/2`, tenggat),
+  ]);
+  return wilayah && api ? gabungCsv(wilayah, api) : wilayah;
+}
+
 /** Urai satu berkas CSV FIRMS ke penampung. */
 function urai(csv: string, satelit: number, w: Penampung) {
   const baris = csv.split("\n");
@@ -237,20 +285,30 @@ function urai(csv: string, satelit: number, w: Penampung) {
 }
 
 /** Hari WIB yang tersimpan, urut naik. `diambil` = pemeriksaan FIRMS terakhir
- *  yang berhasil (dasar "basi"); `versi` = kapan isinya terakhir berubah — sama
- *  dengan `diambil` di data tiap hari yang tertulis bersamanya. */
+ *  yang berhasil (dasar "basi"); `versi` = kapan harinya terakhir diturunkan —
+ *  sama dengan `diambil` di data tiap hari yang tertulis bersamanya. */
 type IndeksHotspot = { diambil: string; versi: string; lengkap: boolean; hari: string[] };
 
-/** Titik dikelompokkan per hari WIB (sejak awal riwayat, lihat penampungBaru). */
+/** Titik dikelompokkan per hari WIB sejak awal riwayat — kecuali hari ini:
+ *  24 jam terakhir (`sejak`), jadi ikut memuat lintasan malam kemarin. */
 function hasil(w: Penampung, lengkap: boolean): { indeks: IndeksHotspot; hari: Map<string, DataHotspot> } {
+  const ms = Date.now();
+  const hariIni = hariWib(ms);
+  const sejak = ms / 60000 - 24 * 60;
+  // Penampung bisa dari sebelum 00.00 WIB (jalur "tak berubah"): awal riwayat dihitung ulang.
+  const awal = awalRiwayat(ms) / 60000;
   const kelompok = new Map<string, number[][]>();
-  for (const t of w.titik) {
-    const h = hariWib(t[4] * 60000);
+  const tambah = (h: string, t: number[]) => {
     const isi = kelompok.get(h);
     if (isi) isi.push(t);
     else kelompok.set(h, [t]);
+  };
+  for (const t of w.titik) {
+    if (t[4] >= sejak) tambah(hariIni, t);
+    const h = hariWib(t[4] * 60000);
+    if (h < hariIni && t[4] >= awal) tambah(h, t);
   }
-  const kini = new Date().toISOString();
+  const kini = new Date(ms).toISOString();
   const indeks = { diambil: kini, versi: kini, lengkap, hari: [...kelompok.keys()].sort() };
   const hari = new Map<string, DataHotspot>();
   for (const h of indeks.hari) {
@@ -258,6 +316,7 @@ function hasil(w: Penampung, lengkap: boolean): { indeks: IndeksHotspot; hari: M
     const terbaru = titik.reduce((m, t) => Math.max(m, t[4]), 0);
     hari.set(h, {
       hari: h,
+      sejak: h === hariIni ? new Date(sejak * 60000).toISOString() : undefined,
       hariTersedia: indeks.hari,
       diperbarui: new Date(terbaru * 60000).toISOString(),
       diambil: indeks.versi,
@@ -278,18 +337,17 @@ function hasil(w: Penampung, lengkap: boolean): { indeks: IndeksHotspot; hari: M
 const csvTerakhir: (string | null)[] = BERKAS.map(() => null);
 const kunciCsv = (s: number) => `firms:csv:v2:${s}`; // v2: berkas 7 hari
 
-/** `{ lengkap }` saja = berkas FIRMS persis sama dengan penyegaran lalu (lihat
- *  segarkanHotspot); `lengkap` false bila ada satelit yang gagal diambil. */
-async function ambilFirms(): Promise<ReturnType<typeof hasil> | { lengkap: boolean }> {
+/** `lengkap` false bila ada satelit yang gagal diambil. */
+async function ambilFirms(): Promise<ReturnType<typeof hasil>> {
   if (!(await firmsTerjangkau())) throw new Error("FIRMS tak terjangkau");
   const tenggat = Date.now() + TENGGAT_UNDUH;
-  const baru = await Promise.all(BERKAS.map((b) => ambilCsv(b.jalur, tenggat)));
+  const baru = await Promise.all(BERKAS.map((b, s) => (s === 0 ? ambilModis(b.jalur, tenggat) : ambilCsv(b.jalur, tenggat))));
   if (baru.every((t) => t === null)) throw new Error("FIRMS tak terjangkau");
   // FIRMS tak menghormati If-Modified-Since, jadi unduhan tak terhindarkan —
-  // tapi berkas yang sama persis tak perlu diurai & ditulis ulang. Hanya bila
-  // modul ini yang menguraikannya terakhir kali (csvTerakhir + indeksMemori).
-  if (indeksMemori && hariMemori.size && baru.every((csv, s) => csv === null || csv === csvTerakhir[s])) {
-    return { lengkap: baru.every((t) => t !== null) };
+  // tapi berkas yang sama persis tak perlu diurai ulang. Harinya tetap
+  // diturunkan ulang: jendela 24 jam hari ini maju tiap penyegaran.
+  if (penampungLalu && baru.every((csv, s) => csv === null || csv === csvTerakhir[s])) {
+    return hasil(penampungLalu, baru.every((t) => t !== null));
   }
   const semua = await Promise.all(baru.map(async (csv, s) => csv ?? (csvTerakhir[s] ??= await redisGet(kunciCsv(s)))));
   const w = penampungBaru();
@@ -301,6 +359,7 @@ async function ambilFirms(): Promise<ReturnType<typeof hasil> | { lengkap: boole
   // berkas itu tak diingat, jadi kiriman sama berikutnya tak lolos sebagai "tak berubah".
   if (!w.titik.length) throw new Error("FIRMS tanpa titik Nusantara");
   wilayahLalu = w.wilayah;
+  penampungLalu = w;
   // Berkas yang lolos diingat; salinan Redis (multi-MB) hanya ditulis bila isinya berubah.
   baru.forEach((csv, s) => {
     if (csv === null || csv === csvTerakhir[s]) return;
@@ -315,35 +374,21 @@ let indeksMemori: { data: IndeksHotspot; dibaca: number } | null = null;
 /** Salinan per hari; sah selama `diambil`-nya tak lebih tua dari indeks. */
 const hariMemori = new Map<string, DataHotspot>();
 let sedangAmbil: Promise<IndeksHotspot> | null = null;
-/** Hari penguraian terakhir yang belum tertulis ke Redis; selama ada, indeks tak ditulis. */
-let hariTertunda = new Map<string, DataHotspot>();
 
 /** Ambil FIRMS (satu pengambilan bersama) lalu simpan ke memori & Redis.
  *  Dipanggil cron warm-asap; gagal = salinan Redis lama tetap utuh. */
 export function segarkanHotspot(): Promise<IndeksHotspot> {
   sedangAmbil ??= ambilFirms()
-    .then(async (hasilBaru) => {
-      let indeks: IndeksHotspot;
-      if ("indeks" in hasilBaru) {
-        indeks = hasilBaru.indeks;
-        hariMemori.clear();
-        for (const [h, data] of hasilBaru.hari) hariMemori.set(h, data);
-        hariTertunda = hasilBaru.hari;
-      } else {
-        // Isi tak berubah: hanya waktu periksa (dan status lengkap) yang maju,
-        // supaya salinan tak dianggap basi — data hari tak ditulis ulang
-        // (kecuali yang tertunda).
-        indeks = { ...indeksMemori!.data, diambil: new Date().toISOString(), lengkap: hasilBaru.lengkap };
-      }
+    .then(async ({ indeks, hari }) => {
+      hariMemori.clear();
+      for (const [h, data] of hari) hariMemori.set(h, data);
       indeksMemori = { data: indeks, dibaca: Date.now() };
       // Hari dulu, indeks terakhir — dan hanya bila semua hari tertulis: indeks
       // di Redis tak pernah menunjuk hari yang hilang atau basi. Hari yang gagal
-      // dicoba lagi penyegaran berikutnya, walau isi FIRMS tak berubah. Hari
-      // yang keluar jendela habis sendiri oleh TTL.
-      const tunda = [...hariTertunda];
-      const tertulis = await Promise.all(tunda.map(([h, data]) => redisSet(kunciHari(h), JSON.stringify(data), TTL_REDIS_DETIK)));
-      hariTertunda = new Map(tunda.filter((_, i) => !tertulis[i]));
-      if (!hariTertunda.size) await redisSet(KUNCI_REDIS, JSON.stringify(indeks), TTL_REDIS_DETIK);
+      // tertulis lagi penyegaran berikutnya (semua hari diturunkan ulang tiap
+      // kali). Hari yang keluar jendela habis sendiri oleh TTL.
+      const tertulis = await Promise.all([...hari].map(([h, data]) => redisSet(kunciHari(h), JSON.stringify(data), TTL_REDIS_DETIK)));
+      if (tertulis.every(Boolean)) await redisSet(KUNCI_REDIS, JSON.stringify(indeks), TTL_REDIS_DETIK);
       return indeks;
     })
     .finally(() => {

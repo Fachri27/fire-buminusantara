@@ -525,6 +525,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     return { ...dataHotspot, titik: susunTitikTampil(dataHotspot, satelitAktif) };
   }, [dataHotspot, satelitAktif]);
   const perSatelit = useMemo(() => (dataHotspot ? hitungPerSatelit(dataHotspot) : null), [dataHotspot]);
+  // Label hari legenda, lencana & panel Lapisan: hari terbaru (`sejak`) = 24 jam terakhir.
+  const labelHariHotspot = dataHotspot && (dataHotspot.sejak ? t.jam24 : formatHariPeta(dataHotspot.hari, bahasa));
 
   // Iframe Windy menerima [lng, lat, kepercayaan, satelit, FRP, waktu, malam,
   // indeks provinsi] + daftar provinsi (gambar & kartu info titik); disimpan
@@ -1203,7 +1205,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           style={{ background: WARNA_SIPONGI[2] }}
           aria-hidden="true"
         />
-        {t.hotspotFirms}{dataHotspot ? `, ${formatHariPeta(dataHotspot.hari, bahasa)}` : ""}
+        {t.hotspotFirms}{labelHariHotspot ? `, ${labelHariHotspot}` : ""}
       </div>
       {statusHotspot === "memuat" && !dataHotspot && <p className="mt-1 text-tinta/60 dark:text-white/55">{t.memuatSatelit}</p>}
       {statusHotspot === "galat" && <p className="mt-1 leading-snug text-amber-700 dark:text-amber-400">{t.firmsGagal}</p>}
@@ -1446,7 +1448,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           >
             <span className="h-2 w-2 rounded-full bg-api-peta" />
             <span className="text-tinta/60 dark:text-white/55">Hotspot</span>
-            <span className="font-semibold tabular-nums">{formatHariPeta(dataHotspot.hari, bahasa)}</span>
+            <span className="font-semibold tabular-nums">{labelHariHotspot}</span>
           </div>
         </div>
       )}
@@ -1517,7 +1519,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
           {/* Lapisan tambahan — sakelar, bukan pilihan: panel tetap terbuka
               supaya titiknya langsung terlihat muncul/hilang di peta. */}
           <p className="px-1 pb-1 text-[10px] text-tinta/55 dark:text-white/50">
-            {t.hotspotFirms}, {dataHotspot ? formatHariPeta(dataHotspot.hari, bahasa) : t.perHari}{statusHotspot === "memuat" && hotspotAktif ? `, ${t.memuat}` : ""}
+            {t.hotspotFirms}, {labelHariHotspot ?? t.perHari}{statusHotspot === "memuat" && hotspotAktif ? `, ${t.memuat}` : ""}
           </p>
           {SATELIT_HOTSPOT.map((satelit, s) => ({
               kunci: s,

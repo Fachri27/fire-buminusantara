@@ -16,6 +16,9 @@ import type * as maplibregl from "maplibre-gl";
 export type DataHotspot = {
   /** Tanggal WIB (YYYY-MM-DD) titik-titik ini — satu hari, lihat hariWib. */
   hari: string;
+  /** Hanya hari terbaru: awal jendela 24 jam bergulir (ISO) — hari itu memuat
+   *  deteksi sejak waktu ini (seperti SiPongi), bukan sejak 00.00 WIB. */
+  sejak?: string;
   /** Tanggal WIB yang punya data di server, urut naik. */
   hariTersedia: string[];
   /** Waktu akuisisi satelit terbaru hari itu (ISO, UTC), null bila tak ada titik. */
@@ -118,16 +121,17 @@ export function hitungPerSatelit(data: DataHotspot): number[][] {
   return per;
 }
 
-/** Satelit (indeks `s`) yang dihitung peringkat wilayah: VIIRS S-NPP & NOAA-20. */
-export const SATELIT_PERINGKAT = [1, 2] as const;
+/** Satelit (indeks `s`) yang dihitung peringkat wilayah: ketiganya, sama dengan
+ *  jumlah legenda SiPongi (MODIS + S-NPP + NOAA-20). */
+export const SATELIT_PERINGKAT = [0, 1, 2] as const;
 
 /** Rincian jumlah: `perSatelit` urut SATELIT_PERINGKAT, `perKepercayaan`
  *  [rendah, sedang, tinggi], `malam` = deteksi lintasan malam. */
 export type BarisPeringkat = { nama: string; jumlah: number; perSatelit: number[]; perKepercayaan: number[]; malam: number };
 
 /** Peringkat provinsi & kabupaten menurut jumlah deteksi SATELIT_PERINGKAT.
- *  Kedua satelit selintasan ±50 menit, jadi satu api sering terhitung dua
- *  kali — angkanya deteksi, bukan banyaknya api. */
+ *  Satelitnya melintas berdekatan (S-NPP & NOAA-20 ±50 menit), jadi satu api
+ *  sering terhitung lebih dari sekali — angkanya deteksi, bukan banyaknya api. */
 export function peringkatHotspot(data: DataHotspot): { provinsi: BarisPeringkat[]; kabupaten: BarisPeringkat[] } {
   const provinsi = new Map<string, BarisPeringkat>();
   const kabupaten = new Map<string, BarisPeringkat>();

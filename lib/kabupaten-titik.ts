@@ -1,4 +1,5 @@
-import { pencariFitur, type Geometri } from "./geometri.ts";
+import { pencariFitur, poligonFitur, tempatAngka, type Geometri } from "./geometri.ts";
+import { provinsiDariTitik } from "./provinsi-titik.ts";
 // Relatif + atribut JSON supaya bisa diuji lewat node:test mentah, sama
 // dengan provinsi-titik.ts.
 import petaKabupaten from "./peta-kabupaten.json" with { type: "json" };
@@ -16,13 +17,35 @@ import petaKabupaten from "./peta-kabupaten.json" with { type: "json" };
  * acak, 99,91% berkabupaten sama dengan poligon asli GeoServer (360 MB; 600 m
  * dulu 99,17%), dan pencariannya ±30× lebih cepat.
  */
-const cariKabupaten = pencariFitur(
-  (petaKabupaten as { features: { properties: { nama: string }; geometry: Geometri }[] }).features.map((f) => ({
-    nama: f.properties.nama,
-    geometri: f.geometry,
-  })),
-);
+const fitur = (petaKabupaten as { features: { properties: { nama: string }; geometry: Geometri }[] }).features.map((f) => ({
+  nama: f.properties.nama,
+  geometri: f.geometry,
+}));
+const cariKabupaten = pencariFitur(fitur);
+// Nama kabupaten unik (515 fitur, tanpa kembar).
+const geometriKabupaten = new Map(fitur.map((f) => [f.nama, f.geometri]));
+const provinsiTembolok = new Map<string, string | null>();
 
 export function kabupatenDariTitik(lat: number, lng: number): string | null {
   return cariKabupaten(lng, lat);
+}
+
+/**
+ * Provinsi kabupaten `nama` — untuk titik pesisir & pulau kecil yang meleset
+ * dari poligon provinsi (7,5 ribu simpul untuk 34 provinsi, jauh lebih kasar
+ * dari poligon kabupaten). Dari titik dalam daratan terbesarnya, lalu pulau
+ * lainnya: daratan terbesar Sikka, Lombok Barat, dll. pun meleset. null untuk
+ * Kep. Seribu — poligon DKI Jakarta sama sekali tak memuatnya.
+ */
+export function provinsiDariKabupaten(nama: string): string | null {
+  if (provinsiTembolok.has(nama)) return provinsiTembolok.get(nama)!;
+  const g = geometriKabupaten.get(nama);
+  let provinsi: string | null = null;
+  for (const bagian of g ? [g, ...poligonFitur(g).map((coordinates) => ({ type: "Polygon", coordinates }))] : []) {
+    const t = tempatAngka(bagian);
+    provinsi = t && provinsiDariTitik(t.titik[1], t.titik[0]);
+    if (provinsi) break;
+  }
+  provinsiTembolok.set(nama, provinsi);
+  return provinsi;
 }

@@ -51,17 +51,17 @@ test("pudar ganti hari yang tertunda dibatalkan saat peta dibuang", (t) => {
   assert.deepEqual(sentuhan, []);
 });
 
-test("peringkat hanya menghitung S-NPP & NOAA-20, urut jumlah menurun", () => {
-  // [s, kepercayaan, provinsi, kabupaten, malam]; MODIS (0) diabaikan.
+test("peringkat menghitung ketiga satelit (MODIS, S-NPP, NOAA-20), urut jumlah menurun", () => {
+  // [s, kepercayaan, provinsi, kabupaten, malam]; s 0 = MODIS, ikut terhitung seperti di SiPongi.
   const titik = [
     [1, 2, 0, 0, 0], [2, 1, 0, 0, 1], [0, 2, 0, 0, 1],
     [1, 2, 1, 1, 0], [2, 2, 1, 1, 1], [2, 0, 1, -1, 1],
   ].map(([s, k, p, kab, malam]) => [100, 0, k, 1, 0, s, p, malam, kab]);
   const { provinsi, kabupaten } = peringkatHotspot({ ...data, provinsi: ["Riau", "Jambi"], kabupaten: ["Siak", "Muaro Jambi"], titik });
   assert.deepEqual(provinsi, [
-    { nama: "Jambi", jumlah: 3, perSatelit: [1, 2], perKepercayaan: [1, 0, 2], malam: 2 },
-    { nama: "Riau", jumlah: 2, perSatelit: [1, 1], perKepercayaan: [0, 1, 1], malam: 1 },
+    { nama: "Jambi", jumlah: 3, perSatelit: [0, 1, 2], perKepercayaan: [1, 0, 2], malam: 2 },
+    { nama: "Riau", jumlah: 3, perSatelit: [1, 1, 1], perKepercayaan: [0, 1, 2], malam: 2 },
   ]);
   // Titik tanpa kabupaten (-1) tetap masuk provinsinya, tak masuk kabupaten mana pun.
-  assert.deepEqual(kabupaten.map((b) => [b.nama, b.jumlah]), [["Muaro Jambi", 2], ["Siak", 2]]);
+  assert.deepEqual(kabupaten.map((b) => [b.nama, b.jumlah]), [["Siak", 3], ["Muaro Jambi", 2]]);
 });

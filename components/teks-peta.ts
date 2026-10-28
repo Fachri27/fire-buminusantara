@@ -8,6 +8,7 @@ export const TEKS_PETA = {
     peringkat: "Peringkat hotspot",
     hotspotFirms: "Hotspot NASA FIRMS",
     perHari: "per hari",
+    jam24: "24 jam terakhir",
     memuat: "memuat…",
     titik: "titik",
     memuatSatelit: "Memuat data satelit…",
@@ -84,14 +85,14 @@ export const TEKS_PETA = {
         kepercayaan: ["Kepercayaan rendah", "Kepercayaan sedang", "Kepercayaan tinggi"],
         warna: "Bentuk penanda menunjukkan satelitnya, warnanya tingkat kepercayaan deteksi.",
         rentang:
-          "Satu hari (WIB) mengikuti bilah waktu peta: hari ini dan enam hari sebelumnya. Data tiba sekitar tiga jam setelah satelit melintas, jadi hari ini masih bertambah. Langkah prakiraan memakai hari terakhir yang ada datanya.",
+          "Satu hari (WIB) mengikuti bilah waktu peta: hari ini dan enam hari sebelumnya. Hari ini berisi deteksi 24 jam terakhir, seperti SiPongi; hari sebelumnya pukul 00.00–24.00 WIB. Data tiba sekitar tiga jam setelah satelit melintas, jadi hari ini masih bertambah. Langkah prakiraan memakai hari terakhir yang ada datanya.",
         detail: "Arahkan kursor atau ketuk sebuah titik untuk melihat waktu deteksi, satelit, dan FRP (daya radiasi api).",
         catatan: "Hotspot menandai suhu permukaan yang tinggi. Pastikan kebakaran lewat pengecekan lapangan.",
         sumberLanjut: "(Fire Information for Resource Management System), bagian dari NASA ESDIS.",
       },
       peringkat: {
         dihitung:
-          "Deteksi satelit VIIRS S-NPP dan NOAA-20. Keduanya melintas sekitar 50 menit berselang, jadi satu api sering terhitung dua kali: angkanya jumlah deteksi, bukan jumlah api.",
+          "Deteksi ketiga satelit: MODIS Terra/Aqua, VIIRS S-NPP, dan VIIRS NOAA-20, seperti jumlah di legenda SiPongi. Satelit-satelit itu melintas berdekatan (S-NPP dan NOAA-20 sekitar 50 menit berselang), jadi satu api sering terhitung lebih dari sekali: angkanya jumlah deteksi, bukan jumlah api.",
         caraBaca:
           "Panjang isi merah menunjukkan jumlah dibanding peringkat pertama. Arahkan kursor atau ketuk angka untuk rincian per satelit, tingkat kepercayaan, serta siang dan malam. Nomor di bawah daftar berpindah halaman; tombol unduh menyimpan seluruh peringkat sebagai CSV.",
         membuka: "Tombol daftar di kiri atas peta membuka dan menutup panel peringkat.",
@@ -104,6 +105,7 @@ export const TEKS_PETA = {
     peringkat: "Hotspot ranking",
     hotspotFirms: "NASA FIRMS hotspots",
     perHari: "per day",
+    jam24: "last 24 hours",
     memuat: "loading…",
     titik: "points",
     memuatSatelit: "Loading satellite data…",
@@ -180,14 +182,14 @@ export const TEKS_PETA = {
         kepercayaan: ["Low confidence", "Medium confidence", "High confidence"],
         warna: "The marker shape shows the satellite; its colour shows how confident the detection is.",
         rentang:
-          "One day (WIB) following the map's time slider: today and the six days before it. Data arrives about three hours after a satellite pass, so today is still filling in. Forecast steps use the latest day with data.",
+          "One day (WIB) following the map's time slider: today and the six days before it. Today shows detections from the last 24 hours, as SiPongi does; earlier days run from 00:00 to 24:00 WIB. Data arrives about three hours after a satellite pass, so today is still filling in. Forecast steps use the latest day with data.",
         detail: "Hover over or tap a point to see the detection time, satellite and FRP (fire radiative power).",
         catatan: "A hotspot marks unusually hot ground. Confirm a fire with a field check.",
         sumberLanjut: "(Fire Information for Resource Management System), part of NASA ESDIS.",
       },
       peringkat: {
         dihitung:
-          "Detections from the VIIRS S-NPP and NOAA-20 satellites. They pass about 50 minutes apart, so one fire is often counted twice: the numbers are detections, not fires.",
+          "Detections from all three satellites: MODIS on Terra/Aqua, VIIRS on S-NPP, and VIIRS on NOAA-20, matching the totals in SiPongi's legend. They pass close together (S-NPP and NOAA-20 about 50 minutes apart), so one fire is often counted more than once: the numbers are detections, not fires.",
         caraBaca:
           "The length of the red fill shows the count relative to first place. Hover over or tap a number for its breakdown by satellite, confidence, and day and night. The numbers below each list switch pages; the download button saves the full ranking as CSV.",
         membuka: "The list button at the top left of the map opens and closes the ranking panel.",

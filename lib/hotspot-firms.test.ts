@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 // Jangan pernah menulis Redis sungguhan (bisa jadi Redis produksi bila REDIS_URL
 // diekspor di shell): redis.ts membaca env saat dimuat, jadi hapus sebelum impor.
 delete process.env.REDIS_URL;
+// Kunci API FIRMS dari shell tak boleh ikut: hanya uji API area yang menyetelnya.
+delete process.env.FIRMS_MAP_KEY;
 // Klien tiruan di globalThis.__redisKlien (dipakai redis.ts bila ada): seperti tanpa
 // Redis sampai `redis.isi` disetel; kunci berakhiran `redis.gagal` gagal ditulis.
 const redis = { isi: null as Map<string, string> | null, gagal: "" };
@@ -17,6 +19,8 @@ const redis = { isi: null as Map<string, string> | null, gagal: "" };
 };
 const { bacaHotspot, segarkanHotspot } = await import("./hotspot-firms.ts");
 const { hariWib } = await import("./lapisan-hotspot.ts");
+const { provinsiDariTitik } = await import("./provinsi-titik.ts");
+const { kabupatenDariTitik } = await import("./kabupaten-titik.ts");
 
 /** CSV FIRMS deteksi di daratan DKI Jakarta, satu per waktu; kolom = yang dibaca urai(). */
 function csv(kepercayaan: string, ...waktu: Date[]) {
@@ -28,14 +32,29 @@ function csv(kepercayaan: string, ...waktu: Date[]) {
   return `latitude,longitude,confidence,frp,acq_date,acq_time,daynight\n${baris.join("")}`;
 }
 
-/** fetch tiruan: HEAD selalu jawab, unduhan memakai `isi`. */
-function tiruFetch(t: TestContext, isi: (url: string) => string) {
+/** fetch tiruan: HEAD selalu jawab, unduhan memakai `isi` (teks = 200; `isi` yang melempar = fetch gagal). */
+function tiruFetch(t: TestContext, isi: (url: string) => string | Response) {
   const fetchAsli = globalThis.fetch;
   t.after(() => {
     globalThis.fetch = fetchAsli;
   });
-  globalThis.fetch = (async (url: string | URL, init?: RequestInit) =>
-    new Response(init?.method === "HEAD" ? null : isi(String(url)))) as typeof fetch;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    if (init?.method === "HEAD") return new Response(null);
+    const r = isi(String(url));
+    return typeof r === "string" ? new Response(r) : r;
+  }) as typeof fetch;
+}
+
+// Entropi rendah: tak dikira rahasia sungguhan oleh gitleaks.
+const KUNCI_API = "rahasia".repeat(5);
+
+/** CSV API area MODIS: urutan kolom lain dari berkas wilayah, plus `instrument`; jam tanpa nol depan. */
+function csvApi(...deteksi: [lat: string, lng: string, waktu: Date][]) {
+  const baris = deteksi.map(([lat, lng, w]) => {
+    const jam = Number(w.toISOString().slice(11, 16).replace(":", ""));
+    return `${lat},${lng},330.1,${w.toISOString().slice(0, 10)},${jam},T,MODIS,90,6.1NRT,20.5,D\n`;
+  });
+  return `latitude,longitude,brightness,acq_date,acq_time,satellite,instrument,confidence,version,frp,daynight\n${baris.join("")}`;
 }
 
 test("segarkan menulis salinan; satelit gagal memakai CSV terakhirnya; baca tak menyentuh FIRMS", async (t) => {
@@ -60,7 +79,8 @@ test("segarkan menulis salinan; satelit gagal memakai CSV terakhirnya; baca tak 
   const pertama = await segarkanHotspot();
   assert.equal(pertama.lengkap, true);
   const data = (await bacaHotspot())!;
-  assert.equal(data.hari, hariWib(sejamLalu.getTime()));
+  assert.equal(data.hari, hariWib(Date.now())); // 24 jam terakhir, walau sejamLalu masih kemarin
+  assert.ok(data.sejak);
   assert.deepEqual(data.titik.map((t) => t[5]), [0, 1, 2]); // satu titik per satelit
   assert.deepEqual(data.titik[0].slice(0, 5), [106.8, -6.2, 2, 12.3, sejamLalu.getTime() / 60000]);
   assert.equal(data.provinsi[data.titik[0][6]], "DKI Jakarta");
@@ -70,9 +90,9 @@ test("segarkan menulis salinan; satelit gagal memakai CSV terakhirnya; baca tak 
   gagalkan = "MODIS"; // server utama dan cadangan sama-sama gagal
   const kedua = await segarkanHotspot();
   assert.equal(kedua.lengkap, false);
-  // Berkas lain sama persis: tak diurai & ditulis ulang — versi tetap,
-  // hanya waktu periksa yang maju (salinan tak menjadi basi).
-  assert.equal(kedua.versi, pertama.versi);
+  // Berkas lain sama persis: tak diurai ulang (baris titik yang sama), hanya
+  // harinya yang diturunkan ulang — waktu periksa maju, salinan tak menjadi basi.
+  assert.equal((await bacaHotspot())!.titik[0], data.titik[0]);
   assert.ok(kedua.diambil >= pertama.diambil);
   assert.equal((await bacaHotspot())!.diambil, kedua.diambil);
   assert.equal((await bacaHotspot())!.lengkap, false);
@@ -97,6 +117,7 @@ test("titik dikelompokkan per hari WIB; sebelum awal riwayat dibuang; hari di lu
   const tertua = new Date(awalHariIni - 6 * HARI - 30 * 60_000); // 23.30 WIB H-7: sebelum awal riwayat → dibuang
   const malamLusa = new Date(awalHariIni - HARI - 30 * 60_000); // 23.30 WIB H-2
   const diniKemarin = new Date(awalHariIni - HARI + 30 * 60_000); // 00.30 WIB H-1, tanggal UTC-nya H-2
+  t.mock.timers.enable({ apis: ["Date"], now: awalHariIni + 12 * 3600_000 }); // 12.00 WIB: keduanya > 24 jam lalu
   tiruFetch(t, () => csv("high", tertua, malamLusa, diniKemarin));
 
   const [lusa, kemarin] = [hariWib(malamLusa.getTime()), hariWib(diniKemarin.getTime())];
@@ -162,6 +183,7 @@ test("indeks Redis hanya ditulis bila semua harinya tertulis; hari yang kuncinya
   const awalHariIni = Date.parse(`${hariWib(Date.now())}T00:00:00+07:00`);
   const [lusa, kemarin] = [awalHariIni - 2 * HARI + 3600_000, awalHariIni - HARI + 3600_000].map((w) => new Date(w));
   const [hariLusa, hariKemarin] = [hariWib(lusa.getTime()), hariWib(kemarin.getTime())];
+  t.mock.timers.enable({ apis: ["Date"], now: awalHariIni + 12 * 3600_000 }); // 12.00 WIB: tanpa hari ini
   tiruFetch(t, () => csv("high", lusa, kemarin));
   const isi = (redis.isi = new Map());
   t.after(() => {
@@ -171,7 +193,7 @@ test("indeks Redis hanya ditulis bila semua harinya tertulis; hari yang kuncinya
   const KUNCI = "firms:hotspot:v5";
 
   redis.gagal = hariKemarin; // time-out menulis nilai multi-MB satu hari
-  const pertama = await segarkanHotspot();
+  await segarkanHotspot();
   assert.ok(isi.has(`${KUNCI}:${hariLusa}`));
   assert.equal(isi.has(KUNCI), false);
   // Isi FIRMS sama ("tak berubah"): hari itu dicoba lagi, indeks tetap tak ditulis selama ia gagal.
@@ -179,7 +201,6 @@ test("indeks Redis hanya ditulis bila semua harinya tertulis; hari yang kuncinya
   assert.equal(isi.has(KUNCI), false);
   redis.gagal = "";
   const ketiga = await segarkanHotspot();
-  assert.equal(ketiga.versi, pertama.versi);
   assert.equal(JSON.parse(isi.get(`${KUNCI}:${hariKemarin}`)!).diambil, ketiga.versi);
   assert.equal(JSON.parse(isi.get(KUNCI)!).versi, ketiga.versi);
 
@@ -189,4 +210,134 @@ test("indeks Redis hanya ditulis bila semua harinya tertulis; hari yang kuncinya
   const rute = (await import(salinanLain)) as typeof import("./hotspot-firms.ts");
   assert.equal((await rute.bacaHotspot(hariKemarin))!.hari, hariLusa);
   assert.equal((await rute.bacaHotspot())!.hari, hariLusa);
+});
+
+test("titik pesisir yang meleset dari poligon provinsi (kasar) diberi provinsi kabupatennya; titik laut tetap terbuang", async (t) => {
+  const pesisir = [-8.5, 140.39]; // pesisir Merauke: hanya poligon kabupaten yang mengenainya
+  const laut = [-9.5, 140]; // Laut Arafura, di dalam kotak Nusantara
+  assert.equal(provinsiDariTitik(pesisir[0], pesisir[1]), null);
+  assert.equal(provinsiDariTitik(laut[0], laut[1]), null);
+  assert.equal(kabupatenDariTitik(laut[0], laut[1]), null);
+
+  const waktu = new Date(Math.floor(Date.now() / 60000) * 60000 - 3600_000);
+  const [tanggal, jam] = [waktu.toISOString().slice(0, 10), waktu.toISOString().slice(11, 16).replace(":", "")];
+  const baris = ([lat, lng]: number[]) => `${lat},${lng},high,5,${tanggal},${jam},D\n`;
+  tiruFetch(t, () => `latitude,longitude,confidence,frp,acq_date,acq_time,daynight\n${baris(pesisir)}${baris(laut)}`);
+
+  await segarkanHotspot();
+  const data = (await bacaHotspot(hariWib(waktu.getTime())))!;
+  assert.equal(data.titik.length, 3); // satu per satelit; titik laut terbuang
+  for (const titik of data.titik) {
+    assert.deepEqual(titik.slice(0, 2), [140.39, -8.5]);
+    assert.equal(data.provinsi[titik[6]], "Papua");
+    assert.equal(data.kabupaten[titik[8]], "Merauke");
+  }
+});
+
+test("FIRMS_MAP_KEY: tanpa kunci tak ada permintaan API; dengan kunci baris MODIS API ditambahkan, duplikat dibuang", async (t) => {
+  t.after(() => {
+    delete process.env.FIRMS_MAP_KEY;
+  });
+  const waktu = new Date(Math.floor(Date.now() / 60000) * 60000 - 90 * 60_000);
+  const keApi: string[] = [];
+  tiruFetch(t, (u) => {
+    if (!u.includes("/api/area/")) return csv(u.includes("MODIS") ? "85" : "high", waktu);
+    keApi.push(u);
+    // Pertama = deteksi berkas wilayah (angka ditulis lain), kedua = baru (Jakarta Pusat).
+    return csvApi(["-6.20", "106.80", waktu], ["-6.17", "106.83", waktu]);
+  });
+  const modis = async () => (await bacaHotspot(hariWib(waktu.getTime())))!.titik.filter((t) => t[5] === 0);
+
+  await segarkanHotspot();
+  assert.deepEqual(keApi, []);
+  assert.equal((await modis()).length, 1);
+
+  process.env.FIRMS_MAP_KEY = KUNCI_API;
+  assert.equal((await segarkanHotspot()).lengkap, true);
+  assert.deepEqual(keApi, [`https://firms.modaps.eosdis.nasa.gov/api/area/csv/${KUNCI_API}/MODIS_NRT/94.5,-11.5,141.5,6.5/2`]);
+  assert.deepEqual((await modis()).map((t) => t.slice(0, 5)), [
+    [106.8, -6.2, 2, 12.3, waktu.getTime() / 60000],
+    [106.83, -6.17, 2, 20.5, waktu.getTime() / 60000], // kolom API dipetakan ke kepala berkas wilayah
+  ]);
+});
+
+test("API area gagal (galat, kunci salah, kuota, bukan CSV): MODIS berkas wilayah saja, tetap lengkap; kunci tak pernah bocor", async (t) => {
+  process.env.FIRMS_MAP_KEY = KUNCI_API;
+  const isiRedis = (redis.isi = new Map<string, string>());
+  t.after(() => {
+    delete process.env.FIRMS_MAP_KEY;
+    redis.isi = null;
+  });
+  // Semua log ditangkap: kunci tak boleh muncul di sana, di galat, maupun di Redis.
+  const log: string[] = [];
+  for (const k of ["log", "info", "warn", "error"] as const) {
+    t.mock.method(console, k, (...a: unknown[]) => void log.push(a.map(String).join(" ")));
+  }
+  const waktu = new Date(Math.floor(Date.now() / 60000) * 60000 - 45 * 60_000);
+  // Galat tiruan sengaja membawa URL (seperti galat fetch sungguhan bisa).
+  const putus = (u: string): never => {
+    throw new Error(`fetch failed ${u}`);
+  };
+  let api: (u: string) => string | Response = putus;
+  let wilayahPutus = false;
+  tiruFetch(t, (u) => {
+    if (u.includes("/api/area/")) return api(u);
+    if (wilayahPutus) putus(u);
+    return csv(u.includes("MODIS") ? "85" : "high", waktu);
+  });
+
+  for (const gagal of [
+    putus,
+    () => new Response("Invalid MAP_KEY.", { status: 400 }),
+    () => "Exceeding allowed transaction limit.",
+    () => "<!doctype html><title>Maintenance</title>",
+  ]) {
+    api = gagal;
+    assert.equal((await segarkanHotspot()).lengkap, true);
+    assert.equal((await bacaHotspot(hariWib(waktu.getTime())))!.titik.filter((t) => t[5] === 0).length, 1);
+  }
+
+  wilayahPutus = true;
+  const galat = await segarkanHotspot().then(
+    () => assert.fail("FIRMS putus seluruhnya harus gagal"),
+    (e: Error) => e,
+  );
+  for (const teks of [galat.message, galat.stack ?? "", ...log, ...isiRedis.keys(), ...isiRedis.values()]) {
+    assert.ok(!teks.includes(KUNCI_API), teks.slice(0, 200));
+  }
+});
+
+test("hari ini = 24 jam terakhir, hari lain hari kalender; berkas tak berubah tetap menggeser jendela & ganti hari", async (t) => {
+  const JAM = 3600_000;
+  const kini = Date.parse(`${hariWib(Date.now())}T10:00:00+07:00`);
+  t.mock.timers.enable({ apis: ["Date"], now: kini });
+  const siangKemarin = new Date(kini - 25 * JAM); // 09.00 WIB H-1: di luar 24 jam
+  const malamKemarin = new Date(kini - 14 * JAM); // 20.00 WIB H-1: di dalam
+  const pagiIni = new Date(kini - 2 * JAM); // 08.00 WIB
+  tiruFetch(t, () => csv("high", siangKemarin, malamKemarin, pagiIni));
+  const waktu = (d: { titik: number[][] }) => new Set(d.titik.map((t) => t[4] * 60000));
+  const [kemarin, hariIni, besok] = [-1, 0, 1].map((n) => hariWib(kini + n * 24 * JAM));
+
+  assert.deepEqual((await segarkanHotspot()).hari, [kemarin, hariIni]);
+  const ini = (await bacaHotspot())!;
+  assert.equal(ini.hari, hariIni);
+  assert.equal(ini.sejak, new Date(kini - 24 * JAM).toISOString());
+  assert.deepEqual(waktu(ini), new Set([malamKemarin.getTime(), pagiIni.getTime()]));
+  const lalu = (await bacaHotspot(kemarin))!;
+  assert.equal(lalu.sejak, undefined);
+  assert.deepEqual(waktu(lalu), new Set([siangKemarin.getTime(), malamKemarin.getTime()]));
+
+  // 00.30 WIB besok, berkas sama: tak diurai ulang, tapi malamKemarin keluar jendela, hari
+  // ini jadi hari kalender, dan besok tersedia walau belum ada deteksi sejak 00.00 WIB.
+  t.mock.timers.setTime(kini + 14.5 * JAM);
+  assert.deepEqual((await segarkanHotspot()).hari, [kemarin, hariIni, besok]);
+  const baru = (await bacaHotspot())!;
+  assert.equal(baru.hari, besok);
+  assert.ok(baru.sejak);
+  assert.deepEqual(waktu(baru), new Set([pagiIni.getTime()]));
+  assert.equal(baru.titik[0], ini.titik.find((t) => t[4] * 60000 === pagiIni.getTime()));
+  const kalender = (await bacaHotspot(hariIni))!;
+  assert.equal(kalender.sejak, undefined);
+  assert.deepEqual(waktu(kalender), new Set([pagiIni.getTime()]));
+  assert.deepEqual(waktu((await bacaHotspot(kemarin))!), waktu(lalu));
 });

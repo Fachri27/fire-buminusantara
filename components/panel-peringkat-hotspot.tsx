@@ -25,6 +25,7 @@ const TEKS = {
     ciutkanPanel: "Ciutkan peringkat hotspot",
     bukaPanel: "Buka peringkat hotspot",
     kembaliPeta: "Peta",
+    jam24: "24 jam terakhir",
     dataSampai: (waktu: string) => `Data sampai ${waktu}.`,
     provinsi: "Provinsi",
     kabupaten: "Kabupaten/Kota",
@@ -56,6 +57,7 @@ const TEKS = {
     ciutkanPanel: "Collapse hotspot ranking",
     bukaPanel: "Expand hotspot ranking",
     kembaliPeta: "Map",
+    jam24: "Last 24 hours",
     dataSampai: (waktu: string) => `Data up to ${waktu}.`,
     provinsi: "Provinces",
     kabupaten: "Regencies/Cities",
@@ -284,7 +286,7 @@ function KartuRincian({ rincian: { baris: b, x, y, kiri }, t }: { rincian: Rinci
 }
 
 /**
- * Ringkasan hari: total deteksi S-NPP + NOAA-20, pita bertumpuk per tingkat
+ * Ringkasan hari: total deteksi ketiga satelit, pita bertumpuk per tingkat
  * kepercayaan (warna penanda peta), lalu per satelit dan siang/malam. Dijumlah
  * dari baris provinsi — tiap titik pasti berprovinsi, jadi totalnya sama
  * dengan jumlah kedua tabel.
@@ -326,14 +328,16 @@ function RingkasanHari({ provinsi, t }: { provinsi: BarisPeringkat[]; t: Teks })
               </span>
             ))}
           </p>
-          <dl className="mt-2.5 grid grid-cols-4 gap-1 text-center [@media(max-height:760px)]:hidden">
+          {/* Kisi 6 kolom: baris atas tiga satelit (2 kolom), baris bawah siang & malam (3 kolom) —
+              "TERRA/AQUA" tak muat bila kelimanya sebaris di kolom 300px. */}
+          <dl className="mt-2.5 grid grid-cols-6 gap-1 text-center [@media(max-height:760px)]:hidden">
             {[
-              ...NAMA_SATELIT.map((nama, j) => [nama, total.perSatelit[j]] as const),
-              [t.siang, total.jumlah - total.malam] as const,
-              [t.malam, total.malam] as const,
-            ].map(([label, n]) => (
+              ...NAMA_SATELIT.map((nama, j) => [nama, total.perSatelit[j], "col-span-2"] as const),
+              [t.siang, total.jumlah - total.malam, "col-span-3"] as const,
+              [t.malam, total.malam, "col-span-3"] as const,
+            ].map(([label, n, lebar]) => (
               // dt lebih dulu (urutan sah <dl>), angka tampil di atas lewat flex-col-reverse.
-              <div key={label} className="flex flex-col-reverse rounded-md bg-black/[0.04] py-1 dark:bg-white/[0.06]">
+              <div key={label} className={`${lebar} flex flex-col-reverse rounded-md bg-black/[0.04] py-1 dark:bg-white/[0.06]`}>
                 <dt className="text-[10px] text-tinta/55 dark:text-white/50">{label}</dt>
                 <dd className="text-[12.5px] font-semibold tabular-nums">{angka(n, t)}</dd>
               </div>
@@ -346,7 +350,7 @@ function RingkasanHari({ provinsi, t }: { provinsi: BarisPeringkat[]; t: Teks })
 }
 
 /**
- * Peringkat provinsi & kabupaten/kota menurut hotspot VIIRS S-NPP + NOAA-20
+ * Peringkat provinsi & kabupaten/kota menurut hotspot MODIS + S-NPP + NOAA-20
  * pada hari yang tampil di peta (ikut bilah waktu). Kolom samping peta.tsx;
  * kedua daftar berbagi tinggi kolom, tanpa gulir.
  */
@@ -388,10 +392,11 @@ export function PanelPeringkatHotspot({
             {t.kembaliPeta}
           </button>
           <h2 className="text-sm font-semibold">{t.judul}</h2>
-          {/* key = hari: tanggal baru masuk dengan animasi tiap hari berganti. */}
+          {/* key = hari: tanggal baru masuk dengan animasi tiap hari berganti.
+              Hari terbaru (`sejak`) = 24 jam terakhir, bukan hari kalender. */}
           {data && (
             <p key={data.hari} className="mt-1 text-[13px] font-medium motion-safe:animate-[hari-masuk_350ms_ease-out]">
-              {hariPanjang(data.hari, t)}
+              {data.sejak ? t.jam24 : hariPanjang(data.hari, t)}
             </p>
           )}
         </div>
