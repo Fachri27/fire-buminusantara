@@ -5,6 +5,15 @@ services:
   web:
     image: ghcr.io/ultramenid/fire-buminusantara:${WEB_TAG:-latest}
     restart: unless-stopped
+    # Atap memori. Unggahan laporan disangga utuh di memori (req.formData():
+    # ±3–4× ukuran kiriman, jadi ±400 MB per unggahan 100 MB), dan MariaDB +
+    # MinIO berbagi host ini. Tanpa atap, banjir unggahan membuat OOM killer
+    # host memilih korban — bisa basis datanya. Dengan atap yang mati hanya
+    # container ini, lalu restart di atas menghidupkannya lagi.
+    # 2g ≈ baseline 0,3–0,5 GB + ±3 unggahan 100 MB serentak. Swap = atap
+    # yang sama: tanpa swap, tak ada perlambatan diam-diam sebelum OOM.
+    mem_limit: 2g
+    memswap_limit: 2g
     env_file: .env
     ports:
       - "127.0.0.1:3000:3000"

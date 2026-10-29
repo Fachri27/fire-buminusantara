@@ -71,6 +71,20 @@ const jalankanFfmpeg = promisify(execFile);
 
 let s3Client: S3Client | null = null;
 
+/* Batas waktu klien MinIO.
+ *
+ * Tanpa ini sebuah MinIO yang TAK TERJANGKAU (container mati, lepas dari
+ * jaringan `shared`, nama layanan berubah) membuat setiap permintaan
+ * /media menggantung tanpa akhir: soket menunggu koneksi yang tak pernah
+ * terjadi, peramban memutar spinner selamanya, dan permintaannya menumpuk di
+ * server. Dengan batas ini kegagalannya cepat dan terbaca — route /media lalu
+ * jatuh ke berkas lokal atau menjawab 404.
+ *
+ * requestTimeout adalah batas DIAM soket (bukan total durasi), jadi unggahan
+ * video 100 MB tetap lolos selama datanya mengalir. */
+const BATAS_SAMBUNG_MS = 3000;
+const BATAS_DIAM_MS = 15000;
+
 export function getMinioClient(): S3Client {
   if (s3Client) return s3Client;
 
@@ -80,12 +94,19 @@ export function getMinioClient(): S3Client {
     // MinIO mengabaikan region, tapi SDK v3 mewajibkan isinya untuk tanda tangan v4.
     region: "us-east-1",
     forcePathStyle: true,
-    // Tanpa batas ini, MinIO yang tak menjawab membuat /media menggantung
-    // selamanya alih-alih jatuh ke cadangan lokal.
-    requestHandler: { connectionTimeout: 3000 },
     credentials: { accessKeyId: cfg.accessKey, secretAccessKey: cfg.secretKey },
+    // Objek biasa (bukan NodeHttpHandler): SDK v3 membangun handler-nya
+    // sendiri, jadi tak perlu mengimpor @smithy/node-http-handler yang cuma
+    // dependensi transitif.
+    requestHandler: {
+      connectionTimeout: BATAS_SAMBUNG_MS,
+      requestTimeout: BATAS_DIAM_MS,
+    },
+    // Dua kali coba, bukan tiga: percobaan ketiga hanya memperpanjang
+    // penantian pengunjung saat MinIO memang sedang mati.
+    maxAttempts: 2,
   });
-  
+
   console.log("[MinIO] Client ready for bucket:", cfg.bucket);
   return s3Client;
 }

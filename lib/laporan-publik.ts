@@ -121,6 +121,9 @@ function lampiranDari(media: unknown): Lampiran[] {
 export async function simpanLaporanPublik(
   data: FormData,
   ip: string | null,
+  /** Akun aplikasi mobile pengirim. Pemanggil mengisinya hanya bila kiriman
+   *  tidak anonim — laporan anonim tidak boleh terikat ke akun. */
+  opsi: { pelaporId?: bigint | null } = {},
 ): Promise<HasilLapor> {
   // Captcha diperiksa PALING DULU, sebelum satu berkas pun ditulis: kalau
   // tidak, bot tetap bisa menghabiskan bucket meski laporannya ditolak.
@@ -177,6 +180,12 @@ export async function simpanLaporanPublik(
     };
   }
 
+  // Atap total juga ditegakkan di sini, bukan hanya di form: rute mobile tidak
+  // dijaga bodySizeLimit server action, dan unggah.ts hanya membatasi per berkas.
+  if (berkas.reduce((n, b) => n + b.size, 0) > BATAS_TOTAL_BYTE) {
+    return { ok: false, galat: "Ukuran total lampiran melebihi 100 MB.", bidang: "berkas" };
+  }
+
   // Bukti visual wajib: laporan tanpa foto/video tidak bisa diverifikasi
   // petugas. Klien sudah mencegah, tapi kiriman langsung tetap ditolak di sini.
   if (berkas.length === 0) {
@@ -231,6 +240,7 @@ export async function simpanLaporanPublik(
         location_lng: titikLaporan ? titikLaporan.lng : null,
         status: "pending",
         ip_address: ip,
+        reporter_user_id: opsi.pelaporId ?? null,
         created_at: sekarang,
         updated_at: sekarang,
       },
@@ -545,6 +555,9 @@ export async function aturStatusLaporan(
       if (!promosi.ok) {
         throw new GagalPromosi(promosi.galat); // Rollback transaksi jika pembuatan kejadian gagal
       }
+
+      // Pelapor dari aplikasi membuka kejadian ini dari "Laporanku".
+      await tx.public_reports.update({ where: { id }, data: { event_id: BigInt(promosi.id) } });
 
       return { ok: true as const, idKejadian: promosi.id };
     },

@@ -30,6 +30,8 @@ const KELOMPOK: { judul?: string; tautan: Tautan[] }[] = [
       { href: "/admin/komentar", label: "Komentar", ikon: "balon" },
       { href: "/admin/reaksi", label: "Reaksi", ikon: "senyum" },
       { href: "/admin/suka", label: "Suka", ikon: "jempol" },
+      { href: "/admin/laporan-konten", label: "Laporan konten", ikon: "bendera" },
+      { href: "/admin/siaran", label: "Siaran langsung", ikon: "siaran" },
     ],
   },
   {
@@ -71,6 +73,8 @@ const IKON = {
   gambar: "M2.5 3h11v10h-11zM2.5 10.5 5.5 7.5l3 3 2-2 3 3M10.5 6.5h0",
   terbit: "M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM2.5 8h11M8 2.5c1.5 1.6 2.2 3.4 2.2 5.5S9.5 11.9 8 13.5C6.5 11.9 5.8 10.1 5.8 8S6.5 4.1 8 2.5z",
   kunci: "M13.5 6.5a4 4 0 1 0-5.5 3.7V11h2v2h2v-2.3a4 4 0 0 0 1.5-4.2zM8 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z",
+  bendera: "M3.5 14V2.5M3.5 3h8.5l-2 3 2 3H3.5",
+  siaran: "M8 9.3a1.3 1.3 0 1 0 0-2.6 1.3 1.3 0 0 0 0 2.6zM5.2 10.8a4 4 0 0 1 0-5.6M10.8 5.2a4 4 0 0 1 0 5.6M3.1 12.9a7 7 0 0 1 0-9.8M12.9 3.1a7 7 0 0 1 0 9.8",
 };
 
 export function Ikon({ nama, className = "size-4" }: { nama: Ikon; className?: string }) {
@@ -83,9 +87,11 @@ export function Ikon({ nama, className = "size-4" }: { nama: Ikon; className?: s
 }
 
 /** "Komentar" dan "Reaksi" berbagi awalan jalur — yang pertama dicocokkan
- *  persis, kalau tidak keduanya menyala saat halaman reaksi dibuka. */
+ *  persis, kalau tidak keduanya menyala saat halaman reaksi dibuka. Awalan
+ *  dicocokkan per segmen: /admin/laporan tidak ikut menyala di
+ *  /admin/laporan-konten. */
 function sedangDibuka(jalur: string, t: Tautan) {
-  return t.tepat ? jalur === t.href : jalur.startsWith(t.href);
+  return t.tepat ? jalur === t.href : jalur === t.href || jalur.startsWith(`${t.href}/`);
 }
 
 export function kelompokUntuk(peran: string) {
