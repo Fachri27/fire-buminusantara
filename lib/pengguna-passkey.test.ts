@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
-import { bolehKelola } from "./auth.ts";
+import { BIAYA_BCRYPT, DUMMY_HASH, bolehKelola, emailSah } from "./auth.ts";
+import { lewatBatas, sudahLewat } from "./batas-laju.ts";
 
 // ── 1. Password Hashing (bcrypt / Argon2 / Laravel compatibility) ───────────
 
@@ -42,15 +43,25 @@ test("password hashing: kompatibilitas dengan format bcrypt Laravel ($2y$)", asy
 test("timing attack defense: DUMMY_HASH mencegah user enumeration", async () => {
   // Di lib/auth.ts, jika user tidak ditemukan atau tidak memiliki sandi (mis. Google OAuth),
   // bcrypt.compare(sandi, DUMMY_HASH) tetap dijalankan agar durasi komputasi setara.
-  const DUMMY_HASH = "$2b$10$raZZcYBlcUZi6wIgvywJKuQdE/bK/7Lzs/Ue1exWpUrRUr/pqLfxi";
+  // Biayanya harus sama dengan hash asli (Laravel: 12) — kalau lebih murah,
+  // email yang terdaftar justru menjawab lebih lambat.
+  assert.equal(BIAYA_BCRYPT, 12);
+  assert.equal(bcrypt.getRounds(DUMMY_HASH), BIAYA_BCRYPT);
+  assert.equal(await bcrypt.compare("tebakan-sandi", DUMMY_HASH), false);
+});
 
-  const awal = Date.now();
-  const hasil = await bcrypt.compare("tebakan-sandi", DUMMY_HASH);
-  const durasi = Date.now() - awal;
-
-  assert.equal(hasil, false);
-  // Komparasi bcrypt memakan waktu CPU (work factor 10 ~ puluhan hingga ratusan ms)
-  assert.ok(durasi >= 0);
+test("emailSah: bentuk email biasa, dan masukan jahat tidak backtracking", () => {
+  assert.equal(emailSah("editor@pasopati.id"), true);
+  assert.equal(emailSah("a.b+c@sub.domain.co.id"), true);
+  for (const salah of ["", "tanpa-at", "a@b", "a@b.", "a@.b", "a@b..c", "a b@c.d", "a@b@c.d", `${"a".repeat(250)}@b.cd`]) {
+    assert.equal(emailSah(salah), false, salah);
+  }
+  // Pola lama (/^[^\s@]+@[^\s@]+\.[^\s@]+$/) butuh ±1,6 detik untuk masukan
+  // 40 KB seperti ini (kuadratik); kini ditolak seketika.
+  const awal = performance.now();
+  assert.equal(emailSah(`a@${"b.".repeat(100_000)} `), false);
+  assert.equal(emailSah(`a@${"b.".repeat(100)} `), false);
+  assert.ok(performance.now() - awal < 50);
 });
 
 // ── 2. Otorisasi Peran & Akses Route Admin ──────────────────────────────────
@@ -207,4 +218,29 @@ test("passkey login: penolakan peran yang tidak berhak masuk CMS", () => {
 
   const bolehMasuk = bolehKelola(passkeyUser.users.role);
   assert.equal(bolehMasuk, false, "Akun dengan peran commenter tidak boleh diberi sesi masuk CMS");
+});
+
+test("pihakWebAuthn: memilih asal sesuai host, host asing jatuh ke asal pertama", async () => {
+  const { pihakWebAuthn } = await import("./auth.ts");
+  const daftar = "https://fire.nusantara.earth, https://fire.buminusantara.id,http://localhost:3000";
+  assert.deepEqual(pihakWebAuthn(daftar, "fire.buminusantara.id"), { asal: "https://fire.buminusantara.id", rpID: "fire.buminusantara.id" });
+  assert.deepEqual(pihakWebAuthn(daftar, "localhost:3000"), { asal: "http://localhost:3000", rpID: "localhost" });
+  assert.deepEqual(pihakWebAuthn(daftar, "jahat.com"), { asal: "https://fire.nusantara.earth", rpID: "fire.nusantara.earth" });
+  assert.deepEqual(pihakWebAuthn("https://satu.id", null), { asal: "https://satu.id", rpID: "satu.id" });
+});
+
+test("passkey challenge: sekali pakai — penukaran kedua ditolak (lewatBatas batas 1)", async () => {
+  // ambilTantangan() menandai tantangan terpakai lewat penghitung atomik ini.
+  const c = `tantangan:uji-${Math.random()}`;
+  assert.equal(await lewatBatas(c, 1, 300), false, "penukaran pertama lolos");
+  assert.equal(await lewatBatas(c, 1, 300), true, "putar ulang ditolak");
+});
+
+test("sesi keluar: jti dicabut, token lain tidak ikut", async () => {
+  // hapusSesi() menandai jti; bacaSesi() menolak jti bertanda.
+  const jti = `sesi-cabut:uji-${Math.random()}`;
+  assert.equal(await sudahLewat(jti, 1), false);
+  await lewatBatas(jti, 0, 60);
+  assert.equal(await sudahLewat(jti, 1), true);
+  assert.equal(await sudahLewat(`sesi-cabut:uji-lain-${Math.random()}`, 1), false);
 });

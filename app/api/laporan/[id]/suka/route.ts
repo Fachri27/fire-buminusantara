@@ -1,3 +1,4 @@
+import { dalamJeda, KALI_TANPA_IP, lewatBatasIp } from "@/lib/batas-laju";
 import { ipDari } from "@/lib/turnstile";
 import { prisma } from "@/lib/prisma";
 import { TAYANG } from "@/lib/events";
@@ -11,42 +12,23 @@ import { batalSuka, jumlahSuka, sukai } from "@/lib/suka";
  * Penangkal bot (tanpa captcha — satu ketukan tak pantas dihadang teka-teki):
  *   1. Hanya dari halaman situs ini (Sec-Fetch-Site / Origin).
  *   2. User agent kosong atau milik perkakas/crawler ditolak.
- *   3. Laju per perangkat (ketukan beruntun) dan per IP (jendela 10 menit).
+ *   3. Laju per perangkat (ketukan beruntun) dan per IP (jendela 10 menit,
+ *      lewatBatasIp: IP tak terbaca berbagi satu ember).
  *   4. Batas keras di basis data: paling banyak BATAS_PER_IP suka per IP per
  *      kejadian — tanpa ini, bot cukup mengganti user agent untuk menambah
- *      suka tanpa batas dari satu IP. Kelebihannya ditolak DIAM-DIAM (jawaban
- *      sukses dengan angka apa adanya) supaya bot tak tahu ia terhadang.
+ *      suka tanpa batas dari satu IP. Suka tanpa IP terbaca (ip_address null)
+ *      dihitung sebagai satu IP bersama, dengan batas KALI_TANPA_IP lipat.
+ *      Kelebihannya ditolak DIAM-DIAM (jawaban sukses dengan angka apa adanya)
+ *      supaya bot tak tahu ia terhadang.
  */
 
 const JEDA_MS = 500;
-const JENDELA_IP_MS = 10 * 60_000;
+const JENDELA_IP_DETIK = 10 * 60;
 const MAKS_PER_JENDELA_IP = 60;
 /** Satu IP bisa dipakai bersama (rumah, kantor, NAT operator seluler). */
 const BATAS_PER_IP = 5;
 
 const POLA_BOT = /bot|crawl|spider|slurp|curl|wget|python|httpie|axios|node-fetch|undici|go-http|java\/|okhttp|libwww|headless|phantom|puppeteer|playwright|selenium|scrapy/i;
-
-// ponytail: pembatas laju in-memory per proses, pindah ke Redis bila replika >1.
-const ketukan = new Map<string, number>();
-const jendelaIp = new Map<string, { mulai: number; n: number }>();
-
-function lolosLaju(perangkat: string, ip: string | null): boolean {
-  const sekarang = Date.now();
-  if (ketukan.size > 5000) ketukan.clear();
-  if (jendelaIp.size > 5000) jendelaIp.clear();
-
-  const t = ketukan.get(perangkat);
-  if (t && sekarang - t < JEDA_MS) return false;
-  ketukan.set(perangkat, sekarang);
-
-  if (!ip) return true;
-  const j = jendelaIp.get(ip);
-  if (!j || sekarang - j.mulai > JENDELA_IP_MS) {
-    jendelaIp.set(ip, { mulai: sekarang, n: 1 });
-    return true;
-  }
-  return ++j.n <= MAKS_PER_JENDELA_IP;
-}
 
 function dariSitusIni(req: Request): boolean {
   const situs = req.headers.get("sec-fetch-site");
@@ -73,7 +55,7 @@ async function tangani(req: Request, params: Promise<{ id: string }>, suka: bool
   }
 
   const ip = ipDari(req);
-  if (!lolosLaju(`${ip}|${ua}|${id}`, ip)) {
+  if (dalamJeda(`suka:${ip}|${ua}|${id}`, JEDA_MS) || (await lewatBatasIp("suka-web", ip, MAKS_PER_JENDELA_IP, JENDELA_IP_DETIK))) {
     return Response.json({ message: "Terlalu cepat." }, { status: 429 });
   }
 
@@ -81,8 +63,8 @@ async function tangani(req: Request, params: Promise<{ id: string }>, suka: bool
     return Response.json({ message: "Laporan tidak ditemukan." }, { status: 404 });
   }
 
-  const penuh = suka && ip !== null
-    && (await prisma.event_likes.count({ where: { event_id: id, ip_address: ip } })) >= BATAS_PER_IP;
+  const penuh = suka
+    && (await prisma.event_likes.count({ where: { event_id: id, ip_address: ip } })) >= (ip ? BATAS_PER_IP : BATAS_PER_IP * KALI_TANPA_IP);
   if (!penuh) await (suka ? sukai(id, ip, ua) : batalSuka(id, ip, ua));
   return Response.json({ jumlah: await jumlahSuka(id) });
 }

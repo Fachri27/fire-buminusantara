@@ -1,5 +1,6 @@
 import { after, connection, type NextRequest } from "next/server";
 import { BATAS_BASI_MS, bacaHotspot, segarkanHotspot } from "@/lib/hotspot-firms";
+import { jsonTermampat } from "@/lib/kompres";
 import type { DataHotspot } from "@/lib/lapisan-hotspot";
 
 /**
@@ -16,10 +17,11 @@ import type { DataHotspot } from "@/lib/lapisan-hotspot";
 const JEDA_PICU = 2 * 60 * 1000;
 let picuBerikut = 0;
 
-function kirim(data: DataHotspot) {
+function kirim(req: Request, data: DataHotspot) {
   const sisa = Math.floor((Date.parse(data.diambil) + BATAS_BASI_MS - Date.now()) / 1000);
   const basi = sisa <= 0;
-  return Response.json(
+  return jsonTermampat(
+    req,
     { ...data, basi },
     {
       headers: {
@@ -49,7 +51,7 @@ export async function GET(req: NextRequest) {
       picuBerikut = Date.now() + JEDA_PICU;
       after(() => segarkanHotspot().catch(() => {}));
     }
-    return kirim(data);
+    return kirim(req, data);
   }
 
   // Belum pernah ada salinan: terpaksa menunggu pengambilan pertama.
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest) {
   try {
     await segarkanHotspot();
     const baru = await bacaHotspot(hari);
-    if (baru) return kirim(baru);
+    if (baru) return kirim(req, baru);
   } catch {
     // FIRMS tak terjangkau — galat di bawah.
   }

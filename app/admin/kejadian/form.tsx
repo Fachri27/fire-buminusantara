@@ -13,6 +13,7 @@ import { Pemuat } from "../pemuat";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Kartu } from "../ruang";
 import type { ItemMedia } from "@/lib/media";
+import type { HasilSimpan } from "@/lib/simpan-kejadian";
 
 export type NilaiAwal = {
   id?: number;
@@ -52,11 +53,10 @@ function buatSlug(teks: string): string {
  * menulis laporannya, menaruh waktu & tempatnya, lalu melampirkan medianya.
  */
 export function FormKejadian({
-  awal, aksi, sedangUbah,
+  awal, sedangUbah,
 }: {
+  /** `id` ada = simpan perubahan kejadian itu; tidak ada = tambah baru. */
   awal: NilaiAwal;
-  /** Sukses → id kejadian; gagal → galat untuk bilah simpan. */
-  aksi: (data: FormData) => Promise<{ ok: false; galat: string } | { ok: true; id: number }>;
   sedangUbah: boolean;
 }) {
   const router = useRouter();
@@ -167,7 +167,9 @@ export function FormKejadian({
       }
     }
 
-    return aksi(data);
+    // Route handler, bukan server action: sesi dan ukuran diperiksa server
+    // SEBELUM unggahan 100 MB disangga (lihat app/api/admin/kejadian/route.ts).
+    return fetch(awal.id ? `/api/admin/kejadian?id=${awal.id}` : "/api/admin/kejadian", { method: "POST", body: data });
   }
 
   // `kiriman` dipakai sebagai defaultValue isian tak terkendali: React 19
@@ -175,7 +177,20 @@ export function FormKejadian({
   // Judul EN, deskripsi, orientasi, dan status kembali ke nilai awal.
   const [gagal, kirim] = useActionState(
     async (_s: { galat: string; kiriman: FormData } | null, data: FormData) => {
-      const hasil = await kirimFormulir(data);
+      let hasil: HasilSimpan;
+      try {
+        const r = await kirimFormulir(data);
+        // Sesi habis — seperti wajibSesi() di server action dulu: ke halaman masuk.
+        if (r.status === 401) {
+          router.push("/admin/login");
+          return null;
+        }
+        hasil = await r.json();
+      } catch {
+        // Jaringan putus / jawaban bukan JSON (gateway mati, dsb.): tanpa
+        // tangkapan ini galatnya sampai ke error boundary dan isian hilang.
+        return { galat: "Kiriman terputus sebelum server menjawab. Periksa koneksi lalu coba lagi.", kiriman: data };
+      }
       if (!hasil.ok) return { galat: hasil.galat, kiriman: data };
       // Simpan = tetap di form ini; tambah = buka kejadian barunya.
       if (sedangUbah) {

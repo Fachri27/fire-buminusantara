@@ -1,12 +1,10 @@
 import { revalidatePath } from "next/cache";
-import { penggunaDari, tokenDari } from "@/lib/akun-mobile";
+import { type BarisPengguna, penggunaDari, tokenDari } from "@/lib/akun-mobile";
 import { lewatBatas, lewatBatasIp, sudahLewat, sudahLewatIp } from "@/lib/batas-laju";
-import { BATAS_TOTAL_BYTE, simpanLaporanPublik } from "@/lib/laporan-publik";
+import { bergiliran, buangBadan, tolakUkuran } from "@/lib/batas-laporan";
+import { simpanLaporanPublik } from "@/lib/laporan-publik";
 import { buatTiket, pakaiTiket } from "@/lib/tiket-lapor";
 import { ipDari } from "@/lib/turnstile";
-
-/** Kelonggaran Content-Length di atas atap lampiran: pembatas multipart + isian teks. */
-const CADANGAN_MULTIPART = 1024 * 1024;
 
 /**
  * Brand ISO-BMFF foto HEIF/AVIF (heic, mif1, avif, …). Pendeteksi jenis di
@@ -20,29 +18,21 @@ async function fotoHeif(berkas: File): Promise<boolean> {
   return kepala.toString("latin1", 4, 8) === "ftyp" && BRAND_FOTO_HEIF.test(kepala.toString("latin1", 8, 12));
 }
 
-/** Baca badan sampai habis lalu buang, potong demi potong (memori tetap kecil). */
-async function buangBadan(req: Request): Promise<void> {
-  const pembaca = req.body?.getReader();
-  try {
-    while (pembaca && !(await pembaca.read()).done);
-  } catch {
-    /* klien memutus sendiri — tidak ada yang perlu dijawab */
-  }
-}
-
 /**
  * POST /api/mobile/laporan (multipart) — laporan warga dari aplikasi mobile.
  *
- * Sama dengan kirimLaporan (server action form web), tapi sebagai route
- * handler supaya bisa dipanggil di luar peramban. Field-nya sama persis dengan
- * form web, jadi FormData diteruskan apa adanya ke simpanLaporanPublik().
+ * Padanan POST /api/lapor (form web), dengan sesi akun mobile. Field-nya sama
+ * persis dengan form web, jadi FormData diteruskan apa adanya ke
+ * simpanLaporanPublik().
  *
  * Gerbang anti-bot:
  *   - Dengan token akun dan tidak anonim → akun menggantikan captcha; laporan
  *     tercatat di "Laporanku".
- *   - Tamu atau anonim → wajib `tiket` dari POST /api/mobile/tiket (Turnstile
- *     yang diselesaikan di dalam aplikasi). Laporan anonim tidak pernah
- *     dikaitkan ke akun, meski kirimannya membawa token.
+ *   - Tamu atau anonim → wajib header `X-Tiket-Lapor` berisi tiket dari
+ *     POST /api/mobile/tiket (Turnstile yang diselesaikan di dalam aplikasi).
+ *     Bidang form `tiket` tidak lagi dibaca: memeriksanya berarti menyangga
+ *     seluruh badan dulu. Laporan anonim tidak pernah dikaitkan ke akun, meski
+ *     kirimannya membawa token.
  *
  * Semua yang bisa diputuskan dari header (ukuran, batas laju, sesi) diputuskan
  * SEBELUM badan disangga: route handler jalan begitu header tiba (kecuali
@@ -53,17 +43,9 @@ async function buangBadan(req: Request): Promise<void> {
  * mengirim user agent `okhttp/…`.
  */
 export async function POST(req: Request) {
-  const mulai = Date.now();
-
-  // Rute ini tidak dijaga bodySizeLimit server action (atap form web). Kiriman
-  // tanpa Content-Length (chunked) dihitung ulang di simpanLaporanPublik; atap
-  // kerasnya client_max_body_size di reverse proxy.
-  if (Number(req.headers.get("content-length") ?? 0) > BATAS_TOTAL_BYTE + CADANGAN_MULTIPART) {
-    return Response.json(
-      { ok: false, galat: "Ukuran total lampiran melebihi 100 MB.", bidang: "berkas" },
-      { status: 413 },
-    );
-  }
+  // Kiriman tanpa Content-Length (chunked) dihitung ulang di simpanLaporanPublik.
+  const kebesaran = tolakUkuran(req, false);
+  if (kebesaran) return kebesaran;
 
   // Ember laju yang SAMA dengan form web: 5 laporan / 10 menit / IP. Di sini
   // hanya dibaca; jatahnya dipakai setelah laporan tersimpan, supaya unggahan
@@ -102,6 +84,26 @@ export async function POST(req: Request) {
     );
   }
 
+  // Tiket dari header, dipakai SEBELUM mengambil jatah unggahan: kalau baru
+  // dibaca dari badan, klien tanpa captcha bisa menduduki ketiga jatah dan
+  // setiap warga lain mendapat 503. Tanpa akun = wajib tiket. Dengan akun,
+  // tiket tetap dipakai bila ada — kirimannya mungkin anonim (lihat terima).
+  // Karena dipakai saat permintaan tiba, umur tiket (30 menit) tidak bisa
+  // habis di tengah unggahan lambat.
+  const tiketSah = await pakaiTiket(req.headers.get("x-tiket-lapor"));
+  if (!pengguna && !tiketSah) {
+    await buangBadan(req);
+    return Response.json(
+      { ok: false, galat: "Verifikasi captcha gagal. Coba lagi.", bidang: "captcha" },
+      { status: 422 },
+    );
+  }
+
+  return bergiliran(req, () => terima(req, ip, pengguna, tiketSah));
+}
+
+/** Badan kiriman, disangga utuh di memori — karena itu lewat bergiliran(). */
+async function terima(req: Request, ip: string | null, pengguna: BarisPengguna | null, tiketSah: boolean) {
   let data: FormData;
   try {
     data = await req.formData();
@@ -111,26 +113,17 @@ export async function POST(req: Request) {
 
   const anonim = String(data.get("anonim") ?? "") !== "";
   const pelapor = pengguna && !anonim ? pengguna : null;
-  const tiket = String(data.get("tiket") ?? "");
-  if (!pelapor && tiket) {
-    // Tiket dinilai terhadap saat permintaan TIBA, bukan saat unggahan selesai:
-    // 100 MB di sinyal lambat bisa melewati umur tiket (30 menit), dan tiket
-    // yang sah saat warga menekan Kirim tidak boleh gugur di tengah jalan.
-    // pakaiTiket hanya mengingat nonce 30 menit sejak dipakai, padahal kiriman
-    // ulang yang dimulai sebelum kedaluwarsa bisa selesai jauh setelahnya —
-    // maka tiket yang lolos di rute ini diingat 3 jam supaya tetap sekali pakai.
-    if (!(await pakaiTiket(tiket, mulai)) || (await lewatBatas(`tiket-mobile:${tiket}`, 1, 3 * 3600))) {
-      return Response.json(
-        { ok: false, galat: "Verifikasi captcha gagal. Coba lagi.", bidang: "captcha" },
-        { status: 422 },
-      );
-    }
+  // Akun yang memilih anonim tetap butuh captcha: laporannya tidak terikat ke akun.
+  if (!pelapor && !tiketSah) {
+    return Response.json(
+      { ok: false, galat: "Verifikasi captcha gagal. Coba lagi.", bidang: "captcha" },
+      { status: 422 },
+    );
   }
-  if (pelapor || tiket) {
-    // Tiket sekali pakai dari server sendiri: simpanLaporanPublik tetap satu jalur.
-    data.set("tiket", buatTiket());
-  }
-  if (pelapor && !String(data.get("nama") ?? "").trim()) data.set("nama", pelapor.name);
+  // Tiket sekali pakai dari server sendiri: simpanLaporanPublik tetap satu jalur.
+  data.set("tiket", buatTiket());
+  // Nama TIDAK diisi dari akun bila kosong: nama Google/Apple itu akan tayang
+  // sebagai keterangan media di /api/umpan tanpa warga memilihnya.
 
   for (const b of data.getAll("berkas")) {
     if (b instanceof File && b.size > 0 && (await fotoHeif(b))) {

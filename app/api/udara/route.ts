@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { brotliCompressSync, gzipSync, constants as konstantaZlib } from "node:zlib";
 import { getUdaraMetadata, getUdaraFrame } from "@/lib/udara-reader";
-import { GalatHuluZarr } from "@/lib/zarr-reader";
+import { GalatHuluZarr, STEP_MAKS, adaDiLinimasa, bacaParamFrame } from "@/lib/zarr-reader";
 
 /**
  * Data lapisan "Angin dan Kualitas Udara" (AQI PM2.5 + angin 10 m, CAMS).
@@ -10,10 +10,12 @@ import { GalatHuluZarr } from "@/lib/zarr-reader";
  * lib/udara-reader.ts).
  */
 
-/** Bilangan bulat non-negatif polos — tolak "1.5", "12abc", "-1" sebelum menyentuh ECMWF. */
-const POLA_BILANGAN = /^\d{1,6}$/;
-/** time_step store berisi jam 0..120 (shape 121). */
-const STEP_MAKS = 120;
+/**
+ * Iframe peta Windy (/api/forecasting) di-sandbox tanpa allow-same-origin,
+ * jadi fetch-nya ke sini datang dari origin "null" — data publik tanpa
+ * kredensial, aman dibuka untuk semua origin.
+ */
+const CORS = { "Access-Control-Allow-Origin": "*" };
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -25,6 +27,7 @@ export async function GET(req: NextRequest) {
       const metadata = await getUdaraMetadata(force);
       return NextResponse.json(metadata, {
         headers: {
+          ...CORS,
           "Cache-Control": force
             ? "no-cache, no-store, must-revalidate"
             : "public, max-age=300, s-maxage=600, stale-while-revalidate=1800",
@@ -33,18 +36,17 @@ export async function GET(req: NextRequest) {
     }
 
     if (mode === "frame") {
-      const timeChunkStr = searchParams.get("timeChunk") ?? "";
-      const stepStr = searchParams.get("step") ?? "";
-      const timeInnerStr = searchParams.get("timeInner") ?? "0";
-
-      if (!POLA_BILANGAN.test(timeChunkStr) || !POLA_BILANGAN.test(stepStr) || !/^[01]$/.test(timeInnerStr)) {
-        return NextResponse.json({ error: "Invalid timeChunk, step or timeInner parameter" }, { status: 400 });
+      const param = bacaParamFrame(searchParams);
+      if (!param) {
+        return NextResponse.json(
+          { error: `Invalid timeChunk, step (0..${STEP_MAKS}) or timeInner (0|1) parameter` },
+          { status: 400, headers: CORS }
+        );
       }
-      const timeChunk = Number(timeChunkStr);
-      const step = Number(stepStr);
-      const timeInner = Number(timeInnerStr);
-      if (step > STEP_MAKS) {
-        return NextResponse.json({ error: `step must be 0..${STEP_MAKS}` }, { status: 400 });
+      const { timeChunk, step, timeInner } = param;
+      // Hanya kombinasi linimasa saat ini — timeChunk bebas = 3 unduhan ECMWF per permintaan.
+      if (!(await adaDiLinimasa(timeChunk, step, timeInner))) {
+        return NextResponse.json({ error: "Frame tidak ada di linimasa saat ini" }, { status: 404, headers: CORS });
       }
 
       const { buffer, lengkap } = await getUdaraFrame(timeChunk, step, timeInner);
@@ -57,6 +59,7 @@ export async function GET(req: NextRequest) {
       const terima = req.headers.get("accept-encoding") ?? "";
       let isi: Uint8Array = buffer;
       const kepala: Record<string, string> = {
+        ...CORS,
         "Content-Type": "application/octet-stream",
         "Content-Length": String(buffer.byteLength),
         "Cache-Control": lengkap
@@ -82,13 +85,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ error: `Unknown mode: ${mode}` }, { status: 400 });
+    return NextResponse.json({ error: `Unknown mode: ${mode}` }, { status: 400, headers: CORS });
   } catch (error) {
     console.error("[API udara] Error:", error);
-    const dariHulu = error instanceof GalatHuluZarr;
+    const status = error instanceof GalatHuluZarr ? (error.status === 503 ? 503 : 502) : 500;
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
-      { status: dariHulu ? 502 : 500 }
+      { status, headers: CORS }
     );
   }
 }

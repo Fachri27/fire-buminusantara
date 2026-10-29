@@ -7,6 +7,8 @@ import {
   bukaTokenApple,
   bundleApple,
   masukUjiBoleh,
+  penggunaApple,
+  penggunaGoogle,
   rahasiaKlienApple,
   segelTokenApple,
   sesiKedaluwarsa,
@@ -156,4 +158,51 @@ test("anonimkanMedia: hanya keterangan bernama pelapor yang diganti, entri lain 
   ]);
   assert.equal(anonimkanMedia(media, new Set(["Orang Lain"])).berubah, false);
   assert.deepEqual(anonimkanMedia(null, new Set(["Siti Rahasia"])), { media: null, berubah: false });
+});
+
+/** Prisma palsu lewat globalThis.prisma (dibaca lib/prisma.ts lebih dulu): tabel users sekecil ini. */
+function usersPalsu(t: { after: (f: () => void) => void }, baris: Record<string, unknown>[]) {
+  const ruang = globalThis as { prisma?: unknown };
+  const lama = ruang.prisma;
+  t.after(() => void (ruang.prisma = lama));
+  const ubah: unknown[] = [];
+  const cari = ({ where }: { where: Record<string, unknown> }) =>
+    baris.find((b) => Object.entries(where).every(([k, v]) => b[k] === v)) ?? null;
+  ruang.prisma = {
+    users: {
+      findUnique: async (a: { where: Record<string, unknown> }) => cari(a),
+      update: async (a: unknown) => void ubah.push(a),
+      create: async () => assert.fail("tidak boleh membuat akun baru"),
+    },
+  };
+  return ubah;
+}
+
+const STAF = { id: BigInt(1), name: "Editor", email: "staf@pasopati.id", image: null, role: "editor", google_id: null, apple_id: null };
+const WARGA = { id: BigInt(2), name: "Warga", email: "warga@pasopati.id", image: null, role: "commenter", google_id: null, apple_id: null };
+
+test("penggunaGoogle: email akun staf tidak ditautkan otomatis (409), email warga ditautkan", async (t) => {
+  const ubah = usersPalsu(t, [STAF, WARGA]);
+  const ditolak = await penggunaGoogle({ sub: "g-asing", email: STAF.email, nama: null, foto: null });
+  assert.equal("galat" in ditolak && ditolak.status, 409);
+  assert.equal(ubah.length, 0, "google_id staf tidak disentuh");
+
+  const warga = await penggunaGoogle({ sub: "g-warga", email: WARGA.email, nama: null, foto: null });
+  assert.equal("id" in warga && warga.id, WARGA.id);
+  assert.equal((ubah[0] as { data: { google_id: string } }).data.google_id, "g-warga");
+});
+
+test("penggunaGoogle/Apple: tautan staf yang sudah ada tetap berlaku", async (t) => {
+  usersPalsu(t, [{ ...STAF, google_id: "g-staf", apple_id: "a-staf" }]);
+  const g = await penggunaGoogle({ sub: "g-staf", email: STAF.email, nama: null, foto: null });
+  assert.equal("id" in g && g.id, STAF.id);
+  const a = await penggunaApple({ sub: "a-staf", email: STAF.email, klien: "x" }, "");
+  assert.equal("id" in a && a.id, STAF.id);
+});
+
+test("penggunaApple: email akun staf tidak ditautkan otomatis (409)", async (t) => {
+  const ubah = usersPalsu(t, [STAF]);
+  const ditolak = await penggunaApple({ sub: "a-asing", email: STAF.email, klien: "x" }, "");
+  assert.equal("galat" in ditolak && ditolak.status, 409);
+  assert.equal(ubah.length, 0);
 });

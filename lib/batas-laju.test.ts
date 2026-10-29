@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { emberIp, lewatBatas, lewatBatasIp, sudahLewat, sudahLewatIp } from "./batas-laju.ts";
+import { dalamJeda, emberIp, lewatBatas, lewatBatasIp, sudahLewat, sudahLewatIp } from "./batas-laju.ts";
 
 test("lewatBatas: tanpa Redis, kiriman ke-(batas+1) ditolak per kunci", async () => {
   for (let i = 0; i < 3; i++) assert.equal(await lewatBatas("uji:a", 3, 60), false);
@@ -71,4 +71,26 @@ test("lewatBatasIp: peringatan ip-tak-terbaca hanya di produksi, paling sering s
 
   await lewatBatasIp("uji-peringatan", "198.51.100.3", 100, 60);
   assert.equal(galat.mock.callCount(), 1, "IP terbaca tidak memicu peringatan");
+});
+
+test("dalamJeda: ketukan kedua dalam jeda ditolak, sesudah jeda lolos", async () => {
+  assert.equal(dalamJeda("uji-jeda:a", 200), false);
+  assert.equal(dalamJeda("uji-jeda:a", 200), true);
+  assert.equal(dalamJeda("uji-jeda:b", 200), false, "kunci lain punya jeda sendiri");
+  await new Promise((r) => setTimeout(r, 220));
+  assert.equal(dalamJeda("uji-jeda:a", 200), false);
+});
+
+test("dalamJeda: banjir kunci baru (ganti user agent) tidak menghapus jeda yang masih berjalan", () => {
+  assert.equal(dalamJeda("uji-jeda:korban", 60_000), false);
+  for (let i = 0; i < 6000; i++) dalamJeda(`uji-jeda:banjir-${i}`, 60_000);
+  assert.equal(dalamJeda("uji-jeda:korban", 60_000), true);
+});
+
+test("lewatBatas: pembersihan memori hanya membuang jendela kedaluwarsa", async () => {
+  assert.equal(await lewatBatas("uji:hidup", 1, 60), false);
+  for (let i = 0; i < 10_001; i++) await lewatBatas(`uji:sebentar-${i}`, 1, 1);
+  await new Promise((r) => setTimeout(r, 1100));
+  await lewatBatas("uji:pemicu-bersih", 1, 1);
+  assert.equal(await lewatBatas("uji:hidup", 1, 60), true, "jendela 60 dtk yang masih berjalan tetap terhitung");
 });

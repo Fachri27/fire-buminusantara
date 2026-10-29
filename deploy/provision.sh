@@ -31,8 +31,10 @@ log "  https://github.com/settings/tokens"
 printf 'Token GitHub (input disembunyikan): '
 read -rs TOKEN
 printf '\n'
-ssh "${SSH_OPTS[@]}" "root@$IP" \
-  "printf '%s' '$TOKEN' | docker login ghcr.io -u ultramenid --password-stdin"
+# Token lewat stdin ssh, bukan di string perintah: tidak muncul di `ps` server
+# dan tanda kutip di dalamnya tidak memecah perintah.
+printf '%s' "$TOKEN" | ssh "${SSH_OPTS[@]}" "root@$IP" \
+  "docker login ghcr.io -u ultramenid --password-stdin"
 unset TOKEN
 
 log "kunci .env yang masih butuh nilai manusiawi:"

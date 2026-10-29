@@ -3,6 +3,8 @@
 # Skrip ini berasal dari repo yang barusan di-reset ke origin/main, jadi logika
 # deploy terverSI bersama kode. Rollback adalah jalur kelas satu, bukan renungan.
 set -euo pipefail
+# Dump DB (--all-databases, termasuk hash mysql.user) & .env hanya untuk pemilik.
+umask 077
 
 ROLE="${1:?usage: remote-deploy.sh <role> VAR=tag ...}"
 shift

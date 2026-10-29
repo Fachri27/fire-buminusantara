@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ipDari } from "@/lib/turnstile";
+import { lewatBatasIp } from "@/lib/batas-laju";
 import { namaProvinsiLokal, inferProvinsi, PROVINSI_PETA_NAMA } from "@/lib/wilayah";
 import { provinsiDariTitik } from "@/lib/provinsi-titik";
 import { PUSAT_WILAYAH } from "@/lib/pusat-wilayah";
@@ -31,6 +32,29 @@ import { cariWilayah, kotaTerdekat } from "@/lib/daftar-wilayah";
 
 /** Cadangan bila IP tak terbaca (dev lokal, proxy 0 hop): Monas. */
 const CADANGAN = { lat: -6.1754, lng: 106.8272, label: "DKI Jakarta" };
+
+/**
+ * Batas entri tiap kas dalam-memori di bawah: kuncinya berasal dari query
+ * pengunjung (teks saran, nama, adm4), jadi tanpa batas Map tumbuh terus.
+ * Penuh → buang yang tertua (urutan sisip Map), sama seperti simpanL1 udara.
+ */
+const MAKS_ENTRI_KAS = 500;
+function simpanKas<T>(peta: Map<string, T>, kunci: string, nilai: T): void {
+  peta.delete(kunci); // set ulang → pindah ke ujung antrean
+  while (peta.size >= MAKS_ENTRI_KAS) {
+    const tertua = peta.keys().next().value;
+    if (tertua === undefined) break;
+    peta.delete(tertua);
+  }
+  peta.set(kunci, nilai);
+}
+
+/** Panjang maksimum teks query (saran, q, nama, provinsi) — nama wilayah tak sepanjang ini. */
+const PANJANG_TEKS_MAKS = 100;
+/** Kode desa Kemendagri: 2.2.2.4 digit, mis. 31.71.01.1001. */
+const POLA_ADM4 = /^\d{2}\.\d{2}\.\d{2}\.\d{4}$/;
+/** Per IP: tiap kas meleset memanggil Nominatim/BMKG (batas BMKG 60/menit untuk IP server). */
+const BATAS_PER_MENIT = 60;
 
 /**
  * Kode desa adm4 Kemendagri ibu kota tiap provinsi — SEMUANYA terverifikasi
@@ -214,7 +238,7 @@ async function cuacaBmkg(adm4: string | null): Promise<Cuaca | null> {
     }
     for (const s of baru) gabung.set(s.ms, s);
     const semua = [...gabung.values()].sort((a, b) => a.ms - b.ms);
-    slotKas.set(adm4, { kedaluwarsa: Date.now() + SLOT_TTL, slot: semua });
+    simpanKas(slotKas, adm4, { kedaluwarsa: Date.now() + SLOT_TTL, slot: semua });
     // Blok berjalan (lantai): yang terbaru yang tidak melewati kini.
     let terbaik: Slot | null = null;
     for (const s of semua) {
@@ -399,7 +423,7 @@ async function cariSaranLokasi(q: string): Promise<ItemSaranLokasi[]> {
       adm4: w.adm4,
       tipe: w.tipe,
     }));
-    kasSaran.set(kunciKas, { kedaluwarsa: Date.now() + 15 * 60_000, hasil });
+    simpanKas(kasSaran, kunciKas, { kedaluwarsa: Date.now() + 15 * 60_000, hasil });
     return hasil;
   }
 
@@ -469,7 +493,7 @@ async function cariSaranLokasi(q: string): Promise<ItemSaranLokasi[]> {
     // jika osm gagal, kembalikan hasil yang ada
   }
 
-  kasSaran.set(kunciKas, { kedaluwarsa: Date.now() + 5 * 60_000, hasil });
+  simpanKas(kasSaran, kunciKas, { kedaluwarsa: Date.now() + 5 * 60_000, hasil });
   return hasil;
 }
 
@@ -478,10 +502,14 @@ const KAS_TTL = 10 * 60_000;
 const kas = new Map<string, { kedaluwarsa: number; badan: Record<string, unknown> }>();
 
 export async function GET(req: Request) {
+  if (await lewatBatasIp("cuaca-lokal", ipDari(req), BATAS_PER_MENIT, 60)) {
+    return NextResponse.json({ error: "Terlalu sering. Coba lagi sebentar lagi." }, { status: 429 });
+  }
   const url = new URL(req.url);
   const bahasa = url.searchParams.get("bahasa") === "en" ? "en" : "id";
+  const teks = (nama: string) => url.searchParams.get(nama)?.slice(0, PANJANG_TEKS_MAKS) ?? null;
 
-  const qSaran = url.searchParams.get("saran");
+  const qSaran = teks("saran");
   if (qSaran !== null) {
     const saran = await cariSaranLokasi(qSaran);
     return NextResponse.json(saran, {
@@ -491,16 +519,17 @@ export async function GET(req: Request) {
 
   const qLat = url.searchParams.get("lat");
   const qLng = url.searchParams.get("lng");
-  const q = url.searchParams.get("q");
-  const qNama = url.searchParams.get("nama");
-  const qProv = url.searchParams.get("provinsi");
-  const qAdm4 = url.searchParams.get("adm4");
+  const q = teks("q");
+  const qNama = teks("nama");
+  const qProv = teks("provinsi");
+  const qAdm4 = url.searchParams.get("adm4")?.trim();
 
   let lat: number | null = null;
   let lng: number | null = null;
   let namaLokasi: string | null = null;
   let provinsi: string | null = null;
-  let adm4Kandidat: string | null = qAdm4 && qAdm4.trim() ? qAdm4.trim() : null;
+  // adm4 tak sah diabaikan (bukan 400): ia jadi kunci kas & diteruskan ke BMKG.
+  let adm4Kandidat: string | null = qAdm4 && POLA_ADM4.test(qAdm4) ? qAdm4 : null;
 
   if (qLat !== null && qLng !== null) {
     const pLat = parseFloat(qLat);
@@ -602,7 +631,7 @@ export async function GET(req: Request) {
 
   const nama = namaLokasi ?? provKanonik;
   const badan = { nama, suhu: cuaca.suhu, kodeCuaca: cuaca.kode, siang: cuaca.siang, sumber };
-  kas.set(kunci, { kedaluwarsa: Date.now() + KAS_TTL, badan });
+  simpanKas(kas, kunci, { kedaluwarsa: Date.now() + KAS_TTL, badan });
   return NextResponse.json(badan, {
     headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
   });

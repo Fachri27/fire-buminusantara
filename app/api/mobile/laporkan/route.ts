@@ -1,12 +1,19 @@
 import { revalidateTag } from "next/cache";
 import { galat, penggunaDari } from "@/lib/akun-mobile";
+import { bacaJson } from "@/lib/batas-badan";
 import { lewatBatas } from "@/lib/batas-laju";
 import { catatGalat } from "@/lib/catat-galat";
 import { prisma } from "@/lib/prisma";
 import { ipDari } from "@/lib/turnstile";
 
 const JENIS = ["komentar", "laporan", "siaran"] as const;
-const ALASAN = ["palsu", "tidak-pantas", "kebencian", "spam", "bahaya", "lainnya"] as const;
+/** id komentar / id kejadian (angka), nama ruang siaran (lib/siaran.ts). */
+const POLA_TARGET: Record<(typeof JENIS)[number], RegExp> = {
+  komentar: /^\d{1,18}$/,
+  laporan: /^\d{1,18}$/,
+  siaran: /^siaran-[a-z0-9-]{1,90}$/,
+};
+const ALASAN =["palsu", "tidak-pantas", "kebencian", "spam", "bahaya", "lainnya"] as const;
 /** Komentar disembunyikan otomatis setelah dilaporkan sekian AKUN berbeda. */
 const AMBANG_SEMBUNYI = 3;
 /** Hanya komentar kejadian: tabel comments dipakai bersama halaman Pasopati lain. */
@@ -51,18 +58,20 @@ export async function POST(req: Request) {
     return galat("Terlalu banyak laporan. Coba lagi sebentar lagi.", 429);
   }
 
-  const isi = await req.json().catch(() => null);
+  const isi = await bacaJson(req);
+  if (isi instanceof Response) return isi;
   const jenis = JENIS.find((j) => j === isi?.jenis);
   const alasan = ALASAN.find((a) => a === isi?.alasan);
   const target = String(isi?.id ?? "").trim();
   const catatan = String(isi?.catatan ?? "").trim().slice(0, 500) || null;
-  if (!jenis || !target || target.length > 100) return galat("Konten yang dilaporkan tidak dikenal.", 422);
+  // Bentuk target dikunci per jenis: ia ikut menjadi label alarm di bawah.
+  if (!jenis || !POLA_TARGET[jenis].test(target)) return galat("Konten yang dilaporkan tidak dikenal.", 422);
   if (!alasan) return galat("Pilih alasan laporan.", 422);
 
   // Komentar yang dilaporkan harus komentar kejadian yang memang ada — bukan id
   // tebakan milik halaman lain. Yang sudah disembunyikan tetap boleh dilaporkan.
   const komentar =
-    jenis === "komentar" && /^\d{1,18}$/.test(target)
+    jenis === "komentar"
       ? await prisma.comments.findFirst({ where: { id: BigInt(target), commentable_type: TIPE }, select: { updated_at: true } })
       : null;
   if (jenis === "komentar" && !komentar) return galat("Komentar yang dilaporkan tidak ditemukan.", 404);
@@ -105,9 +114,11 @@ export async function POST(req: Request) {
     }
   }
 
-  // Kabari pengelola lewat webhook alarm yang sudah ada.
+  // Kabari pengelola lewat webhook alarm yang sudah ada. Label per konten:
+  // catatGalat meredam satu label 5 menit, jadi label bersama membuat laporan
+  // konten lain dalam 5 menit itu tidak pernah sampai.
   await catatGalat(
-    "laporan-konten",
+    `laporan-konten ${jenis}:${target}`,
     new Error(`${jenis} ${teksAman(target)} dilaporkan: ${alasan}`),
     catatan ? `catatan pelapor: ${teksAman(catatan)}` : undefined,
   );

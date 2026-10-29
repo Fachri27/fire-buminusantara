@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { AccessToken, RoomServiceClient, ServerError } from "livekit-server-sdk";
 import { lewatBatas } from "./batas-laju.ts";
 import { koordinat } from "./batas-laporan.ts";
+import { saring } from "./komentar.ts";
 import { prisma } from "./prisma.ts";
 
 /**
@@ -71,16 +72,23 @@ const kasar = (n: number) => Math.round(n * 100) / 100;
 
 /** POST /api/mobile/live/token — ruang baru + token pelapor (hanya menerbitkan).
  *  Syarat akun untuk siaran publik diperiksa rute. */
-export async function tokenPelapor(isi: Record<string, unknown> | null, namaAkun: string | null): Promise<Jawaban> {
+export async function tokenPelapor(
+  isi: Record<string, unknown> | null,
+  akun: { id: bigint; name: string } | null,
+): Promise<Jawaban> {
   const k = konfigurasi();
   if (!k) return BELUM_SIAP;
 
-  const judul = String(isi?.judul ?? "").trim();
-  if (!judul) return [422, { galat: "Tulis singkat apa yang sedang terjadi." }];
-  if (judul.length > 255) return [422, { galat: "Judul maksimal 255 karakter." }];
+  const mentah = String(isi?.judul ?? "").trim();
+  if (!mentah) return [422, { galat: "Tulis singkat apa yang sedang terjadi." }];
+  if (mentah.length > 255) return [422, { galat: "Judul maksimal 255 karakter." }];
+  // Judul & nama tampil di beranda semua HP tanpa moderasi lebih dulu: disensor seperti komentar.
+  const judul = saring(mentah);
   const anonim = isi?.anonim === true;
   const publik = isi?.publik === true;
-  const nama = anonim ? "" : (String(isi?.nama ?? "").trim() || namaAkun || "").slice(0, 100);
+  // Siaran publik memakai nama akun, bukan nama ketikan: penanggung jawabnya harus terbaca.
+  const ketikan = publik ? "" : String(isi?.nama ?? "").trim();
+  const nama = anonim ? "" : saring((ketikan || akun?.name || "").slice(0, 100));
   const titik = koordinat(String(isi?.lat ?? ""), String(isi?.lng ?? ""));
   const persis = titik && !("galat" in titik) ? titik : null;
   // Metadata ruang & atribut awal token terbaca semua penonton: ruang publik
@@ -100,6 +108,10 @@ export async function tokenPelapor(isi: Record<string, unknown> | null, namaAkun
   } catch {
     return [502, { galat: "Server siaran tidak bisa dihubungi. Coba lagi nanti." }];
   }
+  // Ruang → akun, di luar metadata ruang (terbaca semua penonton), supaya siaran
+  // yang dilaporkan bisa dilacak ke akunnya.
+  // shortcut: hanya di log container, naikkan ke tabel bila CMS perlu menampilkannya.
+  if (akun) console.info(`[siaran] ${ruang} akun=${akun.id} publik=${publik}`);
 
   const at = new AccessToken(k.kunci, k.rahasia, {
     identity: `${AWALAN_PELAPOR}${acak()}`,
@@ -154,7 +166,10 @@ async function siaranAktif(k: NonNullable<ReturnType<typeof konfigurasi>>): Prom
       return {
         ruang: r.name,
         judul: String(meta.judul ?? r.name),
-        nama: String(peserta.find((p) => p.identity.startsWith(AWALAN_PELAPOR))?.name || meta.nama || "Warga"),
+        // Nama dari metadata ruang (ditulis server), bukan nama peserta: grant
+        // canUpdateOwnMetadata (untuk atribut lokasi) juga membolehkan pelapor
+        // mengganti nama pesertanya sendiri, tanpa saring() & tanpa nama akun.
+        nama: String(meta.nama || (meta.anonim ? "Anonim" : "Warga")),
         mulai: Number(meta.mulai ?? Number(r.creationTime) * 1000),
         lat: angka(a.lat) ?? angka(meta.lat),
         lng: angka(a.lng) ?? angka(meta.lng),

@@ -25,7 +25,9 @@ model users {
   apple_refresh_token String?             @db.Text
   /// Bundle ID (client_id) penerbit token itu: produksi atau varian .preview.
   apple_client_id     String?             @db.VarChar(255)
-  role                users_role          @default(editor)
+  /// Bawaan commenter: baris yang disisipkan aplikasi Laravel tanpa peran
+  /// (mis. akun Google) tidak boleh otomatis menjadi editor CMS.
+  role                users_role          @default(commenter)
   email_verified_at   DateTime?           @db.Timestamp(0)
   password            String?             @db.VarChar(255)
   image               String?             @db.VarChar(255)

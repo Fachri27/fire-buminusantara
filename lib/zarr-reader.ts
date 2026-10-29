@@ -5,8 +5,23 @@ import { awalRiwayat } from "./lapisan-hotspot.ts";
 const ZARR_BASE_URL =
   process.env.CAMS_ZARR_BASE_URL ||
   "https://arco.datastores.ecmwf.int/cadl-arco-time-001/arco/cams_global_atmospheric_composition_forecasts/sfc-multiforecast/timeChunked.zarr";
-const ZARR_TOKEN =
-  process.env.CAMS_ZARR_TOKEN || "fire-watch-827a2651-8e26-4bc1-ac44-9351fcb916af";
+
+/** Batas waktu unduhan ke ECMWF — hulu yang menggantung tak boleh menahan rute.
+ *  Objek metadata kecil; chunk variabel ~1–3 MB dan saat dingin (banyak unduhan
+ *  serentak dari Asia) badannya bisa >30 dtk, jadi batasnya lebih longgar. */
+const BATAS_WAKTU_ECMWF_MS = 30_000;
+const BATAS_WAKTU_CHUNK_MS = 120_000;
+
+/**
+ * URL objek store bertoken. Token WAJIB dari env (tanpa cadangan di kode):
+ * tanpa CAMS_ZARR_TOKEN lapisan asap/udara padam dengan rapi — metadata
+ * cadangan + frame 503 — alih-alih memakai token yang tercatat di git.
+ */
+function urlZarr(jalur: string): string {
+  const token = process.env.CAMS_ZARR_TOKEN;
+  if (!token) throw new GalatHuluZarr("CAMS_ZARR_TOKEN belum diatur di server", 503);
+  return `${ZARR_BASE_URL}/${jalur}?_fet=${token}`;
+}
 
 // Global geospatial grid dimensions for ECMWF CAMS ARCO Zarr (omaod550, pm2p5, u10, v10, …)
 // Lat: -90°S -> +90°N (step 0.4°, 451 rows; baris 0 = kutub selatan)
@@ -91,9 +106,10 @@ export class GalatHuluZarr extends Error {
  * klien sebagai JSON 500/502.
  */
 async function ambilObjekZarr(jalur: string): Promise<Uint8Array> {
+  const url = urlZarr(jalur);
   let res: Response;
   try {
-    res = await fetch(`${ZARR_BASE_URL}/${jalur}?_fet=${ZARR_TOKEN}`);
+    res = await fetch(url, { signal: AbortSignal.timeout(BATAS_WAKTU_CHUNK_MS) });
   } catch (e) {
     throw new GalatHuluZarr(`Failed to fetch Zarr chunk ${jalur}: ${e instanceof Error ? e.message : e}`);
   }
@@ -233,10 +249,52 @@ export async function getZarrMetadata(forceRefresh: boolean = false): Promise<Za
 }
 
 /**
+ * true bila (timeChunk, step, timeInner) ada di linimasa saat ini. Rute frame
+ * hanya melayani kombinasi ini: tanpanya parameter bebas mengisi Redis
+ * bersama dengan frame sampah (timeInner ikut kunci cache, bukan jalur hulu)
+ * dan menghabiskan kuota token ECMWF.
+ */
+export async function adaDiLinimasa(timeChunk: number, step: number, timeInner: number): Promise<boolean> {
+  const { timesteps } = await getZarrMetadata();
+  return timesteps.some((m) => m.timeChunk === timeChunk && m.step === step && m.timeInner === timeInner);
+}
+
+/** Bilangan bulat non-negatif polos — tolak "1.5", "12abc", "-1" sebelum menyentuh ECMWF. */
+const POLA_BILANGAN = /^\d{1,6}$/;
+/** time_step store berisi jam 0..120 (shape 121). */
+export const STEP_MAKS = 120;
+
+/** Parameter frame dari query (/api/sebaran-asap, /api/udara); null = tak sah → 400. */
+export function bacaParamFrame(q: URLSearchParams): { timeChunk: number; step: number; timeInner: number } | null {
+  const timeChunk = q.get("timeChunk") ?? "";
+  const step = q.get("step") ?? "";
+  const timeInner = q.get("timeInner") ?? "0";
+  if (!POLA_BILANGAN.test(timeChunk) || !POLA_BILANGAN.test(step) || !/^[01]$/.test(timeInner)) return null;
+  if (Number(step) > STEP_MAKS) return null;
+  return { timeChunk: Number(timeChunk), step: Number(step), timeInner: Number(timeInner) };
+}
+
+const REDIS_KEY_META = "cams:zarr:metadata";
+/**
+ * Paksa segar (?force / _ts dari pengunjung, cron warm-asap) paling sering
+ * sekali per JEDA_PAKSA_SEGAR_MS per proses: tiap segar = 1 GET + ≤8 HEAD +
+ * 2 GET ke ECMWF. Dalam jeda itu metadata memang baru diambil, jadi cron tak
+ * kehilangan apa pun. Gagal ambil juga diingat selama jeda ini (lihat bawah).
+ */
+const JEDA_PAKSA_SEGAR_MS = 60 * 1000;
+let paksaSegarTerakhir = -Infinity;
+/** Segar ke hulu yang sedang berjalan — permintaan serentak menunggu yang sama. */
+let janjiSegarMetadata: Promise<ZarrMetadataResponse> | null = null;
+
+/**
  * Fetch and parse Zarr metadata to identify available timesteps.
  */
 async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataResponse> {
   const now = Date.now();
+  if (forceRefresh) {
+    if (now - paksaSegarTerakhir < JEDA_PAKSA_SEGAR_MS) forceRefresh = false;
+    else paksaSegarTerakhir = now;
+  }
   // 1. Cek L1 in-memory cache (RAM lokal)
   if (!forceRefresh && cachedMetadata && cachedMetadata.expiresAt > now) {
     const isWarm = frameCache.size >= Math.floor(cachedMetadata.data.timesteps.length * 0.7);
@@ -248,7 +306,6 @@ async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataRes
   }
 
   // 2. Cek L2 Redis cache terpusat
-  const REDIS_KEY_META = "cams:zarr:metadata";
   if (!forceRefresh) {
     const redisMetaStr = await redisGet(REDIS_KEY_META);
     if (redisMetaStr) {
@@ -269,6 +326,17 @@ async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataRes
     }
   }
 
+  // Segar lain bisa rampung selama menunggu Redis di atas — jangan diulang.
+  if (!forceRefresh && cachedMetadata && cachedMetadata.expiresAt > Date.now()) return cachedMetadata.data;
+  janjiSegarMetadata ??= segarkanZarrMetadata().finally(() => {
+    janjiSegarMetadata = null;
+  });
+  return janjiSegarMetadata;
+}
+
+/** Ambil metadata dari ECMWF lalu simpan ke L1 + Redis. Jangan dipanggil langsung — lewat ambilZarrMetadata (single-flight). */
+async function segarkanZarrMetadata(): Promise<ZarrMetadataResponse> {
+  const now = Date.now();
   // Pembersihan pasif berkala jika interval tercapai
   if (now - lastCleanupTime > CLEANUP_INTERVAL_MS) {
     lastCleanupTime = now;
@@ -276,12 +344,12 @@ async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataRes
   }
 
   try {
-    const metaUrl = `${ZARR_BASE_URL}/.zmetadata?_fet=${ZARR_TOKEN}`;
+    const metaUrl = urlZarr(".zmetadata");
     // no-store, bukan revalidate: tembolok fetch Next tersimpan di disk dan
     // basi-sambil-revalidasi — server yang lama mati menyajikan run model
     // berhari-hari lalu pada permintaan pertama, lalu basi itu terkunci di L1
     // selama UMUR_METADATA_MS. L1 + Redis di atas sudah cukup sebagai tembolok.
-    const res = await fetch(metaUrl, { cache: "no-store" });
+    const res = await fetch(metaUrl, { cache: "no-store", signal: AbortSignal.timeout(BATAS_WAKTU_ECMWF_MS) });
     if (!res.ok) {
       throw new Error(`Failed to fetch Zarr metadata: ${res.status} ${res.statusText}`);
     }
@@ -299,8 +367,9 @@ async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataRes
     try {
       for (let susut = 0; susut < 8 && latestTimeIndex > 0; susut++) {
         const chunkUji = Math.floor(latestTimeIndex / 2);
-        const uji = await fetch(`${ZARR_BASE_URL}/omaod550/${chunkUji}.0.0.0?_fet=${ZARR_TOKEN}`, {
+        const uji = await fetch(urlZarr(`omaod550/${chunkUji}.0.0.0`), {
           method: "HEAD",
+          signal: AbortSignal.timeout(BATAS_WAKTU_ECMWF_MS),
         });
         if (uji.ok) break;
         latestTimeIndex--;
@@ -320,7 +389,7 @@ async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataRes
 
     const muatTimeChunk = async (chunkIdx: number) => {
       try {
-        const timeRes = await fetch(`${ZARR_BASE_URL}/time/${chunkIdx}?_fet=${ZARR_TOKEN}`);
+        const timeRes = await fetch(urlZarr(`time/${chunkIdx}`), { signal: AbortSignal.timeout(BATAS_WAKTU_ECMWF_MS) });
         if (!timeRes.ok) return;
         const timeBuf = new Uint8Array(await timeRes.arrayBuffer());
         const decodedTime = await bloscCodec.decode(timeBuf);
@@ -413,8 +482,12 @@ async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataRes
     return result;
   } catch (error) {
     console.error("[ZarrReader] Error fetching metadata:", error);
-    // Fallback if network fails
-    return getFallbackMetadata();
+    // Fallback if network fails — diingat sebentar di L1 saja (bukan Redis):
+    // tanpa ini tiap permintaan (termasuk cek adaDiLinimasa per frame) selama
+    // ECMWF mati mengulang seluruh rantai unduhan metadata.
+    const cadangan = getFallbackMetadata();
+    cachedMetadata = { data: cadangan, expiresAt: now + JEDA_PAKSA_SEGAR_MS };
+    return cadangan;
   }
 }
 

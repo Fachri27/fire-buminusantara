@@ -2,10 +2,14 @@ import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
-import { getConfig, getMinioClient } from "../../../lib/unggah.ts";
+import { getConfig, getMinioClient, kunciMediaPublik } from "../../../lib/unggah.ts";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 const AKAR_MEDIA = path.join(process.cwd(), "media");
+
+/** Sehari, tanpa `immutable`: media yang dihapus atau laporan yang ditolak
+ *  harus hilang dari cache CDN/peramban dalam hitungan jam, bukan setahun. */
+const CACHE_MEDIA = "public, max-age=86400";
 
 const JENIS: Record<string, string> = {
   ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
@@ -29,9 +33,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ path: st
   const ifNoneMatch = req.headers.get("if-none-match");
   const ifModifiedSince = req.headers.get("if-modified-since");
 
-  const res =
-    (await lewatMinio(bagian.join("/"), rentang, ifNoneMatch, ifModifiedSince, req.signal)) ??
-    (await lewatLokal(bagian, rentang, ifNoneMatch, ifModifiedSince));
+  // Hanya kunci unggahan publik (folder dikenal + nama UUID) yang dilayani —
+  // salinan `asli/` ber-EXIF dan kunci lain di bucket tidak pernah sampai ke
+  // MinIO maupun disk.
+  const kunci = kunciMediaPublik(bagian);
+  const res = !kunci
+    ? new Response("Tidak ditemukan.", { status: 404 })
+    : (await lewatMinio(kunci, rentang, ifNoneMatch, ifModifiedSince, req.signal)) ??
+      (await lewatLokal(bagian, rentang, ifNoneMatch, ifModifiedSince));
 
   // HEAD dijalankan Next lewat GET lalu badannya dibuang tanpa ditutup — soket
   // MinIO (atau fd lokal) di baliknya bocor sampai kolam 50 soket penuh.
@@ -76,7 +85,7 @@ async function lewatMinio(
     // 304 Not Modified dari S3
     if (status === 304) {
       const headers: Record<string, string> = {
-        "cache-control": "public, max-age=31536000, immutable",
+        "cache-control": CACHE_MEDIA,
       };
       if (ifNoneMatch) headers["etag"] = ifNoneMatch;
       return new Response(null, { status: 304, headers });
@@ -122,7 +131,7 @@ function tutupAliran(body: unknown): void {
       headers: {
         ...(etag ? { etag } : {}),
         ...(lastModified ? { "last-modified": lastModified } : {}),
-        "cache-control": "public, max-age=31536000, immutable",
+        "cache-control": CACHE_MEDIA,
       },
     });
   }
@@ -139,7 +148,7 @@ function tutupAliran(body: unknown): void {
         headers: {
           ...(etag ? { etag } : {}),
           ...(lastModified ? { "last-modified": lastModified } : {}),
-          "cache-control": "public, max-age=31536000, immutable",
+          "cache-control": CACHE_MEDIA,
         },
       });
     }
@@ -152,7 +161,7 @@ function tutupAliran(body: unknown): void {
   const headers: Record<string, string> = {
     "content-type": jenis,
     "accept-ranges": "bytes",
-    "cache-control": "public, max-age=31536000, immutable",
+    "cache-control": CACHE_MEDIA,
   };
   if (hasil.ContentLength !== undefined) {
     headers["content-length"] = String(hasil.ContentLength);
@@ -211,7 +220,7 @@ async function lewatLokal(
       headers: {
         etag,
         "last-modified": lastModified,
-        "cache-control": "public, max-age=31536000, immutable",
+        "cache-control": CACHE_MEDIA,
       },
     });
   }
@@ -227,7 +236,7 @@ async function lewatLokal(
         headers: {
           etag,
           "last-modified": lastModified,
-          "cache-control": "public, max-age=31536000, immutable",
+          "cache-control": CACHE_MEDIA,
         },
       });
     }
@@ -245,7 +254,7 @@ async function lewatLokal(
   const headers: Record<string, string> = {
     "content-type": jenis,
     "accept-ranges": "bytes",
-    "cache-control": "public, max-age=31536000, immutable",
+    "cache-control": CACHE_MEDIA,
     etag,
     "last-modified": lastModified,
   };

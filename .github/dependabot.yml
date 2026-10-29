@@ -1,0 +1,10 @@
+# Action dan image dasar dipin ke SHA/digest (rantai pasok) — Dependabot yang
+# menggerakkan pin itu supaya tambalan keamanan tetap masuk.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly }

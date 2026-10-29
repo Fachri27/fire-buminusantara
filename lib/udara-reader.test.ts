@@ -9,8 +9,10 @@ import {
   bangunIndeksGridUdara,
   byteAngin,
   byteAqi,
+  getUdaraFrame,
   kemasFrameUdara,
 } from "./udara-reader.ts";
+import { GalatHuluZarr } from "./zarr-reader.ts";
 
 // Grid sintetis berbentuk store ARCO: 451 lintang × 900 bujur, resolusi 0,4°.
 const BARIS_GLOBAL = 451;
@@ -195,4 +197,30 @@ test("kemasFrameUdara: titik kosong → aqi 0 / angin 128; irisan kosong tidak l
   }
   // Satu variabel kosong saja sudah cukup untuk tidak lengkap (jangan di-cache)
   assert.equal(kemasFrameUdara(pm, u, kosong, 0, indeks).lengkap, false);
+});
+
+test("getUdaraFrame mengingat chunk 404 sebentar — permintaan ulang tak mengunduh lagi", async (t) => {
+  const tokenAsli = process.env.CAMS_ZARR_TOKEN;
+  const fetchAsli = globalThis.fetch;
+  process.env.CAMS_ZARR_TOKEN = "token-uji";
+  let panggilan = 0;
+  globalThis.fetch = (async () => {
+    panggilan++;
+    return new Response(null, { status: 404, statusText: "Not Found" });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = fetchAsli;
+    if (tokenAsli === undefined) delete process.env.CAMS_ZARR_TOKEN;
+    else process.env.CAMS_ZARR_TOKEN = tokenAsli;
+  });
+
+  const galat404 = (e: unknown) => e instanceof GalatHuluZarr && e.status === 404;
+  await assert.rejects(getUdaraFrame(424_242, 3, 0), galat404);
+  const setelahPertama = panggilan;
+  assert.ok(setelahPertama > 0, "permintaan pertama menembak hulu");
+
+  // Pasangan timeInner berbagi chunk yang sama — ikut tertolak dari ingatan.
+  await assert.rejects(getUdaraFrame(424_242, 3, 0), galat404);
+  await assert.rejects(getUdaraFrame(424_242, 3, 1), galat404);
+  assert.equal(panggilan, setelahPertama, "tak ada unduhan ECMWF baru");
 });

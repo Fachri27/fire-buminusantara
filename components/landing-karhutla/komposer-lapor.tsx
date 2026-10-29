@@ -7,7 +7,7 @@ import { BATAS_BERKAS, BATAS_TOTAL_BYTE, koordinat, ukuranTeks } from "@/lib/bat
 import { BilahUnggah } from "@/components/bilah-unggah";
 import { ambilPosisi, izinDitolak } from "@/lib/posisi-gps";
 import { galatServerLapor, type Bahasa } from "@/lib/bahasa";
-import { kirimLaporan, mintaTiketLapor, type KeadaanLapor } from "@/app/[locale]/lapor/aksi";
+import { mintaTiketLapor, type KeadaanLapor } from "@/app/[locale]/lapor/aksi";
 import { bacaDraf, simpanDraf } from "@/lib/draf-lapor";
 import { IkonFoto, IkonVideo, IkonPin, IkonOrang } from "./ikon";
 import { TEKS } from "./teks";
@@ -125,7 +125,7 @@ export function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
   }, []);
 
   const [keadaan, aksi, mengirim] = useActionState<KeadaanLapor, FormData>(
-    async (sebelumnya: KeadaanLapor, data: FormData) => {
+    async (_sebelumnya: KeadaanLapor, data: FormData) => {
       try {
         // Token captcha ditukar tiket lebih dulu, lewat permintaan kecil:
         // token hanya hidup 5 menit, unggahan di sinyal lemah bisa lebih lama.
@@ -136,8 +136,11 @@ export function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
           return { ok: false, galat: "Verifikasi captcha gagal. Coba lagi.", bidang: "captcha" as const };
         }
         data.delete("captcha");
-        data.set("tiket", tiket);
-        const hasil = await kirimLaporan(sebelumnya, data);
+        // Route handler, bukan server action: tiket di header diperiksa server
+        // SEBELUM unggahannya disangga (lihat app/api/lapor/route.ts). Jawaban
+        // bukan JSON (gateway mati, dsb.) melempar ke tangkapan di bawah.
+        const r = await fetch("/api/lapor", { method: "POST", headers: { "x-tiket-lapor": tiket }, body: data });
+        const hasil = (await r.json()) as KeadaanLapor;
         if (hasil?.ok) {
           for (const url of urlRef.current) URL.revokeObjectURL(url);
           urlRef.current = [];
@@ -162,7 +165,7 @@ export function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
         // Jaringan putus / server tak menjawab: action melempar, dan tanpa
         // tangkapan ini useActionState meneruskannya ke error boundary — form
         // lepas dan semua isian serta berkas hilang.
-        console.error("[kirimLaporan]", e);
+        console.error("[lapor]", e);
         ulangCaptcha();
         // Pesan klien (bukan galat server), jadi tidak lewat galatServerLapor.
         setGalatKlien(t.kirimTerputus);
@@ -240,6 +243,8 @@ export function KomposerLapor({ bahasa }: { bahasa: Bahasa }) {
       wadah.innerHTML = "";
       widgetRef.current = ts.render(wadah, {
         sitekey: SITE_KEY,
+        // Server menolak token dari widget lain (komentar) — lihat turnstileSah.
+        action: "lapor",
         appearance: "interaction-only",
         callback: (token: string) => {
           setCaptchaToken(token);

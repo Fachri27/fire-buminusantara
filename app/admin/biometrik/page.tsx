@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { wajibSesi } from "@/lib/sesi";
+import { SEGAR_DETIK, sesiSegar, wajibSesi } from "@/lib/sesi";
 import { ISI, KopPanel, Kartu, Hampa } from "../ruang";
 import { TombolHapusPasskey, TombolTambahPasskey } from "../tombol-passkey";
 import { Ikon } from "../menu-admin";
@@ -17,6 +17,7 @@ const NAMA_JALUR: Record<string, string> = {
 /** Passkey milik akun yang sedang masuk — tiap orang mengelola miliknya sendiri. */
 export default async function Biometrik() {
   const sesi = await wajibSesi();
+  const segar = sesiSegar(sesi);
   const daftar = await prisma.passkeys.findMany({
     where: { user_id: sesi.id },
     orderBy: { created_at: "desc" },
@@ -28,9 +29,13 @@ export default async function Biometrik() {
       <KopPanel
         mata="Pengaturan akun"
         judul="Biometrik & Passkey"
-        deskripsi="Masuk cepat dan aman tanpa mengetik kata sandi menggunakan sidik jari, wajah, atau PIN perangkat."
+        deskripsi={
+          segar
+            ? "Masuk cepat dan aman tanpa mengetik kata sandi menggunakan sidik jari, wajah, atau PIN perangkat."
+            : `Demi keamanan, passkey hanya bisa ditambah dalam ${SEGAR_DETIK / 60} menit setelah masuk. Keluar lalu masuk lagi untuk menambahkannya.`
+        }
       >
-        <TombolTambahPasskey />
+        <TombolTambahPasskey segar={segar} />
       </KopPanel>
 
       <div className={ISI}>

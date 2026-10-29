@@ -211,6 +211,12 @@ const TTL_REDIS_DETIK = 24 * 3600;
 const cacheFrameUdara = new Map<string, { buffer: Uint8Array; lengkap: boolean; expiresAt: number }>();
 /** Unduhan chunk yang sedang berjalan, per (timeChunk, step) — dipakai bersama kedua timeInner. */
 const sedangDiunduh = new Map<string, Promise<{ buffer: Uint8Array; lengkap: boolean }[]>>();
+/**
+ * Chunk yang dijawab 404 oleh ECMWF (belum/tak pernah ditulis), per
+ * (timeChunk, step): galatnya diulang selama UMUR_L1_KOSONG_MS tanpa tiga
+ * unduhan baru tiap permintaan. Kuncinya dibatasi linimasa oleh rute.
+ */
+const chunk404 = new Map<string, { galat: GalatHuluZarr; expiresAt: number }>();
 let janjiIndeksGrid: Promise<IndeksGridUdara> | null = null;
 let pembersihanTerakhir = Date.now();
 
@@ -223,6 +229,9 @@ const kunciRedis = (timeChunk: number, step: number, timeInner: number) =>
 function bersihkanCacheUdaraKedaluwarsa(sekarang: number): void {
   for (const [kunci, entri] of cacheFrameUdara.entries()) {
     if (entri.expiresAt <= sekarang) cacheFrameUdara.delete(kunci);
+  }
+  for (const [kunci, entri] of chunk404.entries()) {
+    if (entri.expiresAt <= sekarang) chunk404.delete(kunci);
   }
 }
 
@@ -315,9 +324,18 @@ export async function getUdaraFrame(
 
   // 3. ECMWF — permintaan serentak untuk chunk yang sama menunggu satu unduhan
   const kunciChunk = `${timeChunk}_${step}`;
+  const tak404 = chunk404.get(kunciChunk);
+  if (tak404 && tak404.expiresAt > sekarang) throw tak404.galat;
   let janji = sedangDiunduh.get(kunciChunk);
   if (!janji) {
-    janji = unduhDanKemasChunk(timeChunk, step).finally(() => sedangDiunduh.delete(kunciChunk));
+    janji = unduhDanKemasChunk(timeChunk, step)
+      .catch((e: unknown) => {
+        if (e instanceof GalatHuluZarr && e.status === 404) {
+          chunk404.set(kunciChunk, { galat: e, expiresAt: Date.now() + UMUR_L1_KOSONG_MS });
+        }
+        throw e;
+      })
+      .finally(() => sedangDiunduh.delete(kunciChunk));
     sedangDiunduh.set(kunciChunk, janji);
   }
   return (await janji)[timeInner];

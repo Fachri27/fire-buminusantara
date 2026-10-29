@@ -7,7 +7,7 @@ import { TEKS_LAPOR, galatServerLapor, type Bahasa } from "@/lib/bahasa";
 import { BilahUnggah } from "@/components/bilah-unggah";
 import { ambilPosisi, izinDitolak } from "@/lib/posisi-gps";
 import { Switch } from "@/components/ui/switch";
-import { kirimLaporan, mintaTiketLapor, type KeadaanLapor } from "./aksi";
+import { mintaTiketLapor, type KeadaanLapor } from "./aksi";
 
 /** Site key Turnstile. Tanpa ini (pengembangan) widget tidak dirender dan
  *  verifikasi di server pun dilewati — sama seperti kolom komentar. */
@@ -126,7 +126,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
   }, []);
 
   const [keadaan, aksi, mengirim] = useActionState<KeadaanLapor, FormData>(
-    async (sebelumnya: KeadaanLapor, data: FormData) => {
+    async (_sebelumnya: KeadaanLapor, data: FormData) => {
       try {
         // Token captcha ditukar tiket lebih dulu, lewat permintaan kecil:
         // token hanya hidup 5 menit, unggahan di sinyal lemah bisa lebih lama.
@@ -137,8 +137,11 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
           return { ok: false, galat: "Verifikasi captcha gagal. Coba lagi.", bidang: "captcha" as const };
         }
         data.delete("captcha");
-        data.set("tiket", tiket);
-        const hasil = await kirimLaporan(sebelumnya, data);
+        // Route handler, bukan server action: tiket di header diperiksa server
+        // SEBELUM unggahannya disangga (lihat app/api/lapor/route.ts). Jawaban
+        // bukan JSON (gateway mati, dsb.) melempar ke tangkapan di bawah.
+        const r = await fetch("/api/lapor", { method: "POST", headers: { "x-tiket-lapor": tiket }, body: data });
+        const hasil = (await r.json()) as KeadaanLapor;
         if (hasil?.ok) {
           for (const url of urlRef.current) URL.revokeObjectURL(url);
           urlRef.current = [];
@@ -152,7 +155,7 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
         // Jaringan putus / server tak menjawab: action melempar, dan tanpa
         // tangkapan ini useActionState meneruskannya ke error boundary — form
         // lepas dan semua isian serta berkas hilang.
-        console.error("[kirimLaporan]", e);
+        console.error("[lapor]", e);
         ulangCaptcha();
         // Pesan klien (bukan galat server), jadi tidak lewat galatServerLapor.
         setGalatKlien(teks.kirimTerputus);
@@ -226,6 +229,8 @@ export function FormLaporan({ bahasa }: { bahasa: Bahasa }) {
 
       widgetRef.current = ts.render(wadah, {
         sitekey: SITE_KEY,
+        // Server menolak token dari widget lain (komentar) — lihat turnstileSah.
+        action: "lapor",
         appearance: "interaction-only",
         callback: (token: string) => {
           setCaptchaToken(token);

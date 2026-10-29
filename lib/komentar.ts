@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import { prisma } from "./prisma.ts";
+import { umumkanHitung } from "./suka.ts";
 import kataKasar from "./kata-kasar.json" with { type: "json" };
 
 /** Model polimorfik dipakai bersama halaman lain di Pasopati; nilainya harus
@@ -37,16 +38,21 @@ function hmacPenulis(kunci: string): string {
 /** Email pengganti di komentar akun yang sudah dihapus — lihat emailAkunDihapus(). */
 const POLA_AKUN_DIHAPUS = /^penulis-([0-9a-f]{16})@akun-dihapus\.invalid$/;
 
+/** Bentuk email form komentar web. Kelas karakter tiap bagian tidak saling
+ *  tumpang-tindih (titik hanya sebagai pemisah), jadi tidak bisa backtracking
+ *  kuadratik seperti /^[^\s@]+@[^\s@]+\.[^\s@]+$/ pada masukan panjang. */
+export const POLA_EMAIL = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
+
 /**
- * Kunci: akun → email → komentar itu sendiri. Komentar tanpa identitas (form
- * web "Anonim") TIDAK dikunci IP atau nama: satu IP CGNAT dan nama "Anonim"
- * dipakai banyak orang, jadi Blokir satu ikut menyembunyikan semuanya — dan
- * komentar anonim jadi bisa dikaitkan satu sama lain.
+ * Kunci: akun → komentar itu sendiri. Bukan email: email form web diketik
+ * tanpa verifikasi, jadi mengetik email orang lain akan meminjam penandanya
+ * (dan Blokir terhadap si peniru ikut menyembunyikan korbannya). Bukan pula IP
+ * atau nama: satu IP CGNAT dan nama "Anonim" dipakai banyak orang.
  */
 function penandaPenulis(k: { id: bigint; user_id: bigint | null; email: string | null }): string {
   const dihapus = k.email?.match(POLA_AKUN_DIHAPUS);
   if (dihapus) return dihapus[1];
-  return hmacPenulis(k.user_id ? `u:${k.user_id}` : k.email ? `e:${k.email.toLowerCase()}` : `k:${k.id}`);
+  return hmacPenulis(k.user_id ? `u:${k.user_id}` : `k:${k.id}`);
 }
 
 /**
@@ -188,7 +194,7 @@ export async function simpanKomentar(input: {
   /** Akun aplikasi mobile yang menulis; form web tidak punya akun. */
   userId?: bigint | null;
 }) {
-  return await prisma.$transaction(async (tx) => {
+  const baris = await prisma.$transaction(async (tx) => {
     let parentId: bigint | null = null;
     let mentionName: string | null = null;
 
@@ -232,4 +238,6 @@ export async function simpanKomentar(input: {
       },
     });
   });
+  umumkanHitung(input.eventId);
+  return baris;
 }

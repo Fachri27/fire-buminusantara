@@ -4,15 +4,21 @@
 
 ```bash
 docker run -d \
-  -p 9000:9000 \
-  -p 9001:9001 \
-  -p 9000-9100:9000-9100 \
+  -p 127.0.0.1:9000:9000 \
+  -p 127.0.0.1:9001:9001 \
   --name minio \
   -e MINIO_ROOT_USER=minioadmin \
   -e MINIO_ROOT_PASSWORD=minio123 \
   -v /path/to/data:/data \
   minio/minio server /data --console-address ":9001"
 ```
+
+> **Hanya untuk laptop pengembang.** Di server: port WAJIB diikat ke
+> `127.0.0.1` (atau tanpa `-p` sama sekali — app memanggil `http://minio:9000`
+> lewat jaringan docker `shared`), dan `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`
+> diganti nilai acak (`openssl rand -base64 32`). Port yang dipublikasikan
+> Docker **melewati ufw** — firewall host tidak melindungi `-p 9001:9001`, jadi
+> konsol MinIO dengan kredensial bawaan akan terbuka ke internet.
 
 ## 2. Buka Web Console
 

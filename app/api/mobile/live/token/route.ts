@@ -1,4 +1,5 @@
 import { penggunaDari } from "@/lib/akun-mobile";
+import { bacaJson } from "@/lib/batas-badan";
 import { lewatBatas, lewatBatasIp } from "@/lib/batas-laju";
 import { tokenPelapor } from "@/lib/siaran";
 import { ipDari } from "@/lib/turnstile";
@@ -6,7 +7,7 @@ import { ipDari } from "@/lib/turnstile";
 /**
  * POST /api/mobile/live/token { judul, nama, anonim, publik, lat, lng }
  * → { url, token, ruang }. Dengan token akun (dan tidak anonim), nama pelapor
- * diambil dari akun bila kosong.
+ * diambil dari akun bila kosong — siaran publik selalu memakai nama akun.
  *
  * Siaran publik (tampil di beranda semua warga, tanpa moderasi lebih dulu)
  * wajib akun dan tidak boleh anonim — harus ada yang bisa dilaporkan dan
@@ -18,7 +19,8 @@ export async function POST(req: Request) {
   if (await lewatBatasIp("live", ip, 3, 600)) {
     return Response.json({ galat: "Terlalu banyak siaran dari jaringan ini. Coba lagi nanti." }, { status: 429 });
   }
-  const isi = await req.json().catch(() => null);
+  const isi = await bacaJson(req);
+  if (isi instanceof Response) return isi;
   if (!isi) return Response.json({ galat: "Kiriman tidak bisa dibaca server." }, { status: 400 });
   const publik = isi.publik === true;
   if (publik && isi.anonim === true) {
@@ -31,6 +33,6 @@ export async function POST(req: Request) {
   if (pengguna && (await lewatBatas(`live-akun:${pengguna.id}`, 3, 600))) {
     return Response.json({ galat: "Terlalu banyak siaran. Coba lagi nanti." }, { status: 429 });
   }
-  const [status, jawab] = await tokenPelapor(isi, pengguna?.name ?? null);
+  const [status, jawab] = await tokenPelapor(isi, pengguna);
   return Response.json(jawab, { status });
 }

@@ -6,7 +6,6 @@ import { ISI, KopPanel, Kartu } from "../../ruang";
 import { FormKejadian } from "../form";
 import { TombolTayang } from "../tombol-tayang";
 import { TombolHapus } from "./tombol-hapus";
-import { aksiUbahKejadian } from "../aksi";
 
 export default async function Ubah({ params }: { params: Promise<{ id: string }> }) {
   const sesi = await wajibSesi();
@@ -34,7 +33,6 @@ export default async function Ubah({ params }: { params: Promise<{ id: string }>
         <FormKejadian
           key={e.updated_at?.toISOString() ?? "awal"}
           sedangUbah
-          aksi={aksiUbahKejadian.bind(null, id)}
           awal={{
             id,
             title_id: e.title_id,

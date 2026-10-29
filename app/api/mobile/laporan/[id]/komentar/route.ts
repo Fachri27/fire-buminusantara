@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { galat, penggunaDari } from "@/lib/akun-mobile";
+import { bacaJson } from "@/lib/batas-badan";
 import { lewatBatas } from "@/lib/batas-laju";
 import { TAYANG } from "@/lib/events";
 import { bentukKomentar, simpanKomentar } from "@/lib/komentar";
@@ -25,7 +26,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return galat("Laporan tidak ditemukan.", 404);
   }
 
-  const isi = await req.json().catch(() => null);
+  const isi = await bacaJson(req);
+  if (isi instanceof Response) return isi;
   const teks = String(isi?.isi ?? "").trim();
   if (!teks) return galat("Komentar wajib diisi.", 422);
   if (teks.length > BATAS_ISI) return galat(`Komentar maksimal ${BATAS_ISI} karakter.`, 422);
@@ -35,7 +37,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return galat("Mohon tunggu beberapa detik sebelum mengirim komentar lagi.", 429);
   }
 
-  const balasKe = Number.isInteger(Number(isi?.balas_ke)) && Number(isi.balas_ke) > 0 ? Number(isi.balas_ke) : null;
+  const balasKe = Number.isInteger(Number(isi?.balas_ke)) && Number(isi?.balas_ke) > 0 ? Number(isi?.balas_ke) : null;
   let baris;
   try {
     baris = await simpanKomentar({ eventId: id, nama: p.name, email: p.email, isi: teks, balasKe, ip: ipDari(req), userId: p.id });

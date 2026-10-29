@@ -1,4 +1,5 @@
 import { buatSesiMobile, masukUjiBoleh, penggunaUji, publik } from "@/lib/akun-mobile";
+import { bacaJson } from "@/lib/batas-badan";
 
 /**
  * POST /api/mobile/masuk/uji { nama } → { token, pengguna }
@@ -9,7 +10,8 @@ import { buatSesiMobile, masukUjiBoleh, penggunaUji, publik } from "@/lib/akun-m
  */
 export async function POST(req: Request) {
   if (!masukUjiBoleh()) return new Response(null, { status: 404 });
-  const isi = await req.json().catch(() => null);
+  const isi = await bacaJson(req);
+  if (isi instanceof Response) return isi;
   const pengguna = await penggunaUji(String(isi?.nama ?? ""));
   return Response.json({ token: await buatSesiMobile(pengguna.id), pengguna: publik(pengguna) });
 }

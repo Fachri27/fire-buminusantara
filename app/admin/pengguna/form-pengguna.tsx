@@ -69,7 +69,7 @@ export function FormPengguna({ id, awal, diriSendiri = false }: {
       </Kartu>
 
       <Kartu judul="Kata sandi"
-             deskripsi={baru ? "Minimal 8 karakter." : "Kosongkan untuk tetap. Mengganti sandi mengeluarkan sesi lama akun ini."}
+             deskripsi={baru ? "Minimal 8 karakter." : "Kosongkan untuk tetap. Mengganti sandi mengeluarkan sesi lama dan mencabut semua passkey akun ini."}
              kaki={<>
                <TombolKirim>{baru ? "Tambah pengguna" : "Simpan perubahan"}</TombolKirim>
                <Link href="/admin/pengguna" className="cms-tombol cms-tombol--hantu">Batal</Link>

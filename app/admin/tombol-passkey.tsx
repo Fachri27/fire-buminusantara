@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { hapusPasskey, masukPasskey, opsiDaftarPasskey, opsiMasukPasskey, simpanPasskey } from "./aksi-passkey";
+import { keluar } from "./aksi-sesi";
 import { TombolKonfirmasi } from "./tombol-konfirmasi";
 import { Pemuat } from "./pemuat";
 import { kabari } from "./toko";
@@ -53,10 +54,23 @@ export function TombolMasukPasskey() {
   );
 }
 
-/** Daftarkan perangkat ini (atau ponsel lewat QR) sebagai passkey akun. */
-export function TombolTambahPasskey() {
+/** Daftarkan perangkat ini (atau ponsel lewat QR) sebagai passkey akun.
+ *  `segar` = sesi masih dalam batas sesiSegar(); kalau tidak, server pasti
+ *  menolak, jadi yang ditawarkan langsung masuk ulang. */
+export function TombolTambahPasskey({ segar }: { segar: boolean }) {
   const [sibuk, mulai] = useTransition();
   const router = useRouter();
+
+  if (!segar) {
+    return (
+      <form action={keluar}>
+        <button type="submit" className="cms-tombol cms-tombol--utama">
+          <Ikon nama="keluar" className="size-3.5" />
+          Masuk ulang untuk menambah
+        </button>
+      </form>
+    );
+  }
 
   const tambah = () => mulai(async () => {
     try {

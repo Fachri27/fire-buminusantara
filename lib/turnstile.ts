@@ -13,10 +13,34 @@
  *     tanpa gejala apa pun. Menutup di produksi memaksa kesalahan itu terlihat
  *     (semua kiriman ditolak) alih-alih membiarkannya jadi lubang senyap.
  */
+import { catatGalat } from "./catat-galat.ts";
+import { URL_SITUS } from "./situs.ts";
+
 // Kunci in-flight untuk mencegah dua permintaan paralel menggunakan token yang sama secara bersamaan
 const tokenInFlight = new Set<string>();
 
-export async function turnstileSah(token: string | null, ip: string | null): Promise<boolean> {
+/**
+ * Hostname tempat widget boleh diselesaikan: asal NEXT_PUBLIC_SITE_URL plus
+ * WEBAUTHN_ORIGIN (daftar koma, semua domain yang melayani situs — termasuk
+ * domain API aplikasi, yang menyajikan halaman /api/mobile/captcha).
+ */
+function hostSah(): Set<string> {
+  const hasil = new Set<string>();
+  for (const asal of [URL_SITUS, ...(process.env.WEBAUTHN_ORIGIN ?? "").split(",")]) {
+    try {
+      hasil.add(new URL(asal.trim()).hostname);
+    } catch {}
+  }
+  // localhost hanya untuk pengembangan, walau tertulis di daftar asal produksi.
+  hasil.delete("localhost");
+  return hasil;
+}
+
+/**
+ * `aksi` (opsional) harus sama dengan opsi `action` widget yang menerbitkan
+ * token — mis. token widget laporan (tanpa action) tidak berlaku untuk komentar.
+ */
+export async function turnstileSah(token: string | null, ip: string | null, aksi?: string): Promise<boolean> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) {
     // Fail-open HANYA di pengembangan; di produksi tidak ada secret = tidak lolos.
@@ -46,7 +70,14 @@ export async function turnstileSah(token: string | null, ip: string | null): Pro
       signal: AbortSignal.timeout(10_000),
     });
     const data = await r.json();
-    return Boolean(data?.success);
+    if (!data?.success) return false;
+    // Di luar produksi kunci uji Cloudflare menjawab hostname/action tiruan, dan
+    // halaman dibuka dari localhost/IP LAN — pencocokan hanya di produksi.
+    if (process.env.NODE_ENV !== "production") return true;
+    if (hostSah().has(data.hostname) && (!aksi || data.action === aksi)) return true;
+    // Token sah dari halaman lain (domain belum didaftarkan = salah konfigurasi, atau peniru).
+    void catatGalat("turnstile-tak-cocok", new Error(`hostname "${data.hostname}" action "${data.action}"`), `harap aksi "${aksi ?? "-"}"`);
+    return false;
   } catch {
     return false;
   } finally {

@@ -109,14 +109,15 @@ function lampiranDari(media: unknown): Lampiran[] {
 /**
  * Terima satu laporan dari pengunjung.
  *
- * CATATAN METADATA — berkas gambar disimpan APA ADANYA, byte demi byte:
- * `simpanBerkasGaleri()` meneruskan hasil `arrayBuffer()` langsung ke MinIO
- * tanpa dekode ulang, jadi EXIF (waktu pengambilan, koordinat GPS, model
- * kamera) ikut utuh sampai ke bucket. Jangan sisipkan pengubah ukuran,
- * kompresor, atau apa pun yang menggambar ulang berkasnya di jalur ini —
- * begitu gambarnya di-encode ulang, metadata itu hilang dan tidak bisa
- * dipulihkan. Alasannya bukan kerapian: bagi laporan karhutla, EXIF-lah bukti
- * kapan dan di mana fotonya diambil.
+ * CATATAN METADATA — `simpanBerkasGaleri()` menyimpan DUA salinan tiap
+ * berkas: `asli/<uuid>.<ext>` byte demi byte (EXIF utuh: waktu pengambilan,
+ * GPS, model kamera — bukti bagi peninjau, TIDAK pernah dilayani /media) dan
+ * versi publik di `gambar/`/`video/` yang metadatanya sudah dibuang tanpa
+ * encode ulang. Versi publik itulah yang bisa diunduh siapa pun, termasuk
+ * untuk laporan anonim — jangan pernah menautkan atau menyalin salinan asli
+ * ke tempat publik. GPS & waktu EXIF dibaca dari berkas kiriman SEBELUM
+ * diunggah (`exifDariBerkas`) dan disimpan di kolom `media`: itulah catatan
+ * bukti utama; `exifDariPath()` membaca salinan asli bila perlu.
  */
 export async function simpanLaporanPublik(
   data: FormData,
@@ -132,7 +133,7 @@ export async function simpanLaporanPublik(
   const tiket = String(data.get("tiket") ?? "");
   const lolos = tiket
     ? await pakaiTiket(tiket)
-    : await turnstileSah(String(data.get("captcha") ?? "") || null, ip);
+    : await turnstileSah(String(data.get("captcha") ?? "") || null, ip, "lapor");
   if (!lolos) {
     return { ok: false, galat: "Verifikasi captcha gagal. Coba lagi.", bidang: "captcha" };
   }

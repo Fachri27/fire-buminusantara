@@ -9,6 +9,7 @@
     "lint": "eslint",
     "seed": "node prisma/seed.mjs",
     "backfill:poster": "node prisma/backfill-poster.mjs",
+    "backfill:strip-exif": "node prisma/backfill-strip-exif.mjs",
     "backfill:lokasi": "node prisma/backfill-lokasi.mjs",
     "seed:media": "node prisma/seed-media.mjs",
     "seed:media:kejadian": "node prisma/seed-media-kejadian.mjs",

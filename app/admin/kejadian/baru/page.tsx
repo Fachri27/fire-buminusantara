@@ -1,7 +1,6 @@
 import { wajibSesi } from "@/lib/sesi";
 import { ISI, KopPanel } from "../../ruang";
 import { FormKejadian } from "../form";
-import { aksiTambahKejadian } from "../aksi";
 
 export default async function Tambah() {
   await wajibSesi();
@@ -15,7 +14,7 @@ export default async function Tambah() {
         kembali="/admin/kejadian"
       />
       <div className={ISI}>
-        <FormKejadian sedangUbah={false} aksi={aksiTambahKejadian}
+        <FormKejadian sedangUbah={false}
           awal={{
             title_id: "", title_en: "", slug: "",
             description_id: "", description_en: "",

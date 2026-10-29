@@ -1,9 +1,10 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "./prisma";
+import { lewatBatas, sudahLewat } from "./batas-laju";
 
 const NAMA_COOKIE = "fire_sesi";
 const UMUR = 60 * 60 * 8; // 8 jam
@@ -14,7 +15,8 @@ function kunci() {
   return new TextEncoder().encode(rahasia);
 }
 
-export type Sesi = { id: number; nama: string; peran: string };
+/** `iat`: detik Unix saat token diterbitkan — hanya diisi bacaSesi(). */
+export type Sesi = { id: number; nama: string; peran: string; iat?: number };
 
 /**
  * Sesi CMS, disimpan sebagai JWT bertanda tangan di cookie httpOnly.
@@ -29,6 +31,7 @@ export async function buatSesi(sesi: Sesi) {
   const token = await new SignJWT({ ...sesi, sv: sidikSandi(akun?.password) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
+    .setJti(randomUUID())
     .setExpirationTime(`${UMUR}s`)
     .sign(kunci());
 
@@ -65,16 +68,46 @@ export const bacaSesi = cache(async (): Promise<Sesi | null> => {
   }
   const id = Number(payload.id);
   if (!Number.isSafeInteger(id) || id <= 0) return null;
+  // Token tanpa jti (terbit sebelum ada daftar cabut) tidak bisa dicabut — tolak.
+  if (typeof payload.jti !== "string" || (await sudahLewat(kunciCabut(payload.jti), 1))) return null;
   const akun = await prisma.users.findUnique({
     where: { id },
     select: { name: true, role: true, password: true },
   });
   if (!akun || !bolehKelola(akun.role) || payload.sv !== sidikSandi(akun.password)) return null;
-  return { id, nama: akun.name, peran: akun.role };
+  return { id, nama: akun.name, peran: akun.role, iat: payload.iat };
 });
 
+/**
+ * Daftar cabut token yang sudah "Keluar": salinan cookie yang dicuri tidak
+ * berlaku lagi sampai sisa umurnya habis. Memakai penghitung lib/batas-laju —
+ * Redis dengan TTL, cadangan memori proses saat Redis mati (tidak fail-open).
+ */
+const kunciCabut = (jti: string) => `sesi-cabut:${jti}`;
+
 export async function hapusSesi() {
-  (await cookies()).delete({ name: NAMA_COOKIE, path: "/" });
+  const toko = await cookies();
+  const token = toko.get(NAMA_COOKIE)?.value;
+  toko.delete({ name: NAMA_COOKIE, path: "/" });
+  if (!token) return;
+  try {
+    const { payload } = await jwtVerify(token, kunci());
+    const sisa = (payload.exp ?? 0) - Math.floor(Date.now() / 1000);
+    if (payload.jti && sisa > 0) await lewatBatas(kunciCabut(payload.jti), 0, sisa);
+  } catch {
+    // kedaluwarsa atau palsu — memang sudah tidak berlaku
+  }
+}
+
+/**
+ * Menambah passkey hanya boleh tak lama setelah masuk (sandi atau passkey):
+ * cookie sesi curian yang sudah berumur tidak bisa dipakai menanam passkey
+ * milik penyerang.
+ */
+export const SEGAR_DETIK = 10 * 60;
+
+export function sesiSegar(sesi: Sesi): boolean {
+  return sesi.iat !== undefined && Date.now() / 1000 - sesi.iat < SEGAR_DETIK;
 }
 
 /** Peran yang boleh mengelola kejadian — sama dengan role:admin,editor di

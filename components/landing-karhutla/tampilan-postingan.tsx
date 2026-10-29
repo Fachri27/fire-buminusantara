@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { Bahasa } from "@/lib/bahasa";
 import { mediaLokal } from "@/lib/media";
+import { useHitungHidup } from "./hitung-hidup";
 import { IkonBagikan } from "./ikon";
 import { VideoOtomatis } from "./video-otomatis";
 import { TEKS } from "./teks";
@@ -31,28 +32,8 @@ export function TampilanPostingan({ laporan: l, bahasa, onTutup, onBuka, onKomen
   const [tersalin, setTersalin] = useState(false);
   const [descPenuh, setDescPenuh] = useState(false);
   const sentuh = useRef<{ x: number; y: number } | null>(null);
-  // Jumlah komentar untuk angka di samping ikon — diambil sekali saat buka.
-  const [jumlahKomentar, setJumlahKomentar] = useState<number | null>(null);
-  useEffect(() => {
-    let hidup = true;
-    fetch(`/api/laporan/${l.id}/komentar`, { headers: { Accept: "application/json" } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j: unknown) => {
-        if (!hidup) return;
-        const daftar = Array.isArray((j as { komentar?: unknown })?.komentar)
-          ? ((j as { komentar: { balasan?: unknown[] }[] }).komentar)
-          : [];
-        setJumlahKomentar(
-          daftar.reduce((n, k) => n + 1 + (Array.isArray(k.balasan) ? k.balasan.length : 0), 0),
-        );
-      })
-      .catch(() => {
-        /* gagal muat: angka disembunyikan, bukan dinolkan */
-      });
-    return () => {
-      hidup = false;
-    };
-  }, [l.id]);
+  // Jumlah komentar hidup (aliran /api/hitung) — tersembunyi sampai angka pertama tiba.
+  const jumlahKomentar = useHitungHidup(l.id)?.komentar ?? null;
   // "Selengkapnya" hanya bila deskripsi benar-benar terpotong clamp —
   // diukur, bukan ditebak dari panjang teks (responsif di semua lebar).
   const descRef = useRef<HTMLSpanElement | null>(null);

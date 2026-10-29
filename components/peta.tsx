@@ -66,13 +66,6 @@ function kameraWindyNusantara(isPenuh: boolean | undefined, kolom: number): { la
   return { lat, lon: lon - geserBujurWindy(kolom, kamera.zoom + 1), zoom: kamera.zoom + 1 };
 }
 
-/** Bagian peta Leaflet milik Windy di dalam iframe (satu origin dengan
- *  halaman) yang dipakai untuk membaca kameranya. */
-type PetaWindy = {
-  getCenter: () => { lat: number; lng: number };
-  getZoom: () => number;
-};
-
 /** Kamera lapisan Aerosol saat ini dalam skala zoom Windy (+1), atau null. */
 function kameraAerosolKini(kolom: number): { lat: number; lon: number; zoom: number } | null {
   const peta = (window as unknown as {
@@ -332,6 +325,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
   }, []);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  // Kamera Windy terakhir dari pesan KAMERA_WINDY (lat, lng, zoom MapLibre).
+  const kameraWindyRef = useRef<{ lat: number; lng: number; zoom: number } | null>(null);
   const [memuatWindy, setMemuatWindy] = useState(true);
   // Tinggi bilah legenda AQI selebar layar di dasar iframe (tampilan mobile/
   // tablet Windy); 0 di tampilan desktop. Lihat SELA_LEGENDA.
@@ -649,22 +644,14 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       // partikel di iframe berhenti total.
       kirimData({ type: "PUTAR_UDARA", putar: false });
       kirimData({ type: "WINDY_NONAKTIF" });
-      try {
-        const windy = (iframeRef.current?.contentWindow as unknown as {
-          W?: { map?: { map?: PetaWindy & { _maplibreMap?: { getZoom: () => number } } } };
-        } | null)?.W?.map?.map;
-        const aerosol = (window as unknown as {
-          _maplibreMap?: { jumpTo: (o: { center: [number, number]; zoom: number }) => void };
-        })._maplibreMap;
-        if (windy && aerosol) {
-          const c = windy.getCenter();
-          const z = typeof windy._maplibreMap?.getZoom === "function"
-            ? windy._maplibreMap.getZoom()
-            : windy.getZoom() - 1;
-          aerosol.jumpTo({ center: [c.lng + geserBujurWindy(tutupKiriRef.current, z + 1), c.lat], zoom: z });
-        }
-      } catch {
-        // Iframe belum siap atau tak terjangkau — biarkan kamera Aerosol apa adanya.
+      // Kamera Windy terakhir (pesan KAMERA_WINDY, zoom skala MapLibre).
+      // Belum pernah digeser → biarkan kamera Aerosol apa adanya.
+      const windy = kameraWindyRef.current;
+      const aerosol = (window as unknown as {
+        _maplibreMap?: { jumpTo: (o: { center: [number, number]; zoom: number }) => void };
+      })._maplibreMap;
+      if (windy && aerosol) {
+        aerosol.jumpTo({ center: [windy.lng + geserBujurWindy(tutupKiriRef.current, windy.zoom + 1), windy.lat], zoom: windy.zoom });
       }
     }
   };
@@ -692,6 +679,10 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
 
   useEffect(() => {
     const saatPesan = (event: MessageEvent) => {
+      // Hanya iframe Windy kita — origin-nya buram ("null", di-sandbox), jadi
+      // yang dicocokkan jendelanya, bukan event.origin. Halaman penyemat
+      // /<locale>/embed pun tak bisa memalsukan pesan ini.
+      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
       const data = event.data;
       if (!data || typeof data !== "object") return;
 
@@ -799,6 +790,10 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         const ketemu = berita?.find((b) => b.id === data.eventId || b.slug === data.slug);
         if (ketemu && onBukaRincian) {
           onBukaRincian(ketemu);
+        }
+      } else if (data.type === "KAMERA_WINDY") {
+        if (Number.isFinite(data.lat) && Number.isFinite(data.lng) && Number.isFinite(data.zoom)) {
+          kameraWindyRef.current = { lat: data.lat, lng: data.lng, zoom: data.zoom };
         }
       } else if (data.type === "SELA_LEGENDA") {
         setSelaLegendaWindy(typeof data.tinggi === "number" ? data.tinggi : 0);
@@ -910,26 +905,15 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         const delta = Math.log2(wBaru / ukuran.w);
         const deltaKirim = seragam && Math.abs(delta) > 0.001 ? delta : 0;
         requestAnimationFrame(() => {
-          // Lepas ukuran iframe lalu — dalam tugas yang sama, sebelum frame
-          // dilukis — minta Windy me-resize kanvas, menggeser zoom, dan
-          // menggambar ulang lewat panggilan langsung (iframe satu origin).
-          // Event resize iframe baru jalan SETELAH parent melukis satu frame,
-          // jadi mengandalkannya menampilkan kanvas basi sekejap (berkedip).
+          // Selisih zoom dikirim dulu, lalu ukuran iframe dilepas: Windy
+          // menerapkannya bersama event resize-nya. Iframe di-sandbox (origin
+          // buram), jadi tak bisa dipanggil langsung secara sinkron — kanvas
+          // basi bisa tampil sekejap sebelum resize iframe tiba.
+          if (deltaKirim) kirimData({ type: "SKALA_ZOOM", delta: deltaKirim });
           ifr.style.width = "";
           ifr.style.height = "";
           ifr.style.transform = "";
           ifr.style.transformOrigin = "";
-          let sinkron = false;
-          try {
-            const skala = (ifr.contentWindow as unknown as { __skalaKonsol?: (d: number) => void } | null)?.__skalaKonsol;
-            if (typeof skala === "function") {
-              skala(deltaKirim);
-              sinkron = true;
-            }
-          } catch {
-            // Tak terjangkau (beda origin) — pakai jalur pesan di bawah.
-          }
-          if (!sinkron && deltaKirim) kirimData({ type: "SKALA_ZOOM", delta: deltaKirim });
         });
         ukuran = { w: wBaru, h: hBaru };
       }, 160);
@@ -995,7 +979,12 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       setPanelLapisan(null);
       // Kembalikan fokus ke tombol Lapisan yang membukanya.
       if (modeRef.current === "asap") tombolLapisanRef.current?.focus();
-      else iframeRef.current?.contentDocument?.getElementById("btn-lapisan")?.focus();
+      else {
+        // Iframe di-sandbox (lintas origin): fokuskan bingkainya, lalu iframe
+        // sendiri memfokuskan #btn-lapisan.
+        iframeRef.current?.focus();
+        kirimData({ type: "FOKUS_LAPISAN" });
+      }
     };
     const tutupBlur = () => {
       ditutupBlurRef.current = Date.now();
@@ -1011,7 +1000,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       document.removeEventListener("keydown", tutupEsc);
       window.removeEventListener("blur", tutupBlur);
     };
-  }, [panelLapisan]);
+  }, [panelLapisan, kirimData]);
 
   /* Dropdown peta dasar (kiri atas). Tertutup saat klik di luar, Escape, atau
      saat jendela kehilangan fokus — klik di dalam iframe Windy tak memicu
@@ -1841,6 +1830,11 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
               src={windySrc}
               title="Peta Sebaran Angin dan Kualitas Udara"
               className="h-full w-full border-0"
+              // Halaman Windy pihak ketiga yang diproksikan dari origin kita:
+              // tanpa allow-same-origin skripnya berjalan di origin buram dan
+              // tak bisa memakai cookie/sesi admin kita. JANGAN tambahkan
+              // allow-same-origin (header CSP /api/forecasting juga men-sandbox).
+              sandbox="allow-scripts allow-popups"
               allow="geolocation"
               onContextMenu={(e) => e.preventDefault()}
               onLoad={() => {

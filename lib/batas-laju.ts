@@ -36,7 +36,7 @@ export async function sudahLewat(kunci: string, batas: number): Promise<boolean>
  * batasnya KALI_TANPA_IP lipat: satu salah konfigurasi tidak langsung mengunci
  * semua warga, tapi juga tidak membuka pintu tanpa batas.
  */
-const KALI_TANPA_IP = 10;
+export const KALI_TANPA_IP = 10;
 
 export function emberIp(awalan: string, ip: string | null, batas: number): { kunci: string; batas: number } {
   return ip ? { kunci: `${awalan}:${ip}`, batas } : { kunci: `${awalan}:tanpa-ip`, batas: batas * KALI_TANPA_IP };
@@ -54,6 +54,24 @@ export async function sudahLewatIp(awalan: string, ip: string | null, batas: num
   if (!ip) peringatkanTanpaIp(awalan);
   const ember = emberIp(awalan, ip, batas);
   return sudahLewat(ember.kunci, ember.batas);
+}
+
+/**
+ * Jeda di bawah satu detik per kunci (ketukan beruntun) — lewatBatas hanya
+ * berjendela detik. true = masih dalam jeda, tolak.
+ * shortcut: in-memory per proses, pindah ke Redis bila web diskalakan ke beberapa container.
+ */
+const ketukan = new Map<string, number>();
+
+export function dalamJeda(kunci: string, jedaMs: number): boolean {
+  const kini = Date.now();
+  // Hanya entri kedaluwarsa yang dibuang: clear() ikut menghapus jeda yang masih
+  // berjalan, dan bot yang mengganti user agent bisa memicunya kapan saja.
+  if (ketukan.size > 5000) for (const [k, t] of ketukan) if (kini - t >= jedaMs) ketukan.delete(k);
+  const t = ketukan.get(kunci);
+  if (t !== undefined && kini - t < jedaMs) return true;
+  ketukan.set(kunci, kini);
+  return false;
 }
 
 /** Di produksi IP tak terbaca hampir pasti salah konfigurasi proxy — dikabarkan

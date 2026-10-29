@@ -1,0 +1,3738 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API LAPORIN",
+    "version": "1.0.0",
+    "description": "Semua rute /api. Rute Admin memakai cookie sesi CMS (otomatis terkirim dari halaman ini). Rute Mobile memakai token Bearer dari /api/mobile/masuk/* — klik Authorize dan tempel tokennya."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Publik"
+    },
+    {
+      "name": "Mobile"
+    },
+    {
+      "name": "Admin"
+    },
+    {
+      "name": "Cron"
+    }
+  ],
+  "paths": {
+    "/api/admin/siaran": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Semua siaran warga yang sedang berjalan, untuk CMS petugas",
+        "description": "Cache-Control no-store. Daftar dibagi sebentar di memori proses.",
+        "security": [
+          {
+            "sesiCms": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar siaran aktif, terbaru dulu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "ruang",
+                      "judul",
+                      "nama",
+                      "mulai",
+                      "lat",
+                      "lng",
+                      "akurasi",
+                      "publik",
+                      "penonton",
+                      "laporan"
+                    ],
+                    "properties": {
+                      "ruang": {
+                        "type": "string"
+                      },
+                      "judul": {
+                        "type": "string"
+                      },
+                      "nama": {
+                        "type": "string"
+                      },
+                      "mulai": {
+                        "type": "number",
+                        "description": "Milidetik epoch"
+                      },
+                      "lat": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "lng": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "akurasi": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "publik": {
+                        "type": "boolean"
+                      },
+                      "penonton": {
+                        "type": "integer"
+                      },
+                      "laporan": {
+                        "type": "integer",
+                        "description": "Jumlah akun berbeda yang melaporkan siaran ini dan belum ditinjau."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/MasukDulu"
+          },
+          "502": {
+            "$ref": "#/components/responses/SiaranTakTerhubung"
+          },
+          "503": {
+            "$ref": "#/components/responses/SiaranBelumSiap"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Petugas mengakhiri siaran",
+        "description": "Ruang dibubarkan dan semua peserta terputus. Ruang yang sudah bubar tetap dijawab ok.",
+        "security": [
+          {
+            "sesiCms": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruang",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^siaran-[a-z0-9-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Siaran diakhiri.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SiaranTidakDikenal"
+          },
+          "401": {
+            "$ref": "#/components/responses/MasukDulu"
+          },
+          "502": {
+            "$ref": "#/components/responses/SiaranTakTerhubung"
+          },
+          "503": {
+            "$ref": "#/components/responses/SiaranBelumSiap"
+          }
+        }
+      }
+    },
+    "/api/admin/siaran/token": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Token LiveKit petugas untuk menonton siaran dari CMS",
+        "description": "Token berlaku 1 jam, hanya untuk menonton (tidak bisa menerbitkan video).",
+        "security": [
+          {
+            "sesiCms": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ruang",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^siaran-[a-z0-9-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "URL server LiveKit dan token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "url",
+                    "token"
+                  ],
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SiaranTidakDikenal"
+          },
+          "401": {
+            "$ref": "#/components/responses/MasukDulu"
+          },
+          "404": {
+            "description": "Siaran sudah berakhir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "502": {
+            "$ref": "#/components/responses/SiaranTakTerhubung"
+          },
+          "503": {
+            "$ref": "#/components/responses/SiaranBelumSiap"
+          }
+        }
+      }
+    },
+    "/api/admin/tunggakan/aliran": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Aliran angka tunggakan untuk lencana menu CMS (Server-Sent Events)",
+        "description": "Server-Sent Events. Angka pertama dikirim segera, lalu setiap ada perubahan, dan diperiksa ulang tiap 30 detik. Komentar keep-alive `: detak` dikirim tiap 20 detik. Setiap event `data:` berisi JSON {belumDitinjau, laporanMenunggu}. Header X-Accel-Buffering: no.",
+        "security": [
+          {
+            "sesiCms": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aliran SSE. Payload tiap event `data` adalah objek di bawah.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "belumDitinjau",
+                    "laporanMenunggu"
+                  ],
+                  "properties": {
+                    "belumDitinjau": {
+                      "type": "integer"
+                    },
+                    "laporanMenunggu": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Tidak berwenang.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "Tidak berwenang."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cron/warm-asap": {
+      "get": {
+        "tags": [
+          "Cron"
+        ],
+        "summary": "Menghangatkan cache frame sebaran asap dan udara, serta menyegarkan hotspot FIRMS",
+        "description": "Secret wajib dikirim di header `Authorization: Bearer <CRON_SECRET>`. Mengirim parameter query `secret` ditolak dengan 400. Di produksi tanpa CRON_SECRET, rute menjawab 401 (fail-closed). Di pengembangan tanpa CRON_SECRET, rute mengizinkan panggilan. maxDuration 300 detik.",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/WarmAsapSukses"
+          },
+          "400": {
+            "$ref": "#/components/responses/WarmAsapSecretDiQuery"
+          },
+          "401": {
+            "$ref": "#/components/responses/WarmAsapTakBerwenang"
+          },
+          "500": {
+            "$ref": "#/components/responses/WarmAsapGagal"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Cron"
+        ],
+        "summary": "Menghangatkan cache frame sebaran asap dan udara, serta menyegarkan hotspot FIRMS",
+        "description": "Sama dengan GET.",
+        "security": [
+          {
+            "cronSecret": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/WarmAsapSukses"
+          },
+          "400": {
+            "$ref": "#/components/responses/WarmAsapSecretDiQuery"
+          },
+          "401": {
+            "$ref": "#/components/responses/WarmAsapTakBerwenang"
+          },
+          "500": {
+            "$ref": "#/components/responses/WarmAsapGagal"
+          }
+        }
+      }
+    },
+    "/api/cuaca-lokal": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Cuaca lokal pengunjung untuk panel kiri landing karhutla",
+        "description": "Publik tanpa sesi. Ada dua mode. (1) Jika `saran` dikirim, rute mengembalikan saran lokasi berupa array. Sumbernya basis data wilayah Kemendagri/BMKG, lalu OSM Nominatim bila tidak ketemu. Cache-Control public, max-age=120. (2) Jika tidak, rute mengembalikan cuaca BMKG (cadangan Open-Meteo). Lokasi diambil dari `lat`+`lng`, lalu `q`, dan bila keduanya tak ada dari IP pengunjung (ipwho.is). Hasil di-cache di memori 10 menit per lokasi; Cache-Control no-store.",
+        "parameters": [
+          {
+            "name": "saran",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Teks pencarian saran lokasi. Jika ada, rute memakai mode saran.",
+            "example": "Palangka"
+          },
+          {
+            "name": "lat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "description": "Hanya dipakai bila dikirim bersama lng.",
+            "example": -2.21
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "example": 113.92
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nama tempat. Dipakai bila lat/lng tidak dikirim."
+          },
+          {
+            "name": "nama",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nama tampilan untuk titik lat/lng."
+          },
+          {
+            "name": "provinsi",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Provinsi untuk titik lat/lng (dipakai bersama nama)."
+          },
+          {
+            "name": "adm4",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Kode desa adm4 Kemendagri untuk API BMKG.",
+            "example": "31.71.01.1001"
+          },
+          {
+            "name": "bahasa",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "id",
+                "en"
+              ],
+              "default": "id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mode saran: array ItemSaranLokasi. Mode cuaca: objek cuaca.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "nama",
+                          "provinsi",
+                          "lat",
+                          "lng"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "nama": {
+                            "type": "string"
+                          },
+                          "provinsi": {
+                            "type": "string"
+                          },
+                          "lat": {
+                            "type": "number"
+                          },
+                          "lng": {
+                            "type": "number"
+                          },
+                          "adm4": {
+                            "type": "string"
+                          },
+                          "tipe": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "nama",
+                        "suhu",
+                        "kodeCuaca",
+                        "siang",
+                        "sumber"
+                      ],
+                      "properties": {
+                        "nama": {
+                          "type": "string"
+                        },
+                        "suhu": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "kodeCuaca": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "description": "Kode cuaca WMO"
+                        },
+                        "siang": {
+                          "type": "boolean"
+                        },
+                        "sumber": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "bmkg",
+                            "model",
+                            null
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/forecasting": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Proksi halaman Windy AQI (CAMS) untuk disematkan sebagai iframe",
+        "description": "Mengambil HTML Windy Air Quality Index, menyisipkan skrip dan gaya sendiri, lalu mengirim HTML-nya. Nilai di luar batas dijepit ke wilayah Indonesia; nilai tidak sah memakai bawaan. Header Content-Security-Policy berisi frame-ancestors *, jadi halaman boleh dibingkai di mana saja.",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": -15,
+              "maximum": 15,
+              "default": 0.2
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 90,
+              "maximum": 145,
+              "default": 118
+            }
+          },
+          {
+            "name": "zoom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "minimum": 2,
+              "maximum": 18,
+              "default": 5
+            }
+          },
+          {
+            "name": "konsol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Mode konsol /peta: roda tetikus memperbesar peta."
+          },
+          {
+            "name": "bentang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Menampilkan tombol buka peta selayar (postMessage BUKA_SELAYAR)."
+          },
+          {
+            "name": "ringkas",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Legenda ringkas."
+          },
+          {
+            "name": "aplikasi",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Aplikasi Laporin: tanpa kolom kendali, bilah AQI, kredit EOX, batas provinsi, dan angka laporan (semuanya native di aplikasi); logo Windy/Copernicus di kiri atas."
+          },
+          {
+            "name": "tema",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "light",
+                "dark"
+              ],
+              "default": "dark"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Halaman HTML Windy yang sudah dimodifikasi.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Gagal mengambil Windy.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Windy membalas dengan galat.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/hitung": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Angka hidup kartu umpan (jumlah suka dan komentar)",
+        "description": "Tanpa cache (Cache-Control: no-store). ID yang tidak sah dibuang dan ID ganda disatukan. Paling banyak 60 ID diproses. Jika tidak ada ID yang sah, jawabannya {}.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Daftar ID laporan dipisah koma.",
+            "example": "1,2,3"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Peta ID laporan ke angka.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "object",
+                    "required": [
+                      "suka",
+                      "komentar"
+                    ],
+                    "properties": {
+                      "suka": {
+                        "type": "integer"
+                      },
+                      "komentar": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/hotspot": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Titik hotspot NASA FIRMS satu hari WIB",
+        "description": "Membaca salinan Redis yang ditulis cron warm-asap. Tanpa `hari`, rute memakai hari terbaru. Hari di luar 7 hari data diganti hari tersedia terdekat (lihat field `hari`). Jika salinan basi (lebih dari 70 menit), penyegaran dipicu di latar. Cache-Control: public, max-age paling lama 300 detik sampai salinan basi; no-store jika sudah basi.",
+        "parameters": [
+          {
+            "name": "hari",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "example": "2026-10-29"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Data hotspot satu hari.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "hari",
+                    "hariTersedia",
+                    "diperbarui",
+                    "diambil",
+                    "satelit",
+                    "lengkap",
+                    "basi",
+                    "provinsi",
+                    "kabupaten",
+                    "titik"
+                  ],
+                  "properties": {
+                    "hari": {
+                      "type": "string",
+                      "description": "Tanggal WIB YYYY-MM-DD"
+                    },
+                    "sejak": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Hanya untuk hari terbaru: awal jendela 24 jam bergulir."
+                    },
+                    "hariTersedia": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "diperbarui": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "diambil": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "satelit": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "lengkap": {
+                      "type": "boolean"
+                    },
+                    "basi": {
+                      "type": "boolean"
+                    },
+                    "provinsi": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "kabupaten": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "titik": {
+                      "type": "array",
+                      "description": "[lng, lat, kepercayaan, FRP (MW), waktu (menit epoch UTC), indeks satelit, indeks provinsi, malam (0/1), indeks kabupaten (-1 = tak ada)]",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Server NASA FIRMS tak terjangkau.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "galat"
+                  ],
+                  "properties": {
+                    "galat": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/laporan/{id}/komentar": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "description": "ID kejadian/laporan yang sudah tayang."
+        }
+      ],
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Daftar komentar pada satu laporan karhutla",
+        "responses": {
+          "200": {
+            "description": "Daftar komentar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "komentar"
+                  ],
+                  "properties": {
+                    "komentar": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Komentar"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Laporan tidak ditemukan atau belum tayang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      },
+      "post": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Kirim komentar pada satu laporan karhutla",
+        "description": "Wajib token Cloudflare Turnstile di field `captcha`. Field `website` adalah honeypot: jika terisi, permintaan ditolak diam-diam dengan 201. Batas laju 1 komentar per 3 detik per IP (in-memory). Jika `anonim` true, nama dan email tidak diminta dan nama tampil sebagai \"Anonim\". Komentar publik langsung disetujui.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "isi",
+                  "captcha"
+                ],
+                "properties": {
+                  "captcha": {
+                    "type": "string",
+                    "maxLength": 2048,
+                    "description": "Token Cloudflare Turnstile"
+                  },
+                  "nama": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "Wajib bila anonim bukan true."
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 100,
+                    "description": "Wajib bila anonim bukan true."
+                  },
+                  "isi": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "anonim": {
+                    "type": "boolean"
+                  },
+                  "balas_ke": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "ID komentar yang dibalas."
+                  },
+                  "website": {
+                    "type": "string",
+                    "description": "Honeypot. Harus kosong."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Komentar tersimpan. Rute mengembalikan daftar komentar terbaru.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "komentar"
+                  ],
+                  "properties": {
+                    "komentar": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Komentar"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Body bukan JSON yang terbaca.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Laporan tidak ditemukan atau belum tayang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Verifikasi captcha gagal atau validasi field gagal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "errors": {
+                      "type": "object",
+                      "properties": {
+                        "nama": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "isi": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu cepat (cooldown 3 detik per IP).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Gagal menyimpan komentar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/laporan/{id}/suka": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Suka pada satu laporan",
+        "description": "Idempoten. Tanpa captcha. Hanya diterima dari halaman situs ini: Sec-Fetch-Site harus same-origin, atau Origin harus cocok dengan Host. User-Agent kosong atau mirip bot/perkakas ditolak. Batas laju: jeda 500 ms per perangkat dan 60 permintaan per 10 menit per IP. Paling banyak 5 suka per IP per kejadian; kelebihannya ditolak diam-diam dengan 200.",
+        "responses": {
+          "200": {
+            "description": "Jumlah suka terbaru.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JumlahSuka"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Bukan dari situs ini, atau user agent ditolak.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Laporan tidak ditemukan atau belum tayang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu cepat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      },
+      "delete": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Batal suka pada satu laporan",
+        "description": "Idempoten. Pemeriksaan asal, user agent, dan batas laju sama dengan POST.",
+        "responses": {
+          "200": {
+            "description": "Jumlah suka terbaru.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JumlahSuka"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Bukan dari situs ini, atau user agent ditolak.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Laporan tidak ditemukan atau belum tayang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu cepat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/lokasi": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Pencarian lokasi untuk form kejadian",
+        "description": "Diproksikan lewat server ke PostGIS Simontini. Hanya untuk pengguna CMS dengan peran admin atau editor. Kata kurang dari 2 karakter menghasilkan daftar kosong. Paling banyak 10 hasil per halaman.",
+        "security": [
+          {
+            "sesiCms": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hasil pencarian.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "hasil"
+                  ],
+                  "properties": {
+                    "hasil": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "nama",
+                          "lat",
+                          "lng"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "nama": {
+                            "type": "string"
+                          },
+                          "lat": {
+                            "type": "number"
+                          },
+                          "lng": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Tidak berwenang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lokasi/balik": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Saran nama \"ikuti pin\" untuk form kejadian",
+        "description": "Mencari nama tempat tepat di titik pin. Sumbernya poligon desa Simontini, lalu OSM Nominatim. Hanya untuk pengguna CMS dengan peran admin atau editor. Cache-Control no-store.",
+        "security": [
+          {
+            "sesiCms": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            },
+            "example": -2.21
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            },
+            "example": 113.92
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saran nama tempat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "saran"
+                  ],
+                  "properties": {
+                    "saran": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "ada",
+                            "nama",
+                            "negara",
+                            "sumber"
+                          ],
+                          "properties": {
+                            "ada": {
+                              "const": true
+                            },
+                            "nama": {
+                              "type": "string"
+                            },
+                            "negara": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "sumber": {
+                              "type": "string",
+                              "enum": [
+                                "desa",
+                                "osm"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "ada"
+                          ],
+                          "properties": {
+                            "ada": {
+                              "const": false
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Koordinat tidak sah.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Tidak berwenang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PesanGalat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/captcha": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Halaman Turnstile untuk WebView aplikasi",
+        "description": "Halaman HTML kecil yang aplikasi buka di WebView sebelum mengirim laporan tamu atau anonim. Token Turnstile dikirim ke aplikasi lewat window.ReactNativeWebView.postMessage, lalu ditukar di POST /api/mobile/tiket. Tanpa NEXT_PUBLIC_TURNSTILE_SITE_KEY (hanya di pengembangan), halaman langsung mengirim {\"token\":\"tanpa-captcha\"}. Cache-Control: no-store.",
+        "responses": {
+          "200": {
+            "description": "Halaman HTML verifikasi",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/mobile/keluar": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Keluar: token dicabut di server",
+        "description": "Menghapus sesi milik token Bearer. Selalu menjawab 200, juga bila token tidak ada atau sudah tidak berlaku.",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sesi dicabut",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/laporan": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Kirim laporan warga dari aplikasi mobile",
+        "description": "Field-nya sama dengan form laporan di web. Gerbang anti-bot: bila ada token akun dan laporan tidak anonim, akun menggantikan captcha dan laporan tercatat di Laporanku. Tamu atau laporan anonim wajib mengirim header `X-Tiket-Lapor` berisi tiket dari POST /api/mobile/tiket. Laporan anonim tidak pernah dikaitkan ke akun. Batas laju: 5 laporan tersimpan per 10 menit per IP, ditambah 30 percobaan per 10 menit per IP. Dengan akun: 5 laporan tersimpan per 10 menit per akun, ditambah 20 percobaan per 10 menit. Content-Length di atas 100 MB + 1 MB ditolak 413. Paling banyak 3 kiriman diterima serentak; sisanya dijawab 503.",
+        "security": [
+          {},
+          {
+            "bearerMobile": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Tiket-Lapor",
+            "in": "header",
+            "required": false,
+            "description": "Tiket dari POST /api/mobile/tiket. Wajib untuk tamu dan laporan anonim. Sekali pakai, berlaku 30 menit dihitung dari saat permintaan tiba. Header, bukan field form: diperiksa sebelum badan kiriman diterima.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "judul": {
+                    "type": "string",
+                    "maxLength": 255
+                  },
+                  "deskripsi": {
+                    "type": "string",
+                    "maxLength": 5000
+                  },
+                  "nama": {
+                    "type": "string",
+                    "description": "Nama pelapor; disimpan paling banyak 100 karakter. Diabaikan bila anonim."
+                  },
+                  "anonim": {
+                    "type": "string",
+                    "description": "Nilai apa pun yang tidak kosong berarti anonim."
+                  },
+                  "lat": {
+                    "type": "string",
+                    "description": "Latitude -90..90. Harus dikirim bersama lng. Bila keduanya kosong, dipakai koordinat EXIF dari berkas."
+                  },
+                  "lng": {
+                    "type": "string",
+                    "description": "Longitude. Harus dikirim bersama lat."
+                  },
+                  "berkas": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 6,
+                    "description": "Foto atau video sebagai bukti, minimal 1. Total paling besar 100 MB. Foto HEIC/AVIF ditolak.",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                },
+                "required": [
+                  "judul",
+                  "deskripsi",
+                  "berkas"
+                ]
+              },
+              "encoding": {
+                "berkas": {
+                  "contentType": "image/*, video/*"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Laporan diterima",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Kiriman tidak bisa dibaca server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilLaporGagal"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token dikirim tetapi sesinya sudah berakhir (bidang = captcha). Kirim ulang lewat jalur tamu atau masuk ulang.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilLaporGagal"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Ukuran total lampiran melebihi 100 MB (bidang = berkas)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilLaporGagal"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validasi gagal, captcha atau tiket gagal, foto HEIC/AVIF, atau laporan gagal disimpan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilLaporGagal"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak laporan dari jaringan atau akun ini",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilLaporGagal"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server sedang menerima banyak laporan; coba lagi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilLaporGagal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/laporan/{id}/komentar": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Kirim komentar dari akun aplikasi",
+        "description": "Sensor kata kasar tetap berlaku. Batas laju: jeda 3 detik antarkomentar, dan 30 komentar per 10 menit per akun. Daftar komentar dibaca dari GET /api/laporan/{id}/komentar.",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID kejadian yang tayang",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "isi": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000
+                  },
+                  "balas_ke": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "ID komentar yang dibalas"
+                  }
+                },
+                "required": [
+                  "isi"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Komentar tersimpan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "komentar": {
+                      "$ref": "#/components/schemas/Komentar"
+                    }
+                  },
+                  "required": [
+                    "komentar"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Laporan tidak ditemukan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Isi kosong, terlalu panjang, atau komentar yang dibalas tidak ada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu cepat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Komentar gagal disimpan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/laporan/{id}/suka": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Sukai laporan dari akun aplikasi",
+        "description": "Satu suka per akun per kejadian. Batas laju: 120 per 10 menit per akun (dihitung bersama DELETE).",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID kejadian yang tayang",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status suka terbaru",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusSuka"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Laporan tidak ditemukan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu cepat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Batalkan suka dari akun aplikasi",
+        "description": "Batas laju: 120 per 10 menit per akun (dihitung bersama POST).",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID kejadian yang tayang",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status suka terbaru",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusSuka"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Laporan tidak ditemukan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu cepat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/laporkan": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Laporkan konten (komentar, laporan, siaran)",
+        "description": "Bisa dipakai tanpa akun. Hanya laporan dari akun yang menyembunyikan komentar otomatis: setelah 3 akun berbeda melaporkan, komentar disembunyikan sampai ditinjau moderator. Laporan ganda dari akun yang sama, atau laporan yang sama persis dari IP tamu yang sama, tetap dijawab {ok:true}. Batas laju: 20 per 10 menit per IP, dan 20 per 10 menit per akun.",
+        "security": [
+          {},
+          {
+            "bearerMobile": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jenis": {
+                    "type": "string",
+                    "enum": [
+                      "komentar",
+                      "laporan",
+                      "siaran"
+                    ]
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "Untuk komentar/laporan: 1 sampai 18 digit angka. Untuk siaran: nama ruang (^siaran-[a-z0-9-]{1,90}$)."
+                  },
+                  "alasan": {
+                    "type": "string",
+                    "enum": [
+                      "palsu",
+                      "tidak-pantas",
+                      "kebencian",
+                      "spam",
+                      "bahaya",
+                      "lainnya"
+                    ]
+                  },
+                  "catatan": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Teks yang lebih panjang dipotong menjadi 500 karakter"
+                  }
+                },
+                "required": [
+                  "jenis",
+                  "id",
+                  "alasan"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Laporan diterima",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Komentar yang dilaporkan tidak ditemukan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Jenis, id, atau alasan tidak sah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak laporan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/live": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Daftar siaran publik untuk kartu LIVE di beranda",
+        "description": "Hanya siaran publik yang dilaporkan kurang dari 3 akun. Koordinat dibulatkan ke 2 desimal (sekitar 1 km). Hasilnya di-cache 5 detik di server. Tanpa konfigurasi LiveKit, jawabannya []. Cache-Control: no-store.",
+        "responses": {
+          "200": {
+            "description": "Siaran aktif, terbaru dulu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ruang": {
+                        "type": "string"
+                      },
+                      "judul": {
+                        "type": "string"
+                      },
+                      "nama": {
+                        "type": "string"
+                      },
+                      "mulai": {
+                        "type": "number",
+                        "description": "Waktu mulai, epoch dalam milidetik"
+                      },
+                      "penonton": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "lat": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "lng": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "ruang",
+                      "judul",
+                      "nama",
+                      "mulai",
+                      "penonton",
+                      "lat",
+                      "lng"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Server siaran tidak bisa dihubungi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/mobile/live/token": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Buat ruang siaran baru dan token pelapor",
+        "description": "Siaran publik (tampil di beranda warga) wajib akun dan tidak boleh anonim, serta selalu memakai nama akun. Siaran khusus petugas boleh dari tamu atau anonim. Ruang publik hanya menyimpan koordinat kasar. Token LiveKit berlaku 2 jam. Batas laju: 3 siaran per 10 menit per IP, ditambah 3 per 10 menit per akun.",
+        "security": [
+          {},
+          {
+            "bearerMobile": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "judul": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  },
+                  "nama": {
+                    "type": "string",
+                    "description": "Diabaikan bila publik atau anonim. Bila kosong, dipakai nama akun. Paling banyak 100 karakter."
+                  },
+                  "anonim": {
+                    "type": "boolean"
+                  },
+                  "publik": {
+                    "type": "boolean"
+                  },
+                  "lat": {
+                    "type": [
+                      "number",
+                      "string"
+                    ]
+                  },
+                  "lng": {
+                    "type": [
+                      "number",
+                      "string"
+                    ]
+                  }
+                },
+                "required": [
+                  "judul"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ruang dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "URL server LiveKit"
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "JWT LiveKit, berlaku 2 jam"
+                    },
+                    "ruang": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "token",
+                    "ruang"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Kiriman tidak bisa dibaca server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Siaran publik tetapi belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Judul kosong atau terlalu panjang, atau siaran publik yang anonim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak siaran",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Server siaran tidak bisa dihubungi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Siaran langsung belum tersedia (LiveKit belum dikonfigurasi)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/live/tonton": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Token warga untuk menonton siaran publik",
+        "description": "Tanpa Bearer yang sah, token hanya untuk menonton. Komentar, hati, dan hadiah butuh akun. Token berlaku 2 menit untuk sambungan pertama. Satu ruang menampung paling banyak 50 penonton warga. Batas laju: 60 per 10 menit per IP, ditambah 5 per 10 menit per ruang (dihitung per akun, atau per IP untuk tamu), dan 100 token per 2 menit per ruang.",
+        "security": [
+          {},
+          {
+            "bearerMobile": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ruang": {
+                    "type": "string",
+                    "pattern": "^siaran-[a-z0-9-]+$",
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "ruang"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token penonton",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string",
+                      "description": "JWT LiveKit, berlaku 2 menit"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "token"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Siaran tidak dikenal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Siaran hanya untuk petugas, atau sedang ditinjau",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Siaran sudah berakhir",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu sering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Server siaran tidak bisa dihubungi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Siaran langsung belum tersedia, atau kursi penonton penuh",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/masuk/apple": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Masuk dengan Apple (Sign in with Apple)",
+        "description": "Memverifikasi identityToken Apple (aud = APPLE_BUNDLE_ID). authorizationCode ditukar menjadi refresh_token agar bisa dicabut saat akun dihapus; bila langkah ini gagal, masuk tetap berhasil. Token sesi kedaluwarsa setelah 90 hari tidak dipakai. Batas laju: 20 per 10 menit per IP (dihitung bersama masuk Google).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "identityToken": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "nama": {
+                    "type": "string",
+                    "description": "Apple hanya memberi nama saat izin pertama. Dipakai saat membuat akun baru; paling banyak 100 karakter."
+                  },
+                  "authorizationCode": {
+                    "type": "string",
+                    "maxLength": 2048
+                  }
+                },
+                "required": [
+                  "identityToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilMasuk"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Token Apple kosong atau rusak",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token Apple tidak sah atau kedaluwarsa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email sudah tertaut ke akun Apple lain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak percobaan masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Masuk dengan Apple belum disiapkan di server (APPLE_BUNDLE_ID kosong)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/mobile/masuk/google": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Masuk dengan Google",
+        "description": "Menukar idToken dari Google Sign-In native dengan token sesi situs ini. aud harus sama dengan GOOGLE_WEB_CLIENT_ID, dan email harus sudah terverifikasi. Token sesi kedaluwarsa setelah 90 hari tidak dipakai. Batas laju: 20 per 10 menit per IP (dihitung bersama masuk Apple).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idToken": {
+                    "type": "string",
+                    "maxLength": 4096
+                  }
+                },
+                "required": [
+                  "idToken"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilMasuk"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Token Google kosong atau rusak",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token Google tidak sah, kedaluwarsa, atau emailnya belum terverifikasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email sudah tertaut ke akun Google lain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak percobaan masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Masuk dengan Google belum disiapkan di server (GOOGLE_WEB_CLIENT_ID kosong)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/mobile/masuk/uji": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Masuk uji tanpa OAuth (khusus pengembangan)",
+        "description": "Hanya aktif bila NODE_ENV bukan production dan MOBILE_MASUK_UJI=1. Selain itu menjawab 404 tanpa isi. Membuat atau memakai ulang akun uji berdasarkan nama.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nama": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "Bila kosong, dipakai \"Penguji\""
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilMasuk"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Masuk uji tidak aktif (tanpa isi)"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/mobile/saya": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Profil akun dan statistik",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pengguna": {
+                      "$ref": "#/components/schemas/PenggunaMobile"
+                    },
+                    "statistik": {
+                      "type": "object",
+                      "properties": {
+                        "laporan": {
+                          "type": "integer",
+                          "description": "Semua laporan milik akun"
+                        },
+                        "tayang": {
+                          "type": "integer",
+                          "description": "Laporan yang disetujui"
+                        },
+                        "disukai": {
+                          "type": "integer",
+                          "description": "Kejadian yang disukai akun"
+                        }
+                      },
+                      "required": [
+                        "laporan",
+                        "tayang",
+                        "disukai"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "pengguna",
+                    "statistik"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Ubah nama akun",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nama": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "nama"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Nama diperbarui",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pengguna": {
+                      "$ref": "#/components/schemas/PenggunaMobile"
+                    }
+                  },
+                  "required": [
+                    "pengguna"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Nama kosong, terlalu panjang, atau mengandung kata tidak pantas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Hapus akun dari aplikasi",
+        "description": "Komentar tetap ada tetapi nama dan emailnya dihapus. Laporan tetap ada tanpa nama pelapor dan tanpa pemilik. Sesi, suka, dan akun dihapus, dan token Sign in with Apple dicabut. Akun pengelola CMS tidak bisa dihapus dari sini.",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Akun dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Akun ini juga akun pengelola CMS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/saya/disukai": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "ID kejadian yang disukai akun",
+        "description": "Paling banyak 1000 ID, terbaru dulu.",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar ID kejadian",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "disukai": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": [
+                    "disukai"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/saya/laporan": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Laporanku: laporan milik akun, terbaru dulu",
+        "description": "Paling banyak 200 laporan. Laporan anonim tidak pernah muncul di sini.",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar laporan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "laporan": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "judul": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "menunggu",
+                              "tayang",
+                              "ditolak"
+                            ]
+                          },
+                          "dibuat": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "sampul": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "format": "uri",
+                            "description": "URL mutlak gambar sampul"
+                          },
+                          "jumlahBerkas": {
+                            "type": "integer"
+                          },
+                          "beritaId": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "description": "ID kejadian, hanya bila kejadiannya sudah tayang"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "judul",
+                          "status",
+                          "dibuat",
+                          "sampul",
+                          "jumlahBerkas",
+                          "beritaId"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "laporan"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/tiket": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Tukar token Turnstile dengan tiket laporan",
+        "description": "Token Turnstile dari halaman /api/mobile/captcha ditukar dengan tiket bertanda tangan HMAC. Tiket berlaku 30 menit, sekali pakai, dan dipakai di field `tiket` POST /api/mobile/laporan. Batas laju: 20 per 10 menit per IP.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Token Turnstile"
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tiket diterbitkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tiket": {
+                      "type": "string",
+                      "description": "Bentuk: <kedaluwarsa ms>.<nonce>.<hmac>"
+                    }
+                  },
+                  "required": [
+                    "tiket"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Verifikasi captcha gagal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak percobaan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/sebaran-asap": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Data lapisan sebaran asap (Zarr CAMS): metadata linimasa atau frame biner",
+        "description": "`mode=metadata` (bawaan) mengembalikan JSON linimasa. `mode=frame` mengembalikan biner application/octet-stream dengan kompresi br (mutu 5) atau gzip sesuai Accept-Encoding. Jika `force=true` atau ada `_ts`, metadata diambil ulang dan Cache-Control menjadi no-store.",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "metadata",
+                "frame"
+              ],
+              "default": "metadata"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          },
+          {
+            "name": "_ts",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Jika ada (nilai apa pun), sama dengan force=true."
+          },
+          {
+            "name": "timeChunk",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Wajib untuk mode=frame."
+          },
+          {
+            "name": "step",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Wajib untuk mode=frame."
+          },
+          {
+            "name": "timeInner",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metadata (JSON) atau frame (biner).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ZarrMetadata"
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parameter tidak sah atau mode tak dikenal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalatError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Galat server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalatError"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/udara": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Data lapisan Angin dan Kualitas Udara (AQI PM2.5 + angin 10 m, CAMS)",
+        "description": "Kontraknya sejajar dengan /api/sebaran-asap. `mode=frame` mengembalikan biner tiga bidang (aqi | u | v) dengan kompresi br/gzip. Frame yang belum lengkap dikirim dengan Cache-Control no-store.",
+        "parameters": [
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "metadata",
+                "frame"
+              ],
+              "default": "metadata"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            }
+          },
+          {
+            "name": "_ts",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Jika ada (nilai apa pun), sama dengan force=true."
+          },
+          {
+            "name": "timeChunk",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,6}$"
+            },
+            "description": "Wajib untuk mode=frame."
+          },
+          {
+            "name": "step",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,6}$"
+            },
+            "description": "Wajib untuk mode=frame. Bilangan bulat 0..120."
+          },
+          {
+            "name": "timeInner",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "0",
+                "1"
+              ],
+              "default": "0"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metadata (JSON) atau frame (biner).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "latestModelRunIso",
+                    "latestModelRunWib",
+                    "timesteps",
+                    "grid",
+                    "enkode"
+                  ],
+                  "properties": {
+                    "latestModelRunIso": {
+                      "type": "string"
+                    },
+                    "latestModelRunWib": {
+                      "type": "string"
+                    },
+                    "timesteps": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ZarrTimestep"
+                      }
+                    },
+                    "grid": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "enkode": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parameter tidak sah atau mode tak dikenal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalatError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Galat server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalatError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Galat dari hulu Zarr/ECMWF.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalatError"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/umpan": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Seluruh umpan (Berita[]) untuk klien",
+        "description": "Data diambil dari cache bertag ambilUmpan. Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=600.",
+        "parameters": [
+          {
+            "name": "bahasa",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "id",
+                "en"
+              ],
+              "default": "id"
+            },
+            "description": "Nilai kosong atau tak dikenal jatuh ke id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar kartu umpan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "slug",
+                      "pulau",
+                      "provinsi",
+                      "tanggal",
+                      "judul",
+                      "gambar",
+                      "alt",
+                      "video",
+                      "poster",
+                      "lokasi",
+                      "lat",
+                      "lng",
+                      "deskripsi",
+                      "media",
+                      "vertikal"
+                    ],
+                    "additionalProperties": true,
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "slug": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "pulau": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "provinsi": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "tanggal": {
+                        "type": "string"
+                      },
+                      "judul": {
+                        "type": "string"
+                      },
+                      "gambar": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "alt": {
+                        "type": "string"
+                      },
+                      "video": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "poster": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lokasi": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lat": {
+                        "type": "number"
+                      },
+                      "lng": {
+                        "type": "number"
+                      },
+                      "deskripsi": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "media": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      },
+                      "vertikal": {
+                        "type": "boolean"
+                      },
+                      "jumlahKomentar": {
+                        "type": "integer"
+                      },
+                      "jumlahSuka": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerMobile": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token sesi aplikasi dari POST /api/mobile/masuk/google | apple | uji. Kedaluwarsa setelah 90 hari tidak dipakai."
+      },
+      "sesiCms": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "fire_sesi",
+        "description": "Cookie sesi CMS (admin/editor), dibuat saat masuk di /admin/login."
+      },
+      "cronSecret": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "CRON_SECRET server."
+      }
+    },
+    "schemas": {
+      "PenggunaMobile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID pengguna (bigint sebagai string)"
+          },
+          "nama": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email"
+          },
+          "foto": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "URL foto profil"
+          }
+        },
+        "required": [
+          "id",
+          "nama",
+          "email",
+          "foto"
+        ]
+      },
+      "Galat": {
+        "type": "object",
+        "properties": {
+          "galat": {
+            "type": "string",
+            "description": "Pesan galat untuk ditampilkan ke warga"
+          }
+        },
+        "required": [
+          "galat"
+        ]
+      },
+      "HasilLaporGagal": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": false
+          },
+          "galat": {
+            "type": "string"
+          },
+          "bidang": {
+            "type": "string",
+            "enum": [
+              "judul",
+              "deskripsi",
+              "berkas",
+              "koordinat",
+              "captcha"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "galat"
+        ]
+      },
+      "HasilMasuk": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token sesi Bearer (base64url dari 32 byte). Kedaluwarsa setelah 90 hari tidak dipakai."
+          },
+          "pengguna": {
+            "$ref": "#/components/schemas/PenggunaMobile"
+          }
+        },
+        "required": [
+          "token",
+          "pengguna"
+        ]
+      },
+      "Komentar": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "nama": {
+            "type": "string"
+          },
+          "isi": {
+            "type": "string"
+          },
+          "waktu": {
+            "type": "string",
+            "description": "Waktu relatif (teks)"
+          },
+          "sebutan": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "penulis": {
+            "type": "string",
+            "description": "Penanda penulis yang stabil (HMAC), untuk fitur Blokir"
+          },
+          "balasan": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Komentar"
+            },
+            "description": "Balasan (hanya pada komentar induk)"
+          }
+        },
+        "required": [
+          "id",
+          "nama",
+          "isi",
+          "waktu",
+          "sebutan",
+          "penulis"
+        ]
+      },
+      "StatusSuka": {
+        "type": "object",
+        "properties": {
+          "disukai": {
+            "type": "boolean"
+          },
+          "jumlah": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "disukai",
+          "jumlah"
+        ]
+      },
+      "PesanGalat": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "GalatError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "JumlahSuka": {
+        "type": "object",
+        "properties": {
+          "jumlah": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "jumlah"
+        ]
+      },
+      "ZarrTimestep": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "timeChunk": {
+            "type": "integer"
+          },
+          "timeInner": {
+            "type": "integer"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "iso": {
+            "type": "string"
+          },
+          "waktu": {
+            "type": "string"
+          },
+          "labelUtc": {
+            "type": "string"
+          },
+          "labelWib": {
+            "type": "string"
+          },
+          "adalahPrediksi": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ZarrMetadata": {
+        "type": "object",
+        "required": [
+          "latestModelRunIso",
+          "timesteps",
+          "grid"
+        ],
+        "properties": {
+          "latestModelRunIso": {
+            "type": "string"
+          },
+          "latestModelRunWib": {
+            "type": "string"
+          },
+          "timesteps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZarrTimestep"
+            }
+          },
+          "grid": {
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "integer"
+              },
+              "cols": {
+                "type": "integer"
+              },
+              "bounds": {}
+            }
+          },
+          "isWarm": {
+            "type": "boolean"
+          },
+          "cachedFramesCount": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "responses": {
+      "MasukDulu": {
+        "description": "Belum masuk CMS",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Galat"
+            }
+          }
+        }
+      },
+      "SiaranTidakDikenal": {
+        "description": "Nama ruang siaran tidak sah",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Galat"
+            }
+          }
+        }
+      },
+      "SiaranTakTerhubung": {
+        "description": "Server siaran tidak bisa dihubungi",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Galat"
+            }
+          }
+        }
+      },
+      "SiaranBelumSiap": {
+        "description": "Siaran langsung belum tersedia (LiveKit belum dikonfigurasi)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Galat"
+            }
+          }
+        }
+      },
+      "WarmAsapSukses": {
+        "description": "Cache dihangatkan",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "const": true
+                },
+                "message": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "integer"
+                },
+                "berhasil": {
+                  "type": "integer"
+                },
+                "gagal": {
+                  "type": "integer"
+                },
+                "durasiMs": {
+                  "type": "integer"
+                },
+                "isWarm": {
+                  "type": "boolean"
+                },
+                "udara": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "hotspot": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "timestamp": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "WarmAsapSecretDiQuery": {
+        "description": "Secret dikirim lewat query ?secret= (ditolak)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/GalatError"
+            }
+          }
+        }
+      },
+      "WarmAsapTakBerwenang": {
+        "description": "Secret salah atau CRON_SECRET belum disetel di produksi",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/GalatError"
+            }
+          }
+        }
+      },
+      "WarmAsapGagal": {
+        "description": "Penghangatan gagal",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "const": false
+                },
+                "error": {
+                  "type": "string"
+                },
+                "hotspot": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

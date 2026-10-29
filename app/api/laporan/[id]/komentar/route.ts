@@ -1,5 +1,7 @@
 import { revalidateTag } from "next/cache";
-import { daftarKomentar, simpanKomentar } from "@/lib/komentar";
+import { bacaJson } from "@/lib/batas-badan";
+import { catatGalat } from "@/lib/catat-galat";
+import { daftarKomentar, POLA_EMAIL, simpanKomentar } from "@/lib/komentar";
 import { ipDari, turnstileSah } from "@/lib/turnstile";
 import { prisma } from "@/lib/prisma";
 import { TAYANG } from "@/lib/events";
@@ -61,14 +63,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return Response.json({ message: "Laporan tidak ditemukan." }, { status: 404 });
   }
 
-  const body = await req.json().catch(() => null);
+  const body = await bacaJson(req);
+  if (body instanceof Response) return body;
   if (!body) {
     return Response.json({ message: "Permintaan tidak terbaca." }, { status: 400 });
   }
 
   const ip = ipDari(req);
 
-  if (!(await turnstileSah(body.captcha ?? null, ip))) {
+  // Aksi "komentar" diset widget di hooks/gunakan-komentar.ts: token dari widget lain tidak berlaku di sini.
+  if (!(await turnstileSah(typeof body.captcha === "string" ? body.captcha : null, ip, "komentar"))) {
     return Response.json({ message: "Verifikasi captcha gagal. Coba lagi." }, { status: 422 });
   }
 
@@ -93,8 +97,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!nama) galat.nama = "Nama wajib diisi.";
     else if (nama.length > BATAS_NAMA) galat.nama = `Nama maksimal ${BATAS_NAMA} karakter.`;
     if (!email) galat.email = "Email wajib diisi.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) galat.email = "Format email tidak valid.";
+    // Panjang dulu: pola email tidak boleh dijalankan pada masukan sepanjang apa pun.
     else if (email.length > BATAS_NAMA) galat.email = `Email maksimal ${BATAS_NAMA} karakter.`;
+    else if (!POLA_EMAIL.test(email)) galat.email = "Format email tidak valid.";
   }
   if (!isi) galat.isi = "Komentar wajib diisi.";
   else if (isi.length > BATAS_ISI) galat.isi = `Komentar maksimal ${BATAS_ISI} karakter.`;
@@ -121,8 +126,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   try {
     await simpanKomentar({ eventId: id, nama: namaSimpan, email: emailSimpan, isi, balasKe, ip });
   } catch (err: unknown) {
-    const pesan = err instanceof Error ? err.message : "Gagal menyimpan komentar.";
-    return Response.json({ message: pesan }, { status: 500 });
+    // simpanKomentar hanya melempar satu pesan ramah (induk balasan tidak ada);
+    // sisanya galat server (rincian Prisma) — dicatat, tidak diteruskan ke pengunjung.
+    if (err instanceof Error && err.message.startsWith("Komentar yang dibalas")) {
+      return Response.json({ message: err.message }, { status: 422 });
+    }
+    void catatGalat("komentar-web", err);
+    return Response.json({ message: "Gagal menyimpan komentar. Coba lagi." }, { status: 500 });
   }
 
   // Komentar publik langsung tersetujui — segarkan jumlah komentar di umpan (ambilUmpan).

@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { ambilUmpan } from "@/lib/events";
 import { adaBahasa, type Bahasa } from "@/lib/bahasa";
+import { jsonTermampat } from "@/lib/kompres";
 
 /** Seluruh umpan (Berita[]) untuk klien — HTML halaman hanya membawa
  *  UMPAN_AWAL kartu pertama. Datanya dari cache bertag ambilUmpan;
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
   await connection();
   const minta = new URL(request.url).searchParams.get("bahasa");
   const bahasa: Bahasa = adaBahasa(minta ?? "") ? (minta as Bahasa) : "id";
-  return Response.json(await ambilUmpan(bahasa), {
+  return jsonTermampat(request, await ambilUmpan(bahasa), {
     headers: { "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" },
   });
 }

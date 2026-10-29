@@ -150,6 +150,8 @@ export function gunakanKomentar(idLaporan: number) {
           sitekey: SITE_KEY,
           appearance: "interaction-only",
           execution: "execute",
+          // Dicocokkan di app/api/laporan/[id]/komentar (turnstileSah) — beda dari widget laporan.
+          action: "komentar",
           callback: (token: string) => {
             if (tokenResolverRef.current) {
               tokenResolverRef.current(token);

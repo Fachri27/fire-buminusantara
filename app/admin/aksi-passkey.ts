@@ -14,8 +14,9 @@ import {
   type RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 import { prisma } from "@/lib/prisma";
-import { bolehKelola, buatSesi, pastikanBolehKelola } from "@/lib/sesi";
+import { bolehKelola, buatSesi, pastikanBolehKelola, SEGAR_DETIK, sesiSegar } from "@/lib/sesi";
 import { ipDari } from "@/lib/turnstile";
+import { pihakWebAuthn } from "@/lib/auth";
 import { lewatBatas } from "@/lib/batas-laju";
 import { catatGalat } from "@/lib/catat-galat";
 
@@ -32,14 +33,19 @@ type Gagal = { ok: false; galat: string };
 type Hasil = { ok: true } | Gagal;
 
 /** Passkey terikat pada domain: passkey buatan staging tidak berlaku di
- *  produksi. WEBAUTHN_ORIGIN untuk pengembangan (http://localhost:3000). */
-function pihak() {
-  const asal = new URL(process.env.WEBAUTHN_ORIGIN || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").origin;
-  return { asal, rpID: new URL(asal).hostname };
+ *  produksi. WEBAUTHN_ORIGIN boleh berisi beberapa asal dipisah koma; asal
+ *  dipilih sesuai host permintaan. Pengembangan: http://localhost:3000. */
+async function pihak() {
+  const h = await headers();
+  const host = h.get("x-forwarded-host")?.split(",")[0].trim() || h.get("host");
+  return pihakWebAuthn(process.env.WEBAUTHN_ORIGIN || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000", host);
 }
 
-// Tantangan disimpan di cookie httpOnly bertanda tangan, berumur 5 menit dan
-// sekali pakai — tidak perlu tabel atau Redis untuk nilai sependek ini.
+// Tantangan disimpan di cookie httpOnly bertanda tangan, berumur 5 menit.
+// Sekali pakai dijamin server, bukan oleh klien yang menghapus cookie: saat
+// ditukar, tantangannya ditandai terpakai secara atomik (INCR Redis lewat
+// lewatBatas, cadangan memori bila Redis mati) — salinan cookie + jawaban
+// yang disadap tidak bisa diputar ulang.
 const COOKIE_TANTANGAN = "fire_tantangan";
 type Tantangan = { c: string; untuk: "daftar" | "masuk"; uid?: number };
 
@@ -67,7 +73,9 @@ async function ambilTantangan(untuk: Tantangan["untuk"]): Promise<Tantangan | nu
   if (!token) return null;
   try {
     const { payload } = await jwtVerify<Tantangan>(token, kunci());
-    return payload.untuk === untuk ? payload : null;
+    if (payload.untuk !== untuk) return null;
+    // Pemakaian kedua dalam 5 menit (umur cookie) = putar ulang.
+    return (await lewatBatas(`tantangan:${payload.c}`, 1, 300)) ? null : payload;
   } catch {
     return null;
   }
@@ -78,7 +86,7 @@ async function ambilTantangan(untuk: Tantangan["untuk"]): Promise<Tantangan | nu
 export async function opsiMasukPasskey(): Promise<{ ok: true; opsi: PublicKeyCredentialRequestOptionsJSON } | Gagal> {
   // Tanpa allowCredentials: perangkat sendiri yang menawarkan passkey mana yang
   // ada, jadi pengguna tidak perlu mengetik email lebih dulu.
-  const opsi = await generateAuthenticationOptions({ rpID: pihak().rpID, userVerification: "required" });
+  const opsi = await generateAuthenticationOptions({ rpID: (await pihak()).rpID, userVerification: "required" });
   await simpanTantangan({ c: opsi.challenge, untuk: "masuk" });
   return { ok: true, opsi };
 }
@@ -100,7 +108,7 @@ export async function masukPasskey(respons: AuthenticationResponseJSON): Promise
   });
   if (!pk) return GAGAL_MASUK;
 
-  const { asal, rpID } = pihak();
+  const { asal, rpID } = await pihak();
   let hasil;
   try {
     hasil = await verifyAuthenticationResponse({
@@ -135,6 +143,9 @@ export async function masukPasskey(respons: AuthenticationResponseJSON): Promise
 export async function opsiDaftarPasskey(): Promise<{ ok: true; opsi: PublicKeyCredentialCreationOptionsJSON } | Gagal> {
   const sesi = await pastikanBolehKelola();
   if (!sesi) return { ok: false, galat: "Sesi berakhir. Masuk lagi." };
+  if (!sesiSegar(sesi)) {
+    return { ok: false, galat: `Demi keamanan, keluar lalu masuk lagi dulu — passkey hanya bisa ditambah dalam ${SEGAR_DETIK / 60} menit setelah masuk.` };
+  }
 
   const user = await prisma.users.findUnique({
     where: { id: sesi.id },
@@ -144,7 +155,7 @@ export async function opsiDaftarPasskey(): Promise<{ ok: true; opsi: PublicKeyCr
 
   const opsi = await generateRegistrationOptions({
     rpName: "Pasopati Fire",
-    rpID: pihak().rpID,
+    rpID: (await pihak()).rpID,
     userName: user.email,
     userDisplayName: user.name,
     userID: new TextEncoder().encode(String(sesi.id)),
@@ -168,7 +179,7 @@ export async function simpanPasskey(respons: RegistrationResponseJSON): Promise<
   const tantangan = await ambilTantangan("daftar");
   if (!tantangan || tantangan.uid !== sesi.id) return { ok: false, galat: "Waktu verifikasi habis. Coba lagi." };
 
-  const { asal, rpID } = pihak();
+  const { asal, rpID } = await pihak();
   let hasil;
   try {
     hasil = await verifyRegistrationResponse({

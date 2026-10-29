@@ -151,9 +151,19 @@ export async function verifikasiGoogle(idToken: string): Promise<KlaimGoogle | {
 }
 
 /**
- * Akun untuk klaim Google: dicari lewat google_id, lalu email. Email yang sudah
- * terdaftar (mis. akun CMS) ditautkan karena Google menjamin pemiliknya —
- * perannya tidak disentuh. Nama yang sudah diubah warga tidak ditimpa nama Google.
+ * Email milik akun staf CMS (admin/editor) tidak ditautkan otomatis: tautan
+ * Google/Apple lewat email saja membuka pintu masuk baru ke akun berhak CMS.
+ * Tautan yang sudah ada (google_id/apple_id terisi) tetap berlaku.
+ */
+const GALAT_STAF = {
+  galat: "Email ini milik akun staf dan tidak bisa ditautkan otomatis. Masuk dengan email lain, atau minta admin.",
+  status: 409,
+};
+
+/**
+ * Akun untuk klaim Google: dicari lewat google_id, lalu email. Email warga
+ * yang sudah terdaftar ditautkan karena Google menjamin pemiliknya — kecuali
+ * akun staf (GALAT_STAF). Nama yang sudah diubah warga tidak ditimpa nama Google.
  */
 export async function penggunaGoogle(g: KlaimGoogle): Promise<BarisPengguna | { galat: string; status: number }> {
   const lewatGoogle = await prisma.users.findUnique({ where: { google_id: g.sub }, select: PILIH });
@@ -162,13 +172,14 @@ export async function penggunaGoogle(g: KlaimGoogle): Promise<BarisPengguna | { 
   const sekarang = new Date();
   const lewatEmail = await prisma.users.findUnique({
     where: { email: g.email },
-    select: { ...PILIH, google_id: true },
+    select: { ...PILIH, google_id: true, role: true },
   });
   if (lewatEmail) {
     if (lewatEmail.google_id && lewatEmail.google_id !== g.sub) {
       return { galat: "Email ini sudah tertaut ke akun Google lain.", status: 409 };
     }
     if (!lewatEmail.google_id) {
+      if (lewatEmail.role !== "commenter") return GALAT_STAF;
       await prisma.users.update({ where: { id: lewatEmail.id }, data: { google_id: g.sub, updated_at: sekarang } });
     }
     return { id: lewatEmail.id, name: lewatEmail.name, email: lewatEmail.email, image: lewatEmail.image };
@@ -231,7 +242,7 @@ export async function verifikasiApple(identityToken: string): Promise<KlaimApple
 
 /**
  * Akun untuk klaim Apple: lewat apple_id, lalu email terverifikasi (ditautkan,
- * peran tidak disentuh), atau akun warga baru. Nama hanya diberikan Apple saat
+ * kecuali akun staf — GALAT_STAF), atau akun warga baru. Nama hanya diberikan Apple saat
  * izin PERTAMA, jadi aplikasi mengirimkannya terpisah (`nama`).
  */
 export async function penggunaApple(a: KlaimApple, nama: string): Promise<BarisPengguna | { galat: string; status: number }> {
@@ -240,11 +251,15 @@ export async function penggunaApple(a: KlaimApple, nama: string): Promise<BarisP
 
   const sekarang = new Date();
   if (a.email) {
-    const lewatEmail = await prisma.users.findUnique({ where: { email: a.email }, select: { ...PILIH, apple_id: true } });
+    const lewatEmail = await prisma.users.findUnique({
+      where: { email: a.email },
+      select: { ...PILIH, apple_id: true, role: true },
+    });
     if (lewatEmail) {
       if (lewatEmail.apple_id && lewatEmail.apple_id !== a.sub) {
         return { galat: "Email ini sudah tertaut ke akun Apple lain.", status: 409 };
       }
+      if (!lewatEmail.apple_id && lewatEmail.role !== "commenter") return GALAT_STAF;
       await prisma.users.update({ where: { id: lewatEmail.id }, data: { apple_id: a.sub, updated_at: sekarang } });
       return { id: lewatEmail.id, name: lewatEmail.name, email: lewatEmail.email, image: lewatEmail.image };
     }

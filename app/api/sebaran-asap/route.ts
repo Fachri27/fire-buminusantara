@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { brotliCompressSync, gzipSync, constants as konstantaZlib } from "node:zlib";
-import { getZarrMetadata, getZarrFrame } from "@/lib/zarr-reader";
+import { GalatHuluZarr, STEP_MAKS, adaDiLinimasa, bacaParamFrame, getZarrMetadata, getZarrFrame } from "@/lib/zarr-reader";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -20,19 +20,16 @@ export async function GET(req: NextRequest) {
     }
 
     if (mode === "frame") {
-      const timeChunkStr = searchParams.get("timeChunk");
-      const stepStr = searchParams.get("step");
-      const timeInnerStr = searchParams.get("timeInner") ?? "0";
-
-      const timeChunk = timeChunkStr !== null ? parseInt(timeChunkStr, 10) : NaN;
-      const step = stepStr !== null ? parseInt(stepStr, 10) : NaN;
-      const timeInner = parseInt(timeInnerStr, 10);
-
-      if (Number.isNaN(timeChunk) || Number.isNaN(step)) {
-        return Response.json({ error: "Invalid timeChunk or step parameter" }, { status: 400 });
+      const param = bacaParamFrame(searchParams);
+      if (!param) {
+        return NextResponse.json({ error: `Invalid timeChunk, step (0..${STEP_MAKS}) or timeInner (0|1) parameter` }, { status: 400 });
+      }
+      const { timeChunk, step, timeInner } = param;
+      if (!(await adaDiLinimasa(timeChunk, step, timeInner))) {
+        return NextResponse.json({ error: "Frame tidak ada di linimasa saat ini" }, { status: 404 });
       }
 
-      const frameBuffer = await getZarrFrame(timeChunk, step, Number.isNaN(timeInner) ? 0 : timeInner);
+      const frameBuffer = await getZarrFrame(timeChunk, step, timeInner);
 
       // Kompresi respons di sini, bukan menunggu gzip nginx: jenis responsnya
       // application/octet-stream, yang tidak masuk gzip_types bawaan — tanpa
@@ -73,9 +70,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: `Unknown mode: ${mode}` }, { status: 400 });
   } catch (error) {
     console.error("[API sebaran-asap] Error:", error);
+    // Galat hulu (ECMWF mati / token belum diatur) → 502/503, bukan 500.
+    const status = error instanceof GalatHuluZarr ? (error.status === 503 ? 503 : 502) : 500;
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal Server Error" },
-      { status: 500 }
+      { status }
     );
   }
 }

@@ -23,8 +23,12 @@ const HEADER_KEAMANAN = [
   },
   {
     key: "Content-Security-Policy",
-    value: "frame-ancestors 'none'; frame-src 'self' http://localhost:3001 https://challenges.cloudflare.com https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'",
+    // localhost:3001 hanya untuk pengembangan — jangan sampai ikut ke produksi.
+    value: `frame-ancestors 'none'; frame-src 'self'${process.env.NODE_ENV === "production" ? "" : " http://localhost:3001"} https://challenges.cloudflare.com https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'`,
   },
+  // Tanpa includeSubDomains: subdomain lain di bawah domain bersama (CMS Laravel
+  // dsb.) belum tentu semuanya HTTPS. Peramban mengabaikan header ini di HTTP.
+  { key: "Strict-Transport-Security", value: "max-age=31536000" },
 ];
 
 const nextConfig: NextConfig = {
@@ -72,22 +76,19 @@ const nextConfig: NextConfig = {
   // ERR_MODULE_NOT_FOUND di dalam kontainer produksi.
   serverExternalPackages: ["@prisma/adapter-mariadb"],
 
-  // Batas upload video kejadian 100 MB (sama dengan CMS Laravel). Diberi 1 MB
-  // napas di atas batas klien (BATAS_TOTAL_BYTE = 100 MB di lib/batas-laporan.ts):
-  // body multipart = berkas + bidang isian + boundary, jadi kiriman yang lolos
-  // cek klien tepat di batas masih melebihi atap yang sama nilainya.
+  // Unggahan besar (lapor warga, media kejadian CMS) lewat route handler di
+  // /api — /api/lapor & /api/admin/kejadian — yang memeriksa panjang, captcha
+  // atau sesi, dan slot serentak SEBELUM badan dibaca. Server action & proxy
+  // tidak butuh badan besar lagi, dan JANGAN dinaikkan: Next menyangga badan
+  // server action dan menyalin badan untuk proxy (di semua path halaman +
+  // /admin) sampai batas ini sebelum sesi atau batas laju apa pun diperiksa —
+  // 101 MB di sini dulu cukup untuk membuat container OOM tanpa login.
   experimental: {
     serverActions: {
-      bodySizeLimit: "101mb",
+      bodySizeLimit: "1mb",
     },
-    // Selama proxy.ts dipakai, Next menyangga body permintaan di memori dan
-    // batas bawaannya 10 MB — sisanya DIPOTONG. Kiriman lapor berlampiran
-    // melewati proxy (matcher hanya mengecualikan _next/admin/api/media), dan
-    // multipart yang terpotong meledak sebagai "Unexpected end of form": 500
-    // polos ber-digest, tanpa pesan apa pun bagi pelapor. Naikkan sampai
-    // menutup bodySizeLimit supaya tidak ada kiriman yang lolos batas klien
-    // tapi terpotong di sini.
-    proxyClientMaxBodySize: "101mb",
+    // Bawaannya 10 MB, jadi harus disetel eksplisit.
+    proxyClientMaxBodySize: "1mb",
   },
 
   // Reaksi dulu di bawah /admin/komentar; kini bagian itu punya layout daftar sendiri.
@@ -119,7 +120,11 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "Content-Security-Policy", value: "frame-ancestors *; object-src 'none'" },
+          // sandbox tanpa allow-same-origin: HTML+skrip Windy dilayani dari asal kita,
+          // jadi tanpa ini skrip pihak ketiga itu berjalan sebagai situs ini (bisa
+          // memanggil aksi /admin dengan cookie editor). Next mengabaikan CSP yang
+          // disetel rute bila config sudah menyetelnya — karena itu di sini.
+          { key: "Content-Security-Policy", value: "frame-ancestors *; object-src 'none'; sandbox allow-scripts allow-popups" },
         ],
       },
       // Peta sematan (app/[locale]/embed) — satu-satunya halaman yang boleh

@@ -43,6 +43,9 @@ export async function GET(req: NextRequest) {
   const bentang = searchParams.get("bentang") === "1";
   // ringkas: legendaRingkas aktif (bingkai sempit / panggung dasbor)
   const ringkas = searchParams.get("ringkas") === "1";
+  // aplikasi: aplikasi Laporin — tombol lapisan, legenda AQI, dan bilah waktu
+  // native di luar iframe, jadi peta tampil polos seperti lapisan Aerosol-nya.
+  const aplikasi = searchParams.get("aplikasi") === "1";
   // Tema terang / gelap (disinkronkan dengan tema aktif situs)
   const temaAwal = searchParams.get("tema") === "light" ? "light" : "dark";
   // Kontrol zoom ditaruh di top 16px bila ada tombol bentang selayar di atasnya
@@ -72,6 +75,7 @@ export async function GET(req: NextRequest) {
         "Accept-Language": "en-US,en;q=0.9",
       },
       cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!resWindy.ok) {
@@ -86,6 +90,44 @@ export async function GET(req: NextRequest) {
     const preInitScript = `
       <script>
         (function() {
+          // 00. Dokumen ini di-sandbox tanpa allow-same-origin (origin buram,
+          // lihat header CSP di bawah & atribut sandbox di peta.tsx): akses
+          // localStorage / sessionStorage / document.cookie melempar
+          // SecurityError dan bisa mematikan boot Windy. Ganti dengan tiruan
+          // dalam-memori — isinya memang tak perlu bertahan antarmuat.
+          function gudangMemori() {
+            var isi = {};
+            var g = {};
+            Object.defineProperties(g, {
+              length: { get: function() { return Object.keys(isi).length; } },
+              key: { value: function(i) { var k = Object.keys(isi); return i < k.length ? k[i] : null; } },
+              getItem: { value: function(k) { k = String(k); return Object.prototype.hasOwnProperty.call(isi, k) ? isi[k] : null; } },
+              setItem: { value: function(k, v) { isi[String(k)] = String(v); } },
+              removeItem: { value: function(k) { delete isi[String(k)]; } },
+              clear: { value: function() { isi = {}; } }
+            });
+            return g;
+          }
+          ['localStorage', 'sessionStorage'].forEach(function(nama) {
+            try { window[nama].getItem('_'); } catch (e) {
+              try { Object.defineProperty(window, nama, { value: gudangMemori(), configurable: true }); } catch (e2) {}
+            }
+          });
+          try { void document.cookie; } catch (e) {
+            var kue = {};
+            try {
+              Object.defineProperty(document, 'cookie', {
+                configurable: true,
+                get: function() { return Object.keys(kue).map(function(k) { return k + '=' + kue[k]; }).join('; '); },
+                set: function(v) {
+                  var pasangan = String(v).split(';')[0];
+                  var i = pasangan.indexOf('=');
+                  if (i > 0) kue[pasangan.slice(0, i).trim()] = pasangan.slice(i + 1).trim();
+                }
+              });
+            } catch (e2) {}
+          }
+
           // 0. Spoof document.referrer to bypass iframe unlegal embed check
           try {
             Object.defineProperty(document, 'referrer', {
@@ -165,11 +207,13 @@ export async function GET(req: NextRequest) {
             }
           } catch(e) {}
           // Jaring pengaman: telan sisa rejection "Failed to fetch" di dalam
-          // iframe peta (konteks ini hanya Windy + skrip peta kita).
+          // iframe peta (konteks ini hanya Windy + skrip peta kita), juga
+          // IndexedDB yang ditolak di origin buram (sandbox) — Windy tetap
+          // jalan tanpa tembolok IDB-nya, hanya konsolnya banjir galat.
           window.addEventListener('unhandledrejection', function(ev) {
             try {
               var m = ev && ev.reason && (ev.reason.message || String(ev.reason));
-              if (m && m.indexOf('Failed to fetch') !== -1) { ev.preventDefault(); }
+              if (m && (m.indexOf('Failed to fetch') !== -1 || m.indexOf('Indexed Database') !== -1)) { ev.preventDefault(); }
             } catch(e) {}
           });
 
@@ -792,6 +836,19 @@ export async function GET(req: NextRequest) {
           pointer-events: none !important;
         }
 
+        /* Titik lokasi pengguna dari aplikasi Laporin (SET_LOKASIKU) — rupanya
+           sama dengan .lokasiku peta MapLibre aplikasi (components/peta-gl.tsx). */
+        .lokasiku {
+          width: 16px !important;
+          height: 16px !important;
+          border-radius: 50% !important;
+          background: #1a73e8 !important;
+          border: 3px solid #fff !important;
+          box-sizing: border-box !important;
+          box-shadow: 0 0 0 6px rgba(26, 115, 232, 0.25), 0 1px 4px rgba(0, 0, 0, 0.4) !important;
+          pointer-events: none !important;
+        }
+
         /* K. Fire Incident Markers from Kejadian API */
         .marker-titik-kejadian {
           position: relative;
@@ -990,6 +1047,34 @@ ${ringkas ? `
         #custom-zoom-controls {
           gap: 6px;
         }` : ""}
+${aplikasi ? `
+        /* Aplikasi: kendali, legenda AQI, dan kredit native (lembar Legenda &
+           Panduan); batas provinsi & laporan hanya di tab Laporan aplikasi.
+           Logo Windy/Copernicus naik ke kiri atas, bilah waktu native di dasar. */
+        #custom-zoom-controls,
+        #plugin-rhbottom,
+        #legend-mobile,
+        #atribusi-eox,
+        .provinsi-layer,
+        .peta-angka {
+          display: none !important;
+        }
+        .rhpane,
+        .rhpane__bottom-messages,
+        #logo,
+        #logo-wrapper #logo,
+        [class*="on"] #logo-wrapper #logo,
+        #device-mobile #logo,
+        #device-tablet #logo {
+          top: 12px !important;
+          bottom: auto !important;
+          transform-origin: top left !important;
+        }
+        /* Ponsel: Copernicus menumpang di .rhpane (relative) — tanpa ini ia
+           turun 12px di bawah logo Windy. */
+        .rhpane .rhpane__bottom-messages {
+          top: 0 !important;
+        }` : ""}
 
         /* Tombol navigasi (+, -, home, lapisan) — 28px jika ringkas (legendaRingkas), default 36px */
         #btn-zoom-in,
@@ -1061,6 +1146,9 @@ ${ringkas ? `
           let markersLayer = null;
           let daftarAngka = [];
           let mapInitialized = false;
+          // [lat, lng] lokasi pengguna dari aplikasi; digambar begitu peta siap.
+          let lokasiku = null;
+          let penandaLokasiku = null;
 
           // ── Lapisan udara: AQI + partikel angin dari /api/udara ──────────
           // Pengganti lapisan AQI & partikel bawaan Windy: frame Windy per jam,
@@ -1142,23 +1230,6 @@ ${ringkas ? `
               terunduh: udaraTerunduh,
               total: udaraLangkah.length
             });
-          }
-
-          // Frame disimpan di jendela induk (satu origin) per siklus model:
-          // iframe dimuat ulang tiap masuk/keluar selayar, framenya tak perlu
-          // diunduh lagi. Disematkan lintas origin → cache lokal saja.
-          function cacheBersama(run) {
-            try {
-              const induk = window.parent && window.parent !== window ? window.parent : null;
-              if (induk) {
-                const c = induk.__frameUdara;
-                if (c && c.run === run && c.frame) return c.frame;
-                const baru = {};
-                induk.__frameUdara = { run: run, frame: baru };
-                return baru;
-              }
-            } catch (e) {}
-            return {};
           }
 
           function muatFrameUdara(m) {
@@ -1259,7 +1330,9 @@ ${ringkas ? `
             if (runLama === d.latestModelRunIso && nLama === d.timesteps.length) return;
             udaraLangkah = d.timesteps;
             udaraKunci = udaraLangkah.map(kunciUdara);
-            udaraFrame = cacheBersama((d.latestModelRunIso || '') + VERSI_UDARA);
+            // Cache lokal saja: iframe di-sandbox (origin buram), jadi jendela
+            // induk tak terjangkau untuk berbagi frame antarmuat ulang.
+            udaraFrame = {};
             hitungTerunduh();
             const n = udaraLangkah.length;
             // Seperti mulaiDariSekarang Aerosol: pemuatan awal dan siklus model
@@ -2340,20 +2413,10 @@ ${ringkas ? `
             if (mml && mml._trackResize) mml._trackResize = false;
           }
           if (KONSOL) {
-            // Dipanggil parent secara SINKRON (iframe ini satu origin) tepat
-            // setelah parent melepas ukuran iframe — resize kanvas, geser zoom,
-            // dan gambar ulang terjadi di tugas yang sama, sebelum frame dilukis.
-            // Event resize di bawah tetap ada untuk resize jendela biasa.
-            window.__skalaKonsol = function(delta) {
-              matikanLacakResize();
-              const mml = petaMapLibreWindy();
-              if (typeof delta === 'number' && isFinite(delta) && delta !== 0) {
-                deltaTertunda += delta;
-                terapkanDeltaTertunda();
-              } else {
-                try { if (mml) { mml.resize(); mml.redraw(); } } catch (e) {}
-              }
-            };
+            // Parent mengirim SKALA_ZOOM lalu melepas ukuran iframe; selisih
+            // zoom yang tertunda diterapkan di sini bersama resize kanvas.
+            // (Dulu dipanggil langsung secara sinkron — tak mungkin lagi sejak
+            // iframe di-sandbox tanpa allow-same-origin.)
             window.addEventListener('resize', function() {
               matikanLacakResize();
               const mml = petaMapLibreWindy();
@@ -2512,6 +2575,20 @@ ${ringkas ? `
             }
 
             setTimeout(() => perbaruiAngka(map), 50);
+          }
+
+          function renderLokasiku(map) {
+            if (penandaLokasiku) {
+              penandaLokasiku.remove();
+              penandaLokasiku = null;
+            }
+            if (!map || !lokasiku || typeof L === 'undefined') return;
+            penandaLokasiku = L.marker(lokasiku, {
+              pane: 'angkaPane',
+              interactive: false,
+              keyboard: false,
+              icon: L.divIcon({ className: 'lokasiku', iconSize: [16, 16] })
+            }).addTo(map);
           }
 
           function initAdministrativeMap() {
@@ -2816,9 +2893,18 @@ ${ringkas ? `
             }, true);
 
             renderAngka(map);
+            renderLokasiku(map);
 
             map.on('zoomend moveend resize', function() {
               perbaruiAngka(map);
+              // Induk (peta.tsx) menyamakan kamera Aerosol dari sini saat beralih
+              // lapisan — ia tak bisa membaca W.map langsung (iframe di-sandbox).
+              try {
+                const c = map.getCenter();
+                const mml = map._maplibreMap;
+                const z = mml && typeof mml.getZoom === 'function' ? mml.getZoom() : map.getZoom() - 1;
+                kirimInduk({ type: 'KAMERA_WINDY', lat: c.lat, lng: c.lng, zoom: z });
+              } catch (e) {}
             });
 
             mapInitialized = true;
@@ -2902,6 +2988,8 @@ ${ringkas ? `
 
           // Listener pesan dari parent Next.js
           window.addEventListener('message', function(event) {
+            // Hanya induk yang membingkai iframe ini, bukan jendela lain.
+            if (event.source !== window.parent) return;
             const data = event.data;
             if (!data || typeof data !== 'object') return;
 
@@ -2911,6 +2999,13 @@ ${ringkas ? `
                 if (window.W && window.W.map && window.W.map.map) {
                   renderAngka(window.W.map.map);
                 }
+              }
+            } else if (data.type === 'SET_LOKASIKU') {
+              // Aplikasi Laporin: titik lokasi pengguna, seperti mode peta lainnya.
+              if (typeof data.lat === 'number' && typeof data.lng === 'number' && isFinite(data.lat) && isFinite(data.lng)) {
+                lokasiku = [data.lat, data.lng];
+                // Sebelum peta siap disimpan saja; initAdministrativeMap menggambarnya.
+                if (mapInitialized) renderLokasiku(window.W.map.map);
               }
             } else if (data.type === 'FOCUS_WILAYAH') {
               const info = CENTROIDS[data.nama];
@@ -3034,6 +3129,9 @@ ${ringkas ? `
               akar.toggle('angka-mati', data.angka === false);
               jagaLapisanUdara();
               mintaGambarUdara();
+            } else if (data.type === 'FOKUS_LAPISAN') {
+              // Esc menutup panel Lapisan induk: kembalikan fokus ke tombolnya.
+              document.getElementById('btn-lapisan')?.focus();
             } else if (data.type === 'SET_TEMA') {
               const zb = document.getElementById('custom-zoom-controls');
               if (zb) {
@@ -3148,8 +3246,10 @@ ${ringkas ? `
         "Content-Type": "text/html; charset=UTF-8",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         // Boleh dibingkai siapa saja — ia bersarang di peta sematan
-        // /<locale>/embed (lihat next.config.ts).
-        "Content-Security-Policy": "frame-ancestors *",
+        // /<locale>/embed (lihat next.config.ts). sandbox tanpa
+        // allow-same-origin: skrip Windy (pihak ketiga) berjalan di origin
+        // buram, bukan origin kita — juga bila URL ini dibuka langsung.
+        "Content-Security-Policy": "frame-ancestors *; sandbox allow-scripts allow-popups",
       },
     });
   } catch (err: unknown) {

@@ -7,7 +7,7 @@ import { TombolKirim } from "../tombol-kirim";
 import { TombolMasukPasskey } from "../tombol-passkey";
 import { headers } from "next/headers";
 import { ipDari } from "@/lib/turnstile";
-import { lewatBatas } from "@/lib/batas-laju";
+import { lewatBatas, sudahLewat } from "@/lib/batas-laju";
 
 export default async function Masuk({
   searchParams,
@@ -29,16 +29,26 @@ export default async function Masuk({
   async function kirim(data: FormData) {
     "use server";
     const email = String(data.get("email") ?? "").trim();
-    // Tebak sandi: 10 percobaan / 15 menit per IP dan per email (yang kedua
-    // menahan tebakan tersebar dari banyak IP ke satu akun).
+    // Tebak sandi: 10 percobaan / 15 menit per IP. Per email hanya yang GAGAL
+    // dihitung: 10 per email+IP — orang asing tidak bisa mengunci admin dari
+    // IP lain — dan 50 per email dari IP mana pun, menahan tebakan tersebar.
     const ip = ipDari(new Request("http://lokal", { headers: await headers() }));
-    if ((ip && (await lewatBatas(`masuk:ip:${ip}`, 10, 900))) || (await lewatBatas(`masuk:email:${email.toLowerCase()}`, 10, 900))) {
+    const kunciEmail = `masuk:email:${email.toLowerCase()}`;
+    const kunciEmailIp = `masuk:email-ip:${ip ?? "tanpa-ip"}:${email.toLowerCase()}`;
+    if (
+      (ip && (await lewatBatas(`masuk:ip:${ip}`, 10, 900))) ||
+      (await sudahLewat(kunciEmailIp, 10)) ||
+      (await sudahLewat(kunciEmail, 50))
+    ) {
       redirect("/admin/login?galat=laju");
     }
     const sesi = await masuk(email, String(data.get("sandi") ?? ""));
     // Pesan yang sama untuk email tak dikenal, sandi salah, maupun peran yang
     // tidak berhak — supaya tidak bisa dipakai menebak akun mana yang ada.
-    if (!sesi) redirect("/admin/login?galat=1");
+    if (!sesi) {
+      await Promise.all([lewatBatas(kunciEmailIp, 10, 900), lewatBatas(kunciEmail, 50, 900)]);
+      redirect("/admin/login?galat=1");
+    }
     await buatSesi(sesi);
     redirect("/admin/kejadian");
   }

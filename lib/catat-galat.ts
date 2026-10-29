@@ -19,6 +19,8 @@ export async function catatGalat(label: string, e: unknown, rincian?: string): P
   const kini = Date.now();
   if (kini - (terakhir.get(label) ?? 0) < JEDA_MS) return;
   terakhir.set(label, kini);
+  // Label per konten (laporan-konten …) membuat Map ini tumbuh: buang yang redamnya sudah lewat.
+  if (terakhir.size > 1000) for (const [l, t] of terakhir) if (kini - t >= JEDA_MS) terakhir.delete(l);
 
   const pesan = e instanceof Error ? e.message : String(e);
   const digest = typeof e === "object" && e !== null && "digest" in e ? ` (digest ${String(e.digest)})` : "";

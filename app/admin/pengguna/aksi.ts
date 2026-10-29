@@ -3,6 +3,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { buatSesi, wajibSesi } from "@/lib/sesi";
+import { BIAYA_BCRYPT, emailSah } from "@/lib/auth";
 import { catatGalat } from "@/lib/catat-galat";
 
 export type IsianPengguna = { nama: string; email: string; peran: string };
@@ -50,7 +51,7 @@ export async function aksiSimpanPengguna(
   const gagal = (galat: string) => ({ galat, isian });
 
   if (!v.nama || !v.email) return gagal("Nama dan email wajib diisi.");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) return gagal("Format email tidak sah.");
+  if (!emailSah(v.email)) return gagal("Format email tidak sah.");
   if (!PERAN.includes(v.peran as Peran)) return gagal("Pilih peran.");
   const galatSandi = periksaSandi(v.sandi, v.konfirmasi, id === null);
   if (galatSandi) return gagal(galatSandi);
@@ -69,7 +70,7 @@ export async function aksiSimpanPengguna(
   const kini = new Date();
   // Hash bcryptjs langsung terbaca pengecek bcrypt Laravel — akun yang sama
   // tetap bisa masuk ke situs utama.
-  const password = v.sandi ? await bcrypt.hash(v.sandi, 10) : undefined;
+  const password = v.sandi ? await bcrypt.hash(v.sandi, BIAYA_BCRYPT) : undefined;
 
   try {
     if (id === null) {
@@ -84,11 +85,14 @@ export async function aksiSimpanPengguna(
       id = Number(dibuat.id);
       return { ok: true, id };
     } else {
-      await prisma.users.update({
+      const ubah = prisma.users.update({
         where: { id },
         data: { name: v.nama, email: v.email, role: v.peran as Peran, updated_at: kini, ...(password && { password }) },
         select: { id: true },
       });
+      // Sandi disetel ulang = passkey akun itu ikut dicabut, dalam transaksi
+      // yang sama: passkey yang ditanam lewat sesi curian tidak boleh bertahan.
+      await (password ? prisma.$transaction([ubah, prisma.passkeys.deleteMany({ where: { user_id: id } })]) : ubah);
     }
   } catch (e) {
     if (bentrokUnik(e)) return gagal("Email itu sudah dipakai akun lain.");

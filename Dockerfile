@@ -1,5 +1,5 @@
 # ── Tahap 1: build standalone ────────────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -46,7 +46,7 @@ RUN mkdir -p /opt/prisma && cd /opt/prisma \
        "prisma@$(node -p "require('/app/package.json').devDependencies.prisma")" >/dev/null
 
 # ── Tahap 2: runtime ─────────────────────────────────────────────────────────
-FROM node:22-alpine
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914
 WORKDIR /app
 ENV NODE_ENV=production
 # Node 22 memberi tiap alamat hanya 250 ms (happy eyeballs); NASA FIRMS butuh
@@ -59,8 +59,13 @@ ENV NODE_OPTIONS=--network-family-autoselection-attempt-timeout=2000
 # (og:image) jatuh ke logo alih-alih cuplikan videonya.
 RUN apk add --no-cache ffmpeg
 
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Proses app jalan sebagai user `node`, bukan root: ffmpeg membedah video
+# unggahan orang luar — celah di demuxer-nya tidak boleh berarti root, dan
+# berkas app (server.js) tidak boleh bisa ditimpa dari dalam proses. Hanya
+# .next (cache ISR/gambar) dan /app (fallback media lokal) yang perlu ditulisi.
+RUN chown node:node /app
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 # Asuransi kalau pelacakan berkas Next tidak menyalin klien Prisma hasil generate.
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
@@ -85,6 +90,7 @@ RUN printf '%s\n' \
 ENV HOSTNAME=0.0.0.0 PORT=3000
 
 EXPOSE 3000
+USER node
 # migrate deploy sebelum server hidup: hanya menerapkan migrasi yang tertunda,
 # tidak pernah membuat berkas migrasi baru dan tidak menjalankan seed. Kalau
 # migrasi gagal, container mati → healthcheck merah → remote-deploy.sh rollback,

@@ -3,7 +3,7 @@
 import { updateTag } from "next/cache";
 import { wajibSesi } from "@/lib/sesi";
 import { prisma } from "@/lib/prisma";
-import { simpanKejadian, hapusKejadian } from "@/lib/simpan-kejadian";
+import { hapusKejadian } from "@/lib/simpan-kejadian";
 import { catatGalat } from "@/lib/catat-galat";
 import type { HasilAksi } from "../use-aksi";
 
@@ -28,33 +28,6 @@ export async function aksiTayang(id: number, status: "draft" | "published") {
     updateTag("kejadian");
   } catch {}
   return { ok: true as const };
-}
-
-/** Simpan kejadian baru. Hasilnya dikembalikan ke form: sukses → form
- *  membuka kejadian barunya di panel rincian; gagal → galat di bilah simpan. */
-export async function aksiTambahKejadian(data: FormData) {
-  await wajibSesi();
-
-  const hasil = await simpanKejadian(data);
-  if (!hasil.ok) return { ok: false as const, galat: hasil.galat };
-  // Metadata slug di halaman publik di-cache; tanpa ini pratinjau bagikan
-  // kejadian baru bisa basi sampai cache-nya kedaluwarsa sendiri.
-  try {
-    updateTag("kejadian");
-  } catch {}
-  return { ok: true as const, id: hasil.id };
-}
-
-/** Simpan perubahan — editor tetap di form yang sama (toast, bukan pindah halaman). */
-export async function aksiUbahKejadian(id: number, data: FormData) {
-  await wajibSesi();
-
-  const hasil = await simpanKejadian(data, id);
-  if (!hasil.ok) return { ok: false as const, galat: hasil.galat };
-  try {
-    updateTag("kejadian");
-  } catch {}
-  return { ok: true as const, id };
 }
 
 /** Hapus permanen kejadian beserta relasinya (hanya untuk peran admin). */

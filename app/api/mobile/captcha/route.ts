@@ -40,6 +40,7 @@ export function GET() {
     if (!KUNCI) return kirim({ token: "tanpa-captcha" });
     turnstile.render("#widget", {
       sitekey: KUNCI,
+      action: "lapor",
       language: "id",
       theme: "auto",
       callback: function (token) {

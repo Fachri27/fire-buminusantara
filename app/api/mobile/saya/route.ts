@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { revalidateTag } from "next/cache";
 import { anonimkanMedia, BATAS_NAMA, cabutTokenApple, galat, penggunaDari, publik } from "@/lib/akun-mobile";
+import { bacaJson } from "@/lib/batas-badan";
 import { emailAkunDihapus, saring } from "@/lib/komentar";
 import { bacaBerkasMedia } from "@/lib/media";
 import { prisma } from "@/lib/prisma";
@@ -22,7 +23,8 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   const p = await penggunaDari(req);
   if (!p) return galat("Masuk dulu.", 401);
-  const isi = await req.json().catch(() => null);
+  const isi = await bacaJson(req);
+  if (isi instanceof Response) return isi;
   const nama = String(isi?.nama ?? "").trim();
   if (!nama) return galat("Nama tidak boleh kosong.", 422);
   if (nama.length > BATAS_NAMA) return galat(`Nama maksimal ${BATAS_NAMA} karakter.`, 422);
