@@ -36,8 +36,13 @@ ssh "${SSH_OPTS[@]}" "root@$IP" \
 unset TOKEN
 
 log "kunci .env yang masih butuh nilai manusiawi:"
+# Tanpa menyaring *_SECRET: gen-secrets.sh sudah mengisi semuanya KECUALI
+# MANUAL_KEYS-nya (mis. LIVEKIT_API_SECRET), dan justru itu yang harus tampil.
 ssh "${SSH_OPTS[@]}" "root@$IP" \
-  "grep -E '^[A-Z_]+=$' '$STACK_DIR/.env' | grep -vE '^[A-Z_]+_(SECRET|PASS)=' | cut -d= -f1 | sort -u" \
+  "grep -E '^[A-Z_]+=$' '$STACK_DIR/.env' | cut -d= -f1 | sort -u" \
   || true
-log "(DATABASE_URL, MINIO_ACCESS_KEY/SECRET_KEY, NEXT_PUBLIC_*, GEO_*, TURNSTILE_*, DB_CONTAINER)"
+log "(DATABASE_URL, MINIO_ACCESS_KEY/SECRET_KEY, NEXT_PUBLIC_*, GEO_*, TURNSTILE_*, DB_CONTAINER,"
+log " TRUSTED_PROXY_HOPS — wajib, jumlah proxy tepercaya di depan container,"
+log " LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET — sama dengan server LiveKit,"
+log " GOOGLE_WEB_CLIENT_ID, APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY)"
 log "selesai — push pertama ke main akan mendeploy."

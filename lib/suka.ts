@@ -13,26 +13,61 @@ export function penandaPengunjung(ip: string | null, ua: string | null): string 
   return createHash("sha256").update(`${ip ?? ""}|${ua ?? ""}`).digest("hex");
 }
 
-/** Suka — idempoten: suka kedua dari perangkat yang sama diabaikan. */
-export async function sukai(eventId: number, ip: string | null, ua: string | null) {
-  const visitor_hash = penandaPengunjung(ip, ua);
-  await prisma.event_likes.upsert({
-    where: { event_id_visitor_hash: { event_id: eventId, visitor_hash } },
-    create: {
+/**
+ * INSERT IGNORE (skipDuplicates), bukan upsert: di MySQL upsert Prisma adalah
+ * SELECT lalu INSERT, jadi dua ketukan serentak membuat yang kalah balapan kena
+ * P2002 (unique) dan dijawab 500, padahal sukanya tersimpan.
+ */
+async function simpanSuka(eventId: number, visitor_hash: string, ip: string | null, ua: string | null) {
+  await prisma.event_likes.createMany({
+    data: [{
       event_id: eventId,
       visitor_hash,
       ip_address: ip,
       user_agent: ua?.slice(0, BATAS_UA) ?? null,
       created_at: new Date(),
-    },
-    update: {},
+    }],
+    skipDuplicates: true,
   });
+}
+
+/** Suka — idempoten: suka kedua dari perangkat yang sama diabaikan. */
+export async function sukai(eventId: number, ip: string | null, ua: string | null) {
+  await simpanSuka(eventId, penandaPengunjung(ip, ua), ip, ua);
 }
 
 export async function batalSuka(eventId: number, ip: string | null, ua: string | null) {
   await prisma.event_likes.deleteMany({
     where: { event_id: eventId, visitor_hash: penandaPengunjung(ip, ua) },
   });
+}
+
+/**
+ * Suka dari akun aplikasi mobile memakai tabel yang sama, satu suka per akun
+ * per kejadian. Penandanya sha256 akun, bukan IP+UA: masukan `akun:<id>` tak
+ * pernah bertabrakan dengan `<ip>|<ua>` milik pengunjung web.
+ */
+export function penandaAkun(userId: bigint | number): string {
+  return createHash("sha256").update(`akun:${userId}`).digest("hex");
+}
+
+export async function sukaiAkun(eventId: number, userId: bigint, ip: string | null, ua: string | null) {
+  await simpanSuka(eventId, penandaAkun(userId), ip, ua);
+}
+
+export async function batalSukaAkun(eventId: number, userId: bigint) {
+  await prisma.event_likes.deleteMany({ where: { event_id: eventId, visitor_hash: penandaAkun(userId) } });
+}
+
+/** Id kejadian yang disukai akun ini, terbaru dulu. */
+export async function kejadianDisukaiAkun(userId: bigint): Promise<number[]> {
+  const baris = await prisma.event_likes.findMany({
+    where: { visitor_hash: penandaAkun(userId) },
+    orderBy: { id: "desc" },
+    take: 1000,
+    select: { event_id: true },
+  });
+  return baris.map((r) => Number(r.event_id));
 }
 
 export function jumlahSuka(eventId: number) {

@@ -277,10 +277,11 @@ async function ambilZarrMetadata(forceRefresh: boolean): Promise<ZarrMetadataRes
 
   try {
     const metaUrl = `${ZARR_BASE_URL}/.zmetadata?_fet=${ZARR_TOKEN}`;
-    const res = await fetch(
-      metaUrl,
-      forceRefresh ? { cache: "no-store" } : { next: { revalidate: 600 } }
-    );
+    // no-store, bukan revalidate: tembolok fetch Next tersimpan di disk dan
+    // basi-sambil-revalidasi — server yang lama mati menyajikan run model
+    // berhari-hari lalu pada permintaan pertama, lalu basi itu terkunci di L1
+    // selama UMUR_METADATA_MS. L1 + Redis di atas sudah cukup sebagai tembolok.
+    const res = await fetch(metaUrl, { cache: "no-store" });
     if (!res.ok) {
       throw new Error(`Failed to fetch Zarr metadata: ${res.status} ${res.statusText}`);
     }

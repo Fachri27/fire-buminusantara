@@ -13,23 +13,35 @@ datasource db {
 // untuk masuk CMS.
 
 model users {
-  id                BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
-  name              String              @db.VarChar(255)
-  email             String              @unique(map: "users_email_unique") @db.VarChar(255)
-  google_id         String?             @unique(map: "users_google_id_unique") @db.VarChar(255)
-  role              users_role          @default(editor)
-  email_verified_at DateTime?           @db.Timestamp(0)
-  password          String?             @db.VarChar(255)
-  image             String?             @db.VarChar(255)
+  id                  BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  name                String              @db.VarChar(255)
+  email               String              @unique(map: "users_email_unique") @db.VarChar(255)
+  google_id           String?             @unique(map: "users_google_id_unique") @db.VarChar(255)
+  /// `sub` Sign in with Apple dari aplikasi mobile (iOS).
+  apple_id            String?             @unique(map: "users_apple_id_unique") @db.VarChar(255)
+  /// refresh_token Sign in with Apple, hanya untuk dicabut (auth/revoke) saat
+  /// akun dihapus — syarat App Store 5.1.1(v). Tak berguna tanpa kunci .p8.
+  /// Disimpan tersegel AES-256-GCM (segelTokenApple, APPLE_TOKEN_SECRET).
+  apple_refresh_token String?             @db.Text
+  /// Bundle ID (client_id) penerbit token itu: produksi atau varian .preview.
+  apple_client_id     String?             @db.VarChar(255)
+  role                users_role          @default(editor)
+  email_verified_at   DateTime?           @db.Timestamp(0)
+  password            String?             @db.VarChar(255)
+  image               String?             @db.VarChar(255)
   /// Warisan basis data bersama (aplikasi Laravel) — tidak dipakai Next.js,
   /// tapi tetap dideklarasikan supaya schema = migrasi = DB (cek drift di CI).
-  remember_token    String?             @db.VarChar(100)
-  created_at        DateTime?           @db.Timestamp(0)
-  updated_at        DateTime?           @db.Timestamp(0)
-  comment_reactions comment_reactions[]
-  comments          comments[]
-  public_reports    public_reports[]
-  passkeys          passkeys[]
+  remember_token      String?             @db.VarChar(100)
+  created_at          DateTime?           @db.Timestamp(0)
+  updated_at          DateTime?           @db.Timestamp(0)
+  comment_reactions   comment_reactions[]
+  comments            comments[]
+  public_reports      public_reports[]    @relation("peninjau")
+  /// Laporan yang dikirim akun ini dari aplikasi mobile (bukan yang anonim).
+  laporan_warga       public_reports[]    @relation("pelapor")
+  passkeys            passkeys[]
+  mobile_sessions     mobile_sessions[]
+  content_reports     content_reports[]
 }
 
 model events {
@@ -59,6 +71,7 @@ model events {
   created_at       DateTime?          @db.Timestamp(0)
   updated_at       DateTime?          @db.Timestamp(0)
   event_likes      event_likes[]
+  public_reports   public_reports[]
 
   @@index([event_date], map: "events_event_date_index")
   @@index([status, event_date(sort: Desc)], map: "events_status_event_date_index")
@@ -185,10 +198,20 @@ model public_reports {
   reviewed_at    DateTime?             @db.Timestamp(0)
   created_at     DateTime?             @db.Timestamp(0)
   updated_at     DateTime?             @db.Timestamp(0)
-  peninjau       users?                @relation(fields: [reviewed_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "public_reports_reviewed_by_foreign")
+  /// Akun pengirim dari aplikasi mobile. Diisi HANYA bila kiriman membawa
+  /// token sesi dan tidak anonim — laporan anonim tidak pernah terikat ke akun.
+  reporter_user_id BigInt?             @db.UnsignedBigInt
+  /// Kejadian hasil promosi saat laporan diverifikasi, supaya pelapor bisa
+  /// membukanya dari "Laporanku" di aplikasi.
+  event_id       BigInt?               @db.UnsignedBigInt
+  peninjau       users?                @relation("peninjau", fields: [reviewed_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "public_reports_reviewed_by_foreign")
+  pelapor        users?                @relation("pelapor", fields: [reporter_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "public_reports_reporter_user_id_foreign")
+  kejadian       events?               @relation(fields: [event_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "public_reports_event_id_foreign")
 
   @@index([status, created_at], map: "public_reports_status_created_at_index")
   @@index([reviewed_by], map: "public_reports_reviewed_by_foreign")
+  @@index([reporter_user_id, created_at], map: "public_reports_reporter_user_id_created_at_index")
+  @@index([event_id], map: "public_reports_event_id_foreign")
 }
 
 enum public_reports_status {
@@ -225,4 +248,42 @@ model passkeys {
   users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "passkeys_user_id_foreign")
 
   @@index([user_id], map: "passkeys_user_id_foreign")
+}
+
+/// Sesi aplikasi mobile (akun warga). Terpisah dari cookie sesi CMS: token
+/// acak dikirim sebagai Bearer, yang disimpan hanya sha256-nya, dan barisnya
+/// dihapus saat keluar. Tabel milik CMS ini.
+model mobile_sessions {
+  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  token_hash   String    @unique(map: "mobile_sessions_token_hash_unique") @db.Char(64)
+  user_id      BigInt    @db.UnsignedBigInt
+  created_at   DateTime  @default(now()) @db.Timestamp(0)
+  last_used_at DateTime? @db.Timestamp(0)
+  users        users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "mobile_sessions_user_id_foreign")
+
+  @@index([user_id], map: "mobile_sessions_user_id_foreign")
+}
+
+/// Laporan konten dari aplikasi mobile ("Laporkan"): komentar, laporan warga di
+/// umpan, atau siaran langsung. Syarat App Store/Play untuk konten buatan
+/// pengguna. Komentar yang dilaporkan beberapa orang disembunyikan otomatis
+/// (is_approved = false) sambil menunggu moderator. Tabel milik CMS ini.
+model content_reports {
+  id               BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  /// komentar | laporan | siaran
+  jenis            String    @db.VarChar(20)
+  /// id komentar / id kejadian / nama ruang siaran
+  target_id        String    @db.VarChar(100)
+  alasan           String    @db.VarChar(30)
+  catatan          String?   @db.Text
+  reporter_user_id BigInt?   @db.UnsignedBigInt
+  ip_address       String?   @db.VarChar(45)
+  /// baru | ditinjau
+  status           String    @default("baru") @db.VarChar(20)
+  created_at       DateTime  @default(now()) @db.Timestamp(0)
+  users            users?    @relation(fields: [reporter_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "content_reports_reporter_user_id_foreign")
+
+  @@index([jenis, target_id], map: "content_reports_jenis_target_id_index")
+  @@index([status, created_at], map: "content_reports_status_created_at_index")
+  @@index([reporter_user_id], map: "content_reports_reporter_user_id_foreign")
 }
