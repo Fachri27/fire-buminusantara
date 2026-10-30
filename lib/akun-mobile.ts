@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes, timingSafeEqual } from "node:crypto";
 import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "jose";
 import { catatGalat } from "./catat-galat.ts";
 import { saring } from "./komentar.ts";
@@ -416,12 +416,24 @@ export function anonimkanMedia(media: unknown, nama: Set<string>): { media: unkn
   return { media: berubah ? baru : media, berubah };
 }
 
+/** Kode masuk uji di produksi minimal sepanjang ini: tidak bisa ditebak lewat percobaan. */
+const KODE_UJI_MIN = 16;
+
 /**
- * Masuk uji tanpa Google, untuk mengembangkan aplikasi terhadap `next dev`.
- * Terkunci ganda: tidak pernah di produksi, dan hanya bila MOBILE_MASUK_UJI=1.
+ * Masuk uji tanpa Google (nama saja). Hanya bila MOBILE_MASUK_UJI=1.
+ * - Pengembangan (`next dev`): cukup itu.
+ * - Produksi: juga wajib MOBILE_MASUK_UJI_KODE (≥ 16 karakter) dan `kode` yang sama dari aplikasi.
+ *   Kode itu hanya tertanam di build preview internal aplikasi (EXPO_PUBLIC_MASUK_UJI_KODE), jadi
+ *   orang luar yang menemukan rute ini tetap tidak bisa masuk sebagai nama apa pun.
  */
-export function masukUjiBoleh(): boolean {
-  return process.env.NODE_ENV !== "production" && process.env.MOBILE_MASUK_UJI === "1";
+export function masukUjiBoleh(kode?: unknown): boolean {
+  if (process.env.MOBILE_MASUK_UJI !== "1") return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  const rahasia = process.env.MOBILE_MASUK_UJI_KODE ?? "";
+  if (rahasia.length < KODE_UJI_MIN || typeof kode !== "string") return false;
+  // Dibandingkan sebagai sidik sha256: panjang sama, waktu tetap.
+  const sidik = (t: string) => createHash("sha256").update(t).digest();
+  return timingSafeEqual(sidik(kode), sidik(rahasia));
 }
 
 export async function penggunaUji(nama: string): Promise<BarisPengguna> {

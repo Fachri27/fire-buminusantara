@@ -63,15 +63,27 @@ test("penandaAkun tidak bertabrakan dengan penanda pengunjung web", () => {
   assert.notEqual(penandaAkun(1), penandaAkun(2));
 });
 
-test("masuk uji terkunci di produksi dan tanpa MOBILE_MASUK_UJI", () => {
+test("masuk uji: produksi butuh kode yang cocok, selalu butuh MOBILE_MASUK_UJI", () => {
   const lama = { ...process.env };
+  const kode = "kode-uji-yang-panjang-sekali";
   process.env.MOBILE_MASUK_UJI = "1";
+  delete process.env.MOBILE_MASUK_UJI_KODE;
   (process.env as Record<string, string>).NODE_ENV = "production";
   assert.equal(masukUjiBoleh(), false);
+  assert.equal(masukUjiBoleh(kode), false);
+  process.env.MOBILE_MASUK_UJI_KODE = "pendek";
+  assert.equal(masukUjiBoleh("pendek"), false);
+  process.env.MOBILE_MASUK_UJI_KODE = kode;
+  assert.equal(masukUjiBoleh(), false);
+  assert.equal(masukUjiBoleh(`${kode}x`), false);
+  assert.equal(masukUjiBoleh(123), false);
+  assert.equal(masukUjiBoleh(kode), true);
   (process.env as Record<string, string>).NODE_ENV = "development";
   assert.equal(masukUjiBoleh(), true);
   delete process.env.MOBILE_MASUK_UJI;
-  assert.equal(masukUjiBoleh(), false);
+  assert.equal(masukUjiBoleh(kode), false);
+  (process.env as Record<string, string>).NODE_ENV = "production";
+  assert.equal(masukUjiBoleh(kode), false);
   Object.assign(process.env, lama);
 });
 

@@ -1,15 +1,16 @@
 import { buatSesiMobile, masukUjiBoleh, penggunaUji, publik } from "@/lib/akun-mobile";
 
 /**
- * POST /api/mobile/masuk/uji { nama } → { token, pengguna }
+ * POST /api/mobile/masuk/uji { nama, kode? } → { token, pengguna }
  *
- * Hanya untuk mengembangkan aplikasi terhadap `next dev` tanpa OAuth Google:
- * tombol "Masuk uji" di aplikasi muncul di dev server saja. Di produksi, atau
- * tanpa MOBILE_MASUK_UJI=1, rute ini tidak ada (404).
+ * Masuk tanpa OAuth Google untuk menguji aplikasi: tombol "Masuk uji" muncul di
+ * dev server dan di build preview internal. Tanpa MOBILE_MASUK_UJI=1 — dan di
+ * produksi tanpa `kode` yang cocok dengan MOBILE_MASUK_UJI_KODE — rute ini tidak
+ * ada (404). Lihat masukUjiBoleh.
  */
 export async function POST(req: Request) {
-  if (!masukUjiBoleh()) return new Response(null, { status: 404 });
   const isi = await req.json().catch(() => null);
+  if (!masukUjiBoleh(isi?.kode)) return new Response(null, { status: 404 });
   const pengguna = await penggunaUji(String(isi?.nama ?? ""));
   return Response.json({ token: await buatSesiMobile(pengguna.id), pengguna: publik(pengguna) });
 }
