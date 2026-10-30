@@ -9,6 +9,8 @@ import type { Bahasa } from "@/lib/bahasa";
 import type { Berita } from "@/lib/events";
 import { mediaLokal } from "@/lib/media";
 import { UlasanKomentar, FormulirKomentar } from "./kolom-komentar";
+import { useSuka } from "./landing-karhutla/aksi-kartu";
+import { IkonJempol, IkonKomentar } from "./landing-karhutla/ikon";
 import { RASIO_MEDIA, SliderRincian, UKURAN_GAMBAR_RINCIAN } from "./slider-rincian";
 
 export type RincianNavProps = {
@@ -90,6 +92,16 @@ export function RincianLaporan({
     tampilkanBalasan, alihkanBalasan, sebutanDari, isiTanpaSebutan,
     kirim, ketikRef, captchaRef,
   } = gunakanKomentar(berita.id);
+
+  const { disukai, suka, komentar, alihSuka } = useSuka(berita.id, berita.jumlahSuka, berita.jumlahKomentar);
+  const en = bahasa === "en";
+  const angka = new Intl.NumberFormat(en ? "en" : "id-ID", { notation: "compact" });
+  // Desktop: kolom ketik sudah menempel di dasar rel, cukup difokuskan.
+  // Ponsel: komentarnya tinggal di lembar bawah, jadi lembar itu yang dibuka.
+  const keKomentar = () => {
+    if (ponsel) setSheetKomentar(true);
+    else ketikRef.current?.focus();
+  };
 
   // Bersihkan timeout saat komponen dibongkar
   useEffect(() => () => {
@@ -241,9 +253,9 @@ export function RincianLaporan({
                   >
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8Z" />
                   </svg>
-                  {daftar.length > 0 && (
+                  {komentar > 0 && (
                     <span className="rincian__komentar-jumlah" aria-hidden="true">
-                      {daftar.length > 99 ? "99+" : daftar.length}
+                      {komentar > 99 ? "99+" : komentar}
                     </span>
                   )}
                 </button>
@@ -312,6 +324,25 @@ export function RincianLaporan({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Suka & komentar — angka hidup yang sama dengan kartu umpan. */}
+            <div className="rincian__reaksi">
+              <button
+                type="button"
+                aria-pressed={disukai}
+                onClick={alihSuka}
+                className={`rincian__reaksi-tombol cursor-pointer${disukai ? " rincian__reaksi-tombol--aktif" : ""}`}
+              >
+                <IkonJempol aktif={disukai} />
+                <span className="rincian__reaksi-angka">{angka.format(suka)}</span>
+                <span>{en ? (suka === 1 ? "Like" : "Likes") : "Suka"}</span>
+              </button>
+              <button type="button" onClick={keKomentar} className="rincian__reaksi-tombol cursor-pointer">
+                <IkonKomentar />
+                <span className="rincian__reaksi-angka">{angka.format(komentar)}</span>
+                <span>{en ? (komentar === 1 ? "Comment" : "Comments") : "Komentar"}</span>
+              </button>
             </div>
 
             {/* Kolom komentar: daftar di badan yang bergulir, kolom kirim di
@@ -404,7 +435,7 @@ export function RincianLaporan({
             <div className="rincian__sheet-kepala">
               <p className="rincian__sheet-judul">
                 {bahasa === "en" ? "Comments" : "Komentar"}
-                {daftar.length > 0 && ` (${daftar.length})`}
+                {komentar > 0 && ` (${komentar})`}
               </p>
               <button
                 type="button"

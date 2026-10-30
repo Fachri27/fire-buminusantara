@@ -10,6 +10,7 @@ import { useTheme } from "next-themes";
 import { useMounted } from "@/hooks/use-mounted";
 import type { Berita } from "@/lib/events";
 import { mediaLokal, type ItemMedia } from "@/lib/media";
+import { HitungLaporan } from "@/components/hitung-laporan";
 
 type Props = {
   nama: string;
@@ -304,9 +305,9 @@ export function PopupPeta({
                               {b.judul}
                             </h3>
                           </div>
-                          {b.lokasi && (
-                            <div className="mt-3 pt-2.5 border-t border-black/[0.06] dark:border-white/10">
-                              <p className="flex items-start gap-1.5 text-[11px] sm:text-[11.5px] leading-snug text-black/60 dark:text-white/55">
+                          <div className="mt-3 flex items-start gap-2 pt-2.5 border-t border-black/[0.06] dark:border-white/10">
+                            {b.lokasi && (
+                              <p className="flex min-w-0 flex-1 items-start gap-1.5 text-[11px] sm:text-[11.5px] leading-snug text-black/60 dark:text-white/55">
                                 <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
                                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
                                      className="mt-0.5 size-3 shrink-0 text-black/40 transition-colors group-hover:text-black/60 dark:text-white/40 dark:group-hover:text-white/60">
@@ -317,8 +318,9 @@ export function PopupPeta({
                                   {b.lokasi}
                                 </span>
                               </p>
-                            </div>
-                          )}
+                            )}
+                            <HitungLaporan b={b} kelas="ml-auto text-[11px] sm:text-xs" />
+                          </div>
                         </div>
                       </button>
                     </li>
@@ -370,6 +372,7 @@ export function PopupPeta({
                                     text-tinta transition-colors group-hover:text-api dark:text-white dark:group-hover:text-white">
                         {b.judul}
                       </p>
+                      <HitungLaporan b={b} kelas="mt-1.5 text-xs" />
                     </div>
                   </button>
                 </li>

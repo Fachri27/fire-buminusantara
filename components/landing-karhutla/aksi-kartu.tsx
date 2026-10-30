@@ -36,6 +36,36 @@ function langganSuka(ubah: () => void) {
   };
 }
 
+/** Suka satu laporan + angka hidupnya — kartu umpan, pop-up wilayah, dan
+ *  rincian memakai yang sama, jadi jempol & angkanya serempak di mana pun.
+ *  Angka cadangan (payload umpan yang di-cache) dipakai sampai angka hidup
+ *  (/api/hitung) tiba. */
+export function useSuka(id: number, cadanganSuka = 0, cadanganKomentar = 0) {
+  const disukai = useSyncExternalStore(langganSuka, () => bacaSuka().includes(id), () => false);
+  const hidup = useHitungHidup(id);
+  const suka = hidup?.suka ?? cadanganSuka;
+  const komentar = hidup?.komentar ?? cadanganKomentar;
+
+  async function alihSuka() {
+    const sukai = !disukai;
+    const sebelum = bacaHitung(id)?.suka ?? cadanganSuka;
+    tulisSuka(id, sukai);
+    aturHitung(id, { komentar, suka: Math.max(0, sebelum + (sukai ? 1 : -1)) });
+    try {
+      const r = await fetch(`/api/laporan/${id}/suka`, { method: sukai ? "POST" : "DELETE" });
+      if (r.status === 429) return; // ketukan beruntun: biarkan tampilan optimistis
+      if (!r.ok) throw new Error();
+      const j = (await r.json()) as { jumlah?: number };
+      if (typeof j.jumlah === "number") aturHitung(id, { suka: j.jumlah });
+    } catch {
+      tulisSuka(id, !sukai);
+      aturHitung(id, { suka: sebelum });
+    }
+  }
+
+  return { disukai, suka, komentar, alihSuka };
+}
+
 /* Baris aksi kartu umpan — di bawah media. Kiri: suka (jempol), komentar
    (langsung ke rincian laporan), bagikan (salin tautan). Angka suka &
    komentar tepat di kanan ikonnya. */
@@ -53,28 +83,7 @@ export function AksiKartu({ laporan: l, bahasa, onKomentar }: {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setTersalin(false), 2000);
   };
-  const disukai = useSyncExternalStore(langganSuka, () => bacaSuka().includes(l.id), () => false);
-  // Angka hidup (/api/hitung), angka umpan yang di-cache hanya cadangan.
-  const hidup = useHitungHidup(l.id);
-  const jumlahSuka = hidup?.suka ?? l.suka ?? 0;
-  const komentar = hidup?.komentar ?? l.komentar ?? 0;
-
-  async function alihSuka() {
-    const suka = !disukai;
-    const sebelum = bacaHitung(l.id)?.suka ?? l.suka ?? 0;
-    tulisSuka(l.id, suka);
-    aturHitung(l.id, { komentar, suka: Math.max(0, sebelum + (suka ? 1 : -1)) });
-    try {
-      const r = await fetch(`/api/laporan/${l.id}/suka`, { method: suka ? "POST" : "DELETE" });
-      if (r.status === 429) return; // ketukan beruntun: biarkan tampilan optimistis
-      if (!r.ok) throw new Error();
-      const j = (await r.json()) as { jumlah?: number };
-      if (typeof j.jumlah === "number") aturHitung(l.id, { suka: j.jumlah });
-    } catch {
-      tulisSuka(l.id, !suka);
-      aturHitung(l.id, { suka: sebelum });
-    }
-  }
+  const { disukai, suka: jumlahSuka, komentar, alihSuka } = useSuka(l.id, l.suka, l.komentar);
 
   const tautan = () => `${window.location.origin}${l.href}`;
 
