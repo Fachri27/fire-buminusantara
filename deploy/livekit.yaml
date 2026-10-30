@@ -1,0 +1,20 @@
+# Config server LiveKit di box prod — layanan "livekit" di docker-compose.prod.yml.
+# Kunci API sengaja tidak di sini: dari LIVEKIT_KEYS yang dirakit compose dari
+# LIVEKIT_API_KEY/LIVEKIT_API_SECRET di .env.
+port: 7880
+# Sinyal hanya untuk nginx host; port RTC di bawah tidak terpengaruh baris ini.
+bind_addresses: ["127.0.0.1"]
+rtc:
+  # Cadangan bila UDP diblok jaringan HP.
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  # Umumkan IP publik box (lewat STUN) sebagai kandidat ICE, bukan IP privat.
+  use_external_ip: true
+turn:
+  enabled: true
+  domain: live.nusantara.earth
+  # 443/udp masih bebas (nginx host tanpa HTTP/3) dan jarang diblok operator.
+  # shortcut: tanpa TURN/TLS di 443/tcp (dipegang nginx); bila jaringan masih
+  # memblok, tambahkan nginx stream + ssl_preread ke tls_port + external_tls.
+  udp_port: 443

@@ -30,6 +30,11 @@ if ! ufw status | grep -q "Status: active"; then
   ufw allow 443/tcp
   ufw --force enable
 fi
+# LiveKit (deploy/livekit.yaml): ICE/TCP, TURN/UDP, media UDP. Di luar blok di
+# atas supaya box lama ikut terbuka saat bootstrap dijalankan ulang.
+ufw allow 7881/tcp
+ufw allow 443/udp
+ufw allow 50000:60000/udp
 systemctl is-active --quiet fail2ban || systemctl enable --now fail2ban
 
 # ── Docker + compose plugin ──────────────────────────────────────────────────

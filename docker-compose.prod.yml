@@ -58,6 +58,25 @@ services:
           sleep 1800
         done
 
+  # Server video siaran langsung aplikasi mobile (lib/siaran.ts). Network host:
+  # WebRTC butuh 10.001 port UDP (50000–60000) yang terlalu berat lewat NAT
+  # docker. Sinyal 7880 hanya di 127.0.0.1 — nginx host yang melayani
+  # wss://live.nusantara.earth (deploy/livekit.nginx.conf). Kunci API dirakit
+  # dari .env yang sama dengan rute siaran, jadi tak mungkin beda pasangan.
+  # Tidak masuk HEALTH_SERVICES: LiveKit mati ≠ situs di-rollback.
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    restart: unless-stopped
+    network_mode: host
+    # Atap memori, alasan sama dengan web: MariaDB + MinIO di host yang sama.
+    mem_limit: 1g
+    memswap_limit: 1g
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-}: ${LIVEKIT_API_SECRET:-}"
+
 networks:
   shared:
     external: true
