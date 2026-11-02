@@ -16,15 +16,6 @@ export default function LocaleLayout({
 }) {
   return (
     <>
-      {/* Prekoneksi CDN tile satelit (Sentinel-2 cloudless) untuk mempercepat
-          pemuatan tile peta 150-250ms saat inisialisasi MapLibre. */}
-      <link
-        rel="preconnect"
-        href="https://tiles.maps.eox.at"
-        crossOrigin="anonymous"
-      />
-      <link rel="dns-prefetch" href="https://tiles.maps.eox.at" />
-
       {/* Prekoneksi beacon Google Analytics (www.google-analytics.com): skrip
           gtag sendiri sudah di-preload next/script, tapi beacon collect ke host
           ini yang membuka koneksi baru — tanpa preconnect, Lighthouse mencatat

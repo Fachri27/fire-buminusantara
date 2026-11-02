@@ -2056,7 +2056,7 @@ ${aplikasi ? `
                 if (!peta.getSource('satelit')) {
                   peta.addSource('satelit', {
                     type: 'raster',
-                    tiles: ['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpeg'],
+                    tiles: [location.origin + '/api/citra/{z}/{y}/{x}'],
                     tileSize: 256,
                     attribution: 'Sentinel-2 cloudless by EOX IT Services GmbH',
                     maxzoom: 14
