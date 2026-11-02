@@ -14,8 +14,8 @@ const BATAS_ALASAN = 500;
 const ALASAN_CEPAT = [
   "Foto KTP buram, terpotong, atau tidak terbaca.",
   "NIK yang diketik tidak sama dengan NIK di KTP.",
-  "Wajah di swafoto tidak cocok dengan foto di KTP.",
-  "KTP tidak terlihat dipegang di swafoto.",
+  "Foto bukan KTP asli (fotokopi, layar, atau hasil sunting).",
+  "NIK di foto tertutup jari atau silau.",
 ];
 
 /**

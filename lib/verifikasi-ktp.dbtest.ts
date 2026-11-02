@@ -44,7 +44,7 @@ test("dbtest: setujui, NIK ganda ditolak + rollback, tolak, kedaluwarsa, cascade
   const sidik = "f".repeat(64);
   const ajukan = async (userId: bigint, created_at = kini) =>
     prisma.mobile_ktp_verifications.create({
-      data: { user_id: userId, nik: "3201011201900001", nik_hash: sidik, ktp_path: await foto(), selfie_path: await foto(), created_at },
+      data: { user_id: userId, nik: "3201011201900001", nik_hash: sidik, ktp_path: await foto(), created_at },
       select: { id: true },
     });
 
@@ -62,7 +62,7 @@ test("dbtest: setujui, NIK ganda ditolak + rollback, tolak, kedaluwarsa, cascade
   assert.ok(akunA.ktp_verified_at);
   assert.equal(akunA.ktp_nik_hash, sidik);
   const barisA = await prisma.mobile_ktp_verifications.findUniqueOrThrow({ where: { id: va.id } });
-  assert.deepEqual([barisA.status, barisA.method, barisA.nik, barisA.ktp_path, barisA.selfie_path], ["disetujui", "petugas", null, null, null]);
+  assert.deepEqual([barisA.status, barisA.method, barisA.nik, barisA.ktp_path], ["disetujui", "petugas", null, null]);
   assert.deepEqual([barisA.ocr_result, barisA.ocr_nik, barisA.ocr_score], ["cocok", null, 0.97], "NIK bacaan OCR ikut dihapus, hasilnya tetap");
   assert.equal((await statusVerifikasi(a.id, kini)).status, "disetujui");
 
@@ -71,8 +71,8 @@ test("dbtest: setujui, NIK ganda ditolak + rollback, tolak, kedaluwarsa, cascade
   assert.equal(gagal.ok, false);
   const barisB = await prisma.mobile_ktp_verifications.findUniqueOrThrow({ where: { id: vb.id } });
   assert.equal(barisB.status, "menunggu");
-  assert.ok(barisB.nik && barisB.ktp_path && barisB.selfie_path);
-  assert.equal((await readdir(folder)).length, 2);
+  assert.ok(barisB.nik && barisB.ktp_path);
+  assert.equal((await readdir(folder)).length, 1);
 
   // Indeks unik menahan dua akun dengan sidik NIK yang sama walau cek aplikasi terlewati.
   await assert.rejects(

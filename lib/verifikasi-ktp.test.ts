@@ -95,7 +95,7 @@ test("jawabanStatus: menunggu yang kedaluwarsa = belum; tanda di akun menang ata
 
 type Baris = {
   id: bigint; user_id: bigint; status: string; nik: string | null; nik_hash: string;
-  ktp_path: string | null; selfie_path: string | null; created_at: Date;
+  ktp_path: string | null; created_at: Date;
   method?: string | null; reason?: string | null; reviewer_id?: bigint | null; decided_at?: Date | null;
 };
 type Akun = { id: bigint; ktp_verified_at: Date | null; ktp_nik_hash: string | null };
@@ -188,12 +188,12 @@ test("folderKtp: bawaan privat/ktp; KTP_DIR di folder publik ditolak", () => {
 test("sapuKedaluwarsa: pengajuan menunggu ≥ 30 hari dihapus beserta fotonya; yang lain utuh", async (t) => {
   const f = await folderUji(t);
   const kini = new Date();
-  const basi = [await f.berkas(), await f.berkas()];
-  const segar = [await f.berkas(), await f.berkas()];
+  const basi = [await f.berkas()];
+  const segar = [await f.berkas()];
   const baris: Baris[] = [
-    { id: BigInt(1), user_id: BigInt(10), status: "menunggu", nik: NIK_SAH, nik_hash: "a", ktp_path: basi[0], selfie_path: basi[1], created_at: new Date(kini.getTime() - 30 * HARI) },
-    { id: BigInt(2), user_id: BigInt(11), status: "menunggu", nik: NIK_SAH, nik_hash: "b", ktp_path: segar[0], selfie_path: segar[1], created_at: new Date(kini.getTime() - 29 * HARI) },
-    { id: BigInt(3), user_id: BigInt(12), status: "ditolak", nik: null, nik_hash: "c", ktp_path: null, selfie_path: null, created_at: new Date(kini.getTime() - 90 * HARI) },
+    { id: BigInt(1), user_id: BigInt(10), status: "menunggu", nik: NIK_SAH, nik_hash: "a", ktp_path: basi[0], created_at: new Date(kini.getTime() - 30 * HARI) },
+    { id: BigInt(2), user_id: BigInt(11), status: "menunggu", nik: NIK_SAH, nik_hash: "b", ktp_path: segar[0], created_at: new Date(kini.getTime() - 29 * HARI) },
+    { id: BigInt(3), user_id: BigInt(12), status: "ditolak", nik: null, nik_hash: "c", ktp_path: null, created_at: new Date(kini.getTime() - 90 * HARI) },
   ];
   dbPalsu(t, baris);
 
@@ -206,13 +206,13 @@ test("sapuKedaluwarsa: pengajuan menunggu ≥ 30 hari dihapus beserta fotonya; y
 test("sapuKedaluwarsa per akun: hanya akun itu, foto yatim tidak disentuh", async (t) => {
   const f = await folderUji(t);
   const kini = new Date();
-  const milikA = [await f.berkas(), await f.berkas()];
-  const milikB = [await f.berkas(), await f.berkas()];
+  const milikA = [await f.berkas()];
+  const milikB = [await f.berkas()];
   const yatim = await f.berkas(2 * 60 * 60_000);
   const umur = new Date(kini.getTime() - 31 * HARI);
   const baris: Baris[] = [
-    { id: BigInt(1), user_id: BigInt(10), status: "menunggu", nik: NIK_SAH, nik_hash: "a", ktp_path: milikA[0], selfie_path: milikA[1], created_at: umur },
-    { id: BigInt(2), user_id: BigInt(11), status: "menunggu", nik: NIK_SAH, nik_hash: "b", ktp_path: milikB[0], selfie_path: milikB[1], created_at: umur },
+    { id: BigInt(1), user_id: BigInt(10), status: "menunggu", nik: NIK_SAH, nik_hash: "a", ktp_path: milikA[0], created_at: umur },
+    { id: BigInt(2), user_id: BigInt(11), status: "menunggu", nik: NIK_SAH, nik_hash: "b", ktp_path: milikB[0], created_at: umur },
   ];
   dbPalsu(t, baris);
 
@@ -223,12 +223,12 @@ test("sapuKedaluwarsa per akun: hanya akun itu, foto yatim tidak disentuh", asyn
 
 test("sapuKedaluwarsa (antrean): foto yatim > 1 jam dihapus, yang baru ditulis dibiarkan", async (t) => {
   const f = await folderUji(t);
-  const dipakai = [await f.berkas(3 * 60 * 60_000), await f.berkas(3 * 60 * 60_000)];
+  const dipakai = [await f.berkas(3 * 60 * 60_000)];
   const yatimLama = await f.berkas(2 * 60 * 60_000);
   const yatimBaru = await f.berkas();
   await writeFile(path.join(f.folder, "bukan-foto-kita.txt"), "x");
   dbPalsu(t, [
-    { id: BigInt(1), user_id: BigInt(10), status: "menunggu", nik: NIK_SAH, nik_hash: "a", ktp_path: dipakai[0], selfie_path: dipakai[1], created_at: new Date() },
+    { id: BigInt(1), user_id: BigInt(10), status: "menunggu", nik: NIK_SAH, nik_hash: "a", ktp_path: dipakai[0], created_at: new Date() },
   ]);
 
   await sapuKedaluwarsa(new Date());
@@ -248,10 +248,10 @@ test("putuskanVerifikasi: tolak tanpa alasan ditolak sebelum menyentuh basis dat
 
 test("putuskanVerifikasi: setuju → tanda di akun, NIK & path dikosongkan, foto dihapus", async (t) => {
   const f = await folderUji(t);
-  const foto = [await f.berkas(), await f.berkas()];
+  const foto = [await f.berkas()];
   const kini = new Date();
   const baris: Baris[] = [
-    { id: BigInt(5), user_id: BigInt(20), status: "menunggu", nik: NIK_SAH, nik_hash: "sidik-a", ktp_path: foto[0], selfie_path: foto[1], created_at: kini },
+    { id: BigInt(5), user_id: BigInt(20), status: "menunggu", nik: NIK_SAH, nik_hash: "sidik-a", ktp_path: foto[0], created_at: kini },
   ];
   const akun: Akun[] = [{ id: BigInt(20), ktp_verified_at: null, ktp_nik_hash: null }];
   dbPalsu(t, baris, akun);
@@ -261,7 +261,7 @@ test("putuskanVerifikasi: setuju → tanda di akun, NIK & path dikosongkan, foto
   assert.equal(baris[0].status, "disetujui");
   assert.equal(baris[0].method, "petugas");
   assert.equal(baris[0].reviewer_id, BigInt(1));
-  assert.deepEqual([baris[0].nik, baris[0].ktp_path, baris[0].selfie_path], [null, null, null]);
+  assert.deepEqual([baris[0].nik, baris[0].ktp_path], [null, null]);
   assert.deepEqual(await f.isi(), []);
 
   const lagi = await putuskanVerifikasi(BigInt(5), { setuju: false, alasan: "x", peninjauId: BigInt(1) }, kini);
@@ -270,10 +270,10 @@ test("putuskanVerifikasi: setuju → tanda di akun, NIK & path dikosongkan, foto
 
 test("putuskanVerifikasi: NIK sudah dipegang akun lain → gagal dengan pesan jelas, foto utuh", async (t) => {
   const f = await folderUji(t);
-  const foto = [await f.berkas(), await f.berkas()];
+  const foto = [await f.berkas()];
   dbPalsu(
     t,
-    [{ id: BigInt(6), user_id: BigInt(21), status: "menunggu", nik: NIK_SAH, nik_hash: "sidik-b", ktp_path: foto[0], selfie_path: foto[1], created_at: new Date() }],
+    [{ id: BigInt(6), user_id: BigInt(21), status: "menunggu", nik: NIK_SAH, nik_hash: "sidik-b", ktp_path: foto[0], created_at: new Date() }],
     [{ id: BigInt(21), ktp_verified_at: null, ktp_nik_hash: null }, { id: BigInt(99), ktp_verified_at: new Date(), ktp_nik_hash: "sidik-b" }],
   );
   const hasil = await putuskanVerifikasi(BigInt(6), { setuju: true, metode: "petugas", peninjauId: BigInt(1) });
@@ -285,11 +285,11 @@ test("putuskanVerifikasi: NIK sudah dipegang akun lain → gagal dengan pesan je
 
 test("putuskanVerifikasi: tolak → alasan disimpan, foto & NIK hilang; pengajuan kedaluwarsa tak bisa diputuskan", async (t) => {
   const f = await folderUji(t);
-  const foto = [await f.berkas(), await f.berkas()];
+  const foto = [await f.berkas()];
   const kini = new Date();
   const baris: Baris[] = [
-    { id: BigInt(7), user_id: BigInt(22), status: "menunggu", nik: NIK_SAH, nik_hash: "c", ktp_path: foto[0], selfie_path: foto[1], created_at: kini },
-    { id: BigInt(8), user_id: BigInt(23), status: "menunggu", nik: NIK_SAH, nik_hash: "d", ktp_path: null, selfie_path: null, created_at: new Date(kini.getTime() - 30 * HARI) },
+    { id: BigInt(7), user_id: BigInt(22), status: "menunggu", nik: NIK_SAH, nik_hash: "c", ktp_path: foto[0], created_at: kini },
+    { id: BigInt(8), user_id: BigInt(23), status: "menunggu", nik: NIK_SAH, nik_hash: "d", ktp_path: null, created_at: new Date(kini.getTime() - 30 * HARI) },
   ];
   dbPalsu(t, baris);
 
@@ -297,7 +297,7 @@ test("putuskanVerifikasi: tolak → alasan disimpan, foto & NIK hilang; pengajua
   assert.equal(baris[0].status, "ditolak");
   assert.equal(baris[0].reason, "Foto buram.");
   assert.equal(baris[0].method, "petugas");
-  assert.deepEqual([baris[0].nik, baris[0].ktp_path, baris[0].selfie_path], [null, null, null]);
+  assert.deepEqual([baris[0].nik, baris[0].ktp_path], [null, null]);
   assert.deepEqual(await f.isi(), []);
 
   assert.equal((await putuskanVerifikasi(BigInt(8), { setuju: true, metode: "petugas", peninjauId: BigInt(2) }, kini)).ok, false);
@@ -329,8 +329,8 @@ test("siapkanFoto: kosong, bukan gambar, HEIC, rusak, atau > 8 MB ditolak dengan
   assert.deepEqual(kosong, { galat: "Foto KTP wajib dilampirkan.", status: 400 });
   assert.deepEqual(await siapkanFoto("teks", "Foto KTP"), kosong);
 
-  const palsu = await siapkanFoto(new File(["<svg/>"], "ktp.jpg", { type: "image/jpeg" }), "Swafoto dengan KTP");
-  assert.deepEqual(palsu, { galat: "Swafoto dengan KTP harus berupa foto JPEG, PNG, atau WebP.", status: 400 });
+  const palsu = await siapkanFoto(new File(["<svg/>"], "ktp.jpg", { type: "image/jpeg" }), "Foto KTP");
+  assert.deepEqual(palsu, { galat: "Foto KTP harus berupa foto JPEG, PNG, atau WebP.", status: 400 });
 
   const heic = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from("ftypheic"), Buffer.alloc(32)]);
   assert.equal((await siapkanFoto(new File([new Uint8Array(heic)], "a.heic"), "Foto KTP") as { status: number }).status, 400);
@@ -348,7 +348,7 @@ test("siapkanFoto: kosong, bukan gambar, HEIC, rusak, atau > 8 MB ditolak dengan
 test("periksaEkyc: tanpa EKYC_PROVIDER atau penyedia tak dikenal = tidak-tersedia (antrean petugas)", async (t) => {
   const lama = process.env.EKYC_PROVIDER;
   t.after(() => (lama === undefined ? delete process.env.EKYC_PROVIDER : (process.env.EKYC_PROVIDER = lama)));
-  const masukan = { nik: NIK_SAH, nama: "Warga", ktp: { isi: Buffer.alloc(0), mime: "image/jpeg" }, selfie: { isi: Buffer.alloc(0), mime: "image/jpeg" } };
+  const masukan = { nik: NIK_SAH, nama: "Warga", ktp: { isi: Buffer.alloc(0), mime: "image/jpeg" } };
   const lolos: PenyediaEkyc = async () => ({ hasil: "lolos" });
   const hasil = async (daftar?: Record<string, PenyediaEkyc>) => (await periksaEkyc(masukan, daftar)).hasil;
 

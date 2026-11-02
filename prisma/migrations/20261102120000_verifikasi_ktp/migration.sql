@@ -1,5 +1,5 @@
 -- Verifikasi KTP untuk siaran langsung publik dari aplikasi mobile: pengajuan
--- (foto di KTP_DIR, NIK polos hanya selama menunggu) dan tanda terverifikasi di
+-- (foto KTP di KTP_DIR, NIK polos hanya selama menunggu) dan tanda terverifikasi di
 -- akun, berikut HMAC NIK yang unik — satu NIK untuk satu akun. Semuanya
 -- tambahan; tidak ada kolom lama yang diubah atau dibuang.
 
@@ -15,7 +15,6 @@ CREATE TABLE `mobile_ktp_verifications` (
     `nik` VARCHAR(16) NULL,
     `nik_hash` CHAR(64) NOT NULL,
     `ktp_path` VARCHAR(64) NULL,
-    `selfie_path` VARCHAR(64) NULL,
     `method` ENUM('petugas', 'ekyc') NULL,
     `reason` TEXT NULL,
     `reviewer_id` BIGINT UNSIGNED NULL,

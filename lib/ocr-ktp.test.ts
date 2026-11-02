@@ -100,7 +100,6 @@ const masukan = {
   nik: NIK,
   nama: "Siti",
   ktp: { isi: Buffer.from([0xff, 0xd8, 0xff, 1, 2]), mime: "image/jpeg" },
-  selfie: { isi: Buffer.alloc(0), mime: "image/jpeg" },
   sinyal: new AbortController().signal,
 };
 const ENV = { OCR_URL: "http://ocr-ktp:8866/", OCR_KUNCI: "kunci-ocr-uji" };

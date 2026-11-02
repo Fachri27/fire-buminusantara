@@ -4,10 +4,10 @@ Penyedia eKYC `paddleocr` untuk verifikasi KTP situs (`lib/ocr-ktp.ts`,
 `EKYC_PROVIDER=paddleocr`). PaddleOCR 3.2 (CPU) membaca teks foto KTP; situs
 mencari NIK di dalamnya dan membandingkannya dengan NIK ketikan warga.
 
-OCR hanya **membaca**: tidak memeriksa keaslian KTP, data Dukcapil, atau wajah
-di swafoto. Di mode `bantu` (bawaan, `KTP_OCR_MODE`) hasilnya hanya lencana
-untuk petugas; di mode `otomatis` NIK yang cocok dengan skor ≥ 0,9 langsung
-disetujui. OCR tidak pernah menolak.
+OCR hanya **membaca**: tidak memeriksa keaslian KTP atau data Dukcapil. Di mode
+`bantu` (bawaan, `KTP_OCR_MODE`) hasilnya hanya lencana untuk petugas; di mode
+`otomatis` NIK yang cocok dengan skor ≥ 0,9 langsung disetujui. OCR tidak
+pernah menolak.
 
 ## API
 

@@ -34,8 +34,11 @@ const COBA_AKUN = 15;
 const COBA_IP = 60;
 
 /**
- * POST /api/mobile/saya/verifikasi (multipart: nik, ktp, selfie)
+ * POST /api/mobile/saya/verifikasi (multipart: nik, ktp)
  * → 202 { status: "menunggu" } | 200 { status: "disetujui" } (eKYC lolos)
+ *
+ * Cukup foto KTP. Bidang `selfie` dari aplikasi versi lama diabaikan — tidak
+ * dibaca, tidak disimpan, dan tidak menjadi galat.
  *
  * Galat `{ galat }`: 401 belum masuk · 409 sudah terverifikasi / NIK dipakai
  * akun lain · 413 foto > 8 MB atau kiriman terlalu besar · 400 foto bukan
@@ -66,7 +69,7 @@ export async function POST(req: Request) {
   }
 
   if (Number(req.headers.get("content-length") ?? 0) > BATAS_BADAN_KTP) {
-    return galat("Kiriman terlalu besar. Setiap foto paling besar 8 MB.", 413);
+    return galat("Kiriman terlalu besar. Foto KTP paling besar 8 MB.", 413);
   }
 
   // Jatah harian hanya dibaca di sini dan dipakai setelah hasilnya jelas (di
@@ -101,12 +104,10 @@ async function terima(req: Request, p: BarisPengguna, ip: string | null, kunci: 
 
   const ktp = await siapkanFoto(data.get("ktp"), "Foto KTP");
   if ("galat" in ktp) return galat(ktp.galat, ktp.status);
-  const selfie = await siapkanFoto(data.get("selfie"), "Swafoto dengan KTP");
-  if ("galat" in selfie) return galat(selfie.galat, selfie.status);
 
   let hasil: HasilAjuan;
   try {
-    hasil = await ajukanVerifikasi(p, nik, ktp, selfie, kunci);
+    hasil = await ajukanVerifikasi(p, nik, ktp, kunci);
   } catch (e) {
     await catatGalat("verifikasi-ktp", e, `akun ${p.id}`);
     return galat("Gagal menyimpan pengajuan. Coba lagi.", 500);

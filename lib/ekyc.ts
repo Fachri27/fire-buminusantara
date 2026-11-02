@@ -29,8 +29,8 @@ export type MasukanEkyc = {
   nik: string;
   /** Nama akun — bukan nama di KTP; penyedia boleh mengabaikannya. */
   nama: string;
+  /** Foto KTP, sudah tanpa EXIF. */
   ktp: { isi: Buffer; mime: string };
-  selfie: { isi: Buffer; mime: string };
   /** Batal = jawaban terlalu lama; adaptor wajib meneruskannya ke fetch. */
   sinyal: AbortSignal;
 };

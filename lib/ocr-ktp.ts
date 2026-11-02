@@ -7,8 +7,8 @@ import { periksaNik } from "./nik.ts";
  * (layanan/ocr-ktp, PaddleOCR) membaca teks foto KTP, lalu NIK yang tercetak
  * dibandingkan dengan NIK ketikan warga.
  *
- * Batasnya jelas: OCR hanya MEMBACA. Ia tidak memeriksa keaslian KTP, data
- * Dukcapil, atau wajah di swafoto. Karena itu:
+ * Batasnya jelas: OCR hanya MEMBACA. Ia tidak memeriksa keaslian KTP atau data
+ * Dukcapil. Karena itu:
  *   - KTP_OCR_MODE=bantu (bawaan): tidak pernah memutuskan apa pun. Hasilnya
  *     disimpan di pengajuan dan tampil sebagai lencana untuk petugas.
  *   - KTP_OCR_MODE=otomatis: NIK cocok DAN skor baca ≥ AMBANG_OTOMATIS →

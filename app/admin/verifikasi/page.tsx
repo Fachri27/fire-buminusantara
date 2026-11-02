@@ -36,7 +36,7 @@ export default async function VerifikasiKtp() {
     skip: (halaman - 1) * PER,
     take: PER,
     select: {
-      id: true, nik: true, nik_hash: true, ktp_path: true, selfie_path: true, created_at: true,
+      id: true, nik: true, nik_hash: true, ktp_path: true, created_at: true,
       ocr_result: true, ocr_nik: true, ocr_score: true,
       pemohon: { select: { id: true, name: true, email: true, created_at: true } },
     },
@@ -58,7 +58,6 @@ export default async function VerifikasiKtp() {
   const butir = await Promise.all(daftar.map(async (d) => ({
     ...d,
     adaKtp: await fotoAda(d.ktp_path),
-    adaSelfie: await fotoAda(d.selfie_path),
     dipakaiLain: pemegang.some((u) => u.ktp_nik_hash === d.nik_hash && u.id !== d.pemohon.id),
     akunSama: akunPengaju.get(d.nik_hash) ?? 1,
     sisaHari: sisaHariPengajuan(d.created_at, kini),
@@ -67,7 +66,7 @@ export default async function VerifikasiKtp() {
   return (
     <>
       <KopPanel lebar mata="Moderasi" judul="Verifikasi KTP"
-                deskripsi="Syarat siaran langsung publik dari aplikasi. Cocokkan NIK ketikan dengan NIK di KTP, dan wajah di swafoto dengan foto KTP. Foto dan NIK dihapus begitu diputuskan; pengajuan yang 30 hari tidak diputuskan terhapus sendiri." />
+                deskripsi="Syarat siaran langsung publik dari aplikasi. Cocokkan NIK ketikan dengan NIK di foto KTP, dan pastikan fotonya KTP sungguhan yang terbaca jelas. Foto dan NIK dihapus begitu diputuskan; pengajuan yang 30 hari tidak diputuskan terhapus sendiri." />
       <div className={LEBAR}>
         {butir.length === 0 ? (
           <Kartu isi="">
@@ -87,10 +86,7 @@ export default async function VerifikasiKtp() {
                     </span>}
                   >
                     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Foto id={v.id} jenis="ktp" ada={v.adaKtp} label="Foto KTP" nama={v.pemohon.name} />
-                        <Foto id={v.id} jenis="selfie" ada={v.adaSelfie} label="Swafoto memegang KTP" nama={v.pemohon.name} />
-                      </div>
+                      <FotoKtp id={v.id} ada={v.adaKtp} nama={v.pemohon.name} />
                       <div className="grid content-start gap-4">
                         <dl className="cms-dl">
                           <div>
@@ -127,10 +123,10 @@ export default async function VerifikasiKtp() {
                         {!v.dipakaiLain && v.akunSama > 1 && (
                           <p className="cms-galat">NIK yang sama sedang diajukan {v.akunSama} akun. Hanya satu yang bisa disetujui.</p>
                         )}
-                        {(!v.adaKtp || !v.adaSelfie) && (
-                          <p className="cms-galat">Foto tidak ditemukan di server. Tolak dan minta warga mengirim ulang.</p>
+                        {!v.adaKtp && (
+                          <p className="cms-galat">Foto KTP tidak ditemukan di server. Tolak dan minta warga mengirim ulang.</p>
                         )}
-                        <TombolKeputusanKtp id={String(v.id)} bolehSetuju={!v.dipakaiLain && v.adaKtp && v.adaSelfie} />
+                        <TombolKeputusanKtp id={String(v.id)} bolehSetuju={!v.dipakaiLain && v.adaKtp} />
                       </div>
                     </div>
                   </Kartu>
@@ -169,11 +165,12 @@ function LencanaOcr({ hasil, nik, skor }: { hasil: mobile_ktp_verifications_ocr_
 }
 
 /**
- * Foto pengajuan lewat rute khusus peninjau (/api/admin/verifikasi/…), bukan
- * /media. Menekannya membuka ukuran penuh di tab baru untuk dicermati.
+ * Foto KTP pengajuan lewat rute khusus peninjau (/api/admin/verifikasi/:id),
+ * bukan /media. Menekannya membuka ukuran penuh di tab baru untuk dicermati.
  */
-function Foto({ id, jenis, ada, label, nama }: { id: bigint; jenis: "ktp" | "selfie"; ada: boolean; label: string; nama: string }) {
-  const url = `/api/admin/verifikasi/${id}/${jenis}`;
+function FotoKtp({ id, ada, nama }: { id: bigint; ada: boolean; nama: string }) {
+  const url = `/api/admin/verifikasi/${id}`;
+  const label = "Foto KTP";
   return (
     <figure className="min-w-0">
       {ada ? (

@@ -301,9 +301,9 @@ model content_reports {
 }
 
 /// Verifikasi KTP akun warga — syarat siaran langsung publik dari aplikasi
-/// mobile. Petugas CMS (/admin/verifikasi) membandingkan foto KTP dan swafoto
-/// memegang KTP dengan NIK ketikan; penyedia eKYC (lib/ekyc.ts) boleh
-/// menyetujui lebih dulu bila dipasang. Tabel milik CMS ini.
+/// mobile. Petugas CMS (/admin/verifikasi) mencocokkan foto KTP dengan NIK
+/// ketikan; penyedia eKYC (lib/ekyc.ts) boleh menyetujui lebih dulu bila
+/// dipasang. Tabel milik CMS ini.
 ///
 /// Data seminimal mungkin: foto (di KTP_DIR, tak pernah dilayani publik) dan
 /// NIK polos hanya ada selama `menunggu`, lalu dibuang begitu diputuskan.
@@ -318,9 +318,8 @@ model mobile_ktp_verifications {
   nik         String?                              @db.VarChar(16)
   /// HMAC-SHA256 NIK (KTP_NIK_SECRET) — disalin ke users.ktp_nik_hash saat disetujui.
   nik_hash    String                               @db.Char(64)
-  /// Nama berkas acak di KTP_DIR. null setelah diputuskan (berkasnya dihapus).
+  /// Nama berkas foto KTP (acak) di KTP_DIR. null setelah diputuskan (berkasnya dihapus).
   ktp_path    String?                              @db.VarChar(64)
-  selfie_path String?                              @db.VarChar(64)
   /// OCR foto KTP (EKYC_PROVIDER=paddleocr, lib/ocr-ktp.ts): NIK di foto
   /// dibandingkan NIK ketikan. null = OCR tidak dijalankan.
   ocr_result  mobile_ktp_verifications_ocr_result?

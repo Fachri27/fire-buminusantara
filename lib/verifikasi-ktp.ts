@@ -13,13 +13,13 @@ import { BATAS_PIKSEL, bersihkanGambar, deteksiMime } from "./unggah.ts";
  * tanpa moderasi lebih dulu, jadi penyiarnya harus orang yang bisa dimintai
  * tanggung jawab, bukan sekadar akun Google sekali pakai.
  *
- * Alur: warga mengirim NIK + foto KTP + swafoto memegang KTP
- * (POST /api/mobile/saya/verifikasi) → eKYC otomatis bila dipasang
+ * Alur: warga mengirim NIK + foto KTP (POST /api/mobile/saya/verifikasi) →
+ * eKYC otomatis bila dipasang
  * (lib/ekyc.ts; "lolos" = langsung disetujui) → selain itu petugas CMS
  * memutuskan di /admin/verifikasi.
  *
  * Privasi — yang disimpan seminimal mungkin dan sesingkat mungkin:
- *   - Foto di KTP_DIR (di luar public/ dan media/, nama acak, mode 600), tidak
+ *   - Foto KTP di KTP_DIR (di luar public/ dan media/, nama acak, mode 600), tidak
  *     pernah dilayani publik; hanya /api/admin/verifikasi/… untuk peninjau.
  *     EXIF (GPS rumah, jam, model ponsel) dibuang sebelum ditulis.
  *   - Foto dan NIK polos (ketikan dan bacaan OCR) hanya ada selama `menunggu` —
@@ -40,7 +40,11 @@ export const UMUR_PENGAJUAN_MS = 30 * 24 * 60 * 60_000;
 /** Atap per foto. Foto ponsel modern 2–6 MB; KTP terbaca jelas jauh di bawahnya. */
 export const BATAS_FOTO_BYTE = 8 * 1024 * 1024;
 
-/** Kelonggaran badan multipart di atas dua foto: pembatas + isian NIK. */
+/**
+ * Atap badan multipart: SATU foto KTP + pembatas & isian NIK, ditambah ruang
+ * untuk satu foto lagi — klien lama yang masih mengirim bidang `selfie` tetap
+ * dijawab normal (bidang itu diabaikan, tidak pernah disimpan), bukan 413.
+ */
 export const BATAS_BADAN_KTP = 2 * BATAS_FOTO_BYTE + 256 * 1024;
 
 /** Panjang minimum KTP_NIK_SECRET di produksi. */
@@ -263,7 +267,6 @@ export async function ajukanVerifikasi(
   akun: { id: bigint; name: string },
   nik: string,
   ktp: FotoKtp,
-  selfie: FotoKtp,
   kunci: string,
 ): Promise<HasilAjuan> {
   const nikHash = sidikNik(nik, kunci);
@@ -273,33 +276,33 @@ export async function ajukanVerifikasi(
   });
   if (dipakai) return [409, { galat: GALAT_NIK_DIPAKAI }];
 
-  const baru: string[] = [];
+  let baru: string | null = null;
   let id: bigint;
   let lama: (string | null)[];
   try {
-    baru.push(await simpanFoto(ktp));
-    baru.push(await simpanFoto(selfie));
+    baru = await simpanFoto(ktp);
+    const nama = baru;
     [id, lama] = await prisma.$transaction(async (tx) => {
       const sebelum = await tx.mobile_ktp_verifications.findMany({
         where: { user_id: akun.id, status: { in: ["menunggu", "ditolak"] } },
-        select: { id: true, ktp_path: true, selfie_path: true },
+        select: { id: true, ktp_path: true },
       });
       if (sebelum.length) {
         await tx.mobile_ktp_verifications.deleteMany({ where: { id: { in: sebelum.map((s) => s.id) } } });
       }
       const dibuat = await tx.mobile_ktp_verifications.create({
-        data: { user_id: akun.id, nik, nik_hash: nikHash, ktp_path: baru[0], selfie_path: baru[1] },
+        data: { user_id: akun.id, nik, nik_hash: nikHash, ktp_path: nama },
         select: { id: true },
       });
-      return [dibuat.id, sebelum.flatMap((s) => [s.ktp_path, s.selfie_path])] as const;
+      return [dibuat.id, sebelum.map((s) => s.ktp_path)] as const;
     });
   } catch (e) {
-    await hapusFotoSemua(baru);
+    await hapusFoto(baru);
     throw e;
   }
   await hapusFotoSemua(lama);
 
-  const periksa = await periksaEkyc({ nik, nama: akun.name, ktp, selfie });
+  const periksa = await periksaEkyc({ nik, nama: akun.name, ktp });
   if (periksa.ocr) {
     // Untuk lencana peninjau. Gagal menyimpan bukan alasan menggagalkan pengajuan.
     await prisma.mobile_ktp_verifications
@@ -348,12 +351,12 @@ export async function putuskanVerifikasi(
     foto = await prisma.$transaction(async (tx) => {
       const v = await tx.mobile_ktp_verifications.findUnique({
         where: { id },
-        select: { user_id: true, status: true, nik_hash: true, ktp_path: true, selfie_path: true, created_at: true },
+        select: { user_id: true, status: true, nik_hash: true, ktp_path: true, created_at: true },
       });
       if (!v || v.status !== "menunggu" || kedaluwarsa(v.created_at, kini)) {
         throw new GagalPutus("Pengajuan ini sudah diputuskan, kedaluwarsa, atau dihapus.");
       }
-      const berkas = [v.ktp_path, v.selfie_path];
+      const berkas = [v.ktp_path];
       const ubah = await tx.mobile_ktp_verifications.updateMany({
         where: { id, status: "menunggu" },
         data: {
@@ -365,7 +368,6 @@ export async function putuskanVerifikasi(
           nik: null,
           ocr_nik: null,
           ktp_path: null,
-          selfie_path: null,
         },
       });
       // Peninjau lain memutuskannya di antara baca dan tulis di atas.
@@ -381,12 +383,12 @@ export async function putuskanVerifikasi(
       // Kiriman ganda yang masih menunggu tidak berarti lagi setelah akunnya disetujui.
       const ganda = await tx.mobile_ktp_verifications.findMany({
         where: { user_id: v.user_id, status: "menunggu" },
-        select: { id: true, ktp_path: true, selfie_path: true },
+        select: { id: true, ktp_path: true },
       });
       if (ganda.length) {
         await tx.mobile_ktp_verifications.deleteMany({ where: { id: { in: ganda.map((g) => g.id) } } });
       }
-      return [...berkas, ...ganda.flatMap((g) => [g.ktp_path, g.selfie_path])];
+      return [...berkas, ...ganda.map((g) => g.ktp_path)];
     });
   } catch (e) {
     if (e instanceof GagalPutus) return { ok: false, galat: e.message };
@@ -408,13 +410,13 @@ export async function sapuKedaluwarsa(kini = new Date(), userId?: bigint): Promi
   const batas = new Date(kini.getTime() - UMUR_PENGAJUAN_MS);
   const basi = await prisma.mobile_ktp_verifications.findMany({
     where: { status: "menunggu", created_at: { lte: batas }, ...(userId !== undefined && { user_id: userId }) },
-    select: { id: true, ktp_path: true, selfie_path: true },
+    select: { id: true, ktp_path: true },
   });
   if (basi.length) {
     await prisma.mobile_ktp_verifications.deleteMany({
       where: { id: { in: basi.map((b) => b.id) }, status: "menunggu" },
     });
-    await hapusFotoSemua(basi.flatMap((b) => [b.ktp_path, b.selfie_path]));
+    await hapusFotoSemua(basi.map((b) => b.ktp_path));
   }
   if (userId === undefined) await sapuYatim(kini);
   return basi.length;
@@ -436,10 +438,10 @@ async function sapuYatim(kini: Date): Promise<void> {
     const nama = (await readdir(folder).catch(() => [] as string[])).filter((n) => NAMA_FOTO.test(n));
     if (!nama.length) return;
     const dirujuk = await prisma.mobile_ktp_verifications.findMany({
-      where: { OR: [{ ktp_path: { in: nama } }, { selfie_path: { in: nama } }] },
-      select: { ktp_path: true, selfie_path: true },
+      where: { ktp_path: { in: nama } },
+      select: { ktp_path: true },
     });
-    const terpakai = new Set(dirujuk.flatMap((d) => [d.ktp_path, d.selfie_path]));
+    const terpakai = new Set(dirujuk.map((d) => d.ktp_path));
     for (const n of nama) {
       if (terpakai.has(n)) continue;
       const info = await stat(path.join(folder, n)).catch(() => null);
@@ -458,8 +460,8 @@ async function sapuYatim(kini: Date): Promise<void> {
 export async function hapusVerifikasiAkun(tx: Prisma.TransactionClient, userId: bigint): Promise<(string | null)[]> {
   const baris = await tx.mobile_ktp_verifications.findMany({
     where: { user_id: userId },
-    select: { ktp_path: true, selfie_path: true },
+    select: { ktp_path: true },
   });
   await tx.mobile_ktp_verifications.deleteMany({ where: { user_id: userId } });
-  return baris.flatMap((b) => [b.ktp_path, b.selfie_path]);
+  return baris.map((b) => b.ktp_path);
 }
