@@ -17,6 +17,11 @@ services:
     env_file: .env
     ports:
       - "127.0.0.1:3000:3000"
+    volumes:
+      # Foto KTP yang menunggu keputusan petugas (KTP_DIR bawaan, lib/verifikasi-ktp.ts).
+      # Di lapisan container ia hilang setiap deploy. Isinya dihapus aplikasi
+      # begitu diputuskan atau setelah 30 hari — volume ini tidak perlu dicadangkan.
+      - ktp-privat:/app/privat/ktp
     networks:
       # Jaringan bersama dengan MinIO/MariaDB (dibuat manual:
       # docker network create shared) — container saling memanggil dengan nama
@@ -76,6 +81,9 @@ services:
       - ./deploy/livekit.yaml:/etc/livekit.yaml:ro
     environment:
       LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-}: ${LIVEKIT_API_SECRET:-}"
+
+volumes:
+  ktp-privat:
 
 networks:
   shared:

@@ -2035,7 +2035,7 @@
           "Mobile"
         ],
         "summary": "Buat ruang siaran baru dan token pelapor",
-        "description": "Siaran publik (tampil di beranda warga) wajib akun dan tidak boleh anonim, serta selalu memakai nama akun. Siaran khusus petugas boleh dari tamu atau anonim. Ruang publik hanya menyimpan koordinat kasar. Token LiveKit berlaku 2 jam. Batas laju: 3 siaran per 10 menit per IP, ditambah 3 per 10 menit per akun.",
+        "description": "Siaran publik (tampil di beranda warga) wajib akun, tidak boleh anonim, akunnya wajib lolos verifikasi KTP (GET/POST /api/mobile/saya/verifikasi), dan selalu memakai nama akun. Permintaan tanpa publik (siaran khusus petugas, aplikasi versi lama) boleh dari tamu atau anonim tanpa verifikasi. Ruang publik hanya menyimpan koordinat kasar. Token LiveKit berlaku 2 jam. Batas laju: 3 siaran per 10 menit per IP, ditambah 3 per 10 menit per akun.",
         "security": [
           {},
           {
@@ -2129,6 +2129,34 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Siaran publik tetapi akun belum lolos verifikasi KTP",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "galat": {
+                      "type": "string"
+                    },
+                    "verifikasi": {
+                      "type": "string",
+                      "enum": [
+                        "belum",
+                        "menunggu",
+                        "ditolak",
+                        "disetujui"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "galat",
+                    "verifikasi"
+                  ]
                 }
               }
             }
@@ -2848,6 +2876,248 @@
           },
           "401": {
             "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/saya/verifikasi": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Status verifikasi KTP akun (syarat siaran langsung publik)",
+        "description": "Pengajuan yang 30 hari tidak diputuskan dihapus (beserta fotonya) dan statusnya kembali \"belum\". `alasan` hanya terisi bila ditolak.",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status verifikasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "belum",
+                        "menunggu",
+                        "disetujui",
+                        "ditolak"
+                      ]
+                    },
+                    "alasan": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Alasan penolakan dari petugas"
+                    },
+                    "diajukan": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "diputuskan": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "alasan",
+                    "diajukan",
+                    "diputuskan"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Ajukan verifikasi KTP: NIK + foto KTP + swafoto memegang KTP",
+        "description": "Foto disimpan privat (KTP_DIR, EXIF dibuang) hanya selama menunggu; foto dan NIK polos dihapus begitu diputuskan petugas di /admin/verifikasi atau penyedia eKYC. Pengajuan baru menggantikan yang menunggu/ditolak. Satu NIK hanya untuk satu akun terverifikasi (HMAC-SHA256 berkunci KTP_NIK_SECRET). Batas laju: 5 pengajuan per hari per akun dan 20 per IP (dihitung untuk pengajuan tersimpan dan jawaban NIK dipakai), plus 15 percobaan per hari per akun dan 60 per IP.",
+        "security": [
+          {
+            "bearerMobile": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nik": {
+                    "type": "string",
+                    "pattern": "^[0-9]{16}$",
+                    "description": "16 angka; kode provinsi 11–96, tanggal lahir DDMMYY (perempuan +40) yang sah"
+                  },
+                  "ktp": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Foto KTP, JPEG/PNG/WebP (dideteksi dari isi), ≤ 8 MB"
+                  },
+                  "selfie": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Swafoto memegang KTP, JPEG/PNG/WebP, ≤ 8 MB"
+                  }
+                },
+                "required": [
+                  "nik",
+                  "ktp",
+                  "selfie"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Langsung disetujui eKYC",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "disetujui"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Masuk antrean petugas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "menunggu"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Kiriman tidak terbaca, foto tidak ada, bukan JPEG/PNG/WebP, rusak, atau resolusinya terlalu besar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Belum masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Akun sudah terverifikasi, atau NIK sudah dipakai akun lain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Foto melebihi 8 MB atau kiriman terlalu besar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "NIK bukan 16 angka atau tidak valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Batas pengajuan harian terlewati",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Gagal menyimpan pengajuan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server belum disiapkan (KTP_NIK_SECRET) atau sedang sibuk",
             "content": {
               "application/json": {
                 "schema": {

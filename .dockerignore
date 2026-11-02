@@ -8,6 +8,8 @@
 .next
 node_modules
 media
+# foto KTP lokal (KTP_DIR bawaan) — data pribadi, tidak boleh masuk image
+privat
 public/storage
 backups
 *.tsbuildinfo
