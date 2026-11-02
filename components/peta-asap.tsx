@@ -10,6 +10,7 @@ import { inferPulau, PROVINSI_KE_PULAU } from "@/lib/wilayah";
 import { PUSAT_WILAYAH } from "@/lib/pusat-wilayah";
 import { BATAS_NUSANTARA, selaNusantara } from "@/lib/kamera-nusantara";
 import type { ZarrTimestepMeta, ZarrMetadataResponse } from "@/lib/tipe-asap";
+import { GEO_URL } from "@/lib/situs";
 import type { Berita } from "@/lib/events";
 import {
   dariSentuhan,
@@ -857,7 +858,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
     const promise = (async () => {
       try {
         const res = await fetch(
-          `/api/sebaran-asap?mode=frame&timeChunk=${stepMeta.timeChunk}&step=${stepMeta.step}&timeInner=${stepMeta.timeInner}`
+          `${GEO_URL}/api/sebaran-asap?mode=frame&timeChunk=${stepMeta.timeChunk}&step=${stepMeta.step}&timeInner=${stepMeta.timeInner}`
         );
         if (!res.ok) return null;
         const arrayBuf = await res.arrayBuffer();
@@ -895,7 +896,7 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
   const perbaruiLinimasa = useCallback(
     async () => {
       try {
-        const res = await fetch("/api/sebaran-asap?mode=metadata");
+        const res = await fetch(`${GEO_URL}/api/sebaran-asap?mode=metadata`);
         if (!res.ok) return;
         const metaBaru: ZarrMetadataResponse = await res.json();
         if (!metaBaru.timesteps || metaBaru.timesteps.length === 0) return;
@@ -1031,8 +1032,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
 
       try {
         const url = paksaRefresh
-          ? `/api/sebaran-asap?mode=metadata&_ts=${Date.now()}`
-          : "/api/sebaran-asap?mode=metadata";
+          ? `${GEO_URL}/api/sebaran-asap?mode=metadata&_ts=${Date.now()}`
+          : `${GEO_URL}/api/sebaran-asap?mode=metadata`;
 
         const res = await fetch(url);
         if (!res.ok) {
@@ -1167,8 +1168,8 @@ export function PetaAsap({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian,
       sources: {
         "satellite-tiles": {
           type: "raster",
-          // EOX lewat tembolok server sendiri (app/api/citra): langsung dari Indonesia 3–14 dtk per ubin.
-          tiles: [`${window.location.origin}/api/citra/{z}/{y}/{x}`],
+          // EOX lewat tembolok geoplatform (/api/citra): langsung dari Indonesia 3–14 dtk per ubin.
+          tiles: [`${GEO_URL}/api/citra/{z}/{y}/{x}`],
           tileSize: 256,
           attribution: "Sentinel-2 cloudless by EOX IT Services GmbH",
           maxzoom: 14,

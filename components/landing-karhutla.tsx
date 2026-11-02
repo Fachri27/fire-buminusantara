@@ -18,6 +18,7 @@ import { BilahSaringan, SaklarSegmen } from "@/components/bilah-saringan";
 import { useTheme } from "next-themes";
 import { useMounted } from "@/hooks/use-mounted";
 import { mediaLokal } from "@/lib/media";
+import { GEO_URL } from "@/lib/situs";
 
 /* Modul-modul pendukung hasil pemecahan berkas ini — lihat folder
    components/landing-karhutla/. Berkas utama tetap di sini supaya
@@ -207,7 +208,7 @@ export function LandingKarhutla(
     }, 0);
     const timer = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/cuaca-lokal?saran=${encodeURIComponent(kueriCuaca.trim())}`, {
+        const r = await fetch(`${GEO_URL}/api/cuaca-lokal?saran=${encodeURIComponent(kueriCuaca.trim())}`, {
           signal: AbortSignal.timeout(6000),
           headers: { Accept: "application/json" },
         });

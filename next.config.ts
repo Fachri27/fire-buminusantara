@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { GEO_URL } from "./lib/situs";
 
 /**
  * Header keamanan untuk SEMUA rute.
@@ -10,7 +11,8 @@ import type { NextConfig } from "next";
  * (Next.js menyuntik skrip inline, dan halaman memuat Turnstile + Leaflet dari
  * CDN — CSP script yang keliru akan mematikan halaman, bukan sekadar
  * memperketatnya). `frame-src` memasukkan challenges.cloudflare.com karena
- * widget Turnstile merender dirinya dalam iframe dari sana. `geolocation=(self)`
+ * widget Turnstile merender dirinya dalam iframe dari sana; GEO_URL karena
+ * lapisan Windy adalah iframe /api/forecasting milik geoplatform. `geolocation=(self)`
  * DISENGAJA: form laporan memakai "Pakai lokasi saya".
  */
 const HEADER_KEAMANAN = [
@@ -24,7 +26,7 @@ const HEADER_KEAMANAN = [
   {
     key: "Content-Security-Policy",
     // localhost:3001 hanya untuk pengembangan — jangan sampai ikut ke produksi.
-    value: `frame-ancestors 'none'; frame-src 'self'${process.env.NODE_ENV === "production" ? "" : " http://localhost:3001"} https://challenges.cloudflare.com https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'`,
+    value: `frame-ancestors 'none'; frame-src 'self'${process.env.NODE_ENV === "production" ? "" : " http://localhost:3001"} ${GEO_URL} https://challenges.cloudflare.com https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'`,
   },
   // Tanpa includeSubDomains: subdomain lain di bawah domain bersama (CMS Laravel
   // dsb.) belum tentu semuanya HTTPS. Peramban mengabaikan header ini di HTTP.
@@ -89,28 +91,11 @@ const nextConfig: NextConfig = {
     },
     // Bawaannya 10 MB, jadi harus disetel eksplisit.
     proxyClientMaxBodySize: "1mb",
-    // Rewrite ke geoplatform terpotong 30 dtk bawaan; /api/hotspot dingin
-    // menunggu FIRMS >24 dtk. Batas nyatanya tetap timeout nginx di depan.
-    proxyTimeout: 120_000,
   },
 
   // Reaksi dulu di bawah /admin/komentar; kini bagian itu punya layout daftar sendiri.
   async redirects() {
     return [{ source: "/admin/komentar/reaksi", destination: "/admin/reaksi", permanent: true }];
-  },
-
-  // API data peta (hotspot, asap, udara, cuaca, forecasting, citra) dilayani
-  // geoplatform; peta fire dan aplikasi seluler tetap memanggilnya di asal
-  // fire, diteruskan apa adanya (query ikut). Proksi rewrite Next tidak
-  // memasang xfwd: X-Forwarded-For dari nginx diteruskan utuh, jadi
-  // TRUSTED_PROXY_HOPS=1 di geoplatform tetap membaca IP klien. Header rute
-  // ini (CSP sandbox /api/forecasting, cache) datang dari geoplatform: Next
-  // membuang headers() config pada rewrite eksternal.
-  async rewrites() {
-    // Bawaan build produksi = layanan compose `geo`; dev = geoplatform di :3100.
-    const geo = process.env.GEO_INTERNAL_URL || (process.env.NODE_ENV === "production" ? "http://geo:3000" : "http://localhost:3100");
-    return ["/api/hotspot", "/api/sebaran-asap", "/api/udara", "/api/cuaca-lokal", "/api/forecasting", "/api/citra/:path*"]
-      .map((source) => ({ source, destination: `${geo}${source}` }));
   },
 
   async headers() {
@@ -138,7 +123,7 @@ const nextConfig: NextConfig = {
           ...HEADER_KEAMANAN.filter((h) => h.key !== "X-Frame-Options" && h.key !== "Content-Security-Policy"),
           {
             key: "Content-Security-Policy",
-            value: "frame-ancestors *; frame-src 'self' https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'",
+            value: `frame-ancestors *; frame-src 'self' ${GEO_URL} https://*.windy.com https://windy.com; base-uri 'self'; object-src 'none'`,
           },
         ],
       },
@@ -186,7 +171,7 @@ const nextConfig: NextConfig = {
       // membawa header cache tersendiri.
       {
         source:
-          "/((?!_next/static|_next/image|assets/|css/|favicon\\.ico|icon\\.png|apple-icon\\.png|robots\\.txt|sitemap\\.xml|media/|api/citra/|api/forecasting|api/hotspot|api/sebaran-asap|api/udara|api/umpan|data/).*)",
+          "/((?!_next/static|_next/image|assets/|css/|favicon\\.ico|icon\\.png|apple-icon\\.png|robots\\.txt|sitemap\\.xml|media/|api/umpan|data/).*)",
         headers: [
           {
             key: "Cache-Control",

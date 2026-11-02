@@ -1,5 +1,5 @@
 /** Bentuk respons /api/sebaran-asap?mode=metadata — dilayani geoplatform
- *  (lib/zarr-reader.ts di sana), diteruskan fire lewat rewrite. */
+ *  (lib/zarr-reader.ts di sana), dipanggil peramban langsung di GEO_URL. */
 export interface ZarrTimestepMeta {
   index: number;
   timeChunk: number;

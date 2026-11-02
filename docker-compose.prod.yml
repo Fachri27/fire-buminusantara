@@ -22,9 +22,7 @@ services:
       # docker network create shared) — container saling memanggil dengan nama
       # layanan (http://minio:9000), tanpa lewat port host. Port 127.0.0.1
       # MinIO tidak bisa dijangkau dari container (host.docker.internal datang
-      # lewat alamat bridge, bukan loopback). Rewrites API peta menjangkau
-      # geoplatform di jaringan yang sama (http://geo:3000, stack
-      # /srv/geoplatform) — karena itu layanan ini tetap bernama `web` dan
+      # lewat alamat bridge, bukan loopback). Layanan ini bernama `web` dan
       # layanan geoplatform `geo`: nama layanan = alias di jaringan "shared".
       - shared
       - default

@@ -33,6 +33,7 @@ import type { LapisanAsap } from "./peta-asap";
 import { PanelPeringkatHotspot, RelPeringkatHotspot } from "./panel-peringkat-hotspot";
 import { formatHariPeta, LOCALE, TEKS_PETA } from "./teks-peta";
 import type { Bahasa } from "@/lib/bahasa";
+import { GEO_URL } from "@/lib/situs";
 import { useKurangiGerak, useMediaQuery } from "@/hooks/use-media-query";
 
 /** Bagian peta MapLibre lapisan Aerosol yang dibaca untuk menyamakan kamera
@@ -275,7 +276,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
      sebab memindahkan <iframe> di DOM selalu memuatnya ulang. */
   const { resolvedTheme } = useTheme();
   const [windyKamera, setWindyKamera] = useState("lat=0.200&lon=118.000&zoom=5");
-  const windySrc = `/api/forecasting?${windyKamera}${zoomRoda ? "&konsol=1" : ""}${
+  const windySrc = `${GEO_URL}/api/forecasting?${windyKamera}${zoomRoda ? "&konsol=1" : ""}${
     onExpand ? "&bentang=1" : ""
   }${legendaRingkas ? "&ringkas=1" : ""}${tombolRapat ? "&rapat=1" : ""}${
     resolvedTheme ? `&tema=${resolvedTheme}` : ""
@@ -407,7 +408,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     const pengendali = new AbortController();
     unduhan.set(kunci, pengendali);
     // ?v=3: data per hari + kolom kabupaten — lewati tembolok lama.
-    fetch(`/api/hotspot?v=3${kunci ? `&hari=${kunci}` : ""}`, { signal: pengendali.signal })
+    fetch(`${GEO_URL}/api/hotspot?v=3${kunci ? `&hari=${kunci}` : ""}`, { signal: pengendali.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((d: DataHotspot) => {
         const simpanan = simpananHotspotRef.current;

@@ -36,7 +36,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20 mnt deploy + ≤15 mnt menunggu geoplatform (langkah di bawah).
+    timeout-minutes: 35
     steps:
       # Fail closed: input divalidasi SEBELUM dipakai karena diinterpolasi ke
       # perintah shell remote, dan payload dispatch tidak dipercaya.
@@ -52,6 +53,27 @@ jobs:
           echo "$TAGS" | grep -Eq '^[A-Z_]+_TAG=[A-Za-z0-9._-]+( [A-Z_]+_TAG=[A-Za-z0-9._-]+)*$' \
             || { echo "::error::format tags salah: '$TAGS'"; exit 1; }
           echo "role=$ROLE tags=$TAGS valid"
+
+      # Peta fire memanggil API data langsung di geoplatform (GEO_URL,
+      # lib/situs.ts) — deploy sebelum domain itu hidup dengan header CORS
+      # membuat peta kosong, jadi box tidak disentuh sampai siap. Ditunggu ≤15
+      # mnt: push bersamaan ke geoplatform mungkin sedang mendeploy. Rollback
+      # manual (dispatch) tidak menunggu — versi lama tak bergantung padanya.
+      - name: Tunggu geoplatform terjangkau
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          GEO_URL: https://geoplatform.nusantara.earth
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf -o /dev/null -D h.txt -m 20 -H "Origin: https://fire.nusantara.earth" \
+                 "$GEO_URL/api/sebaran-asap?mode=metadata" \
+               && grep -qi '^access-control-allow-origin:' h.txt; then
+              echo "geoplatform siap: $GEO_URL"; exit 0
+            fi
+            echo "menunggu $GEO_URL ($i/30)…"; sleep 30
+          done
+          echo "::error::$GEO_URL belum terjangkau dengan header CORS — fire tidak dideploy (peta akan kosong). Cek log deploy geoplatform (nginx/TLS)."
+          exit 1
 
       - name: Tulis kunci SSH dan known_hosts terpatok
         env:
