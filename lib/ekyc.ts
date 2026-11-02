@@ -1,24 +1,28 @@
 import { catatGalat } from "./catat-galat.ts";
+import { type CatatanOcr, periksaPaddleOcr } from "./ocr-ktp.ts";
 
 /**
  * Pemeriksaan eKYC otomatis (opsional) untuk verifikasi KTP — lihat
- * lib/verifikasi-ktp.ts.
+ * lib/verifikasi-ktp.ts. Tanpa EKYC_PROVIDER jawabannya selalu
+ * "tidak-tersedia" dan pengajuan masuk antrean petugas di /admin/verifikasi,
+ * sama seperti "ragu" dan "gagal". Hanya "lolos" yang langsung menyetujui
+ * (metode "ekyc"); tidak ada penyedia yang boleh MENOLAK.
  *
- * BELUM ADA PENYEDIA YANG DIPILIH (VIDA, Privy, Verihubs, …) dan belum ada
- * kunci, jadi modul ini sengaja tidak memanggil API apa pun: tanpa
- * EKYC_PROVIDER jawabannya selalu "tidak-tersedia" dan pengajuan masuk antrean
- * petugas di /admin/verifikasi, sama seperti "ragu" dan "gagal". Hanya "lolos"
- * yang langsung menyetujui (metode "ekyc").
+ * Penyedia terpasang:
+ *   - paddleocr — layanan OCR internal (layanan/ocr-ktp): NIK di foto KTP
+ *     dibandingkan NIK ketikan. Lihat lib/ocr-ktp.ts (OCR_URL, OCR_KUNCI,
+ *     KTP_OCR_MODE).
  *
- * Memasang penyedia:
- *   1. Tulis adaptor `PenyediaEkyc` di bawah (satu fungsi: kirim NIK, nama,
- *      foto KTP, dan swafoto ke API-nya, terjemahkan jawabannya ke HasilEkyc).
- *      Jangan pernah menjawab "lolos" untuk jawaban yang tidak dipahami.
- *   2. Daftarkan di PENYEDIA dengan nama, mis. `vida: periksaVida`.
- *   3. Setel EKYC_PROVIDER=<nama> (+ kunci penyedia) di .env.
- *   4. Perbarui kebijakan privasi aplikasi: data KTP lalu dikirim ke pihak ketiga.
+ * Menambah penyedia lain (VIDA, Privy, Verihubs, …): tulis adaptor
+ * `PenyediaEkyc` (kirim data ke API-nya, terjemahkan jawabannya ke
+ * HasilEkyc — jangan pernah "lolos" untuk jawaban yang tidak dipahami),
+ * daftarkan di PENYEDIA, setel EKYC_PROVIDER=<nama>, dan perbarui kebijakan
+ * privasi aplikasi bila datanya keluar ke pihak ketiga.
  */
 export type HasilEkyc = "lolos" | "ragu" | "gagal" | "tidak-tersedia";
+
+/** Hasil satu pemeriksaan; `ocr` disimpan di pengajuan untuk lencana peninjau. */
+export type Pemeriksaan = { hasil: HasilEkyc; ocr?: CatatanOcr };
 
 export type MasukanEkyc = {
   /** 16 angka, sudah lolos periksaNik. */
@@ -31,24 +35,18 @@ export type MasukanEkyc = {
   sinyal: AbortSignal;
 };
 
-export type PenyediaEkyc = (m: MasukanEkyc) => Promise<HasilEkyc>;
+export type PenyediaEkyc = (m: MasukanEkyc) => Promise<Pemeriksaan>;
 
-/**
- * ── TITIK SAMBUNG ADAPTOR eKYC ──────────────────────────────────────────────
- * Kosong dengan sengaja. Contoh bentuknya (JANGAN diaktifkan tanpa kontrak dan
- * dokumentasi API penyedia yang sesungguhnya):
- *
- *   async function periksaContoh(m: MasukanEkyc): Promise<HasilEkyc> {
- *     const r = await fetch(process.env.EKYC_URL!, { method: "POST", signal: m.sinyal, … });
- *     if (!r.ok) return "tidak-tersedia";
- *     const j = await r.json();
- *     return j.cocok === true && j.skor >= AMBANG ? "lolos" : j.cocok === false ? "gagal" : "ragu";
- *   }
- */
-const PENYEDIA: Record<string, PenyediaEkyc> = {};
+/** ── TITIK SAMBUNG ADAPTOR eKYC ── nama EKYC_PROVIDER → adaptor. */
+const PENYEDIA: Record<string, PenyediaEkyc> = {
+  paddleocr: (m) => periksaPaddleOcr(m),
+};
 
 /** Batas tunggu jawaban penyedia: warga sedang menunggu di layar unggah. */
 export const BATAS_TUNGGU_EKYC_MS = 20_000;
+
+const TIDAK_TERSEDIA: Pemeriksaan = { hasil: "tidak-tersedia" };
+const HASIL_SAH = new Set<string>(["lolos", "ragu", "gagal", "tidak-tersedia"]);
 
 /**
  * Periksa satu pengajuan lewat penyedia eKYC yang dipasang (EKYC_PROVIDER).
@@ -58,19 +56,20 @@ export const BATAS_TUNGGU_EKYC_MS = 20_000;
 export async function periksaEkyc(
   m: Omit<MasukanEkyc, "sinyal">,
   daftar: Record<string, PenyediaEkyc> = PENYEDIA,
-): Promise<HasilEkyc> {
+): Promise<Pemeriksaan> {
   const nama = (process.env.EKYC_PROVIDER ?? "").trim().toLowerCase();
-  if (!nama) return "tidak-tersedia";
+  if (!nama) return TIDAK_TERSEDIA;
   const penyedia = Object.hasOwn(daftar, nama) ? daftar[nama] : undefined;
   if (!penyedia) {
-    void catatGalat("ekyc", new Error(`EKYC_PROVIDER "${nama}" tidak dikenal — adaptornya belum ditulis di lib/ekyc.ts`));
-    return "tidak-tersedia";
+    void catatGalat("ekyc", new Error(`EKYC_PROVIDER "${nama}" tidak dikenal — adaptornya belum ada di lib/ekyc.ts`));
+    return TIDAK_TERSEDIA;
   }
   try {
-    const hasil = await penyedia({ ...m, sinyal: AbortSignal.timeout(BATAS_TUNGGU_EKYC_MS) });
-    return hasil === "lolos" || hasil === "ragu" || hasil === "gagal" ? hasil : "tidak-tersedia";
+    const p = await penyedia({ ...m, sinyal: AbortSignal.timeout(BATAS_TUNGGU_EKYC_MS) });
+    // Jawaban asing tidak pernah dianggap lolos.
+    return p && HASIL_SAH.has(p.hasil) ? p : { ...p, hasil: "tidak-tersedia" };
   } catch (e) {
     void catatGalat("ekyc", e, `penyedia ${nama}`);
-    return "tidak-tersedia";
+    return TIDAK_TERSEDIA;
   }
 }

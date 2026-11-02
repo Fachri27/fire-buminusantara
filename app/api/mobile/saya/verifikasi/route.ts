@@ -3,10 +3,11 @@ import { bacaFormData } from "@/lib/batas-badan";
 import { lewatBatas, lewatBatasIp, sudahLewat, sudahLewatIp } from "@/lib/batas-laju";
 import { buangBadan } from "@/lib/batas-laporan";
 import { catatGalat } from "@/lib/catat-galat";
+import { periksaNik, rapikanNik } from "@/lib/nik";
 import { ipDari } from "@/lib/turnstile";
 import {
-  ajukanVerifikasi, BATAS_BADAN_KTP, folderKtp, type HasilAjuan, kunciNik, periksaNik, rapikanNik,
-  siapkanFoto, statusVerifikasi, sudahTerverifikasi,
+  ajukanVerifikasi, BATAS_BADAN_KTP, folderKtp, type HasilAjuan, kunciNik, siapkanFoto, statusVerifikasi,
+  sudahTerverifikasi,
 } from "@/lib/verifikasi-ktp";
 
 /**

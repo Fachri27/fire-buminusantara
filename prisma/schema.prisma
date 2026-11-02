@@ -311,24 +311,31 @@ model content_reports {
 /// HMAC NIK. Pengajuan `menunggu` lebih dari 30 hari dihapus saat antrean atau
 /// status dibaca (sapuKedaluwarsa di lib/verifikasi-ktp.ts).
 model mobile_ktp_verifications {
-  id          BigInt                           @id @default(autoincrement()) @db.UnsignedBigInt
-  user_id     BigInt                           @db.UnsignedBigInt
-  status      mobile_ktp_verifications_status  @default(menunggu)
+  id          BigInt                               @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id     BigInt                               @db.UnsignedBigInt
+  status      mobile_ktp_verifications_status      @default(menunggu)
   /// NIK ketikan warga, dicocokkan peninjau dengan foto. null setelah diputuskan.
-  nik         String?                          @db.VarChar(16)
+  nik         String?                              @db.VarChar(16)
   /// HMAC-SHA256 NIK (KTP_NIK_SECRET) — disalin ke users.ktp_nik_hash saat disetujui.
-  nik_hash    String                           @db.Char(64)
+  nik_hash    String                               @db.Char(64)
   /// Nama berkas acak di KTP_DIR. null setelah diputuskan (berkasnya dihapus).
-  ktp_path    String?                          @db.VarChar(64)
-  selfie_path String?                          @db.VarChar(64)
+  ktp_path    String?                              @db.VarChar(64)
+  selfie_path String?                              @db.VarChar(64)
+  /// OCR foto KTP (EKYC_PROVIDER=paddleocr, lib/ocr-ktp.ts): NIK di foto
+  /// dibandingkan NIK ketikan. null = OCR tidak dijalankan.
+  ocr_result  mobile_ktp_verifications_ocr_result?
+  /// NIK yang terbaca OCR. null setelah diputuskan, seperti `nik`.
+  ocr_nik     String?                              @db.VarChar(16)
+  /// Skor baca terendah baris NIK itu (0–1).
+  ocr_score   Float?
   method      mobile_ktp_verifications_method?
   /// Alasan penolakan — ditampilkan ke warga di aplikasi.
-  reason      String?                          @db.Text
-  reviewer_id BigInt?                          @db.UnsignedBigInt
-  created_at  DateTime                         @default(now()) @db.Timestamp(0)
-  decided_at  DateTime?                        @db.Timestamp(0)
-  pemohon     users                            @relation("pemohon_ktp", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "mobile_ktp_verifications_user_id_foreign")
-  peninjau    users?                           @relation("peninjau_ktp", fields: [reviewer_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "mobile_ktp_verifications_reviewer_id_foreign")
+  reason      String?                              @db.Text
+  reviewer_id BigInt?                              @db.UnsignedBigInt
+  created_at  DateTime                             @default(now()) @db.Timestamp(0)
+  decided_at  DateTime?                            @db.Timestamp(0)
+  pemohon     users                                @relation("pemohon_ktp", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "mobile_ktp_verifications_user_id_foreign")
+  peninjau    users?                               @relation("peninjau_ktp", fields: [reviewer_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "mobile_ktp_verifications_reviewer_id_foreign")
 
   @@index([user_id, created_at], map: "mobile_ktp_verifications_user_id_created_at_index")
   @@index([status, created_at], map: "mobile_ktp_verifications_status_created_at_index")
@@ -344,4 +351,11 @@ enum mobile_ktp_verifications_status {
 enum mobile_ktp_verifications_method {
   petugas
   ekyc
+}
+
+enum mobile_ktp_verifications_ocr_result {
+  cocok
+  beda
+  tak_terbaca
+  gagal
 }

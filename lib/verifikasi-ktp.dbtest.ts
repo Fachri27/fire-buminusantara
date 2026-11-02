@@ -50,6 +50,10 @@ test("dbtest: setujui, NIK ganda ditolak + rollback, tolak, kedaluwarsa, cascade
 
   const va = await ajukan(a.id);
   const vb = await ajukan(b.id);
+  await prisma.mobile_ktp_verifications.update({
+    where: { id: va.id },
+    data: { ocr_result: "cocok", ocr_nik: "3201011201900001", ocr_score: 0.97 },
+  });
   assert.equal((await statusVerifikasi(a.id, kini)).status, "menunggu");
 
   // Setujui A: tanda di akun, NIK & path kosong, fotonya hilang.
@@ -59,6 +63,7 @@ test("dbtest: setujui, NIK ganda ditolak + rollback, tolak, kedaluwarsa, cascade
   assert.equal(akunA.ktp_nik_hash, sidik);
   const barisA = await prisma.mobile_ktp_verifications.findUniqueOrThrow({ where: { id: va.id } });
   assert.deepEqual([barisA.status, barisA.method, barisA.nik, barisA.ktp_path, barisA.selfie_path], ["disetujui", "petugas", null, null, null]);
+  assert.deepEqual([barisA.ocr_result, barisA.ocr_nik, barisA.ocr_score], ["cocok", null, 0.97], "NIK bacaan OCR ikut dihapus, hasilnya tetap");
   assert.equal((await statusVerifikasi(a.id, kini)).status, "disetujui");
 
   // B dengan NIK yang sama: gagal, dan transaksinya digulung balik — masih menunggu, foto utuh.

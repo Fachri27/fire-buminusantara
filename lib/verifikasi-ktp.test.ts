@@ -8,63 +8,13 @@ import sharp from "sharp";
 import exifr from "exifr";
 import { periksaEkyc, type PenyediaEkyc } from "./ekyc.ts";
 import {
-  BATAS_FOTO_BYTE, folderKtp, jawabanStatus, kedaluwarsa, kunciNik, periksaNik, putuskanVerifikasi,
-  rapikanNik, sapuKedaluwarsa, siapkanFoto, sidikNik, sisaHariPengajuan, uraiNik, UMUR_PENGAJUAN_MS,
+  BATAS_FOTO_BYTE, folderKtp, jawabanStatus, kedaluwarsa, kunciNik, putuskanVerifikasi, sapuKedaluwarsa,
+  siapkanFoto, sidikNik, sisaHariPengajuan, UMUR_PENGAJUAN_MS,
 } from "./verifikasi-ktp.ts";
 
-// ── NIK ──────────────────────────────────────────────────────────────────────
-
-/** 32 01 01 120190 0001: Jawa Barat, lahir 12-01-90, laki-laki. */
+/** NIK berbentuk sah (uji bentuknya di lib/nik.test.ts). */
 const NIK_SAH = "3201011201900001";
 const nikDengan = (i: number, dua: string) => NIK_SAH.slice(0, i) + dua + NIK_SAH.slice(i + 2);
-
-test("periksaNik: NIK berbentuk wajar lolos — laki-laki dan perempuan (tanggal + 40)", () => {
-  assert.equal(periksaNik(NIK_SAH), null);
-  assert.equal(periksaNik(nikDengan(6, "52")), null, "perempuan, tanggal 12");
-  assert.equal(periksaNik(nikDengan(6, "71")), null, "perempuan, tanggal 31 Januari");
-  assert.equal(periksaNik(nikDengan(6, "01")), null);
-});
-
-test("periksaNik: bukan tepat 16 angka → 'NIK harus 16 angka.'", () => {
-  for (const nik of ["", "123", NIK_SAH.slice(0, 15), `${NIK_SAH}0`, "3201a11201900001", "3201 011201900001", "３２０１０１１２０１９０００１"]) {
-    assert.equal(periksaNik(nik), "NIK harus 16 angka.", JSON.stringify(nik));
-  }
-});
-
-test("periksaNik: kode provinsi 11–96 (termasuk pemekaran Papua 95/96)", () => {
-  for (const p of ["11", "32", "94", "95", "96"]) assert.equal(periksaNik(nikDengan(0, p)), null, p);
-  for (const p of ["00", "10", "97", "99"]) assert.equal(periksaNik(nikDengan(0, p)), "NIK tidak valid.", p);
-});
-
-test("periksaNik: tanggal lahir harus tanggal sungguhan", () => {
-  const tidak = (ddmm: string, yy = "90") => periksaNik(NIK_SAH.slice(0, 6) + ddmm + yy + NIK_SAH.slice(12));
-  for (const ddmm of ["0001", "3201", "4001", "7201", "1200", "1213", "3002", "3104", "7104"]) {
-    assert.equal(tidak(ddmm), "NIK tidak valid.", ddmm);
-  }
-  assert.equal(tidak("3101"), null, "31 Januari");
-  assert.equal(tidak("3004"), null, "30 April");
-  assert.equal(tidak("2902", "01"), "NIK tidak valid.", "29 Feb bukan kabisat");
-  assert.equal(tidak("2902", "04"), null, "29 Feb 2004 / 1904");
-  assert.equal(tidak("2902", "00"), null, "29 Feb 2000 (abad tidak tertulis)");
-  assert.equal(tidak("6902", "04"), null, "29 Feb, perempuan");
-});
-
-test("periksaNik: kabupaten, kecamatan, dan nomor urut 0 tidak ada", () => {
-  assert.equal(periksaNik(nikDengan(2, "00")), "NIK tidak valid.");
-  assert.equal(periksaNik(nikDengan(4, "00")), "NIK tidak valid.");
-  assert.equal(periksaNik(`${NIK_SAH.slice(0, 12)}0000`), "NIK tidak valid.");
-});
-
-test("rapikanNik: spasi pemisah dibuang, selain itu apa adanya", () => {
-  assert.equal(rapikanNik(" 3201 0112 0190 0001 "), NIK_SAH);
-  assert.equal(rapikanNik(null), "");
-  assert.equal(rapikanNik("3201-0112"), "3201-0112");
-});
-
-test("uraiNik: tanggal lahir dan jenis kelamin untuk peninjau", () => {
-  assert.deepEqual(uraiNik(NIK_SAH), { lahir: "12-01-90", perempuan: false });
-  assert.deepEqual(uraiNik(nikDengan(6, "45")), { lahir: "05-01-90", perempuan: true });
-});
 
 // ── Sidik ────────────────────────────────────────────────────────────────────
 
@@ -399,17 +349,20 @@ test("periksaEkyc: tanpa EKYC_PROVIDER atau penyedia tak dikenal = tidak-tersedi
   const lama = process.env.EKYC_PROVIDER;
   t.after(() => (lama === undefined ? delete process.env.EKYC_PROVIDER : (process.env.EKYC_PROVIDER = lama)));
   const masukan = { nik: NIK_SAH, nama: "Warga", ktp: { isi: Buffer.alloc(0), mime: "image/jpeg" }, selfie: { isi: Buffer.alloc(0), mime: "image/jpeg" } };
-  const lolos: PenyediaEkyc = async () => "lolos";
+  const lolos: PenyediaEkyc = async () => ({ hasil: "lolos" });
+  const hasil = async (daftar?: Record<string, PenyediaEkyc>) => (await periksaEkyc(masukan, daftar)).hasil;
 
   delete process.env.EKYC_PROVIDER;
-  assert.equal(await periksaEkyc(masukan, { uji: lolos }), "tidak-tersedia");
+  assert.equal(await hasil({ uji: lolos }), "tidak-tersedia");
   process.env.EKYC_PROVIDER = "belum-ditulis";
-  assert.equal(await periksaEkyc(masukan, { uji: lolos }), "tidak-tersedia");
-  assert.equal(await periksaEkyc(masukan), "tidak-tersedia", "belum ada adaptor bawaan");
+  assert.equal(await hasil({ uji: lolos }), "tidak-tersedia");
+  assert.equal(await hasil(), "tidak-tersedia", "nama di luar daftar bawaan");
 
   process.env.EKYC_PROVIDER = "Uji";
-  assert.equal(await periksaEkyc(masukan, { uji: lolos }), "lolos");
-  assert.equal(await periksaEkyc(masukan, { uji: async () => "ragu" }), "ragu");
-  assert.equal(await periksaEkyc(masukan, { uji: async () => { throw new Error("jaringan"); } }), "tidak-tersedia");
-  assert.equal(await periksaEkyc(masukan, { uji: async () => "ya" as never }), "tidak-tersedia", "jawaban asing bukan lolos");
+  assert.equal(await hasil({ uji: lolos }), "lolos");
+  assert.equal(await hasil({ uji: async () => ({ hasil: "ragu" }) }), "ragu");
+  assert.equal(await hasil({ uji: async () => { throw new Error("jaringan"); } }), "tidak-tersedia");
+  assert.equal(await hasil({ uji: async () => ({ hasil: "ya" as never }) }), "tidak-tersedia", "jawaban asing bukan lolos");
+  const ocr = { hasil: "beda" as const, nik: NIK_SAH, skor: 0.8 };
+  assert.deepEqual(await periksaEkyc(masukan, { uji: async () => ({ hasil: "gagal", ocr }) }), { hasil: "gagal", ocr });
 });

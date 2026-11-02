@@ -10,6 +10,8 @@ node_modules
 media
 # foto KTP lokal (KTP_DIR bawaan) — data pribadi, tidak boleh masuk image
 privat
+# layanan lain (OCR KTP) punya image & konteks build sendiri
+layanan
 public/storage
 backups
 *.tsbuildinfo

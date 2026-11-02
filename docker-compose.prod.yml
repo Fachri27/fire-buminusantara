@@ -15,6 +15,10 @@ services:
     mem_limit: 2g
     memswap_limit: 2g
     env_file: .env
+    # Layanan OCR KTP di jaringan internal compose (OCR_KUNCI ikut dari .env).
+    # Bisa ditimpa dari .env; dipakai hanya bila EKYC_PROVIDER=paddleocr.
+    environment:
+      OCR_URL: ${OCR_URL:-http://ocr-ktp:8866}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -62,6 +66,30 @@ services:
           # sehari — 15 menit dulu sebagian besar mengunduh berkas yang sama.
           sleep 1800
         done
+
+  # OCR foto KTP untuk verifikasi siaran (layanan/ocr-ktp, PaddleOCR CPU):
+  # penyedia eKYC "paddleocr" (lib/ocr-ktp.ts). TANPA port terbuka — hanya web
+  # yang memanggilnya lewat jaringan default compose. /tmp di tmpfs: unggahan
+  # multipart yang dispool tidak pernah menyentuh disk. Tidak masuk
+  # HEALTH_SERVICES: OCR mati = pengajuan ke antrean petugas, situs tetap jalan.
+  ocr-ktp:
+    image: ghcr.io/ultramenid/fire-buminusantara-ocr-ktp:${OCR_TAG:-latest}
+    restart: unless-stopped
+    # Atap: model PP-OCRv5 + Paddle CPU ±1–1,5 GB; MariaDB + MinIO di host yang sama.
+    mem_limit: 2g
+    memswap_limit: 2g
+    # OCR satu foto memakan CPU beberapa detik — jangan sampai merebut web.
+    cpus: 2
+    environment:
+      OCR_KUNCI: ${OCR_KUNCI:-}
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8866/sehat', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   # Server video siaran langsung aplikasi mobile (lib/siaran.ts). Network host:
   # WebRTC butuh 10.001 port UDP (50000–60000) yang terlalu berat lewat NAT

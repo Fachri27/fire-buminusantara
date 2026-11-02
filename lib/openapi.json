@@ -2965,7 +2965,7 @@
           "Mobile"
         ],
         "summary": "Ajukan verifikasi KTP: NIK + foto KTP + swafoto memegang KTP",
-        "description": "Foto disimpan privat (KTP_DIR, EXIF dibuang) hanya selama menunggu; foto dan NIK polos dihapus begitu diputuskan petugas di /admin/verifikasi atau penyedia eKYC. Pengajuan baru menggantikan yang menunggu/ditolak. Satu NIK hanya untuk satu akun terverifikasi (HMAC-SHA256 berkunci KTP_NIK_SECRET). Batas laju: 5 pengajuan per hari per akun dan 20 per IP (dihitung untuk pengajuan tersimpan dan jawaban NIK dipakai), plus 15 percobaan per hari per akun dan 60 per IP.",
+        "description": "Foto disimpan privat (KTP_DIR, EXIF dibuang) hanya selama menunggu; foto dan NIK polos dihapus begitu diputuskan petugas di /admin/verifikasi atau penyedia eKYC. Pengajuan baru menggantikan yang menunggu/ditolak. Satu NIK hanya untuk satu akun terverifikasi (HMAC-SHA256 berkunci KTP_NIK_SECRET). Batas laju: 5 pengajuan per hari per akun dan 20 per IP (dihitung untuk pengajuan tersimpan dan jawaban NIK dipakai), plus 15 percobaan per hari per akun dan 60 per IP. Dengan EKYC_PROVIDER=paddleocr, NIK di foto KTP dibaca OCR internal dan dibandingkan dengan NIK ketikan: mode bantu (bawaan) hanya memberi lencana untuk petugas; mode otomatis (KTP_OCR_MODE) langsung menyetujui bila cocok dengan skor ≥ 0,9 (jawaban 200). OCR tidak pernah menolak, dan layanan OCR yang mati tidak menggagalkan pengajuan.",
         "security": [
           {
             "bearerMobile": []
@@ -3005,7 +3005,7 @@
         },
         "responses": {
           "200": {
-            "description": "Langsung disetujui eKYC",
+            "description": "Langsung disetujui eKYC (OCR KTP, mode otomatis)",
             "content": {
               "application/json": {
                 "schema": {

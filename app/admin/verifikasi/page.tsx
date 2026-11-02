@@ -1,7 +1,9 @@
+import type { mobile_ktp_verifications_ocr_result } from "@prisma/client";
 import { catatGalat } from "@/lib/catat-galat";
 import { prisma } from "@/lib/prisma";
 import { wajibSesi } from "@/lib/sesi";
-import { fotoAda, sapuKedaluwarsa, sisaHariPengajuan, uraiNik } from "@/lib/verifikasi-ktp";
+import { uraiNik } from "@/lib/nik";
+import { fotoAda, sapuKedaluwarsa, sisaHariPengajuan } from "@/lib/verifikasi-ktp";
 import { Ikon } from "../menu-admin";
 import { bacaSaring, halamanDari } from "../saring";
 import { Hampa, Kartu, KopPanel, LEBAR } from "../ruang";
@@ -35,6 +37,7 @@ export default async function VerifikasiKtp() {
     take: PER,
     select: {
       id: true, nik: true, nik_hash: true, ktp_path: true, selfie_path: true, created_at: true,
+      ocr_result: true, ocr_nik: true, ocr_score: true,
       pemohon: { select: { id: true, name: true, email: true, created_at: true } },
     },
   });
@@ -94,6 +97,12 @@ export default async function VerifikasiKtp() {
                             <dt>NIK ketikan</dt>
                             <dd className="cms-angka text-[15px] tracking-wide">{v.nik ? kelompokNik(v.nik) : "—"}</dd>
                           </div>
+                          {v.ocr_result && (
+                            <div>
+                              <dt>Bacaan mesin</dt>
+                              <dd><LencanaOcr hasil={v.ocr_result} nik={v.ocr_nik} skor={v.ocr_score} /></dd>
+                            </div>
+                          )}
                           {urai && (
                             <div>
                               <dt>Menurut NIK</dt>
@@ -138,6 +147,25 @@ export default async function VerifikasiKtp() {
       </div>
     </>
   );
+}
+
+const skorTeks = (skor: number | null) => (skor === null ? "" : ` (skor ${skor.toFixed(2)})`);
+
+/**
+ * Hasil OCR foto KTP (EKYC_PROVIDER=paddleocr) — petunjuk, bukan keputusan:
+ * OCR hanya membaca angka di foto, tidak menilai keaslian KTP atau wajah.
+ */
+function LencanaOcr({ hasil, nik, skor }: { hasil: mobile_ktp_verifications_ocr_result; nik: string | null; skor: number | null }) {
+  if (hasil === "cocok") return <span className="cms-cap cms-cap--aman cms-cap--titik">OCR: NIK cocok{skorTeks(skor)}</span>;
+  if (hasil === "beda") {
+    return (
+      <span className="cms-cap cms-cap--perhatian cms-cap--titik">
+        OCR: NIK di foto berbeda{nik ? <>: <span className="cms-angka">{kelompokNik(nik)}</span></> : null}{skorTeks(skor)}
+      </span>
+    );
+  }
+  if (hasil === "tak_terbaca") return <span className="cms-cap cms-cap--diam cms-cap--titik">OCR: NIK tidak terbaca</span>;
+  return <span className="cms-cap cms-cap--diam cms-cap--titik">OCR: layanan tidak tersedia</span>;
 }
 
 /**
