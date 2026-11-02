@@ -42,9 +42,11 @@ const TOKEN_ANGKA = /^[0-9OoDIl|SBZ]+$/;
 const LABEL_NIK = /^[Nn][I1l|i][Kk]$/;
 const LABEL_MENEMPEL = /^([Nn][I1l|i][Kk])([0-9OoDIl|SBZ]{4,})$/;
 
-/** Pisah baris menjadi token; "NIK3201…" (label menempel) dipisah dua. */
+/** Pisah baris menjadi token; "NIK3201…" (label menempel) dipisah dua. NFKC dulu: PaddleOCR
+ *  menulis titik dua lebar "：" ("NIK：3201…", terukur pada model latin PP-OCRv5) dan kadang angka lebar. */
 function tokenBaris(teks: string): string[] {
   return teks
+    .normalize("NFKC")
     .split(/[\s:;.,=_\-–—]+/)
     .filter(Boolean)
     .flatMap((t) => {

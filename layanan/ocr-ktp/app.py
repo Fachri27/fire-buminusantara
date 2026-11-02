@@ -32,6 +32,9 @@ BATAS_BYTE = 10 * 1024 * 1024
 CADANGAN_MULTIPART = 64 * 1024
 # Sisi terpanjang sebelum OCR: KTP tetap terbaca, CPU per permintaan terbatas.
 SISI_MAKS = 2048
+# Thread CPU Paddle = jatah CPU container (docker-compose: cpus 2). Bawaan Paddle mengikuti jumlah CPU
+# mesin (mis. 10): di bawah jatah 2 CPU semua thread itu saling tercekik, satu foto 25–45 dtk alih-alih ±3.
+CPU_THREADS = int(os.environ.get("OCR_CPU_THREADS", "2"))
 # Kunci pendek = salah konfigurasi; layanan menolak semua permintaan.
 PANJANG_KUNCI_MIN = 16
 
@@ -45,11 +48,18 @@ def buat_ocr():
     (lihat Dockerfile), jadi container tidak pernah mengambilnya saat jalan."""
     from paddleocr import PaddleOCR
 
+    # Deteksi model *mobile* & sisi gambar paling panjang 960 px: teks KTP besar, jadi tetap terbaca
+    # tepat (NIK skor ±0,99 pada foto HP miring & buram), sedangkan model *server* bawaan dengan gambar
+    # penuh memakan ±5 GB memori dan 30–60 dtk per foto di CPU (melewati batas memori container).
     return PaddleOCR(
         lang="id",
+        text_detection_model_name="PP-OCRv5_mobile_det",
+        text_det_limit_type="max",
+        text_det_limit_side_len=960,
         use_doc_orientation_classify=True,
         use_doc_unwarping=False,
         use_textline_orientation=False,
+        cpu_threads=CPU_THREADS,
     )
 
 

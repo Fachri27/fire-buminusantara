@@ -35,6 +35,12 @@ test("nikDariOcr: salah baca huruf↔angka dinormalkan hanya di token berangka",
   assert.equal(nikDariOcr([{ teks: "BOGOR SD DI O", skor: 0.99 }]), null);
 });
 
+test("nikDariOcr: titik dua & angka lebar keluaran PaddleOCR asli (NFKC)", () => {
+  // Persis keluaran latin_PP-OCRv5_mobile_rec pada foto KTP spesimen: titik dua lebar U+FF1A.
+  assert.deepEqual(nikDariOcr(ktp("NIK\uFF1A3201014101900001", 0.988)), { nik: NIK, skor: 0.988 });
+  assert.equal(nikDariOcr(ktp("NIK\uFF1A\uFF13\uFF12\uFF10\uFF11014101900001"))?.nik, NIK, "angka lebar");
+});
+
 test("nikDariOcr: label menempel, salah baca label, dan angka berspasi", () => {
   assert.equal(nikDariOcr(ktp("NIK:3201014101900001"))?.nik, NIK);
   assert.equal(nikDariOcr(ktp("NIK3201014101900001"))?.nik, NIK);

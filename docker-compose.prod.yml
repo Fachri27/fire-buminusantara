@@ -75,13 +75,16 @@ services:
   ocr-ktp:
     image: ghcr.io/ultramenid/fire-buminusantara-ocr-ktp:${OCR_TAG:-latest}
     restart: unless-stopped
-    # Atap: model PP-OCRv5 + Paddle CPU ±1–1,5 GB; MariaDB + MinIO di host yang sama.
+    # Atap: deteksi mobile + pengenal latin PP-OCRv5, sisi 960 px — terukur ±0,5–0,8 GB per foto KTP
+    # (model deteksi server dengan gambar penuh ±5 GB → OOM). MariaDB + MinIO di host yang sama.
     mem_limit: 2g
     memswap_limit: 2g
     # OCR satu foto memakan CPU beberapa detik — jangan sampai merebut web.
     cpus: 2
     environment:
       OCR_KUNCI: ${OCR_KUNCI:-}
+      # Harus sama dengan `cpus` di atas: thread Paddle melebihi jatah CPU = ±10× lebih lambat.
+      OCR_CPU_THREADS: "2"
     tmpfs:
       - /tmp
     healthcheck:
