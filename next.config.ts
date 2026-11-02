@@ -89,11 +89,28 @@ const nextConfig: NextConfig = {
     },
     // Bawaannya 10 MB, jadi harus disetel eksplisit.
     proxyClientMaxBodySize: "1mb",
+    // Rewrite ke geoplatform terpotong 30 dtk bawaan; /api/hotspot dingin
+    // menunggu FIRMS >24 dtk. Batas nyatanya tetap timeout nginx di depan.
+    proxyTimeout: 120_000,
   },
 
   // Reaksi dulu di bawah /admin/komentar; kini bagian itu punya layout daftar sendiri.
   async redirects() {
     return [{ source: "/admin/komentar/reaksi", destination: "/admin/reaksi", permanent: true }];
+  },
+
+  // API data peta (hotspot, asap, udara, cuaca, forecasting, citra) dilayani
+  // geoplatform; peta fire dan aplikasi seluler tetap memanggilnya di asal
+  // fire, diteruskan apa adanya (query ikut). Proksi rewrite Next tidak
+  // memasang xfwd: X-Forwarded-For dari nginx diteruskan utuh, jadi
+  // TRUSTED_PROXY_HOPS=1 di geoplatform tetap membaca IP klien. Header rute
+  // ini (CSP sandbox /api/forecasting, cache) datang dari geoplatform: Next
+  // membuang headers() config pada rewrite eksternal.
+  async rewrites() {
+    // Bawaan build produksi = layanan compose `geo`; dev = geoplatform di :3100.
+    const geo = process.env.GEO_INTERNAL_URL || (process.env.NODE_ENV === "production" ? "http://geo:3000" : "http://localhost:3100");
+    return ["/api/hotspot", "/api/sebaran-asap", "/api/udara", "/api/cuaca-lokal", "/api/forecasting", "/api/citra/:path*"]
+      .map((source) => ({ source, destination: `${geo}${source}` }));
   },
 
   async headers() {
@@ -112,21 +129,6 @@ const nextConfig: NextConfig = {
           { key: "Content-Security-Policy", value: "default-src 'none'; sandbox" },
         ],
       },
-      // /api/forecasting ikut boleh dibingkai siapa saja: ia iframe di dalam
-      // /<locale>/embed, dan frame-ancestors memeriksa SEMUA leluhur — termasuk
-      // situs penyemat. Tanpa X-Frame-Options (SAMEORIGIN akan memblokirnya).
-      {
-        source: "/api/forecasting",
-        headers: [
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          // sandbox tanpa allow-same-origin: HTML+skrip Windy dilayani dari asal kita,
-          // jadi tanpa ini skrip pihak ketiga itu berjalan sebagai situs ini (bisa
-          // memanggil aksi /admin dengan cookie editor). Next mengabaikan CSP yang
-          // disetel rute bila config sudah menyetelnya — karena itu di sini.
-          { key: "Content-Security-Policy", value: "frame-ancestors *; object-src 'none'; sandbox allow-scripts allow-popups" },
-        ],
-      },
       // Peta sematan (app/[locale]/embed) — satu-satunya halaman yang boleh
       // dibingkai situs lain. Isinya hanya peta tanpa aksi bersesi, jadi
       // clickjacking tak punya sasaran.
@@ -140,7 +142,7 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      { source: "/((?!media/|api/forecasting|(?:id|en)/embed).*)", headers: HEADER_KEAMANAN },
+      { source: "/((?!media/|(?:id|en)/embed).*)", headers: HEADER_KEAMANAN },
       {
         source: "/assets/:path*",
         headers: [

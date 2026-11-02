@@ -19,9 +19,6 @@
     },
     {
       "name": "Admin"
-    },
-    {
-      "name": "Cron"
     }
   ],
   "paths": {
@@ -293,67 +290,13 @@
         }
       }
     },
-    "/api/cron/warm-asap": {
-      "get": {
-        "tags": [
-          "Cron"
-        ],
-        "summary": "Menghangatkan cache frame sebaran asap dan udara, serta menyegarkan hotspot FIRMS",
-        "description": "Secret wajib dikirim di header `Authorization: Bearer <CRON_SECRET>`. Mengirim parameter query `secret` ditolak dengan 400. Di produksi tanpa CRON_SECRET, rute menjawab 401 (fail-closed). Di pengembangan tanpa CRON_SECRET, rute mengizinkan panggilan. maxDuration 300 detik.",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/WarmAsapSukses"
-          },
-          "400": {
-            "$ref": "#/components/responses/WarmAsapSecretDiQuery"
-          },
-          "401": {
-            "$ref": "#/components/responses/WarmAsapTakBerwenang"
-          },
-          "500": {
-            "$ref": "#/components/responses/WarmAsapGagal"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Cron"
-        ],
-        "summary": "Menghangatkan cache frame sebaran asap dan udara, serta menyegarkan hotspot FIRMS",
-        "description": "Sama dengan GET.",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/WarmAsapSukses"
-          },
-          "400": {
-            "$ref": "#/components/responses/WarmAsapSecretDiQuery"
-          },
-          "401": {
-            "$ref": "#/components/responses/WarmAsapTakBerwenang"
-          },
-          "500": {
-            "$ref": "#/components/responses/WarmAsapGagal"
-          }
-        }
-      }
-    },
     "/api/cuaca-lokal": {
       "get": {
         "tags": [
           "Publik"
         ],
         "summary": "Cuaca lokal pengunjung untuk panel kiri landing karhutla",
-        "description": "Publik tanpa sesi. Ada dua mode. (1) Jika `saran` dikirim, rute mengembalikan saran lokasi berupa array. Sumbernya basis data wilayah Kemendagri/BMKG, lalu OSM Nominatim bila tidak ketemu. Cache-Control public, max-age=120. (2) Jika tidak, rute mengembalikan cuaca BMKG (cadangan Open-Meteo). Lokasi diambil dari `lat`+`lng`, lalu `q`, dan bila keduanya tak ada dari IP pengunjung (ipwho.is). Hasil di-cache di memori 10 menit per lokasi; Cache-Control no-store.",
+        "description": "Dilayani geoplatform; fire meneruskan rute ini apa adanya (rewrite) untuk aplikasi seluler. Publik tanpa sesi. Ada dua mode. (1) Jika `saran` dikirim, rute mengembalikan saran lokasi berupa array. Sumbernya basis data wilayah Kemendagri/BMKG, lalu OSM Nominatim bila tidak ketemu. Cache-Control public, max-age=120. (2) Jika tidak, rute mengembalikan cuaca BMKG (cadangan Open-Meteo). Lokasi diambil dari `lat`+`lng`, lalu `q`, dan bila keduanya tak ada dari IP pengunjung (ipwho.is). Hasil di-cache di memori 10 menit per lokasi; Cache-Control no-store.",
         "parameters": [
           {
             "name": "saran",
@@ -539,7 +482,7 @@
           "Publik"
         ],
         "summary": "Proksi halaman Windy AQI (CAMS) untuk disematkan sebagai iframe",
-        "description": "Mengambil HTML Windy Air Quality Index, menyisipkan skrip dan gaya sendiri, lalu mengirim HTML-nya. Nilai di luar batas dijepit ke wilayah Indonesia; nilai tidak sah memakai bawaan. Header Content-Security-Policy berisi frame-ancestors *, jadi halaman boleh dibingkai di mana saja.",
+        "description": "Dilayani geoplatform; fire meneruskan rute ini apa adanya (rewrite) untuk aplikasi seluler. Mengambil HTML Windy Air Quality Index, menyisipkan skrip dan gaya sendiri, lalu mengirim HTML-nya. Nilai di luar batas dijepit ke wilayah Indonesia; nilai tidak sah memakai bawaan. Header Content-Security-Policy berisi frame-ancestors *, jadi halaman boleh dibingkai di mana saja.",
         "parameters": [
           {
             "name": "lat",
@@ -726,7 +669,7 @@
           "Publik"
         ],
         "summary": "Titik hotspot NASA FIRMS satu hari WIB",
-        "description": "Membaca salinan Redis yang ditulis cron warm-asap. Tanpa `hari`, rute memakai hari terbaru. Hari di luar 7 hari data diganti hari tersedia terdekat (lihat field `hari`). Jika salinan basi (lebih dari 70 menit), penyegaran dipicu di latar. Cache-Control: public, max-age paling lama 300 detik sampai salinan basi; no-store jika sudah basi.",
+        "description": "Dilayani geoplatform; fire meneruskan rute ini apa adanya (rewrite) untuk aplikasi seluler. Membaca salinan Redis yang ditulis cron di geoplatform. Tanpa `hari`, rute memakai hari terbaru. Hari di luar 7 hari data diganti hari tersedia terdekat (lihat field `hari`). Jika salinan basi (lebih dari 70 menit), penyegaran dipicu di latar. Cache-Control: public, max-age paling lama 300 detik sampai salinan basi; no-store jika sudah basi.",
         "parameters": [
           {
             "name": "hari",
@@ -2935,7 +2878,7 @@
           "Publik"
         ],
         "summary": "Data lapisan sebaran asap (Zarr CAMS): metadata linimasa atau frame biner",
-        "description": "`mode=metadata` (bawaan) mengembalikan JSON linimasa. `mode=frame` mengembalikan biner application/octet-stream dengan kompresi br (mutu 5) atau gzip sesuai Accept-Encoding. Jika `force=true` atau ada `_ts`, metadata diambil ulang dan Cache-Control menjadi no-store.",
+        "description": "Dilayani geoplatform; fire meneruskan rute ini apa adanya (rewrite) untuk aplikasi seluler. `mode=metadata` (bawaan) mengembalikan JSON linimasa. `mode=frame` mengembalikan biner application/octet-stream dengan kompresi br (mutu 5) atau gzip sesuai Accept-Encoding. Jika `force=true` atau ada `_ts`, metadata diambil ulang dan Cache-Control menjadi no-store.",
         "parameters": [
           {
             "name": "mode",
@@ -3045,7 +2988,7 @@
           "Publik"
         ],
         "summary": "Data lapisan Angin dan Kualitas Udara (AQI PM2.5 + angin 10 m, CAMS)",
-        "description": "Kontraknya sejajar dengan /api/sebaran-asap. `mode=frame` mengembalikan biner tiga bidang (aqi | u | v) dengan kompresi br/gzip. Frame yang belum lengkap dikirim dengan Cache-Control no-store.",
+        "description": "Dilayani geoplatform; fire meneruskan rute ini apa adanya (rewrite) untuk aplikasi seluler. Kontraknya sejajar dengan /api/sebaran-asap. `mode=frame` mengembalikan biner tiga bidang (aqi | u | v) dengan kompresi br/gzip. Frame yang belum lengkap dikirim dengan Cache-Control no-store.",
         "parameters": [
           {
             "name": "mode",
@@ -3351,11 +3294,6 @@
         "in": "cookie",
         "name": "fire_sesi",
         "description": "Cookie sesi CMS (admin/editor), dibuat saat masuk di /admin/login."
-      },
-      "cronSecret": {
-        "type": "http",
-        "scheme": "bearer",
-        "description": "CRON_SECRET server."
       }
     },
     "schemas": {
@@ -3646,89 +3584,6 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Galat"
-            }
-          }
-        }
-      },
-      "WarmAsapSukses": {
-        "description": "Cache dihangatkan",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-                "success": {
-                  "const": true
-                },
-                "message": {
-                  "type": "string"
-                },
-                "total": {
-                  "type": "integer"
-                },
-                "berhasil": {
-                  "type": "integer"
-                },
-                "gagal": {
-                  "type": "integer"
-                },
-                "durasiMs": {
-                  "type": "integer"
-                },
-                "isWarm": {
-                  "type": "boolean"
-                },
-                "udara": {
-                  "type": "object",
-                  "additionalProperties": true
-                },
-                "hotspot": {
-                  "type": "object",
-                  "additionalProperties": true
-                },
-                "timestamp": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      },
-      "WarmAsapSecretDiQuery": {
-        "description": "Secret dikirim lewat query ?secret= (ditolak)",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/GalatError"
-            }
-          }
-        }
-      },
-      "WarmAsapTakBerwenang": {
-        "description": "Secret salah atau CRON_SECRET belum disetel di produksi",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/GalatError"
-            }
-          }
-        }
-      },
-      "WarmAsapGagal": {
-        "description": "Penghangatan gagal",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-                "success": {
-                  "const": false
-                },
-                "error": {
-                  "type": "string"
-                },
-                "hotspot": {}
-              }
             }
           }
         }

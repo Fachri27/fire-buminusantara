@@ -32,6 +32,13 @@ ENV NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
 ARG NEXT_DEPLOYMENT_ID=""
 ENV NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID
 
+# Asal internal geoplatform (layanan `geo` di jaringan docker "shared"):
+# rewrites next.config meneruskan /api/{hotspot,sebaran-asap,udara,
+# cuaca-lokal,forecasting,citra/*} ke sana. Rewrites dipanggang saat build —
+# mengubahnya di .env runtime tidak berpengaruh.
+ARG GEO_INTERNAL_URL=http://geo:3000
+ENV GEO_INTERNAL_URL=$GEO_INTERNAL_URL
+
 # ponytail: --webpack — build Turbopack (bawaan Next 16) gagal spawn proses
 # anak di beberapa lingkungan; webpack terverifikasi menghasilkan standalone.
 # Bisa dilepas bila Turbopack build terbukti stabil di CI.

@@ -9,7 +9,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { inferPulau, PROVINSI_KE_PULAU } from "@/lib/wilayah";
 import { PUSAT_WILAYAH } from "@/lib/pusat-wilayah";
 import { BATAS_NUSANTARA, selaNusantara } from "@/lib/kamera-nusantara";
-import type { ZarrTimestepMeta, ZarrMetadataResponse } from "@/lib/zarr-reader";
+import type { ZarrTimestepMeta, ZarrMetadataResponse } from "@/lib/tipe-asap";
 import type { Berita } from "@/lib/events";
 import {
   dariSentuhan,
