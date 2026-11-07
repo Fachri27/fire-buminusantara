@@ -135,7 +135,7 @@ export const TAYANG = { status: "published" } as const;
 
 /** Jumlah kartu umpan yang ikut di HTML halaman; sisanya diambil klien dari
  *  /api/umpan supaya muatan awal tidak membengkak seiring arsip. */
-export const UMPAN_AWAL = 24;
+export const UMPAN_AWAL = 15;
 
 /**
  * Kejadian untuk korsel beranda, urutan CAMPURAN "terbaru + komentar terbanyak":

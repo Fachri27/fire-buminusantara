@@ -63,6 +63,10 @@ const DURASI_TUTUP_PETA = 200;
    setState saat render berputar tanpa henti → "Too many re-renders". */
 const BERITA_KOSONG: Berita[] = [];
 
+/** Kartu umpan per langkah gulir — samakan dengan UMPAN_AWAL di lib/events
+ *  (tak diimpor: modul itu membawa Prisma ke bundle klien). */
+const LANGKAH_UMPAN = 15;
+
 export function LandingKarhutla(
   {
     bahasa,
@@ -710,6 +714,38 @@ export function LandingKarhutla(
     if (butuhPenuh) muatPenuh();
   }, [butuhPenuh, muatPenuh]);
 
+  /* Gulir tak berujung: umpan dirender LANGKAH_UMPAN kartu sekali jalan;
+     penanda di dasar umpan menambah satu langkah tiap kali mendekati layar
+     (dan memicu muatPenuh bila daftar lengkap belum tiba). Saringan, urutan,
+     atau kata kunci baru mulai lagi dari langkah pertama. */
+  const [batasUmpan, setBatasUmpan] = useState(LANGKAH_UMPAN);
+  const kunciUmpan = `${kata}|${dariUmpan}|${sampaiUmpan}|${wilayahUmpan}|${urutanUmpan}`;
+  const [kunciUmpanLama, setKunciUmpanLama] = useState(kunciUmpan);
+  if (kunciUmpan !== kunciUmpanLama) {
+    setKunciUmpanLama(kunciUmpan);
+    setBatasUmpan(LANGKAH_UMPAN);
+  }
+  const umpanTampil = useMemo(() => hasil.slice(0, batasUmpan), [hasil, batasUmpan]);
+  const adaLagiUmpan = batasUmpan < hasil.length || berita.length < totalBerita;
+  const ujungUmpanRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ujungUmpanRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    // Panggung menggulir di dalam <main> (.lk-kanan overflow-y:auto), aliran
+    // menggulir jendela — rootMargin hanya berlaku pada akar yang benar.
+    const rel = el.closest("main");
+    const akar = rel && getComputedStyle(rel).overflowY !== "visible" ? rel : null;
+    // Dibuat ulang tiap batas berubah: pengamat baru langsung melapor bila
+    // penanda masih terlihat (layar tinggi), jadi langkah berikutnya ikut.
+    const pengamat = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      muatPenuh();
+      setBatasUmpan((b) => (b < hasil.length ? b + LANGKAH_UMPAN : b));
+    }, { root: akar, rootMargin: "0px 0px 800px 0px" });
+    pengamat.observe(el);
+    return () => pengamat.disconnect();
+  }, [batasUmpan, hasil.length, muatPenuh, adaLagiUmpan, aliran]);
+
   /* Geser/panah antar-laporan di rincian mengikuti umpan YANG TERLIHAT —
      urutan dan saringannya — jadi "berikutnya" selalu kartu berikutnya di
      layar. Laporan yang dibuka dari luar umpan (mis. pop-up peta, atau yang
@@ -1260,7 +1296,7 @@ export function LandingKarhutla(
             </div>
           ) : (
             <UmpanMasonry
-              daftar={hasil}
+              daftar={umpanTampil}
               kolom={kolom}
               kartu={(l, i) => (
                 <article key={l.id} className="lk-kartu group text-tinta dark:text-[#f5f5f5]">
@@ -1342,6 +1378,7 @@ export function LandingKarhutla(
               )}
             />
           )}
+          {adaLagiUmpan && hasil.length > 0 && <div ref={ujungUmpanRef} aria-hidden="true" className="h-px" />}
         </main>
         )}
       </div>
