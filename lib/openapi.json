@@ -2565,6 +2565,154 @@
         },
         "security": []
       }
+    },
+    "/api/umpan/halaman": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Satu halaman umpan beranda (gulir tak berujung)",
+        "description": "15 kartu per halaman. Saringan dan urutan dikerjakan server atas daftar ambilUmpan yang di-cache. Cache-Control sama dengan /api/umpan.",
+        "parameters": [
+          {
+            "name": "bahasa",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "id",
+                "en"
+              ],
+              "default": "id"
+            },
+            "description": "Nilai kosong atau tak dikenal jatuh ke id."
+          },
+          {
+            "name": "kursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Nilai `berikut` jawaban sebelumnya — cadangan posisi bila kartu `setelah` sudah hilang; kosong = halaman pertama."
+          },
+          {
+            "name": "setelah",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Id kartu terakhir yang sudah tampil; halaman dilanjutkan tepat sesudahnya sehingga laporan baru/terhapus tidak membuat kartu terlewat atau ganda."
+          },
+          {
+            "name": "cari",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Kata kunci pada judul (tak peka huruf besar)."
+          },
+          {
+            "name": "dari",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Tanggal kejadian paling awal, YYYY-MM-DD."
+          },
+          {
+            "name": "sampai",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Tanggal kejadian paling akhir, YYYY-MM-DD."
+          },
+          {
+            "name": "wilayah",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "semua",
+                "Sumatra",
+                "Jawa",
+                "Kalimantan",
+                "Sulawesi",
+                "Maluku",
+                "Papua"
+              ],
+              "default": "semua"
+            },
+            "description": "Tab pulau; nilai asing jatuh ke semua."
+          },
+          {
+            "name": "urut",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "terbaru",
+                "komentar"
+              ],
+              "default": "terbaru"
+            },
+            "description": "komentar = komentar terbanyak dulu, seri terbaru dulu."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Satu halaman umpan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "isi",
+                    "berikut",
+                    "jumlahWilayah"
+                  ],
+                  "properties": {
+                    "isi": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/paths/~1api~1umpan/get/responses/200/content/application~1json/schema/items"
+                      }
+                    },
+                    "berikut": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Kursor halaman berikutnya; null = habis."
+                    },
+                    "jumlahWilayah": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      },
+                      "description": "Banyak laporan per opsi wilayah setelah saringan cari + tanggal."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

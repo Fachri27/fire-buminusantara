@@ -12,7 +12,7 @@ import { gunakanKolomUmpan } from "@/hooks/gunakan-kolom-umpan";
 import { ambilStatistik, type Statistik as DataStatistik } from "@/lib/statistik";
 import { type Bahasa } from "@/lib/bahasa";
 import type { Berita } from "@/lib/events";
-import { waktuIso, waktuTeks } from "@/lib/tanggal";
+import { UMPAN_AWAL, type HalamanUmpan } from "@/lib/halaman-umpan";
 import { PULAU_TAB } from "@/lib/wilayah";
 import { BilahSaringan, SaklarSegmen } from "@/components/bilah-saringan";
 import { useTheme } from "next-themes";
@@ -27,6 +27,7 @@ import { GEO_URL } from "@/lib/situs";
 import { TEKS } from "./landing-karhutla/teks";
 import { UKURAN_FOTO_UMPAN, VideoOtomatis } from "./landing-karhutla/video-otomatis";
 import { UmpanMasonry } from "./landing-karhutla/umpan-masonry";
+import { MediaTunda, akarGulir, rasioKerangka } from "./landing-karhutla/media-tunda";
 import { AksiKartu } from "./landing-karhutla/aksi-kartu";
 import { KomposerLapor } from "./landing-karhutla/komposer-lapor";
 import { IsiSaranLokasi } from "./landing-karhutla/saran-lokasi";
@@ -63,9 +64,47 @@ const DURASI_TUTUP_PETA = 200;
    setState saat render berputar tanpa henti → "Too many re-renders". */
 const BERITA_KOSONG: Berita[] = [];
 
-/** Kartu umpan per langkah gulir — samakan dengan UMPAN_AWAL di lib/events
- *  (tak diimpor: modul itu membawa Prisma ke bundle klien). */
-const LANGKAH_UMPAN = 15;
+/** Keadaan umpan yang tampil: halaman-halaman yang sudah dimuat untuk satu
+ *  `kunci` saringan. `sumber` = prop berita saat keadaan ini dibuat. */
+type KeadaanUmpan = {
+  /** Naik tiap umpan diulang (saringan/prop baru) — penanda jawaban basi. */
+  generasi: number;
+  kunci: string;
+  sumber: Berita[];
+  isi: Berita[];
+  berikut: number | null;
+  jumlahWilayah?: Record<string, number>;
+  memuat: boolean;
+  gagal: boolean;
+};
+
+/** Berita → bentuk kartu umpan. Media utama (video pertama, kalau tidak foto
+ *  pertama) untuk tampilan tunggal; galeri penuh untuk lencana multi-media;
+ *  tanpa media sama sekali kartunya memakai placeholder. */
+function keLaporan(b: Berita, bahasa: Bahasa): Laporan {
+  const vid = b.media.find((m) => m.jenis === "video");
+  const gbr = b.media.find((m) => m.jenis === "gambar");
+  return {
+    id: b.id,
+    gambar: vid
+      ? (vid.poster ?? b.poster ?? b.gambar)
+      : (gbr?.url ?? b.gambar ?? b.poster),
+    video: vid?.url ?? b.video ?? undefined,
+    galeri: b.media
+      .filter((m) => (m.jenis === "gambar" || m.jenis === "video") && m.url)
+      .map((m) => ({ url: m.url, jenis: m.jenis, poster: m.poster, keterangan: m.keterangan })),
+    alt: b.alt,
+    judul: b.judul,
+    tanggal: b.tanggal,
+    lokasi: b.lokasi ?? b.provinsi,
+    deskripsi: b.deskripsi,
+    slug: b.slug,
+    href: b.slug ? `/${bahasa}/fire/${b.slug}` : `/${bahasa}`,
+    pulau: b.pulau,
+    komentar: b.jumlahKomentar ?? 0,
+    suka: b.jumlahSuka ?? 0,
+  };
+}
 
 export function LandingKarhutla(
   {
@@ -77,14 +116,18 @@ export function LandingKarhutla(
     statistik,
     kejadianAwal = null,
     kolomAwal,
+    jumlahWilayah: jumlahWilayahAwal,
   }: {
     bahasa: Bahasa;
     /** Peta butuh angka provinsi — halaman umpan tak memakainya. */
     jumlahLaporan?: Record<string, number>;
-    /** Potongan awal umpan (24 teratas) — sisanya diambil dari /api/umpan. */
+    /** Halaman pertama umpan (UMPAN_AWAL teratas, /fire/<slug> menambah
+     *  kejadiannya di belakang) — halaman berikutnya dari /api/umpan/halaman. */
     berita?: Berita[];
     /** Banyak kejadian seluruhnya; lebih besar dari `berita` = masih ada sisa. */
     totalBerita?: number;
+    /** Angka opsi wilayah untuk saringan bawaan (hitungWilayah di server). */
+    jumlahWilayah?: Record<string, number>;
     /** "semua" = dasbor (desktop dua rel; seluler hanya daftar laporan);
         "panel" = halaman panel situasi saja (peta+cuaca+statistik). */
     tampil?: "semua" | "panel";
@@ -98,11 +141,11 @@ export function LandingKarhutla(
 ) {
   const t = TEKS[bahasa];
   const daftarStatistik = statistik ?? ambilStatistik(bahasa);
-  /* Umpan penuh: server hanya mengirim potongan awal supaya payload RSC tetap
-     kecil; daftar lengkap diambil saat peramban senggang, atau seketika saat
-     pengunjung butuh (saringan, urutan, cari, pop-up provinsi, rincian).
-     Gagal = tetap memakai potongan awal. Prop baru (router.refresh sesudah
-     melapor) mengulang dari potongan barunya. */
+  /* Daftar penuh untuk pop-up provinsi dan rincian yang dibuka dari luar
+     umpan: server hanya mengirim potongan awal; /api/umpan diambil HANYA saat
+     dibutuhkan (muatPenuh) — umpan sendiri dimuat per halaman (lihat
+     KeadaanUmpan). Gagal = tetap memakai potongan awal. Prop baru
+     (router.refresh sesudah melapor) mengulang dari potongan barunya. */
   const [berita, setBerita] = useState(beritaAwal);
   const [beritaAwalLama, setBeritaAwalLama] = useState(beritaAwal);
   if (beritaAwal !== beritaAwalLama) {
@@ -123,14 +166,9 @@ export function LandingKarhutla(
         if (dimuatUntuk.current === beritaAwal) dimuatUntuk.current = null;
       });
   }, [beritaAwal, totalBerita, bahasa]);
-  useEffect(() => {
-    if (typeof requestIdleCallback === "function") {
-      const id = requestIdleCallback(muatPenuh, { timeout: 4000 });
-      return () => cancelIdleCallback(id);
-    }
-    const id = setTimeout(muatPenuh, 1500);
-    return () => clearTimeout(id);
-  }, [muatPenuh]);
+  /* Kartu umpan yang sudah dimuat — dibaca pencarian per id/slug di atas
+     deklarasi keadaan umpan (bukaDariId, popstate). */
+  const umpanRef = useRef<Berita[]>([]);
   // Lokasi + suhu otomatis dari IP (tanpa izin geolokasi); sebelum tiba,
   // lokasi memakai teks statis dan suhu memakai garis jeda.
   const cuaca = useCuacaLokal(bahasa, t.lokasi);
@@ -423,16 +461,29 @@ export function LandingKarhutla(
       }
     }
   }, [bahasa]);
+  /* Maju/mundur ke /fire/<slug> yang belum ada di data klien: rincian ditutup
+     dulu, daftar lengkap diambil, lalu dibuka begitu laporannya tiba. */
+  const [slugTertunda, setSlugTertunda] = useState<string | null>(null);
+  if (slugTertunda) {
+    const ketemu = berita.find((b) => b.slug === slugTertunda || String(b.id) === slugTertunda);
+    if (ketemu || berita.length >= totalBerita) {
+      setSlugTertunda(null);
+      if (ketemu) setSorot(ketemu);
+    }
+  }
   useEffect(() => {
     const saatPopState = () => {
+      setSlugTertunda(null);
       const cocokan = window.location.pathname.match(/\/fire\/([^/]+)$/);
       if (cocokan && cocokan[1]) {
         const slug = decodeURIComponent(cocokan[1]);
-        const ketemu = berita.find((b) => b.slug === slug || String(b.id) === slug);
+        const cocok = (b: Berita) => b.slug === slug || String(b.id) === slug;
+        const ketemu = berita.find(cocok) ?? umpanRef.current.find(cocok);
         if (ketemu) {
           setSorot(ketemu);
           return;
         }
+        setSlugTertunda(slug);
         muatPenuh();
       }
       setSorot(null);
@@ -443,7 +494,7 @@ export function LandingKarhutla(
   }, [berita, muatPenuh]);
   const bukaDariId = useCallback(
     (id: number) => {
-      const asli = berita.find((b) => b.id === id);
+      const asli = berita.find((b) => b.id === id) ?? umpanRef.current.find((b) => b.id === id);
       if (asli) bukaRincian(asli);
     },
     [berita, bukaRincian],
@@ -620,38 +671,6 @@ export function LandingKarhutla(
     const tujuan = petaPenuh ? slotPenuhRef.current : isiPetaRef.current;
     if (hostPeta && tujuan && hostPeta.parentNode !== tujuan) tujuan.appendChild(hostPeta);
   }, [hostPeta, petaPenuh]);
-  /* Umpan langsung dari basis data — SELURUH kejadian tayang, terbaru dulu,
-     sama seperti arsip di index. Media utama (video pertama, kalau tidak foto
-     pertama) untuk tampilan tunggal; galeri penuh untuk carousel kartu
-     bermedia banyak; tanpa media sama sekali kartunya memakai placeholder. */
-  const laporan = useMemo<Laporan[]>(
-    () =>
-      berita.map((b) => {
-        const vid = b.media.find((m) => m.jenis === "video");
-        const gbr = b.media.find((m) => m.jenis === "gambar");
-        return {
-          id: b.id,
-          gambar: vid
-            ? (vid.poster ?? b.poster ?? b.gambar)
-            : (gbr?.url ?? b.gambar ?? b.poster),
-          video: vid?.url ?? b.video ?? undefined,
-          galeri: b.media
-            .filter((m) => (m.jenis === "gambar" || m.jenis === "video") && m.url)
-            .map((m) => ({ url: m.url, jenis: m.jenis, poster: m.poster, keterangan: m.keterangan })),
-          alt: b.alt,
-          judul: b.judul,
-          tanggal: b.tanggal,
-          lokasi: b.lokasi ?? b.provinsi,
-          deskripsi: b.deskripsi,
-          slug: b.slug,
-          href: b.slug ? `/${bahasa}/fire/${b.slug}` : `/${bahasa}`,
-          pulau: b.pulau,
-          komentar: b.jumlahKomentar ?? 0,
-          suka: b.jumlahSuka ?? 0,
-        };
-      }),
-    [berita, bahasa],
-  );
   const kata = cari.trim().toLowerCase();
 
   /* Bilah saringan umpan — rentang tanggal, wilayah pulau, dan mode tampilan.
@@ -672,90 +691,114 @@ export function LandingKarhutla(
     setWilayahUmpan("semua");
   };
 
-  // Kata kunci + rentang tanggal lebih dulu, wilayah belakangan: jumlah di
-  // tiap opsi wilayah dihitung dari hasil tahap pertama, jadi "(5 laporan)"
-  // selalu sama dengan banyak kartu yang muncul saat opsi itu dipilih.
-  const sebelumWilayah = useMemo(() => {
-    const awal = waktuIso(dariUmpan);
-    const akhir = waktuIso(sampaiUmpan);
-    return laporan.filter((l) => {
-      if (!l.judul.toLowerCase().includes(kata)) return false;
-      const waktu = waktuTeks(l.tanggal);
-      if (waktu === null) return true; // tanggal tak terbaca: jangan disembunyikan
-      if (awal !== null && waktu < awal) return false;
-      if (akhir !== null && waktu > akhir) return false;
-      return true;
-    });
-  }, [laporan, kata, dariUmpan, sampaiUmpan]);
-  const opsiWilayah = useMemo(() => [
-    { kunci: "semua", label: t.semuaWilayah, jumlah: sebelumWilayah.length },
-    ...PULAU_TAB.map((tab: (typeof PULAU_TAB)[number]) => ({
-      kunci: tab.kunci,
-      label: tab.label,
-      jumlah: sebelumWilayah.filter((l) => !!l.pulau && (tab.isi as readonly string[]).includes(l.pulau)).length,
-    })),
-  ], [sebelumWilayah, t.semuaWilayah]);
-  const hasil = useMemo(() => {
-    const tab = PULAU_TAB.find((x: (typeof PULAU_TAB)[number]) => x.kunci === wilayahUmpan);
-    const isi = tab ? (tab.isi as readonly string[]) : null;
-    const tersaring = isi ? sebelumWilayah.filter((l) => !!l.pulau && isi.includes(l.pulau)) : sebelumWilayah;
-    // Terbaru: tanggal kejadian, lalu id (yang dibuat belakangan dulu).
-    // Komentar terbanyak: jumlah komentar, seri → yang lebih baru dulu.
-    // Bawaan ("semua", tanpa pil menyala): sama dengan Terbaru — seluruh
-    // data tampil dengan yang terbaru di atas.
-    const baru = (a: Laporan, b: Laporan) => (waktuTeks(b.tanggal) ?? 0) - (waktuTeks(a.tanggal) ?? 0) || b.id - a.id;
-    return [...tersaring].sort(urutanUmpan === "komentar"
-      ? (a, b) => (b.komentar ?? 0) - (a.komentar ?? 0) || baru(a, b)
-      : baru);
-  }, [sebelumWilayah, wilayahUmpan, urutanUmpan]);
-  // Interaksi yang butuh daftar lengkap tak menunggu waktu senggang.
-  const butuhPenuh = Boolean(kata || adaSaringanUmpan || urutanUmpan !== "terbaru" || wilayah || sorot);
+  /* Gulir tak berujung, per halaman dari server: /api/umpan/halaman menyaring
+     + mengurutkan daftar penuh yang di-cache server lalu mengirim UMPAN_AWAL
+     kartu sekali jalan. Penanda di dasar umpan meminta halaman berikutnya
+     begitu ≤600px dari layar. Saringan/urutan/kata kunci baru = kunci baru:
+     mulai lagi dari halaman pertama (saringan bawaan memakai halaman pertama
+     kiriman server, tanpa permintaan). Kata kunci ditunda 250 ms supaya tiap
+     ketukan tidak jadi satu permintaan. */
+  const [kataUmpan, setKataUmpan] = useState(kata);
   useEffect(() => {
-    if (butuhPenuh) muatPenuh();
-  }, [butuhPenuh, muatPenuh]);
-
-  /* Gulir tak berujung: umpan dirender LANGKAH_UMPAN kartu sekali jalan;
-     penanda di dasar umpan menambah satu langkah tiap kali mendekati layar
-     (dan memicu muatPenuh bila daftar lengkap belum tiba). Saringan, urutan,
-     atau kata kunci baru mulai lagi dari langkah pertama. */
-  const [batasUmpan, setBatasUmpan] = useState(LANGKAH_UMPAN);
-  const kunciUmpan = `${kata}|${dariUmpan}|${sampaiUmpan}|${wilayahUmpan}|${urutanUmpan}`;
-  const [kunciUmpanLama, setKunciUmpanLama] = useState(kunciUmpan);
-  if (kunciUmpan !== kunciUmpanLama) {
-    setKunciUmpanLama(kunciUmpan);
-    setBatasUmpan(LANGKAH_UMPAN);
+    const id = setTimeout(() => setKataUmpan(kata), 250);
+    return () => clearTimeout(id);
+  }, [kata]);
+  const saringanBawaan = !kataUmpan && !adaSaringanUmpan && urutanUmpan === "terbaru";
+  const kunciUmpan = new URLSearchParams({
+    bahasa, cari: kataUmpan, dari: dariUmpan, sampai: sampaiUmpan, wilayah: wilayahUmpan, urut: urutanUmpan,
+  }).toString();
+  const benihUmpan = (generasi: number): KeadaanUmpan => {
+    const isi = beritaAwal.slice(0, UMPAN_AWAL);
+    return {
+      generasi, kunci: kunciUmpan, sumber: beritaAwal, isi, berikut: totalBerita > isi.length ? isi.length : null,
+      jumlahWilayah: jumlahWilayahAwal, memuat: false, gagal: false,
+    };
+  };
+  const [umpan, setUmpan] = useState<KeadaanUmpan>(() => benihUmpan(0));
+  if (umpan.kunci !== kunciUmpan || umpan.sumber !== beritaAwal) {
+    const generasi = umpan.generasi + 1;
+    setUmpan(saringanBawaan ? benihUmpan(generasi) : {
+      generasi, kunci: kunciUmpan, sumber: beritaAwal, isi: [], berikut: 0,
+      jumlahWilayah: umpan.jumlahWilayah, memuat: false, gagal: false,
+    });
   }
-  const umpanTampil = useMemo(() => hasil.slice(0, batasUmpan), [hasil, batasUmpan]);
-  const adaLagiUmpan = batasUmpan < hasil.length || berita.length < totalBerita;
+  const { berikut, memuat: memuatUmpan, gagal: gagalUmpan } = umpan;
+  useEffect(() => {
+    umpanRef.current = umpan.isi;
+  }, [umpan.isi]);
+
+  /* Halaman sesudah kartu terakhir `u`. Jawaban hanya diterima bila umpan
+     masih generasi yang sama — saringan baru atau router.refresh (prop berita
+     baru) menaikkan generasi, jadi jawaban lama tak tercampur ke daftar baru
+     dan tanda permintaan generasi baru tak terhalang yang lama. */
+  const permintaanRef = useRef("");
+  const muatHalaman = useCallback((u: KeadaanUmpan) => {
+    if (u.berikut === null) return;
+    const tanda = `${u.generasi}@${u.berikut}`;
+    if (permintaanRef.current === tanda) return;
+    permintaanRef.current = tanda;
+    const sama = (v: KeadaanUmpan) => v.generasi === u.generasi;
+    const jangkar = u.isi.at(-1);
+    setUmpan((v) => (sama(v) ? { ...v, memuat: true, gagal: false } : v));
+    fetch(`/api/umpan/halaman?${u.kunci}&kursor=${u.berikut}${jangkar ? `&setelah=${jangkar.id}` : ""}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: HalamanUmpan) => setUmpan((v) => {
+        if (!sama(v)) return v;
+        // Jangkar mencegah celah; saringan id ini sisa pengaman bila jangkar
+        // hilang dan server jatuh ke posisi.
+        const ada = new Set(v.isi.map((b) => b.id));
+        return {
+          ...v, isi: [...v.isi, ...d.isi.filter((b) => !ada.has(b.id))],
+          berikut: d.berikut, jumlahWilayah: d.jumlahWilayah, memuat: false,
+        };
+      }))
+      .catch(() => setUmpan((v) => (sama(v) ? { ...v, memuat: false, gagal: true } : v)))
+      .finally(() => {
+        if (permintaanRef.current === tanda) permintaanRef.current = "";
+      });
+  }, []);
+
   const ujungUmpanRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ujungUmpanRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    // Panggung menggulir di dalam <main> (.lk-kanan overflow-y:auto), aliran
-    // menggulir jendela — rootMargin hanya berlaku pada akar yang benar.
-    const rel = el.closest("main");
-    const akar = rel && getComputedStyle(rel).overflowY !== "visible" ? rel : null;
-    // Dibuat ulang tiap batas berubah: pengamat baru langsung melapor bila
-    // penanda masih terlihat (layar tinggi), jadi langkah berikutnya ikut.
+    if (!el || berikut === null || memuatUmpan || gagalUmpan) return;
+    // Umpan kosong (saringan baru): halaman pertama langsung, jangan menunggu
+    // penanda — tiga baris kerangka bisa mendorongnya melewati jangkauan.
+    if (umpan.isi.length === 0) {
+      muatHalaman(umpan);
+      return;
+    }
+    // Dibuat ulang tiap halaman tiba: pengamat baru langsung melapor bila
+    // penanda masih terlihat (layar tinggi), jadi halaman berikutnya ikut.
     const pengamat = new IntersectionObserver(([e]) => {
-      if (!e.isIntersecting) return;
-      muatPenuh();
-      setBatasUmpan((b) => (b < hasil.length ? b + LANGKAH_UMPAN : b));
-    }, { root: akar, rootMargin: "0px 0px 800px 0px" });
+      if (e.isIntersecting) muatHalaman(umpan);
+    }, { root: akarGulir(el), rootMargin: "0px 0px 600px 0px" });
     pengamat.observe(el);
     return () => pengamat.disconnect();
-  }, [batasUmpan, hasil.length, muatPenuh, adaLagiUmpan, aliran]);
+  }, [umpan, berikut, memuatUmpan, gagalUmpan, muatHalaman, aliran]);
+
+  const opsiWilayah = useMemo(() => [
+    { kunci: "semua", label: t.semuaWilayah, jumlah: umpan.jumlahWilayah?.semua },
+    ...PULAU_TAB.map((tab) => ({ kunci: tab.kunci, label: tab.label, jumlah: umpan.jumlahWilayah?.[tab.kunci] })),
+  ], [umpan.jumlahWilayah, t.semuaWilayah]);
+  const umpanTampil = useMemo(() => umpan.isi.map((b) => keLaporan(b, bahasa)), [umpan.isi, bahasa]);
 
   /* Geser/panah antar-laporan di rincian mengikuti umpan YANG TERLIHAT —
      urutan dan saringannya — jadi "berikutnya" selalu kartu berikutnya di
-     layar. Laporan yang dibuka dari luar umpan (mis. pop-up peta, atau yang
-     tersaring keluar) jatuh ke urutan seluruh `berita`. */
-  const urutanNav = useMemo(() => {
-    if (!sorot || !hasil.some((l) => l.id === sorot.id)) return berita;
-    const perId = new Map(berita.map((b) => [b.id, b]));
-    return hasil.map((l) => perId.get(l.id)).filter((b): b is Berita => !!b);
-  }, [sorot, hasil, berita]);
+     layar; di kartu terakhir yang sudah dimuat, halaman berikutnya diminta
+     supaya tidak buntu. Laporan yang dibuka dari luar umpan (mis. pop-up
+     peta) jatuh ke urutan seluruh `berita` — itu, dan pop-up provinsi,
+     satu-satunya yang masih butuh daftar lengkap. */
+  const diUmpan = !!sorot && umpan.isi.some((b) => b.id === sorot.id);
+  const urutanNav = diUmpan ? umpan.isi : berita;
+  const butuhPenuh = Boolean(wilayah || (sorot && !diUmpan));
+  useEffect(() => {
+    if (butuhPenuh) muatPenuh();
+  }, [butuhPenuh, muatPenuh]);
   const indeksSorot = sorot ? urutanNav.findIndex((b) => b.id === sorot.id) : -1;
+  useEffect(() => {
+    if (diUmpan && indeksSorot === umpan.isi.length - 1 && !memuatUmpan && !gagalUmpan) muatHalaman(umpan);
+  }, [diUmpan, indeksSorot, umpan, memuatUmpan, gagalUmpan, muatHalaman]);
   const adaSebelumnya = indeksSorot > 0;
   const adaBerikutnya = indeksSorot >= 0 && indeksSorot < urutanNav.length - 1;
   const keSebelumnya = adaSebelumnya ? () => bukaRincian(urutanNav[indeksSorot - 1]) : undefined;
@@ -777,12 +820,12 @@ export function LandingKarhutla(
      via komentarAwal. */
   const bukaKomentar = useCallback(
     (id: number) => {
-      const asli = berita.find((b) => b.id === id);
+      const asli = berita.find((b) => b.id === id) ?? umpan.isi.find((b) => b.id === id);
       if (!asli) return;
       setSorotKomentar(true);
       bukaRincian(asli);
     },
-    [berita, bukaRincian],
+    [berita, umpan.isi, bukaRincian],
   );
 
   return (
@@ -1280,7 +1323,7 @@ export function LandingKarhutla(
             />
           </div>
 
-          {hasil.length === 0 ? (
+          {umpanTampil.length === 0 && berikut === null ? (
             <div className="mt-5 flex flex-col items-center rounded-xl border border-dashed border-black/15 px-4 py-12 text-center text-[14px] text-black/60 dark:border-white/15 dark:text-[#a0a0a0]">
               <IkonCari className="mb-3 size-7 opacity-50" />
               <p className="max-w-[40ch] text-balance">{adaSaringanUmpan && !kata ? t.saringanKosong : t.hasilKosong}</p>
@@ -1298,7 +1341,11 @@ export function LandingKarhutla(
             <UmpanMasonry
               daftar={umpanTampil}
               kolom={kolom}
-              kartu={(l, i) => (
+              // Selama masih ada halaman, dasar tiap kolom memegang kerangka:
+              // penanda memintanya 600px di depan, jadi kartu baru mengisi
+              // tempat yang sudah ada. Umpan kosong (saringan baru) = tiga.
+              kerangka={berikut === null || gagalUmpan ? 0 : umpanTampil.length ? 1 : 3}
+              kartu={(l, posisi, baris) => (
                 <article key={l.id} className="lk-kartu group text-tinta dark:text-[#f5f5f5]">
                   <div className="lk-kartu-teks">
                     <p className="lk-kartu-tanggal text-[13px] text-black/60 dark:text-white/85 sm:text-[14px]">{l.tanggal}</p>
@@ -1327,6 +1374,8 @@ export function LandingKarhutla(
                         label={l.judul}
                         onBuka={() => bukaMedia(l.id)}
                         bahasa={bahasa}
+                        tunda={baris !== 0}
+                        rasio={rasioKerangka(posisi)}
                       />
                       {l.galeri.length > 1 && (
                         <span aria-hidden="true" className="lk-galeri-lencana">
@@ -1345,16 +1394,18 @@ export function LandingKarhutla(
                       aria-label={l.judul}
                       className="lk-foto cursor-pointer relative mt-3 block w-full overflow-hidden transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff5a26]"
                     >
-                      {mediaLokal(l.gambar) ? (
-                        /* Baris pertama (j === 0 tiap kolom) kandidat LCP: jangan ditunda. */
-                        <Image src={l.gambar} alt={l.alt} loading={i % 100 === 0 ? "eager" : "lazy"} draggable={false}
-                               width={0} height={0} sizes={UKURAN_FOTO_UMPAN}
+                      {/* Baris pertama tiap kolom kandidat LCP: jangan ditunda. */}
+                      <MediaTunda langsung={baris === 0} rasio={rasioKerangka(posisi)}>
+                        {(selesai) => mediaLokal(l.gambar!) ? (
+                          <Image src={l.gambar!} alt={l.alt} loading={baris === 0 ? "eager" : "lazy"} draggable={false}
+                                 width={0} height={0} sizes={UKURAN_FOTO_UMPAN} onLoad={selesai} onError={selesai}
+                                 className="lk-foto h-auto w-full transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
+                          <img src={l.gambar!} alt={l.alt} loading="lazy" draggable={false} onLoad={selesai} onError={selesai}
                                className="lk-foto h-auto w-full transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
-                        <img src={l.gambar} alt={l.alt} loading="lazy" draggable={false}
-                             className="lk-foto h-auto w-full transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100" />
-                      )}
+                        )}
+                      </MediaTunda>
                       {l.galeri.length > 1 && (
                         <span aria-hidden="true" className="lk-galeri-lencana">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -1378,7 +1429,18 @@ export function LandingKarhutla(
               )}
             />
           )}
-          {adaLagiUmpan && hasil.length > 0 && <div ref={ujungUmpanRef} aria-hidden="true" className="h-px" />}
+          {gagalUmpan && berikut !== null ? (
+            <p role="status" className="mt-4 text-center text-[14px] text-black/60 dark:text-[#a0a0a0]">
+              {t.umpanGagal}{" "}
+              <button
+                type="button"
+                onClick={() => muatHalaman(umpan)}
+                className="cursor-pointer font-semibold text-bara underline underline-offset-2 transition-colors hover:text-api"
+              >
+                {t.cobaLagi}
+              </button>
+            </p>
+          ) : berikut !== null && <div ref={ujungUmpanRef} aria-hidden="true" className="h-px" />}
         </main>
         )}
       </div>
@@ -1459,7 +1521,7 @@ export function LandingKarhutla(
           adaSebelumnya={adaSebelumnya}
           adaBerikutnya={adaBerikutnya}
           indeksAktif={indeksSorot >= 0 ? indeksSorot : undefined}
-          totalKejadian={urutanNav.length}
+          totalKejadian={diUmpan ? (umpan.jumlahWilayah?.[wilayahUmpan] ?? urutanNav.length) : urutanNav.length}
           beritaSebelumnya={adaSebelumnya ? urutanNav[indeksSorot - 1] : undefined}
           beritaBerikutnya={adaBerikutnya ? urutanNav[indeksSorot + 1] : undefined}
           komentarAwal={sorotKomentar}
