@@ -1,15 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import bcrypt from "bcryptjs";
 import { decodeProtectedHeader, exportPKCS8, generateKeyPair, jwtVerify } from "jose";
 import {
   anonimkanMedia,
   asalPublik,
   bukaTokenApple,
   bundleApple,
+  daftarEmail,
+  galatSandi,
   masukUjiBoleh,
   penggunaApple,
+  penggunaEmail,
   penggunaGoogle,
   rahasiaKlienApple,
+  rapikanEmail,
   segelTokenApple,
   sesiKedaluwarsa,
   sidikToken,
@@ -173,7 +178,11 @@ test("anonimkanMedia: hanya keterangan bernama pelapor yang diganti, entri lain 
 });
 
 /** Prisma palsu lewat globalThis.prisma (dibaca lib/prisma.ts lebih dulu): tabel users sekecil ini. */
-function usersPalsu(t: { after: (f: () => void) => void }, baris: Record<string, unknown>[]) {
+function usersPalsu(
+  t: { after: (f: () => void) => void },
+  baris: Record<string, unknown>[],
+  catat: { dibuat?: Record<string, unknown>[]; sesiDihapus?: unknown[] } = {},
+) {
   const ruang = globalThis as { prisma?: unknown };
   const lama = ruang.prisma;
   t.after(() => void (ruang.prisma = lama));
@@ -184,8 +193,13 @@ function usersPalsu(t: { after: (f: () => void) => void }, baris: Record<string,
     users: {
       findUnique: async (a: { where: Record<string, unknown> }) => cari(a),
       update: async (a: unknown) => void ubah.push(a),
-      create: async () => assert.fail("tidak boleh membuat akun baru"),
+      create: async (a: { data: Record<string, unknown> }) => {
+        if (!catat.dibuat) assert.fail("tidak boleh membuat akun baru");
+        catat.dibuat.push(a.data);
+        return { id: BigInt(99), name: a.data.name, email: a.data.email, image: null };
+      },
     },
+    mobile_sessions: { deleteMany: async (a: unknown) => void catat.sesiDihapus?.push(a) },
   };
   return ubah;
 }
@@ -217,4 +231,98 @@ test("penggunaApple: email akun staf tidak ditautkan otomatis (409)", async (t) 
   const ditolak = await penggunaApple({ sub: "a-asing", email: STAF.email, klien: "x" }, "");
   assert.equal("galat" in ditolak && ditolak.status, 409);
   assert.equal(ubah.length, 0);
+});
+
+test("galatSandi: minimal 8 karakter, maksimal 72 byte UTF-8", () => {
+  assert.match(galatSandi("1234567") ?? "", /minimal 8/);
+  assert.equal(galatSandi("12345678"), null);
+  assert.equal(galatSandi("a".repeat(72)), null);
+  assert.match(galatSandi("a".repeat(73)) ?? "", /terlalu panjang/);
+  // 25 × 3 byte = 75 byte walau hanya 25 karakter.
+  assert.match(galatSandi("€".repeat(25)) ?? "", /terlalu panjang/);
+});
+
+test("rapikanEmail: tanpa spasi tepi & huruf besar", () => {
+  assert.equal(rapikanEmail("  Warga@Contoh.ID "), "warga@contoh.id");
+  assert.equal(rapikanEmail(undefined), "");
+});
+
+test("penggunaGoogle/Apple: akun email belum terverifikasi kehilangan sandi & sesinya saat ditautkan", async (t) => {
+  for (const [jenis, masuk] of [
+    ["google", () => penggunaGoogle({ sub: "g-pemilik", email: WARGA.email, nama: null, foto: null })],
+    ["apple", () => penggunaApple({ sub: "a-pemilik", email: WARGA.email, klien: "x" }, "")],
+  ] as const) {
+    const sesiDihapus: unknown[] = [];
+    const ubah = usersPalsu(t, [{ ...WARGA, password: "$2b$04$didaftarkanorang", email_verified_at: null }], { sesiDihapus });
+    const hasil = await masuk();
+    assert.equal("id" in hasil && hasil.id, WARGA.id, jenis);
+    const data = (ubah[0] as { data: Record<string, unknown> }).data;
+    assert.equal(data.password, null, `${jenis}: kata sandi pendaftar lain dicabut`);
+    assert.ok(data.email_verified_at instanceof Date, `${jenis}: email kini terbukti`);
+    assert.deepEqual(sesiDihapus, [{ where: { user_id: WARGA.id } }], `${jenis}: sesi lama dicabut`);
+  }
+});
+
+test("penggunaGoogle: akun terverifikasi (mis. Laravel) tetap memegang kata sandi & sesinya", async (t) => {
+  const sesiDihapus: unknown[] = [];
+  const ubah = usersPalsu(t, [{ ...WARGA, password: "$2y$10$laravel", email_verified_at: new Date("2024-01-01") }], { sesiDihapus });
+  await penggunaGoogle({ sub: "g-warga", email: WARGA.email, nama: null, foto: null });
+  const data = (ubah[0] as { data: Record<string, unknown> }).data;
+  assert.equal("password" in data, false);
+  assert.equal("email_verified_at" in data, false);
+  assert.equal(sesiDihapus.length, 0);
+});
+
+test("penggunaEmail: sandi benar = akun warga, salah/tanpa sandi = 401, staf = 403", async (t) => {
+  const hash = await bcrypt.hash("rahasia-warga", 4);
+  usersPalsu(t, [
+    { ...WARGA, password: hash },
+    { ...STAF, password: hash },
+    { ...WARGA, id: BigInt(3), email: "google@contoh.id", password: null },
+  ]);
+  const ok = await penggunaEmail(WARGA.email, "rahasia-warga");
+  assert.deepEqual(ok, { id: WARGA.id, name: WARGA.name, email: WARGA.email, image: null });
+  for (const [email, sandi] of [
+    [WARGA.email, "salah-sandi"],
+    ["google@contoh.id", "rahasia-warga"],
+    ["tidak-ada@contoh.id", "rahasia-warga"],
+    ["bukan email", "rahasia-warga"],
+  ]) {
+    const r = await penggunaEmail(email, sandi);
+    assert.equal("galat" in r && r.status, 401, email);
+  }
+  const staf = await penggunaEmail(STAF.email, "rahasia-warga");
+  assert.equal("galat" in staf && staf.status, 403);
+  const stafSalah = await penggunaEmail(STAF.email, "salah-sandi");
+  assert.equal("galat" in stafSalah && stafSalah.status, 401, "peran tidak bocor tanpa sandi yang benar");
+});
+
+test("daftarEmail: email terdaftar 409 tanpa menyentuh akunnya; isian tidak sah 422", async (t) => {
+  const dibuat: Record<string, unknown>[] = [];
+  const ubah = usersPalsu(t, [WARGA], { dibuat });
+  const sudah = await daftarEmail("Penyerobot", WARGA.email, "sandi-baru-123");
+  assert.equal("galat" in sudah && sudah.status, 409);
+  for (const [nama, email, sandi] of [
+    ["  ", "baru@contoh.id", "sandi-baru-123"],
+    ["Baru", "bukan-email", "sandi-baru-123"],
+    ["Baru", "baru@contoh.id", "pendek"],
+  ]) {
+    const r = await daftarEmail(nama, email, sandi);
+    assert.equal("galat" in r && r.status, 422, `${nama}/${email}/${sandi}`);
+  }
+  assert.equal(dibuat.length, 0);
+  assert.equal(ubah.length, 0);
+});
+
+test("daftarEmail: akun warga baru, sandi di-hash bcrypt, email belum terverifikasi", async (t) => {
+  const dibuat: Record<string, unknown>[] = [];
+  usersPalsu(t, [], { dibuat });
+  const r = await daftarEmail("  Siti Rahma  ", "siti@contoh.id", "sandi-siti-123");
+  assert.equal("id" in r && r.email, "siti@contoh.id");
+  const d = dibuat[0];
+  assert.equal(d.name, "Siti Rahma");
+  assert.equal(d.role, "commenter");
+  assert.equal(d.email_verified_at, null);
+  assert.notEqual(d.password, "sandi-siti-123");
+  assert.ok(await bcrypt.compare("sandi-siti-123", String(d.password)));
 });

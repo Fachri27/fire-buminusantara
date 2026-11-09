@@ -1390,6 +1390,91 @@
         "security": []
       }
     },
+    "/api/mobile/daftar": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Daftar akun warga dengan email & kata sandi",
+        "description": "Membuat akun warga (commenter) lalu langsung masuk. Tanpa verifikasi email: email_verified_at kosong, dan bila pemilik email itu kelak masuk dengan Google/Apple, kata sandi & sesi akun tersebut dicabut sebelum ditautkan. Email yang sudah terdaftar (akun apa pun) ditolak 409. Batas laju: 5 per jam per IP.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nama": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "Tampil publik di komentar & siaran; disensor seperti komentar."
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254,
+                    "description": "Tidak peka huruf besar; spasi di tepi dibuang."
+                  },
+                  "sandi": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Maksimal 72 byte UTF-8 (batas bcrypt)."
+                  }
+                },
+                "required": [
+                  "nama",
+                  "email",
+                  "sandi"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Akun dibuat dan masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilMasuk"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email sudah terdaftar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Nama kosong, email tidak valid, atau kata sandi tidak memenuhi syarat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak pendaftaran dari jaringan ini",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/api/mobile/keluar": {
       "post": {
         "tags": [
@@ -2411,6 +2496,93 @@
           },
           "503": {
             "description": "Masuk dengan Apple belum disiapkan di server (APPLE_BUNDLE_ID kosong)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/mobile/masuk/email": {
+      "post": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Masuk dengan email & kata sandi",
+        "description": "Akun yang didaftarkan lewat /api/mobile/daftar atau akun situs lama (bcrypt Laravel). Akun staf (bukan commenter) ditolak 403 setelah kata sandinya benar. Token sesi kedaluwarsa setelah 90 hari tidak dipakai. Batas laju: 20 per 10 menit per IP (dihitung bersama masuk Google/Apple) dan 10 per 15 menit per email.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254,
+                    "description": "Tidak peka huruf besar; spasi di tepi dibuang."
+                  },
+                  "sandi": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "sandi"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil masuk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HasilMasuk"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email atau kata sandi salah (juga untuk akun tanpa kata sandi, mis. Google murni)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Akun staf tidak bisa masuk ke aplikasi dengan kata sandi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Email atau kata sandi kosong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak percobaan masuk (per IP atau per email)",
             "content": {
               "application/json": {
                 "schema": {
