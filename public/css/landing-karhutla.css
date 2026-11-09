@@ -50,6 +50,14 @@
   animation: lk-peta-keluar 200ms ease both;
 }
 
+/* Gambar kartu umpan yang selesai dimuat memudar masuk dari kerangkanya
+   (MediaTunda). Hanya opacity — transform milik efek hover kartu. */
+@keyframes lk-media-muncul {
+  from {
+    opacity: 0;
+  }
+}
+
 @keyframes lk-peta-masuk {
   from {
     opacity: 0;

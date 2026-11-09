@@ -5,6 +5,7 @@ import Image from "next/image";
 import { mediaLokal } from "@/lib/media";
 import type { Bahasa } from "@/lib/bahasa";
 import { IkonPutarBadge } from "./ikon";
+import { MediaTunda } from "./media-tunda";
 
 /* Lebar kartu umpan untuk srcset next/image: 2 kolom di bawah 1024px (1 kolom
    di layar sangat sempit), 3-4 kolom di panggung — 33vw batas atasnya. */
@@ -13,8 +14,12 @@ export const UKURAN_FOTO_UMPAN = "(max-width: 359px) 100vw, (max-width: 1023px) 
 /* Video kartu umpan — tidak autoplay otomatis; pratinjau putar bisu hanya saat kursor melayang (hover).
    Klik membuka modal rincian yang memuat pemutar video lengkap dengan kendali.
    preload="none" mencegah unduhan data video sebelum interaksi, demi performa PageSpeed Insights. */
-export function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = null }: {
+export function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kredit = null, tunda = false, rasio }: {
   url: string; poster: string | null; label: string; onBuka: () => void;
+  /** true di umpan: poster baru dimuat dekat layar, dengan kerangka (MediaTunda). */
+  tunda?: boolean;
+  /** Rasio kerangka selama poster ditunda (rasioKerangka). */
+  rasio?: string;
   /** true di dalam carousel — margin atas milik wadah, bukan tombol. */
   tanpaMt?: boolean;
   /** Nama kredit untuk pil © — null = tanpa pil. */
@@ -66,23 +71,27 @@ export function VideoOtomatis({ url, poster, label, onBuka, tanpaMt = false, kre
         >
           {poster && !posterGagal ? (
             <>
-              {mediaLokal(poster) ? (
-                /* Poster unggahan lokal lewat optimizer (AVIF/WebP, srcset
-                   selebar kartu); rasio alaminya tetap dari CSS h-auto. */
-                <Image
-                  src={poster} alt="" aria-hidden="true" loading="lazy"
-                  width={0} height={0} sizes={tanpaMt ? "100vw" : UKURAN_FOTO_UMPAN}
-                  onError={() => setPosterGagal(true)}
-                  className="lk-foto h-auto w-full"
-                />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
-                <img
-                  src={poster} alt="" aria-hidden="true" loading="lazy"
-                  onError={() => setPosterGagal(true)}
-                  className="lk-foto h-auto w-full"
-                />
-              )}
+              <MediaTunda langsung={!tunda} rasio={rasio}>
+                {(selesai) => mediaLokal(poster) ? (
+                  /* Poster unggahan lokal lewat optimizer (AVIF/WebP, srcset
+                     selebar kartu); rasio alaminya tetap dari CSS h-auto. */
+                  <Image
+                    src={poster} alt="" aria-hidden="true" loading="lazy"
+                    width={0} height={0} sizes={tanpaMt ? "100vw" : UKURAN_FOTO_UMPAN}
+                    onLoad={selesai}
+                    onError={() => setPosterGagal(true)}
+                    className="lk-foto h-auto w-full"
+                  />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element -- URL media remote warisan, host dinamis di luar remotePatterns
+                  <img
+                    src={poster} alt="" aria-hidden="true" loading="lazy"
+                    onLoad={selesai}
+                    onError={() => setPosterGagal(true)}
+                    className="lk-foto h-auto w-full"
+                  />
+                )}
+              </MediaTunda>
               <video
                 ref={ref}
                 src={url}

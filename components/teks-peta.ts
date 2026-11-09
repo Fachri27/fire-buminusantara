@@ -64,7 +64,7 @@ export const TEKS_PETA = {
         rentang:
           "Hari ini dan enam hari sebelumnya sampai tiga hari ke depan, tiap tiga jam, sama dengan hotspot. Langkah berlabel Prediksi adalah prakiraan. Siklus model di legenda menunjukkan run CAMS terbaru, dua kali sehari.",
         lapisan:
-          "Tombol Lapisan di kolom kanan menyalakan atau mematikan animasi asap, batas provinsi, jumlah laporan, dan tiga lapisan hotspot.",
+          "Tombol Lapisan di kolom kanan menyalakan atau mematikan asap, angin dan kualitas udara, batas provinsi, jumlah laporan, dan tiga lapisan hotspot.",
         sumberLanjut:
           "Peta dasar © EOX IT Services GmbH (Sentinel-2 cloudless). Komisi Eropa dan ECMWF tidak bertanggung jawab atas penggunaan data atau informasi yang disajikan.",
       },
@@ -73,7 +73,7 @@ export const TEKS_PETA = {
         aqi: ["Baik", "Sedang", "Tidak sehat bagi kelompok sensitif", "Tidak sehat", "Sangat tidak sehat", "Berbahaya"],
         rentang: "Hari ini dan enam hari sebelumnya sampai tiga hari ke depan, tiap tiga jam, sama dengan Aerosol Karhutla dan hotspot.",
         lapisan:
-          "Sakelar Angin di panel Lapisan mematikan warna AQI dan animasi angin; peta dasarnya berganti ke citra satelit. Batas provinsi, jumlah laporan, dan hotspot tetap bisa dinyalakan.",
+          "Angin dan Kualitas Udara tampil di peta Windy tersendiri, jadi menyalakannya di panel Lapisan mematikan Aerosol, dan sebaliknya. Mematikan keduanya menyisakan citra satelit. Batas provinsi, jumlah laporan, dan hotspot tetap tampil di kedua peta.",
         petaDasar: "Peta dasar dari",
       },
       hotspot: {
@@ -161,7 +161,7 @@ export const TEKS_PETA = {
         rentang:
           "Today and the six days before it, up to three days ahead, every three hours, the same as hotspots. Steps labelled Prediksi are forecasts. The model cycle in the legend shows the latest CAMS run, published twice a day.",
         lapisan:
-          "The Layers button in the right-hand column turns the smoke animation, province borders, report counts and the three hotspot layers on or off.",
+          "The Layers button in the right-hand column turns smoke, wind and air quality, province borders, report counts and the three hotspot layers on or off.",
         sumberLanjut:
           "Basemap © EOX IT Services GmbH (Sentinel-2 cloudless). Neither the European Commission nor ECMWF is responsible for any use of the data or information presented.",
       },
@@ -170,7 +170,7 @@ export const TEKS_PETA = {
         aqi: ["Good", "Moderate", "Unhealthy for sensitive groups", "Unhealthy", "Very unhealthy", "Hazardous"],
         rentang: "Today and the six days before it, up to three days ahead, every three hours, the same as the smoke aerosol layer and hotspots.",
         lapisan:
-          "The Wind switch in the Layers panel turns off the AQI colours and wind animation, and the basemap switches to satellite imagery. Province borders, report counts and hotspots can still be turned on.",
+          "Wind and Air Quality runs on a separate Windy map, so turning it on in the Layers panel turns Aerosol off, and the other way round. With both off, only satellite imagery remains. Province borders, report counts and hotspots show on both maps.",
         petaDasar: "Basemap from",
       },
       hotspot: {

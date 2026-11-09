@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ambilUmpan, hitungLaporanProvinsi, UMPAN_AWAL } from "@/lib/events";
+import { hitungWilayah } from "@/lib/halaman-umpan";
 import { ambilSorotan } from "@/lib/statistik-sorotan";
 import { ambilKolomUmpanAwal } from "@/lib/perangkat";
 import { LandingKarhutla } from "@/components/landing-karhutla";
@@ -76,6 +77,7 @@ export default async function HalamanPanel({ params }: Props) {
         jumlahLaporan={jumlahLaporan}
         berita={berita.slice(0, UMPAN_AWAL)}
         totalBerita={berita.length}
+        jumlahWilayah={hitungWilayah(berita)}
         statistik={sorotan[locale]}
         tampil="panel"
         kolomAwal={kolomAwal}
