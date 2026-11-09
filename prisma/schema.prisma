@@ -69,6 +69,10 @@ model events {
   title_id         String             @db.VarChar(255)
   slug             String?            @unique(map: "events_slug_unique") @db.VarChar(255)
   title_en         String             @db.VarChar(255)
+  /// Warisan basis data bersama (aplikasi Laravel) — tidak dipakai Next.js (isinya
+  /// di description_id/_en), tapi tetap dideklarasikan supaya schema = migrasi = DB.
+  desc_id          String?            @db.Text
+  desc_en          String?            @db.Text
   description_id   String?            @db.Text
   description_en   String?            @db.Text
   event_date       DateTime           @db.Date
@@ -115,6 +119,8 @@ model comments {
 
   @@index([commentable_type, commentable_id, is_approved], map: "comments_commentable_index")
   @@index([is_approved, created_at], map: "comments_is_approved_created_at_index")
+  // Warisan basis data bersama (indeks buatan aplikasi Laravel).
+  @@index([page_id, is_approved], map: "comments_page_id_is_approved_index")
   @@index([parent_id], map: "comments_parent_id_foreign")
   @@index([user_id], map: "comments_user_id_foreign")
 }
