@@ -18,6 +18,9 @@ import { prisma } from "./prisma.ts";
  *   - warga (publik) → hanya siaran yang pelapornya memilih "Tampilkan di
  *     beranda warga" (metadata ruang `publik: true`), identitas `warga-…`.
  *     Dengan akun boleh komentar/hati/hadiah; tamu hanya menonton.
+ *   - pratinjau      → video bisu di hero beranda & kisi tab Live, identitas
+ *     `pratinjau-…`, peserta tersembunyi: tidak terlihat pelapor maupun
+ *     penonton lain, tidak dihitung penonton, dan tidak memakan kursi warga.
  *
  * Metadata ruang dan atribut peserta terbaca SEMUA penonton, termasuk tamu.
  * Karena itu ruang publik hanya memuat titik kasar (~1 km); titik persis
@@ -29,12 +32,16 @@ import { prisma } from "./prisma.ts";
 
 const AWALAN_PELAPOR = "pelapor-";
 const AWALAN_WARGA = "warga-";
+const AWALAN_PRATINJAU = "pratinjau-";
 const POLA_RUANG = /^siaran-[a-z0-9-]+$/;
 
 /** Kursi penonton warga per ruang. Ruang sendiri dibuat tanpa maxParticipants:
  *  batas LiveKit berlaku untuk semua peserta, sehingga warga yang memenuhi
  *  ruang dulu mengunci petugas (dan pelapor yang menyambung ulang) di luar. */
 const BATAS_WARGA = 50;
+/** Kursi pratinjau per ruang, terpisah dari kursi warga: tanpa batas, setiap HP
+ *  yang membuka beranda menarik lapisan video (±160–600 kbps) dari server. */
+const BATAS_PRATINJAU = 50;
 /** Ruang publik hilang dari beranda setelah dilaporkan sekian akun berbeda. */
 const AMBANG_LAPORAN = 3;
 /** Beranda setiap HP menanyakan daftar siaran tiap 8 detik; hasilnya dibagi. */
@@ -160,8 +167,8 @@ async function siaranAktif(k: NonNullable<ReturnType<typeof konfigurasi>>): Prom
   const hasil = await Promise.all(
     aktif.map(async (r): Promise<Siaran> => {
       const meta = bacaJson(r.metadata);
-      const peserta = await ruangan(k).listParticipants(r.name).catch(() => []);
-      const a = peserta.find((p) => p.identity.startsWith(AWALAN_PELAPOR))?.attributes ?? {};
+      const peserta = await ruangan(k).listParticipants(r.name).catch(() => null);
+      const a = peserta?.find((p) => p.identity.startsWith(AWALAN_PELAPOR))?.attributes ?? {};
       const angka = (v: unknown) => (v === undefined || v === null || v === "" ? null : Number(v));
       return {
         ruang: r.name,
@@ -175,7 +182,11 @@ async function siaranAktif(k: NonNullable<ReturnType<typeof konfigurasi>>): Prom
         lng: angka(a.lng) ?? angka(meta.lng),
         akurasi: angka(a.akurasi),
         publik: meta.publik === true,
-        penonton: Math.max(0, r.numParticipants - 1),
+        // Pratinjau beranda (peserta tersembunyi) bukan penonton. numParticipants
+        // hanya cadangan bila daftar peserta gagal diambil.
+        penonton: peserta
+          ? peserta.filter((p) => !p.identity.startsWith(AWALAN_PELAPOR) && !p.permission?.hidden).length
+          : Math.max(0, r.numParticipants - 1),
         laporan: laporan.get(r.name) ?? 0,
       };
     }),
@@ -249,10 +260,12 @@ async function ruangHidup(
 const PENUH: Jawaban = [503, { galat: "Penonton siaran ini sedang penuh. Coba lagi sebentar lagi." }];
 
 /**
- * POST /api/mobile/live/tonton { ruang } — token warga, tanpa menerbitkan
- * media. Dengan akun: komentar, hati, hadiah; tamu (akun null) hanya menonton.
+ * POST /api/mobile/live/tonton { ruang, pratinjau? } — token warga, tanpa
+ * menerbitkan media. Dengan akun: komentar, hati, hadiah; tamu (akun null)
+ * hanya menonton. `pratinjau`: video bisu beranda — peserta tersembunyi dengan
+ * kursi sendiri (BATAS_PRATINJAU), tanpa kirim data.
  */
-export async function tokenWarga(ruang: string, akun: { name: string } | null): Promise<Jawaban> {
+export async function tokenWarga(ruang: string, akun: { name: string } | null, pratinjau = false): Promise<Jawaban> {
   const k = konfigurasi();
   if (!k) return BELUM_SIAP;
   const r = await ruangHidup(k, ruang);
@@ -263,19 +276,28 @@ export async function tokenWarga(ruang: string, akun: { name: string } | null): 
 
   // Kursi dihitung dari peserta yang benar-benar tersambung — numParticipants
   // listRooms tertinggal beberapa detik.
-  let warga: number;
+  const awalan = pratinjau ? AWALAN_PRATINJAU : AWALAN_WARGA;
+  const kursi = pratinjau ? BATAS_PRATINJAU : BATAS_WARGA;
+  let terisi: number;
   try {
-    warga = (await ruangan(k).listParticipants(ruang)).filter((p) => p.identity.startsWith(AWALAN_WARGA)).length;
+    terisi = (await ruangan(k).listParticipants(ruang)).filter((p) => p.identity.startsWith(awalan)).length;
   } catch {
     return TAK_TERHUBUNG;
   }
-  if (warga >= BATAS_WARGA) return PENUH;
+  if (terisi >= kursi) return PENUH;
   // Token yang belum dipakai belum memakan kursi. Supaya tidak bisa ditimbun lalu
   // dipakai serentak, penerbitan per ruang dibatasi dan umurnya pendek — umur
   // token hanya berlaku untuk sambungan pertama; LiveKit memperbaruinya sendiri
   // selama peserta tersambung.
-  if (await lewatBatas(`tonton-ruang:${ruang}`, BATAS_WARGA * 2, 120)) return PENUH;
+  if (await lewatBatas(`${pratinjau ? "pratinjau" : "tonton"}-ruang:${ruang}`, kursi * 2, 120)) return PENUH;
 
+  if (pratinjau) {
+    // 10 menit, bukan 2: aplikasi memakai ulang tiket pratinjau setiap kartunya
+    // kembali terlihat, jadi token 2 menit gagal hampir setiap kali digulir balik.
+    const at = new AccessToken(k.kunci, k.rahasia, { identity: `${AWALAN_PRATINJAU}${acak()}`, name: "Pratinjau", ttl: "10m" });
+    at.addGrant({ room: ruang, roomJoin: true, canSubscribe: true, canPublish: false, canPublishData: false, hidden: true });
+    return [200, { url: k.url, token: await at.toJwt() }];
+  }
   const at = new AccessToken(k.kunci, k.rahasia, { identity: `${AWALAN_WARGA}${acak()}`, name: akun?.name || "Warga", ttl: "2m" });
   at.addGrant({ room: ruang, roomJoin: true, canSubscribe: true, canPublish: false, canPublishData: akun !== null });
   return [200, { url: k.url, token: await at.toJwt() }];
