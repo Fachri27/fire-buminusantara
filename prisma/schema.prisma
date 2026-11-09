@@ -268,6 +268,22 @@ model passkeys {
   @@index([user_id], map: "passkeys_user_id_foreign")
 }
 
+/// Perangkat penerima notifikasi push aplikasi mobile (Expo Push, lib/notifikasi-push.ts): setiap
+/// pemasang aplikasi, dengan atau tanpa akun. Hanya token Expo & pilihan jenisnya yang disimpan —
+/// tidak terhubung ke akun. Token yang ditolak Expo (DeviceNotRegistered) dibuang saat mengirim.
+model mobile_push_tokens {
+  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
+  token      String   @unique(map: "mobile_push_tokens_token_unique") @db.VarChar(255)
+  /// "ios" | "android"
+  platform   String   @db.VarChar(16)
+  /// Mau dikabari siaran langsung publik yang baru mulai.
+  live       Boolean  @default(true)
+  /// Mau dikabari laporan yang baru ditayangkan petugas.
+  laporan    Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+}
+
 /// Sesi aplikasi mobile (akun warga). Terpisah dari cookie sesi CMS: token
 /// acak dikirim sebagai Bearer, yang disimpan hanya sha256-nya, dan barisnya
 /// dihapus saat keluar. Tabel milik CMS ini.

@@ -2728,6 +2728,157 @@
         "security": []
       }
     },
+    "/api/mobile/notifikasi": {
+      "put": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Daftarkan perangkat untuk notifikasi push",
+        "description": "Tanpa akun: setiap pemasang aplikasi boleh menerima notifikasi siaran langsung publik yang baru mulai (`live`) dan kejadian yang baru ditayangkan petugas (`laporan`). Dipanggil saat izin diberikan, token berganti, atau pilihan diubah. Pilihan yang tidak dikirim dianggap true. Batas laju: 30 per 10 menit per IP.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "Token Expo: ExponentPushToken[…]"
+                  },
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "ios",
+                      "android"
+                    ]
+                  },
+                  "live": {
+                    "type": "boolean"
+                  },
+                  "laporan": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "token",
+                  "platform"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tersimpan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "live": {
+                      "type": "boolean"
+                    },
+                    "laporan": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Token atau platform tidak sah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu sering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      },
+      "delete": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Berhenti menerima notifikasi push",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "Token Expo: ExponentPushToken[…]"
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Dihapus",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Token tidak sah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu sering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Galat"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
     "/api/mobile/saya": {
       "get": {
         "tags": [

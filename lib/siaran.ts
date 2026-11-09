@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { AccessToken, RoomServiceClient, ServerError } from "livekit-server-sdk";
 import { lewatBatas } from "./batas-laju.ts";
+import { catatGalat } from "./catat-galat.ts";
+import { kirimPushLatar } from "./notifikasi-push.ts";
 import { koordinat } from "./batas-laporan.ts";
 import { saring } from "./komentar.ts";
 import { prisma } from "./prisma.ts";
@@ -129,7 +131,42 @@ export async function tokenPelapor(
   // canSubscribe: menerima komentar, hati & hadiah (text stream). Penonton tidak
   // menerbitkan media, jadi pelapor tetap tidak menerima video/suara apa pun.
   at.addGrant({ room: ruang, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true, canUpdateOwnMetadata: true });
+  if (publik) umumkanSiaranNanti(k, { ruang, judul, nama, akunId: akun?.id ?? null });
   return [200, { url: k.url, token: await at.toJwt(), ruang }];
+}
+
+/** Jeda sebelum memeriksa apakah pelapor siaran publik sudah tersambung. */
+const TUNGGU_UMUMKAN_MS = 15_000;
+
+/**
+ * Siaran publik baru → notifikasi push "live" (lib/notifikasi-push.ts), tetapi hanya bila pelapor
+ * benar-benar tersambung TUNGGU_UMUMKAN_MS kemudian: token yang tidak pernah dipakai (izin kamera
+ * ditolak, batal) tidak mengabari siapa pun. Sekali per akun per 30 menit (siaran ulang setelah
+ * sinyal putus) dan paling banyak 10 per jam untuk semua siaran, supaya HP warga tidak dibanjiri.
+ * Tanpa webhook LiveKit: cukup timer di proses server (bukan serverless).
+ */
+function umumkanSiaranNanti(
+  k: NonNullable<ReturnType<typeof konfigurasi>>,
+  s: { ruang: string; judul: string; nama: string; akunId: bigint | null },
+): void {
+  const mulai = Date.now();
+  const timer = setTimeout(async () => {
+    try {
+      const peserta = await ruangan(k).listParticipants(s.ruang);
+      if (!peserta.some((p) => p.identity.startsWith(AWALAN_PELAPOR))) return;
+      if (s.akunId !== null && (await lewatBatas(`notif-live-akun:${s.akunId}`, 1, 1800))) return;
+      if (await lewatBatas("notif-live", 10, 3600)) return;
+      kirimPushLatar("live", {
+        judul: `🔴 ${s.nama || "Warga"} sedang live`,
+        isi: s.judul,
+        data: { jenis: "live", ruang: s.ruang, judul: s.judul, nama: s.nama, mulai },
+      });
+    } catch (e) {
+      // Ruang sudah kosong & dibuang (pelapor pergi) juga berakhir di sini: tidak perlu dikabarkan.
+      if (!(e instanceof ServerError)) await catatGalat("umumkanSiaranNanti", e, s.ruang);
+    }
+  }, TUNGGU_UMUMKAN_MS);
+  timer.unref?.();
 }
 
 type Siaran = {
