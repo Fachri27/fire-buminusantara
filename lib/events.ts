@@ -133,9 +133,9 @@ function keBerita(e: Baris, bahasa: Bahasa): Berita {
  */
 export const TAYANG = { status: "published" } as const;
 
-/** Jumlah kartu umpan yang ikut di HTML halaman; sisanya diambil klien dari
- *  /api/umpan supaya muatan awal tidak membengkak seiring arsip. */
-export const UMPAN_AWAL = 24;
+/** Jumlah kartu umpan yang ikut di HTML halaman; sisanya diambil klien per
+ *  halaman dari /api/umpan/halaman. Didefinisikan di modul bebas Prisma. */
+export { UMPAN_AWAL } from "./halaman-umpan";
 
 /**
  * Kejadian untuk korsel beranda, urutan CAMPURAN "terbaru + komentar terbanyak":

@@ -31,7 +31,8 @@ services:
       # docker network create shared) — container saling memanggil dengan nama
       # layanan (http://minio:9000), tanpa lewat port host. Port 127.0.0.1
       # MinIO tidak bisa dijangkau dari container (host.docker.internal datang
-      # lewat alamat bridge, bukan loopback).
+      # lewat alamat bridge, bukan loopback). Layanan ini bernama `web` dan
+      # layanan geoplatform `geo`: nama layanan = alias di jaringan "shared".
       - shared
       - default
     healthcheck:
@@ -41,31 +42,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-
-  # Penyegar data tiap 30 menit lewat /api/cron/warm-asap: sebaran asap +
-  # udara (CAMS) dan hotspot FIRMS ditulis ke Redis; rute publik hanya membaca
-  # salinan itu. Sengaja tanpa `condition: service_healthy`: web yang tak
-  # sehat akan menggagalkan `compose up` sebelum rollback remote-deploy.sh
-  # sempat jalan. Secret lewat stdin (-K -), bukan argumen: tidak muncul di
-  # `ps` host. Log (satu baris JSON hasil per putaran): docker compose logs cron.
-  cron:
-    image: curlimages/curl:8.11.1
-    restart: unless-stopped
-    depends_on: [web]
-    environment:
-      CRON_SECRET: ${CRON_SECRET:-}
-    entrypoint: ["sh", "-c"]
-    command:
-      - |
-        sleep 60
-        while :; do
-          printf '[cron] '
-          printf 'header = "Authorization: Bearer %s"\n' "$$CRON_SECRET" \
-            | curl -sS -K - -X POST -m 600 -w ' [%{http_code} %{time_total}s]\n' http://web:3000/api/cron/warm-asap
-          # 30 menit: FIRMS memperbarui berkasnya tiap 60 menit, CAMS dua run
-          # sehari — 15 menit dulu sebagian besar mengunduh berkas yang sama.
-          sleep 1800
-        done
 
   # OCR foto KTP untuk verifikasi siaran (layanan/ocr-ktp, PaddleOCR CPU):
   # penyedia eKYC "paddleocr" (lib/ocr-ktp.ts). TANPA port terbuka — hanya web

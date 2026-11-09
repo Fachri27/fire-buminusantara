@@ -5,3 +5,8 @@ export const DESKRIPSI_SITUS =
   "Menyaksikan kebakaran hutan dan lahan? Asap? Atau hal-hal terkait seperti kekeringan? Kabarkan di sini.";
 /** Akar absolut situs; env supaya instance staging bisa menimpanya. */
 export const URL_SITUS = (process.env.NEXT_PUBLIC_SITE_URL || "https://laporin.app").replace(/\/$/, "");
+/** Asal geoplatform: peramban memanggil API data peta (hotspot, asap, udara,
+ *  cuaca, citra, Windy) langsung ke sana — fire tidak menyimpan maupun
+ *  meneruskannya. Dipanggang saat build; dev = geoplatform lokal di :3100. */
+export const GEO_URL = (process.env.NEXT_PUBLIC_GEO_URL ||
+  (process.env.NODE_ENV === "production" ? "https://geoplatform.nusantara.earth" : "http://localhost:3100")).replace(/\/$/, "");

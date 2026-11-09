@@ -19,9 +19,6 @@
     },
     {
       "name": "Admin"
-    },
-    {
-      "name": "Cron"
     }
   ],
   "paths": {
@@ -293,384 +290,6 @@
         }
       }
     },
-    "/api/cron/warm-asap": {
-      "get": {
-        "tags": [
-          "Cron"
-        ],
-        "summary": "Menghangatkan cache frame sebaran asap dan udara, serta menyegarkan hotspot FIRMS",
-        "description": "Secret wajib dikirim di header `Authorization: Bearer <CRON_SECRET>`. Mengirim parameter query `secret` ditolak dengan 400. Di produksi tanpa CRON_SECRET, rute menjawab 401 (fail-closed). Di pengembangan tanpa CRON_SECRET, rute mengizinkan panggilan. maxDuration 300 detik.",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/WarmAsapSukses"
-          },
-          "400": {
-            "$ref": "#/components/responses/WarmAsapSecretDiQuery"
-          },
-          "401": {
-            "$ref": "#/components/responses/WarmAsapTakBerwenang"
-          },
-          "500": {
-            "$ref": "#/components/responses/WarmAsapGagal"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Cron"
-        ],
-        "summary": "Menghangatkan cache frame sebaran asap dan udara, serta menyegarkan hotspot FIRMS",
-        "description": "Sama dengan GET.",
-        "security": [
-          {
-            "cronSecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/WarmAsapSukses"
-          },
-          "400": {
-            "$ref": "#/components/responses/WarmAsapSecretDiQuery"
-          },
-          "401": {
-            "$ref": "#/components/responses/WarmAsapTakBerwenang"
-          },
-          "500": {
-            "$ref": "#/components/responses/WarmAsapGagal"
-          }
-        }
-      }
-    },
-    "/api/cuaca-lokal": {
-      "get": {
-        "tags": [
-          "Publik"
-        ],
-        "summary": "Cuaca lokal pengunjung untuk panel kiri landing karhutla",
-        "description": "Publik tanpa sesi. Ada dua mode. (1) Jika `saran` dikirim, rute mengembalikan saran lokasi berupa array. Sumbernya basis data wilayah Kemendagri/BMKG, lalu OSM Nominatim bila tidak ketemu. Cache-Control public, max-age=120. (2) Jika tidak, rute mengembalikan cuaca BMKG (cadangan Open-Meteo). Lokasi diambil dari `lat`+`lng`, lalu `q`, dan bila keduanya tak ada dari IP pengunjung (ipwho.is). Hasil di-cache di memori 10 menit per lokasi; Cache-Control no-store.",
-        "parameters": [
-          {
-            "name": "saran",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Teks pencarian saran lokasi. Jika ada, rute memakai mode saran.",
-            "example": "Palangka"
-          },
-          {
-            "name": "lat",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
-            },
-            "description": "Hanya dipakai bila dikirim bersama lng.",
-            "example": -2.21
-          },
-          {
-            "name": "lng",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 180
-            },
-            "example": 113.92
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Nama tempat. Dipakai bila lat/lng tidak dikirim."
-          },
-          {
-            "name": "nama",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Nama tampilan untuk titik lat/lng."
-          },
-          {
-            "name": "provinsi",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Provinsi untuk titik lat/lng (dipakai bersama nama)."
-          },
-          {
-            "name": "adm4",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Kode desa adm4 Kemendagri untuk API BMKG.",
-            "example": "31.71.01.1001"
-          },
-          {
-            "name": "bahasa",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "id",
-                "en"
-              ],
-              "default": "id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Mode saran: array ItemSaranLokasi. Mode cuaca: objek cuaca.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "required": [
-                          "id",
-                          "nama",
-                          "provinsi",
-                          "lat",
-                          "lng"
-                        ],
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "nama": {
-                            "type": "string"
-                          },
-                          "provinsi": {
-                            "type": "string"
-                          },
-                          "lat": {
-                            "type": "number"
-                          },
-                          "lng": {
-                            "type": "number"
-                          },
-                          "adm4": {
-                            "type": "string"
-                          },
-                          "tipe": {
-                            "type": "string"
-                          }
-                        }
-                      }
-                    },
-                    {
-                      "type": "object",
-                      "required": [
-                        "nama",
-                        "suhu",
-                        "kodeCuaca",
-                        "siang",
-                        "sumber"
-                      ],
-                      "properties": {
-                        "nama": {
-                          "type": "string"
-                        },
-                        "suhu": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
-                        },
-                        "kodeCuaca": {
-                          "type": [
-                            "integer",
-                            "null"
-                          ],
-                          "description": "Kode cuaca WMO"
-                        },
-                        "siang": {
-                          "type": "boolean"
-                        },
-                        "sumber": {
-                          "type": [
-                            "string",
-                            "null"
-                          ],
-                          "enum": [
-                            "bmkg",
-                            "model",
-                            null
-                          ]
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
-    "/api/forecasting": {
-      "get": {
-        "tags": [
-          "Publik"
-        ],
-        "summary": "Proksi halaman Windy AQI (CAMS) untuk disematkan sebagai iframe",
-        "description": "Mengambil HTML Windy Air Quality Index, menyisipkan skrip dan gaya sendiri, lalu mengirim HTML-nya. Nilai di luar batas dijepit ke wilayah Indonesia; nilai tidak sah memakai bawaan. Header Content-Security-Policy berisi frame-ancestors *, jadi halaman boleh dibingkai di mana saja.",
-        "parameters": [
-          {
-            "name": "lat",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "minimum": -15,
-              "maximum": 15,
-              "default": 0.2
-            }
-          },
-          {
-            "name": "lon",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "minimum": 90,
-              "maximum": 145,
-              "default": 118
-            }
-          },
-          {
-            "name": "zoom",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "minimum": 2,
-              "maximum": 18,
-              "default": 5
-            }
-          },
-          {
-            "name": "konsol",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "1"
-              ]
-            },
-            "description": "Mode konsol /peta: roda tetikus memperbesar peta."
-          },
-          {
-            "name": "bentang",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "1"
-              ]
-            },
-            "description": "Menampilkan tombol buka peta selayar (postMessage BUKA_SELAYAR)."
-          },
-          {
-            "name": "ringkas",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "1"
-              ]
-            },
-            "description": "Legenda ringkas."
-          },
-          {
-            "name": "aplikasi",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "1"
-              ]
-            },
-            "description": "Aplikasi Laporin: tanpa kolom kendali, bilah AQI, kredit EOX, batas provinsi, dan angka laporan (semuanya native di aplikasi); logo Windy/Copernicus di kiri atas."
-          },
-          {
-            "name": "tema",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "light",
-                "dark"
-              ],
-              "default": "dark"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Halaman HTML Windy yang sudah dimodifikasi.",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Gagal mengambil Windy.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Windy membalas dengan galat.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
     "/api/hitung": {
       "get": {
         "tags": [
@@ -710,132 +329,6 @@
                       "komentar": {
                         "type": "integer"
                       }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
-    "/api/hotspot": {
-      "get": {
-        "tags": [
-          "Publik"
-        ],
-        "summary": "Titik hotspot NASA FIRMS satu hari WIB",
-        "description": "Membaca salinan Redis yang ditulis cron warm-asap. Tanpa `hari`, rute memakai hari terbaru. Hari di luar 7 hari data diganti hari tersedia terdekat (lihat field `hari`). Jika salinan basi (lebih dari 70 menit), penyegaran dipicu di latar. Cache-Control: public, max-age paling lama 300 detik sampai salinan basi; no-store jika sudah basi.",
-        "parameters": [
-          {
-            "name": "hari",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-            },
-            "example": "2026-10-29"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Data hotspot satu hari.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "hari",
-                    "hariTersedia",
-                    "diperbarui",
-                    "diambil",
-                    "satelit",
-                    "lengkap",
-                    "basi",
-                    "provinsi",
-                    "kabupaten",
-                    "titik"
-                  ],
-                  "properties": {
-                    "hari": {
-                      "type": "string",
-                      "description": "Tanggal WIB YYYY-MM-DD"
-                    },
-                    "sejak": {
-                      "type": "string",
-                      "format": "date-time",
-                      "description": "Hanya untuk hari terbaru: awal jendela 24 jam bergulir."
-                    },
-                    "hariTersedia": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "diperbarui": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "format": "date-time"
-                    },
-                    "diambil": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
-                    "satelit": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "lengkap": {
-                      "type": "boolean"
-                    },
-                    "basi": {
-                      "type": "boolean"
-                    },
-                    "provinsi": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "kabupaten": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "titik": {
-                      "type": "array",
-                      "description": "[lng, lat, kepercayaan, FRP (MW), waktu (menit epoch UTC), indeks satelit, indeks provinsi, malam (0/1), indeks kabupaten (-1 = tak ada)]",
-                      "items": {
-                        "type": "array",
-                        "items": {
-                          "type": "number"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Server NASA FIRMS tak terjangkau.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "galat"
-                  ],
-                  "properties": {
-                    "galat": {
-                      "type": "string"
                     }
                   }
                 }
@@ -3516,271 +3009,6 @@
         "security": []
       }
     },
-    "/api/sebaran-asap": {
-      "get": {
-        "tags": [
-          "Publik"
-        ],
-        "summary": "Data lapisan sebaran asap (Zarr CAMS): metadata linimasa atau frame biner",
-        "description": "`mode=metadata` (bawaan) mengembalikan JSON linimasa. `mode=frame` mengembalikan biner application/octet-stream dengan kompresi br (mutu 5) atau gzip sesuai Accept-Encoding. Jika `force=true` atau ada `_ts`, metadata diambil ulang dan Cache-Control menjadi no-store.",
-        "parameters": [
-          {
-            "name": "mode",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "metadata",
-                "frame"
-              ],
-              "default": "metadata"
-            }
-          },
-          {
-            "name": "force",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "true"
-              ]
-            }
-          },
-          {
-            "name": "_ts",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Jika ada (nilai apa pun), sama dengan force=true."
-          },
-          {
-            "name": "timeChunk",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Wajib untuk mode=frame."
-          },
-          {
-            "name": "step",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer"
-            },
-            "description": "Wajib untuk mode=frame."
-          },
-          {
-            "name": "timeInner",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Metadata (JSON) atau frame (biner).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ZarrMetadata"
-                }
-              },
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Parameter tidak sah atau mode tak dikenal.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GalatError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Galat server.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GalatError"
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
-    "/api/udara": {
-      "get": {
-        "tags": [
-          "Publik"
-        ],
-        "summary": "Data lapisan Angin dan Kualitas Udara (AQI PM2.5 + angin 10 m, CAMS)",
-        "description": "Kontraknya sejajar dengan /api/sebaran-asap. `mode=frame` mengembalikan biner tiga bidang (aqi | u | v) dengan kompresi br/gzip. Frame yang belum lengkap dikirim dengan Cache-Control no-store.",
-        "parameters": [
-          {
-            "name": "mode",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "metadata",
-                "frame"
-              ],
-              "default": "metadata"
-            }
-          },
-          {
-            "name": "force",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "true"
-              ]
-            }
-          },
-          {
-            "name": "_ts",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Jika ada (nilai apa pun), sama dengan force=true."
-          },
-          {
-            "name": "timeChunk",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{1,6}$"
-            },
-            "description": "Wajib untuk mode=frame."
-          },
-          {
-            "name": "step",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{1,6}$"
-            },
-            "description": "Wajib untuk mode=frame. Bilangan bulat 0..120."
-          },
-          {
-            "name": "timeInner",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "0",
-                "1"
-              ],
-              "default": "0"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Metadata (JSON) atau frame (biner).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "latestModelRunIso",
-                    "latestModelRunWib",
-                    "timesteps",
-                    "grid",
-                    "enkode"
-                  ],
-                  "properties": {
-                    "latestModelRunIso": {
-                      "type": "string"
-                    },
-                    "latestModelRunWib": {
-                      "type": "string"
-                    },
-                    "timesteps": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/ZarrTimestep"
-                      }
-                    },
-                    "grid": {
-                      "type": "object",
-                      "additionalProperties": true
-                    },
-                    "enkode": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  }
-                }
-              },
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Parameter tidak sah atau mode tak dikenal.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GalatError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Galat server.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GalatError"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Galat dari hulu Zarr/ECMWF.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GalatError"
-                }
-              }
-            }
-          }
-        },
-        "security": []
-      }
-    },
     "/api/umpan": {
       "get": {
         "tags": [
@@ -3924,6 +3152,154 @@
         },
         "security": []
       }
+    },
+    "/api/umpan/halaman": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Satu halaman umpan beranda (gulir tak berujung)",
+        "description": "15 kartu per halaman. Saringan dan urutan dikerjakan server atas daftar ambilUmpan yang di-cache. Cache-Control sama dengan /api/umpan.",
+        "parameters": [
+          {
+            "name": "bahasa",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "id",
+                "en"
+              ],
+              "default": "id"
+            },
+            "description": "Nilai kosong atau tak dikenal jatuh ke id."
+          },
+          {
+            "name": "kursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Nilai `berikut` jawaban sebelumnya — cadangan posisi bila kartu `setelah` sudah hilang; kosong = halaman pertama."
+          },
+          {
+            "name": "setelah",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Id kartu terakhir yang sudah tampil; halaman dilanjutkan tepat sesudahnya sehingga laporan baru/terhapus tidak membuat kartu terlewat atau ganda."
+          },
+          {
+            "name": "cari",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "description": "Kata kunci pada judul (tak peka huruf besar)."
+          },
+          {
+            "name": "dari",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Tanggal kejadian paling awal, YYYY-MM-DD."
+          },
+          {
+            "name": "sampai",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Tanggal kejadian paling akhir, YYYY-MM-DD."
+          },
+          {
+            "name": "wilayah",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "semua",
+                "Sumatra",
+                "Jawa",
+                "Kalimantan",
+                "Sulawesi",
+                "Maluku",
+                "Papua"
+              ],
+              "default": "semua"
+            },
+            "description": "Tab pulau; nilai asing jatuh ke semua."
+          },
+          {
+            "name": "urut",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "terbaru",
+                "komentar"
+              ],
+              "default": "terbaru"
+            },
+            "description": "komentar = komentar terbanyak dulu, seri terbaru dulu."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Satu halaman umpan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "isi",
+                    "berikut",
+                    "jumlahWilayah"
+                  ],
+                  "properties": {
+                    "isi": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/paths/~1api~1umpan/get/responses/200/content/application~1json/schema/items"
+                      }
+                    },
+                    "berikut": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Kursor halaman berikutnya; null = habis."
+                    },
+                    "jumlahWilayah": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      },
+                      "description": "Banyak laporan per opsi wilayah setelah saringan cari + tanggal."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3938,11 +3314,6 @@
         "in": "cookie",
         "name": "fire_sesi",
         "description": "Cookie sesi CMS (admin/editor), dibuat saat masuk di /admin/login."
-      },
-      "cronSecret": {
-        "type": "http",
-        "scheme": "bearer",
-        "description": "CRON_SECRET server."
       }
     },
     "schemas": {
@@ -4101,17 +3472,6 @@
           "message"
         ]
       },
-      "GalatError": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "error"
-        ]
-      },
       "JumlahSuka": {
         "type": "object",
         "properties": {
@@ -4122,78 +3482,6 @@
         "required": [
           "jumlah"
         ]
-      },
-      "ZarrTimestep": {
-        "type": "object",
-        "properties": {
-          "index": {
-            "type": "integer"
-          },
-          "timeChunk": {
-            "type": "integer"
-          },
-          "timeInner": {
-            "type": "integer"
-          },
-          "step": {
-            "type": "integer"
-          },
-          "iso": {
-            "type": "string"
-          },
-          "waktu": {
-            "type": "string"
-          },
-          "labelUtc": {
-            "type": "string"
-          },
-          "labelWib": {
-            "type": "string"
-          },
-          "adalahPrediksi": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ZarrMetadata": {
-        "type": "object",
-        "required": [
-          "latestModelRunIso",
-          "timesteps",
-          "grid"
-        ],
-        "properties": {
-          "latestModelRunIso": {
-            "type": "string"
-          },
-          "latestModelRunWib": {
-            "type": "string"
-          },
-          "timesteps": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ZarrTimestep"
-            }
-          },
-          "grid": {
-            "type": "object",
-            "properties": {
-              "rows": {
-                "type": "integer"
-              },
-              "cols": {
-                "type": "integer"
-              },
-              "bounds": {}
-            }
-          },
-          "isWarm": {
-            "type": "boolean"
-          },
-          "cachedFramesCount": {
-            "type": "integer"
-          }
-        }
       }
     },
     "responses": {
@@ -4233,89 +3521,6 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Galat"
-            }
-          }
-        }
-      },
-      "WarmAsapSukses": {
-        "description": "Cache dihangatkan",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-                "success": {
-                  "const": true
-                },
-                "message": {
-                  "type": "string"
-                },
-                "total": {
-                  "type": "integer"
-                },
-                "berhasil": {
-                  "type": "integer"
-                },
-                "gagal": {
-                  "type": "integer"
-                },
-                "durasiMs": {
-                  "type": "integer"
-                },
-                "isWarm": {
-                  "type": "boolean"
-                },
-                "udara": {
-                  "type": "object",
-                  "additionalProperties": true
-                },
-                "hotspot": {
-                  "type": "object",
-                  "additionalProperties": true
-                },
-                "timestamp": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      },
-      "WarmAsapSecretDiQuery": {
-        "description": "Secret dikirim lewat query ?secret= (ditolak)",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/GalatError"
-            }
-          }
-        }
-      },
-      "WarmAsapTakBerwenang": {
-        "description": "Secret salah atau CRON_SECRET belum disetel di produksi",
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/GalatError"
-            }
-          }
-        }
-      },
-      "WarmAsapGagal": {
-        "description": "Penghangatan gagal",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "properties": {
-                "success": {
-                  "const": false
-                },
-                "error": {
-                  "type": "string"
-                },
-                "hotspot": {}
-              }
             }
           }
         }

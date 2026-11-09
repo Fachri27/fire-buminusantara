@@ -20,7 +20,7 @@ test("gen-secrets: slot *_SECRET/*_PASS kosong diisi acak, kecuali MANUAL_KEYS",
     [
       "SESSION_SECRET=",
       "DB_PASS=",
-      "CRON_SECRET=sudah-ada",
+      "APPLE_TOKEN_SECRET=sudah-ada",
       "LIVEKIT_API_SECRET=",
       "LIVEKIT_API_KEY=",
       "TRUSTED_PROXY_HOPS=1",
@@ -39,7 +39,7 @@ test("gen-secrets: slot *_SECRET/*_PASS kosong diisi acak, kecuali MANUAL_KEYS",
   assert.match(isi.SESSION_SECRET, /^[A-Za-z0-9]{20,}$/);
   assert.match(isi.DB_PASS, /^[A-Za-z0-9]{20,}$/);
   assert.notEqual(isi.SESSION_SECRET, isi.DB_PASS);
-  assert.equal(isi.CRON_SECRET, "sudah-ada", "yang sudah berisi tidak ditimpa");
+  assert.equal(isi.APPLE_TOKEN_SECRET, "sudah-ada", "yang sudah berisi tidak ditimpa");
   assert.equal(isi.LIVEKIT_API_SECRET, "", "harus sama dengan server LiveKit — tidak boleh diacak");
   assert.equal(isi.LIVEKIT_API_KEY, "");
   assert.equal(isi.TRUSTED_PROXY_HOPS, "1");

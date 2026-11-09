@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { cacheLife, cacheTag } from "next/cache";
 import { ambilBeritaSlug, ambilUmpan, hitungLaporanProvinsi, TAYANG, UMPAN_AWAL } from "@/lib/events";
+import { hitungWilayah } from "@/lib/halaman-umpan";
 import { prisma } from "@/lib/prisma";
 import { JsonLd } from "@/components/json-ld";
 import { LandingKarhutla } from "@/components/landing-karhutla";
@@ -224,6 +225,7 @@ async function IsiHalaman({
         jumlahLaporan={jumlahLaporan}
         berita={daftarBerita}
         totalBerita={semuaBerita.length}
+        jumlahWilayah={hitungWilayah(semuaBerita)}
         statistik={sorotan[bahasa]}
         kejadianAwal={kejadian}
         kolomAwal={kolomAwal}

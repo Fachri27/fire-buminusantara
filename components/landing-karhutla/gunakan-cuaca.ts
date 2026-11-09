@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Bahasa } from "@/lib/bahasa";
+import { GEO_URL } from "@/lib/situs";
 
 /**
  * Cuaca lokal pengunjung: lokasi + suhu dibaca otomatis dari IP, tanpa
@@ -43,7 +44,7 @@ export function useCuacaLokal(bahasa: Bahasa, lokasiAwal: string) {
     if (!q) return false;
     setMemuat(true);
     try {
-      const r = await fetch(`/api/cuaca-lokal?bahasa=${bahasa}&q=${encodeURIComponent(q)}`, {
+      const r = await fetch(`${GEO_URL}/api/cuaca-lokal?bahasa=${bahasa}&q=${encodeURIComponent(q)}`, {
         signal: AbortSignal.timeout(12000),
         headers: { Accept: "application/json" },
       });
@@ -77,7 +78,7 @@ export function useCuacaLokal(bahasa: Bahasa, lokasiAwal: string) {
         try {
           const { latitude, longitude } = pos.coords;
           const r = await fetch(
-            `/api/cuaca-lokal?bahasa=${bahasa}&lat=${latitude}&lng=${longitude}`,
+            `${GEO_URL}/api/cuaca-lokal?bahasa=${bahasa}&lat=${latitude}&lng=${longitude}`,
             {
               signal: AbortSignal.timeout(12000),
               headers: { Accept: "application/json" },
@@ -137,7 +138,7 @@ export function useCuacaLokal(bahasa: Bahasa, lokasiAwal: string) {
     // ulangi bila gugur.
     const ambil = async (batas: number): Promise<boolean> => {
       try {
-        const r = await fetch(`/api/cuaca-lokal?bahasa=${bahasa}`, {
+        const r = await fetch(`${GEO_URL}/api/cuaca-lokal?bahasa=${bahasa}`, {
           signal: AbortSignal.timeout(batas),
           headers: { Accept: "application/json" },
         });
@@ -185,7 +186,7 @@ export function useCuacaLokal(bahasa: Bahasa, lokasiAwal: string) {
           provinsi: item.provinsi,
           ...(item.adm4 ? { adm4: item.adm4 } : {}),
         });
-        const r = await fetch(`/api/cuaca-lokal?${param}`, {
+        const r = await fetch(`${GEO_URL}/api/cuaca-lokal?${param}`, {
           signal: AbortSignal.timeout(12000),
           headers: { Accept: "application/json" },
         });

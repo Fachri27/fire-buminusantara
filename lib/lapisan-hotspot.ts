@@ -2,7 +2,7 @@ import type * as maplibregl from "maplibre-gl";
 
 /**
  * Lapisan tambahan titik anomali panas (hotspot) satu hari dari NASA FIRMS
- * (lib/hotspot-firms.ts, lewat /api/hotspot), ditumpangkan di atas peta dasar
+ * (geoplatform lib/hotspot-firms.ts, lewat /api/hotspot), ditumpangkan di atas peta dasar
  * yang sedang tampil. Satu data, tiga sakelar satelit ala legenda SiPongi KLHK
  * di panel Lapisan peta.tsx (bawaan menyala): NASA-TERRA/AQUA segi lima,
  * NASA-SNPP segi enam, NASA-NOAA20 bintang, diwarnai hijau/kuning/merah per
@@ -45,7 +45,7 @@ export function hariWib(ms: number): string {
 }
 
 /** Riwayat peta = hari ini + enam hari WIB sebelumnya, untuk bilah waktu
- *  Aerosol & Angin (lib/zarr-reader.ts) DAN hotspot (lib/hotspot-firms.ts) —
+ *  Aerosol & Angin (geoplatform lib/zarr-reader.ts) DAN hotspot (geoplatform lib/hotspot-firms.ts) —
  *  sepanjang berkas 7 hari FIRMS, jadi ketiganya mundur sejauh yang sama. */
 export const HARI_RIWAYAT = 7;
 
@@ -59,7 +59,7 @@ export const WARNA_SIPONGI = ["#4caf50", "#fbc02d", "#f01e1e"] as const;
 export const LABEL_KEPERCAYAAN = ["Rendah", "Sedang", "Tinggi"] as const;
 
 /**
- * Satelit per indeks `s` di data — lib/hotspot-firms.ts membaca berkas
+ * Satelit per indeks `s` di data — geoplatform lib/hotspot-firms.ts membaca berkas
  * FIRMS dengan urutan yang sama. `sisi` = bentuk penanda lapisan SiPongi-nya:
  * 5 segi lima, 6 segi enam, 0 bintang. Urutan = sakelar panel & legenda.
  */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type ReactNode, type KeyboardEvent as KeyboardEventReact, type PointerEvent as PointerEventReact } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type CSSProperties, type ReactNode, type PointerEvent as PointerEventReact } from "react";
 import { createPortal, flushSync } from "react-dom";
 import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
@@ -33,6 +33,7 @@ import type { LapisanAsap } from "./peta-asap";
 import { PanelPeringkatHotspot, RelPeringkatHotspot } from "./panel-peringkat-hotspot";
 import { formatHariPeta, LOCALE, TEKS_PETA } from "./teks-peta";
 import type { Bahasa } from "@/lib/bahasa";
+import { GEO_URL } from "@/lib/situs";
 import { useKurangiGerak, useMediaQuery } from "@/hooks/use-media-query";
 
 /** Bagian peta MapLibre lapisan Aerosol yang dibaca untuk menyamakan kamera
@@ -82,33 +83,24 @@ function kameraAerosolKini(kolom: number): { lat: number; lon: number; zoom: num
  *  asap = ungu berbahaya #49006A, windy = oren bara. */
 export type ModePeta = "asap" | "windy";
 
-/** Peta dasar di dropdown kiri atas. `latar` = gradien pil saat aktif. */
+/** Dua lapisan data di panel Lapisan; `latar` = gradien ikon barisnya. */
 const LAPISAN: {
   mode: ModePeta;
-  ikon: string;
   label: string;
-  labelPendek: string;
   keterangan: string;
   latar: string;
-  kelasAktif: string;
 }[] = [
   {
     mode: "asap",
-    ikon: "🔥",
     label: "Aerosol Karhutla",
-    labelPendek: "Karhutla",
     keterangan: "Sebaran asap karhutla",
     latar: "linear-gradient(to right, #49006a 0%, #86198f 35%, #b90d84 65%, #f472b6 90%, #fce7f3 100%)",
-    kelasAktif: "shadow-purple-950/50 ring-fuchsia-400/40",
   },
   {
     mode: "windy",
-    ikon: "💨",
     label: "Angin dan Kualitas Udara",
-    labelPendek: "Angin",
-    keterangan: "Kualitas udara dan arah angin",
+    keterangan: "Peta Windy terpisah, mematikan Aerosol",
     latar: "linear-gradient(to right, #047857 0%, #059669 40%, #10b981 75%, #84cc16 100%)",
-    kelasAktif: "shadow-emerald-950/50 ring-emerald-400/40",
   },
 ];
 
@@ -284,7 +276,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
      sebab memindahkan <iframe> di DOM selalu memuatnya ulang. */
   const { resolvedTheme } = useTheme();
   const [windyKamera, setWindyKamera] = useState("lat=0.200&lon=118.000&zoom=5");
-  const windySrc = `/api/forecasting?${windyKamera}${zoomRoda ? "&konsol=1" : ""}${
+  const windySrc = `${GEO_URL}/api/forecasting?${windyKamera}${zoomRoda ? "&konsol=1" : ""}${
     onExpand ? "&bentang=1" : ""
   }${legendaRingkas ? "&ringkas=1" : ""}${tombolRapat ? "&rapat=1" : ""}${
     resolvedTheme ? `&tema=${resolvedTheme}` : ""
@@ -416,7 +408,7 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     const pengendali = new AbortController();
     unduhan.set(kunci, pengendali);
     // ?v=3: data per hari + kolom kabupaten — lewati tembolok lama.
-    fetch(`/api/hotspot?v=3${kunci ? `&hari=${kunci}` : ""}`, { signal: pengendali.signal })
+    fetch(`${GEO_URL}/api/hotspot?v=3${kunci ? `&hari=${kunci}` : ""}`, { signal: pengendali.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((d: DataHotspot) => {
         const simpanan = simpananHotspotRef.current;
@@ -1002,49 +994,27 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
     };
   }, [panelLapisan, kirimData]);
 
-  /* Dropdown peta dasar (kiri atas). Tertutup saat klik di luar, Escape, atau
-     saat jendela kehilangan fokus — klik di dalam iframe Windy tak memicu
-     pointerdown di dokumen ini, tapi memindah fokus ke iframe. */
-  const [bukaPilihan, setBukaPilihan] = useState(false);
-  const pilihanRef = useRef<HTMLDivElement | null>(null);
-  const pemicuPilihanRef = useRef<HTMLButtonElement | null>(null);
-  const menuPilihanRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!bukaPilihan) return;
-    const tutupLuar = (e: PointerEvent) => {
-      if (!pilihanRef.current?.contains(e.target as Node)) setBukaPilihan(false);
-    };
-    const tutupEsc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setBukaPilihan(false);
-      pemicuPilihanRef.current?.focus();
-    };
-    const tutup = () => setBukaPilihan(false);
-    document.addEventListener("pointerdown", tutupLuar, true);
-    document.addEventListener("keydown", tutupEsc);
-    window.addEventListener("blur", tutup);
-    // Fokus ke peta dasar aktif supaya panah atas/bawah langsung bisa dipakai.
-    menuPilihanRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
-    return () => {
-      document.removeEventListener("pointerdown", tutupLuar, true);
-      document.removeEventListener("keydown", tutupEsc);
-      window.removeEventListener("blur", tutup);
-    };
-  }, [bukaPilihan]);
-  const gerakFokusPilihan = (e: KeyboardEventReact<HTMLDivElement>) => {
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-    e.preventDefault();
-    const item = [...(menuPilihanRef.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [])];
-    const i = item.indexOf(document.activeElement as HTMLElement);
-    item[(i + (e.key === "ArrowDown" ? 1 : -1) + item.length) % item.length]?.focus();
+  /* Aerosol & Angin di panel Lapisan. Windy peta tersendiri (iframe), tak
+     bisa ditumpuk dengan asap MapLibre: menyalakan satu mematikan yang lain,
+     dan mematikan Angin kembali ke peta MapLibre tanpa asap (citra satelit).
+     Ganti peta menutup panel — tombol jangkarnya pindah ke peta lain. */
+  const aerosolTampil = mode === "asap" && lapisan.aerosol;
+  const alihAerosol = () => {
+    if (mode === "asap") {
+      setLapisan((s) => ({ ...s, aerosol: !s.aerosol }));
+      return;
+    }
+    setLapisan((s) => ({ ...s, aerosol: true }));
+    setPanelLapisan(null);
+    handlePilihMode("asap");
   };
-  const lapisanAktif = LAPISAN.find((l) => l.mode === mode) ?? LAPISAN[0];
-
-  /* Pil alih mode versi rapat untuk bingkai dasbor — sedikit lebih kecil
-     dari versi fullscreen beranda. */
-  const kelasPil = `flex cursor-pointer items-center gap-1 sm:gap-2 rounded-full font-semibold transition-all ${
-    tombolRapat ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs"
-  }`;
+  const alihAngin = () => {
+    setPanelLapisan(null);
+    if (mode === "windy") {
+      setLapisan((s) => ({ ...s, aerosol: false }));
+      handlePilihMode("asap");
+    } else handlePilihMode("windy");
+  };
 
   const kelasInfo = `flex cursor-pointer items-center justify-center rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white hover:text-tinta dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:hover:text-white dark:shadow-2xl dark:ring-1 dark:ring-white/20 backdrop-blur-md transition-all active:scale-95 ${
     tombolRapat ? "h-7 w-7" : "h-8 w-8 sm:h-9 sm:w-9"
@@ -1287,92 +1257,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
       // peta, bukan viewport — kolom peringkat memakan 300px darinya.
       className="@container relative h-full min-w-0 flex-1 overflow-hidden bg-black"
     >
-      {/* Tombol Alih Mode Layer Peta & Info Perbedaan */}
+      {/* Tombol kiri atas: panduan, sematkan, peringkat. */}
       <div className={`pointer-events-auto absolute left-4 z-[450] flex items-center gap-1.5 sm:gap-2 sm:left-6 ${tombolRapat ? "top-4" : "top-20"}`}>
-        {/* Dropdown peta dasar — pemicunya pil lapisan aktif (gradien yang sama
-            dengan pil alih mode sebelumnya). Lapisan tambahan (hotspot) ada di
-            panel tombol Lapisan, kolom kendali kanan. */}
-        <div ref={pilihanRef} className="relative">
-          <div className="flex items-center rounded-full bg-white/90 border border-black/[0.08] text-tinta shadow-sm hover:bg-white dark:bg-pantau-konsol/90 dark:border-white/10 dark:text-white dark:hover:bg-white/10 dark:shadow-2xl dark:ring-1 dark:ring-white/20 p-1 backdrop-blur-md">
-            <button
-              ref={pemicuPilihanRef}
-              type="button"
-              onClick={() => setBukaPilihan((b) => !b)}
-              aria-haspopup="menu"
-              aria-expanded={bukaPilihan}
-              aria-label={`Peta dasar: ${lapisanAktif.label}`}
-              style={{ background: lapisanAktif.latar }}
-              className={`${kelasPil} text-white shadow-md ring-1 ${lapisanAktif.kelasAktif} [text-shadow:_0_1px_2px_rgb(0_0_0_/_70%)]`}
-            >
-              <span className="text-xs sm:text-sm leading-none">{lapisanAktif.ikon}</span>
-              <span>
-                <span className="sm:hidden">{lapisanAktif.labelPendek}</span>
-                <span className="hidden sm:inline">{lapisanAktif.label}</span>
-              </span>
-              <svg
-                viewBox="0 0 24 24"
-                width="12"
-                height="12"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`shrink-0 transition-transform duration-150 ${bukaPilihan ? "rotate-180" : ""}`}
-                aria-hidden="true"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </button>
-          </div>
-
-          {bukaPilihan && (
-            <div
-              ref={menuPilihanRef}
-              role="menu"
-              aria-label="Pilih peta dasar"
-              onKeyDown={gerakFokusPilihan}
-              className="absolute left-0 top-full z-[460] mt-1.5 w-64 max-w-[calc(100vw-2rem)] rounded-2xl bg-white/95 border border-black/[0.08] p-1.5 text-tinta shadow-xl dark:bg-pantau-konsol/95 dark:border-white/10 dark:text-white dark:shadow-2xl dark:ring-1 dark:ring-white/15 backdrop-blur-md"
-            >
-              {LAPISAN.map((l) => {
-                const terpilih = l.mode === mode;
-                return (
-                  <button
-                    key={l.mode}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={terpilih}
-                    onClick={() => {
-                      setBukaPilihan(false);
-                      handlePilihMode(l.mode);
-                    }}
-                    className={`flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-api ${
-                      terpilih ? "bg-black/[0.05] dark:bg-white/10" : "hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    <span
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm leading-none shadow-sm"
-                      style={{ background: l.latar }}
-                      aria-hidden="true"
-                    >
-                      {l.ikon}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold text-tinta dark:text-white">{l.label}</span>
-                      <span className="block text-[10.5px] leading-snug text-tinta/60 dark:text-white/55">{l.keterangan}</span>
-                    </span>
-                    {terpilih && (
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-api" aria-hidden="true">
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
         {/* Tombol Buka Panduan Sains & Data */}
         <button
           type="button"
@@ -1442,9 +1328,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         </div>
       )}
 
-      {/* Panel Lapisan peta — lihat panelLapisan. Berisi lapisan tambahan
-          yang ditumpangkan di peta dasar mana pun; peta dasarnya sendiri
-          dipilih lewat dropdown kiri atas. */}
+      {/* Panel Lapisan peta — lihat panelLapisan. Satu-satunya tempat memilih
+          lapisan, termasuk Aerosol/Angin (lihat alihAerosol & alihAngin). */}
       {panelTampil && panelLapisan && (
         /* Rel tak kasatmata dari 8px di bawah tepi atas sampai dasar tombol:
            panel rata dasar tombol, tapi bila tak muat (kolom Windy lebih
@@ -1462,17 +1347,19 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
         >
           <p className="px-1 pb-1.5 text-xs font-semibold">Lapisan peta</p>
 
-          {/* Lapisan bawaan — baris pertama animasi peta dasar yang tampil. */}
+          {/* Lapisan data, batas & angka laporan. Hotspot di bawahnya tampil di kedua peta. */}
           <div className="mb-1.5 border-b border-black/[0.08] pb-1.5 dark:border-white/10">
             {[
+              ...LAPISAN.map((l) => ({
+                kunci: l.mode,
+                label: l.label,
+                keterangan: l.keterangan,
+                ikon: <span className="h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/[0.06] dark:ring-white/10" style={{ background: l.latar }} aria-hidden="true" />,
+                aktif: l.mode === "asap" ? aerosolTampil : mode === "windy",
+                onAlih: l.mode === "asap" ? alihAerosol : alihAngin,
+              })),
               {
-                kunci: mode === "asap" ? ("aerosol" as const) : ("angin" as const),
-                label: lapisanAktif.label,
-                keterangan: lapisanAktif.keterangan,
-                ikon: <span className="h-8 w-8 shrink-0 rounded-lg ring-1 ring-black/[0.06] dark:ring-white/10" style={{ background: lapisanAktif.latar }} aria-hidden="true" />,
-              },
-              {
-                kunci: "poligon" as const,
+                kunci: "poligon",
                 label: "Batas Provinsi",
                 keterangan: "Garis batas wilayah",
                 ikon: (
@@ -1482,9 +1369,11 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
                     </svg>
                   </span>
                 ),
+                aktif: lapisan.poligon,
+                onAlih: () => setLapisan((s) => ({ ...s, poligon: !s.poligon })),
               },
               {
-                kunci: "angka" as const,
+                kunci: "angka",
                 label: "Jumlah Laporan",
                 keterangan: "Angka laporan per provinsi",
                 ikon: (
@@ -1492,6 +1381,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
                     12
                   </span>
                 ),
+                aktif: lapisan.angka,
+                onAlih: () => setLapisan((s) => ({ ...s, angka: !s.angka })),
               },
             ].map((l) => (
               <SakelarLapisan
@@ -1499,8 +1390,8 @@ export function Peta({ jumlahLaporan, onPilihWilayah, berita, onBukaRincian, leg
                 ikon={l.ikon}
                 label={l.label}
                 keterangan={l.keterangan}
-                aktif={lapisan[l.kunci]}
-                onAlih={() => setLapisan((s) => ({ ...s, [l.kunci]: !s[l.kunci] }))}
+                aktif={l.aktif}
+                onAlih={l.onAlih}
               />
             ))}
           </div>

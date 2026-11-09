@@ -194,7 +194,8 @@ asap_rute() {
   cek "/admin/login" halaman       # cangkang CMS (tanpa DB)
   cek "/robots.txt" halaman
   cek "/sitemap.xml" halaman       # sekalian canary query DB events
-  cek "/api/forecasting?lat=-2.4&lon=118&zoom=5" tahan
+  # API data peta tidak ada di fire: peramban memanggil geoplatform
+  # (/srv/geoplatform) langsung — geo padam tidak boleh me-rollback fire.
   [ "$gagal" -eq 0 ]
 }
 
