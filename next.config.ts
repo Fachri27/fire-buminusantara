@@ -75,8 +75,9 @@ const nextConfig: NextConfig = {
   // adapter MariaDB belum: tanpa ini webpack membundelnya ke chunk server, ia
   // tidak pernah tersalin ke node_modules standalone, dan skrip di prisma/
   // (backfill-poster.mjs dkk.) yang meng-import-nya secara polos gagal dengan
-  // ERR_MODULE_NOT_FOUND di dalam kontainer produksi.
-  serverExternalPackages: ["@prisma/adapter-mariadb"],
+  // ERR_MODULE_NOT_FOUND di dalam kontainer produksi. bcryptjs (JS murni) juga,
+  // untuk prisma/akun-peninjau.mjs.
+  serverExternalPackages: ["@prisma/adapter-mariadb", "bcryptjs"],
 
   // Unggahan besar (lapor warga, media kejadian CMS) lewat route handler di
   // /api — /api/lapor & /api/admin/kejadian — yang memeriksa panjang, captcha

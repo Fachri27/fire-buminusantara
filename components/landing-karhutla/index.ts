@@ -14,6 +14,7 @@ export { VideoOtomatis, UKURAN_FOTO_UMPAN } from "./video-otomatis";
 export { TampilanPostingan } from "./tampilan-postingan";
 export { LembarKomentar } from "./lembar-komentar";
 export { UmpanMasonry } from "./umpan-masonry";
+export { DeretanLive } from "./siaran-live";
 export { AksiKartu } from "./aksi-kartu";
 export { KomposerLapor } from "./komposer-lapor";
 export { IsiSaranLokasi } from "./saran-lokasi";

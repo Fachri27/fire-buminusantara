@@ -65,7 +65,7 @@ async function IsiPrivasi({ params }: Props) {
       <p className="mt-6 text-tinta/80 dark:text-[#d0d0d0]">{teks.pembuka}</p>
 
       {teks.bagian.map((b) => (
-        <section key={b.judul} className="mt-9">
+        <section key={b.judul} id={b.id} className="mt-9 scroll-mt-24">
           <h2 className="text-[17px] font-semibold">{b.judul}</h2>
           {b.paragraf?.map((p) => (
             <p key={p} className="mt-3 text-tinta/80 dark:text-[#d0d0d0]"><Teks isi={p} /></p>
