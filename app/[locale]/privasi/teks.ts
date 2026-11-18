@@ -11,7 +11,7 @@ import type { Bahasa } from "@/lib/bahasa";
 
 // Lembaga yang mengelola situs & surel untuk permintaan data (juga jalur hapus akun tanpa aplikasi).
 export const PENGELOLA = "Proteus Labs";
-export const SUREL_PRIVASI = "privasi@laporin.app";
+export const SUREL_PRIVASI = "dev@proteus.id";
 
 export const DIPERBARUI = new Date("2026-11-18T00:00:00+07:00");
 
