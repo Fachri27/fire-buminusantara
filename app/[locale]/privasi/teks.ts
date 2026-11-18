@@ -9,11 +9,11 @@ import type { Bahasa } from "@/lib/bahasa";
  * dan Play Store.
  */
 
-// ISI SEBELUM RILIS: lembaga yang mengelola situs & surel untuk permintaan data.
-export const PENGELOLA = "[nama lembaga pengelola]";
-export const SUREL_PRIVASI = "[surel kontak privasi]";
+// Lembaga yang mengelola situs & surel untuk permintaan data (juga jalur hapus akun tanpa aplikasi).
+export const PENGELOLA = "Proteus Labs";
+export const SUREL_PRIVASI = "privasi@laporin.app";
 
-export const DIPERBARUI = new Date("2026-11-10T00:00:00+07:00");
+export const DIPERBARUI = new Date("2026-11-18T00:00:00+07:00");
 
 /**
  * `{surel}` di dalam teks dirender sebagai tautan mailto ke SUREL_PRIVASI. `id` = anchor bagian:
@@ -26,7 +26,7 @@ export const TEKS_PRIVASI: Record<Bahasa, { judul: string; diperbarui: string; p
     judul: "Kebijakan Privasi",
     diperbarui: "Terakhir diperbarui",
     pembuka:
-      "Kebijakan ini menjelaskan data apa yang dikumpulkan Lapor Karhutla — situs fire.nusantara.earth dan aplikasi Laporin — untuk apa data itu dipakai, siapa yang bisa melihatnya, dan bagaimana kamu mengatur atau menghapusnya.",
+      "Kebijakan ini menjelaskan data apa yang dikumpulkan Lapor Karhutla — situs laporin.app (juga dapat dibuka di fire.nusantara.earth) dan aplikasi Laporin — untuk apa data itu dipakai, siapa yang bisa melihatnya, dan bagaimana kamu mengatur atau menghapusnya.",
     bagian: [
       {
         judul: "Pengelola",
@@ -35,13 +35,13 @@ export const TEKS_PRIVASI: Record<Bahasa, { judul: string; diperbarui: string; p
       {
         judul: "Data yang kami kumpulkan",
         butir: [
-          "Laporan kejadian: judul, deskripsi, foto atau video, titik lokasi (bila kamu mengisinya, menekan “Pakai lokasi saya”, atau titik itu terbaca dari GPS foto), dan nama — boleh dikosongkan dengan memilih anonim. Berkas disimpan apa adanya, termasuk metadata di dalamnya seperti lokasi GPS dan waktu pemotretan.",
+          "Laporan kejadian: judul, deskripsi, foto atau video, titik lokasi (bila kamu mengisinya, menekan “Pakai lokasi saya”, atau titik itu terbaca dari GPS foto), dan nama — boleh dikosongkan dengan memilih anonim. Berkas yang kamu kirim disimpan utuh sebagai bukti, termasuk metadata di dalamnya bila ada (misalnya lokasi GPS dan waktu pemotretan); salinan utuh ini hanya dipakai petugas peninjau dan tidak pernah ditampilkan ke publik. Aplikasi Laporin di Android sudah membuang metadata foto sebelum mengirimnya.",
           "Komentar: nama, alamat email, dan isi komentar. Bila kamu memilih anonim, nama tampil sebagai “Anonim” dan email tidak disimpan. Di aplikasi, nama dan email diambil dari akunmu.",
           "Suka: alamat IP dan jenis peramban (user agent), untuk mencegah satu perangkat memberi suka berulang kali.",
           "Akun aplikasi: bila kamu mendaftar dengan email, kami menyimpan nama, alamat email, dan kata sandimu dalam bentuk hash (bcrypt) — kata sandi aslinya tidak pernah disimpan. Saat kamu masuk dengan Google atau Apple, kami menerima nama, alamat email, foto profil (Google), dan ID akun dari penyedia itu. Untuk akun Apple kami juga menyimpan token yang hanya dipakai untuk mencabut akses aplikasi saat akunmu dihapus; token itu disimpan terenkripsi.",
           "Verifikasi KTP (syarat siaran langsung): NIK dan foto KTP. Foto disimpan tanpa metadata EXIF, terpisah dari berkas publik, dan hanya dibuka petugas peninjau. NIK di foto dapat dibaca otomatis (OCR) oleh layanan di server kami sendiri untuk dicocokkan dengan NIK yang kamu isi — tidak dikirim ke pihak lain. Begitu pengajuan disetujui atau ditolak, foto dan NIK aslinya dihapus; pengajuan yang tidak diputuskan dalam 30 hari juga dihapus. Setelah itu yang tersisa hanya status, waktu, alasan penolakan, hasil pencocokan otomatis, dan sidik NIK (kode satu arah yang tidak bisa dibaca kembali menjadi NIK) supaya satu KTP tidak dipakai banyak akun.",
           "Siaran langsung (aplikasi): judul, nama akun, dan titik lokasi bila kamu membagikannya. Gambar dan suara disalurkan langsung ke penonton dan tidak kami rekam.",
-          "Notifikasi (aplikasi, opsional): bila kamu mengizinkannya, kami menyimpan token notifikasi perangkat, jenis perangkat (Android atau iOS), dan pilihan notifikasimu (siaran langsung, laporan baru). Token itu tidak dikaitkan dengan akunmu.",
+          "Notifikasi (aplikasi, opsional): di aplikasi Android, HP-mu sendiri memeriksa kabar baru ke server kami secara berkala, tanpa token notifikasi dan tanpa dikaitkan dengan akunmu; pilihan notifikasimu disimpan di HP. Pada versi aplikasi yang memakai layanan push, bila kamu mengizinkannya, kami menyimpan token notifikasi perangkat, jenis perangkat (Android atau iOS), dan pilihan notifikasimu (siaran langsung, laporan baru). Token itu tidak dikaitkan dengan akunmu.",
           "Laporan konten (“Laporkan” di aplikasi): alasan, catatan yang kamu tulis, dan akun atau alamat IP pengirimnya.",
           "Data teknis: alamat IP pengirim laporan, komentar, dan laporan konten dicatat untuk mencegah penyalahgunaan. Google Analytics mencatat statistik kunjungan situs dengan cookie.",
         ],
@@ -62,7 +62,7 @@ export const TEKS_PRIVASI: Record<Bahasa, { judul: string; diperbarui: string; p
         judul: "Apa yang tampil untuk publik",
         butir: [
           "Laporan yang lolos verifikasi tayang sebagai kejadian: judul, deskripsi, foto atau video, titik lokasi, tanggal, dan namamu sebagai keterangan foto — kecuali kamu memilih anonim. Laporan yang belum atau tidak lolos verifikasi tidak ditampilkan.",
-          "Foto dan video yang tayang bisa dibuka dan diunduh siapa pun beserta metadata di dalamnya, termasuk lokasi GPS. Bila tidak ingin metadata itu ikut tersebar, matikan penandaan lokasi di kamera sebelum memotret.",
+          "Foto dan video yang tayang bisa dibuka dan diunduh siapa pun, tetapi metadata di dalamnya (lokasi GPS, waktu pemotretan, model kamera) sudah dibuang lebih dulu. Titik lokasi laporan tetap tampil di peta.",
           "Komentar tampil bersama nama penulisnya. Email tidak pernah ditampilkan.",
           "Siaran langsung tampil untuk semua warga dengan nama akun penyiar dan titik lokasi yang dibulatkan (sekitar 1 km). Titik lokasi persisnya hanya terlihat oleh petugas.",
           "NIK dan foto KTP tidak pernah ditampilkan kepada siapa pun selain petugas peninjau.",
@@ -75,7 +75,7 @@ export const TEKS_PRIVASI: Record<Bahasa, { judul: string; diperbarui: string; p
           "Cloudflare Turnstile — memeriksa bahwa pengirim laporan dan komentar bukan bot.",
           "Google Analytics — statistik kunjungan situs.",
           "Google Sign-In dan Sign in with Apple — masuk ke aplikasi.",
-          "Expo (Expo Push dan pembaruan aplikasi), Firebase Cloud Messaging (Google), dan Apple Push Notification service — mengirim notifikasi ke perangkatmu dan memasang pembaruan aplikasi.",
+          "Expo (Expo Push dan pembaruan aplikasi), Firebase Cloud Messaging (Google), dan Apple Push Notification service — mengirim notifikasi ke perangkatmu dan memasang pembaruan aplikasi, pada versi aplikasi yang memakai layanan push.",
           "LiveKit — server penyalur siaran langsung.",
           "ipwho.is dan BigDataCloud — memperkirakan kota dari alamat IP untuk panel cuaca; BMKG dan Open-Meteo — data cuaca untuk lokasi itu.",
           "OpenStreetMap (Nominatim) — mencari nama tempat yang kamu ketik dan menerjemahkan titik lokasi laporan menjadi nama tempat.",
@@ -124,7 +124,7 @@ export const TEKS_PRIVASI: Record<Bahasa, { judul: string; diperbarui: string; p
     judul: "Privacy Policy",
     diperbarui: "Last updated",
     pembuka:
-      "This policy explains what data Lapor Karhutla — the fire.nusantara.earth website and the Laporin app — collects, what it is used for, who can see it, and how you can manage or delete it.",
+      "This policy explains what data Lapor Karhutla — the laporin.app website (also available at fire.nusantara.earth) and the Laporin app — collects, what it is used for, who can see it, and how you can manage or delete it.",
     bagian: [
       {
         judul: "Who runs this service",
@@ -133,13 +133,13 @@ export const TEKS_PRIVASI: Record<Bahasa, { judul: string; diperbarui: string; p
       {
         judul: "Data we collect",
         butir: [
-          "Fire reports: title, description, photos or videos, location (when you enter it, tap “Use my location”, or it is read from the photo’s GPS), and your name — which you can leave out by submitting anonymously. Files are stored as uploaded, including the metadata inside them such as GPS location and capture time.",
+          "Fire reports: title, description, photos or videos, location (when you enter it, tap “Use my location”, or it is read from the photo’s GPS), and your name — which you can leave out by submitting anonymously. The files you send are kept intact as evidence, including any metadata inside them (such as GPS location and capture time); this intact copy is used only by reviewing officers and is never shown publicly. The Laporin Android app already removes photo metadata before sending.",
           "Comments: name, email address, and the comment. If you comment anonymously, your name shows as “Anonim” (anonymous) and your email is not stored. In the app, name and email come from your account.",
           "Likes: IP address and browser type (user agent), to stop one device from liking repeatedly.",
           "App accounts: if you sign up with email, we store your name, email address, and password as a hash (bcrypt) — your actual password is never stored. When you sign in with Google or Apple, we receive your name, email address, profile photo (Google), and account ID from that provider. For Apple accounts we also keep a token used only to revoke the app’s access when you delete your account; it is stored encrypted.",
           "ID card (KTP) verification, required for live streaming: your national ID number (NIK) and a photo of your KTP. The photo is stored without EXIF metadata, apart from public files, and is opened only by reviewing officers. The NIK on the photo may be read automatically (OCR) by a service on our own servers to match it with the NIK you entered — it is not sent to anyone else. Once the request is approved or rejected, the photo and the plain NIK are deleted; requests not decided within 30 days are deleted too. What remains is the status, timestamps, any rejection reason, the automatic match result, and a fingerprint of the NIK (a one-way code that cannot be turned back into the NIK) so one KTP cannot be used for many accounts.",
           "Live streams (app): title, account name, and location if you share it. Video and audio are relayed directly to viewers and are not recorded by us.",
-          "Notifications (app, optional): if you allow them, we store your device’s notification token, device type (Android or iOS), and your notification choices (live streams, new reports). The token is not linked to your account.",
+          "Notifications (app, optional): in the Android app, your phone itself checks our server for news periodically, without a notification token and without linking to your account; your notification choices are stored on your phone. In app versions that use a push service, if you allow notifications, we store your device’s notification token, device type (Android or iOS), and your notification choices (live streams, new reports). The token is not linked to your account.",
           "Content reports (“Report” in the app): the reason, any note you write, and the reporting account or IP address.",
           "Technical data: the IP address of whoever sends a report, comment, or content report is logged to prevent abuse. Google Analytics records site visit statistics using cookies.",
         ],
@@ -160,7 +160,7 @@ export const TEKS_PRIVASI: Record<Bahasa, { judul: string; diperbarui: string; p
         judul: "What is public",
         butir: [
           "Reports that pass verification are published as incidents: title, description, photos or videos, location, date, and your name as the photo caption — unless you submitted anonymously. Reports that are pending or rejected are not shown.",
-          "Published photos and videos can be opened and downloaded by anyone together with the metadata inside them, including GPS location. If you do not want that metadata shared, turn off location tagging in your camera before taking the photo.",
+          "Published photos and videos can be opened and downloaded by anyone, but the metadata inside them (GPS location, capture time, camera model) is removed first. The report’s location is still shown on the map.",
           "Comments are shown with the author’s name. Email addresses are never shown.",
           "Live streams are visible to everyone with the streamer’s account name and a location rounded to about 1 km. The exact location is visible to officers only.",
           "Your NIK and KTP photo are never shown to anyone other than reviewing officers.",
@@ -173,7 +173,7 @@ export const TEKS_PRIVASI: Record<Bahasa, { judul: string; diperbarui: string; p
           "Cloudflare Turnstile — checks that report and comment senders are not bots.",
           "Google Analytics — site visit statistics.",
           "Google Sign-In and Sign in with Apple — signing in to the app.",
-          "Expo (Expo Push and app updates), Firebase Cloud Messaging (Google), and Apple Push Notification service — delivering notifications to your device and installing app updates.",
+          "Expo (Expo Push and app updates), Firebase Cloud Messaging (Google), and Apple Push Notification service — delivering notifications to your device and installing app updates, in app versions that use a push service.",
           "LiveKit — the server that relays live streams.",
           "ipwho.is and BigDataCloud — estimate your city from your IP address for the weather panel; BMKG and Open-Meteo — weather data for that location.",
           "OpenStreetMap (Nominatim) — searches place names you type and turns report locations into place names.",
