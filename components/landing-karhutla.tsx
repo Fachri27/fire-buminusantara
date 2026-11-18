@@ -27,6 +27,7 @@ import { GEO_URL } from "@/lib/situs";
 import { TEKS } from "./landing-karhutla/teks";
 import { UKURAN_FOTO_UMPAN, VideoOtomatis } from "./landing-karhutla/video-otomatis";
 import { UmpanMasonry } from "./landing-karhutla/umpan-masonry";
+import { DeretanLive } from "./landing-karhutla/siaran-live";
 import { MediaTunda, akarGulir, rasioKerangka } from "./landing-karhutla/media-tunda";
 import { AksiKartu } from "./landing-karhutla/aksi-kartu";
 import { KomposerLapor } from "./landing-karhutla/komposer-lapor";
@@ -1323,6 +1324,9 @@ export function LandingKarhutla(
               }
             />
           </div>
+
+          {/* Siaran langsung dari aplikasi — kosong = tak menggambar apa pun. */}
+          <DeretanLive bahasa={bahasa} />
 
           {umpanTampil.length === 0 && berikut === null ? (
             <div className="mt-5 flex flex-col items-center rounded-xl border border-dashed border-black/15 px-4 py-12 text-center text-[14px] text-black/60 dark:border-white/15 dark:text-[#a0a0a0]">

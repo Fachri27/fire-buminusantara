@@ -20,9 +20,10 @@ import { prisma } from "./prisma.ts";
  *   - warga (publik) → hanya siaran yang pelapornya memilih "Tampilkan di
  *     beranda warga" (metadata ruang `publik: true`), identitas `warga-…`.
  *     Dengan akun boleh komentar/hati/hadiah; tamu hanya menonton.
- *   - pratinjau      → video bisu di hero beranda & kisi tab Live, identitas
- *     `pratinjau-…`, peserta tersembunyi: tidak terlihat pelapor maupun
- *     penonton lain, tidak dihitung penonton, dan tidak memakan kursi warga.
+ *   - pratinjau      → video bisu di hero beranda & kisi tab Live aplikasi,
+ *     juga deret "Sedang live" di umpan situs, identitas `pratinjau-…`,
+ *     peserta tersembunyi: tidak terlihat pelapor maupun penonton lain, tidak
+ *     dihitung penonton, dan tidak memakan kursi warga.
  *
  * Metadata ruang dan atribut peserta terbaca SEMUA penonton, termasuk tamu.
  * Karena itu ruang publik hanya memuat titik kasar (~1 km); titik persis
